@@ -33,13 +33,25 @@ class ZenzSegmentReranker(
         val pathScore: Int,
     )
 
+    data class RerankResult(
+        val candidates: List<Candidate>,
+        val firstSegmentAlternatives: List<String>,
+    )
+
     fun rerank(
         input: String,
         candidates: List<Candidate>,
-        maxCandidatesToInspect: Int = 8,
-    ): List<Candidate> {
+        maxCandidatesToInspect: Int = 16,
+    ): List<Candidate> = rerankDetailed(input, candidates, maxCandidatesToInspect).candidates
+
+    fun rerankDetailed(
+        input: String,
+        candidates: List<Candidate>,
+        maxCandidatesToInspect: Int = 16,
+    ): RerankResult {
         if (!scorer.isReady() || candidates.size < 2 || input.isEmpty()) {
-            return candidates.distinctBy(Candidate::string)
+            val distinct = candidates.distinctBy(Candidate::string)
+            return RerankResult(distinct, emptyList())
         }
 
         val inspected = candidates.asSequence().distinctBy(Candidate::string).take(maxCandidatesToInspect.coerceAtLeast(2)).toList()
@@ -109,7 +121,7 @@ class ZenzSegmentReranker(
         }
 
         if (zenzBySpan.isEmpty()) {
-            return candidates.distinctBy(Candidate::string)
+            return RerankResult(candidates.distinctBy(Candidate::string), emptyList())
         }
 
         val ordered = candidates.mapIndexed { index, candidate ->
@@ -132,7 +144,7 @@ class ZenzSegmentReranker(
         }
 
         // Keep the Sumire path intact. zenz only supplies an ordering signal.
-        return ordered
+        val reranked = ordered
             .sortedWith(
                 compareByDescending<RerankedCandidate> { it.matchedSegments > 0 }
                     .thenByDescending { it.zenzAverageScore }
@@ -141,6 +153,19 @@ class ZenzSegmentReranker(
             )
             .map { it.candidate }
             .distinctBy(Candidate::string)
+
+        val first = reranked.firstOrNull()?.conversionSegments?.firstOrNull()
+        val firstSpan = first?.let { Span(it.inputStart, it.inputEnd) }
+        val firstAlternatives = firstSpan
+            ?.let { zenzBySpan[it] }
+            ?.entries
+            ?.sortedByDescending { it.value }
+            ?.map { it.key }
+            ?.filter { it != first.output }
+            ?.take(3)
+            ?: emptyList()
+
+        return RerankResult(reranked, firstAlternatives)
     }
 
     private data class RerankedCandidate(
