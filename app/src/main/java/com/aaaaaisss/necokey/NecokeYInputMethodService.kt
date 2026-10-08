@@ -148,7 +148,7 @@ class NecokeYInputMethodService : InputMethodService() {
 
             val topStrings = buildSet {
                 mainCandidate?.let { add(it.string) }
-                alternatives.forEach { add(it.output) }
+                alternatives.forEach { add(it) }
             }
             val predictionCandidates = prediction
                 .filter { it.string !in topStrings }
@@ -159,9 +159,9 @@ class NecokeYInputMethodService : InputMethodService() {
                 conversionRow.removeAllViews()
                 predictionRow.removeAllViews()
                 mainCandidate?.let { candidate -> addCandidateView(conversionRow, candidate.string) { commitCandidate(candidate.string) } }
-                alternatives.forEach { first ->
-                    addCandidateView(conversionRow, first.output) {
-                        commitSegmentAlternative(first.output, mainCandidate!!, input)
+                alternatives.forEach { firstOutput ->
+                    addCandidateView(conversionRow, firstOutput) {
+                        commitSegmentAlternative(firstOutput, mainCandidate!!, input)
                     }
                 }
                 predictionCandidates.forEach { addCandidateView(predictionRow, it.string) }
