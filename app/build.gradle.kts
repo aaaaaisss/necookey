@@ -41,9 +41,7 @@ android {
             )
             assets.srcDir(file("../vendor/sumire/app/src/main/assets"))
             // English/QWERTY conversion is intentionally omitted: necokey is Japanese-only.
-            java {
-                exclude("engine/EnglishEngine.kt")
-            }
+            java.exclude("engine/EnglishEngine.kt")
         }
     }
 }
