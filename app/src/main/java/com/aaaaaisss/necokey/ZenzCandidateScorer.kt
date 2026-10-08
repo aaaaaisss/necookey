@@ -22,7 +22,14 @@ class ZenzCandidateScorer {
 
     fun isReady(): Boolean = ready
 
-    fun score(
+    /**
+     * Scores explicitly supplied candidates with zenz Teacher Forcing.
+     *
+     * zenz does not generate a replacement string here. The native layer
+     * pre-fills the prompt, then feeds each candidate token sequence as the
+     * expected continuation and sums/normalizes the token log probabilities.
+     */
+    fun scoreTeacherForced(
         input: String,
         candidates: List<String>,
         leftContext: String = "",
@@ -49,7 +56,7 @@ class ZenzCandidateScorer {
         leftContext: String = "",
         rightContext: String = ""
     ): List<String> {
-        val scores = score(input, candidates, leftContext, rightContext) ?: return candidates
+        val scores = scoreTeacherForced(input, candidates, leftContext, rightContext) ?: return candidates
         return candidates.indices
             .sortedByDescending { scores[it] }
             .map { candidates[it] }
