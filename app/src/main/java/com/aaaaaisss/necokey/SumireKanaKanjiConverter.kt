@@ -17,6 +17,7 @@ import com.kazumaproject.markdownhelperkeyboard.converter.mozc.MozcNodeAttribute
 import com.kazumaproject.markdownhelperkeyboard.converter.mozc.MozcNodeAttributeTableReader
 import com.kazumaproject.markdownhelperkeyboard.converter.mozc.MozcSegmenter
 import com.kazumaproject.markdownhelperkeyboard.converter.mozc.MozcSegmenterDataReader
+import com.kazumaproject.markdownhelperkeyboard.repository.LearnRepository
 import com.kazumaproject.markdownhelperkeyboard.repository.UserDictionaryRepository
 import java.io.BufferedInputStream
 import java.io.ObjectInputStream
