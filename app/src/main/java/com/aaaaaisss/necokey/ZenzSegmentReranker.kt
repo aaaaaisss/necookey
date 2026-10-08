@@ -9,8 +9,16 @@ import com.kazumaproject.markdownhelperkeyboard.converter.candidate.Candidate
  * This layer only observes Candidate.conversionSegments, detects spans whose
  * top candidates disagree, and asks zenz to score those segment alternatives.
  *
- * This is intentionally a first integration layer rather than a replacement
- * for Sumire's path search. It never calls zenz for a span with one output.
+ * Pipeline:
+ *   1. Sumire generates the full candidate lattice.
+ *   2. The confidence gate checks each input span for ambiguity.
+ *   3. Only ambiguous spans are sent to zenz. The scorer builds the prompt
+ *      from left/right context and the reading, then Teacher-Forces each
+ *      explicitly supplied candidate token sequence.
+ *   4. zenz scores reorder the existing Sumire candidates. No text is generated.
+ *
+ * This layer never calls zenz for a span with one output and never invents a
+ * candidate that Sumire did not generate.
  */
 class ZenzSegmentReranker(
     private val scorer: ZenzCandidateScorer,
@@ -79,7 +87,8 @@ class ZenzSegmentReranker(
                 .joinToString(separator = "") { it.output }
 
             val reading = input.substring(span.start, span.end)
-            val scores = scorer.score(
+            // Gate first. Only an ambiguous span reaches the Teacher Forcing scorer.
+            val scores = scorer.scoreTeacherForced(
                 input = reading,
                 candidates = outputs,
                 leftContext = leftContext,
