@@ -164,7 +164,7 @@ class ZenzSegmentReranker(
             ?.map { it.key }
             ?.filter { it != first.output }
             ?.take(3)
-            ?: emptyList()
+            ?: fallbackFirstAlternatives(reranked)
 
         return RerankResult(reranked, firstAlternatives)
     }
