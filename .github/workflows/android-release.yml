@@ -5,6 +5,14 @@ on:
   push:
     branches:
       - main
+    paths-ignore:
+      - "**/*.md"
+      - "docs/**"
+      - ".github/**"
+
+concurrency:
+  group: necookey-${{ github.ref }}
+  cancel-in-progress: true
 
 permissions:
   contents: read
@@ -26,15 +34,13 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      - name: Cache Android SDK and Gradle
+      - name: Cache Android SDK
         uses: actions/cache@v4
         with:
-          path: |
-            /usr/local/lib/android/sdk
-            ~/.gradle
-          key: ${{ runner.os }}-android-${{ hashFiles('**/build.gradle*', '**/gradle.properties', '**/settings.gradle*') }}
+          path: /usr/local/lib/android/sdk
+          key: ${{ runner.os }}-android-sdk-${{ hashFiles('gradle.properties', 'settings.gradle.kts', 'build.gradle.kts') }}
           restore-keys: |
-            ${{ runner.os }}-android-
+            ${{ runner.os }}-android-sdk-
       - name: Prepare Android SDK
         run: |
           export ANDROID_HOME=/usr/local/lib/android/sdk
@@ -42,18 +48,10 @@ jobs:
           yes | sdkmanager --licenses >/dev/null || true
           sdkmanager "platform-tools" "platforms;android-36" "build-tools;36.0.0" "ndk;27.2.12479018"
 
-      - name: Remove unused converter sources
-        run: |
-          rm -f vendor/sumire/app/src/main/java/com/kazumaproject/markdownhelperkeyboard/converter/engine/EnglishEngine.kt
-          rm -rf vendor/sumire/app/src/main/java/com/kazumaproject/markdownhelperkeyboard/converter/glide
-          rm -rf vendor/sumire/app/src/main/java/com/kazumaproject/markdownhelperkeyboard/converter/english
-          sed -i "s/implementation project(':core')/implementation project(':sumireCore')/" vendor/sumire/custom_keyboard/build.gradle
-
-      - name: Download Gradle
-        run: |
-          curl -L --fail --retry 3 -o gradle.zip https://services.gradle.org/distributions/gradle-8.11.1-bin.zip
-          unzip -q gradle.zip
-          echo "$GITHUB_WORKSPACE/gradle-8.11.1/bin" >> "$GITHUB_PATH"
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.11.1"
 
       - name: Build release APK
         run: gradle --no-daemon --stacktrace :app:assembleRelease
