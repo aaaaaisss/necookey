@@ -1,7 +1,6 @@
 package com.aaaaaisss.necokey
 
 import com.kazumaproject.markdownhelperkeyboard.converter.candidate.Candidate
-import com.kazumaproject.markdownhelperkeyboard.converter.candidate.CandidateConversionSegment
 
 /**
  * Reranks only existing Sumire paths.
