@@ -81,10 +81,16 @@ class ZenzSegmentReranker(
             // One output means there is no ambiguity for this input span.
             if (grouped.size < 2) continue
 
-            // Candidate.score is a whole-path cost. It is used only as a cheap
-            // ambiguity gate here, never as a zenz probability.
-            val scoreList = grouped.values.sorted()
-            if (!ZenzConfidenceGate.shouldRerank(scoreList.map(Int::toLong))) continue
+            // Use Sumire's candidate rank, not an absolute Candidate.score gap.
+            // Candidate.score is a whole-path cost and is not a probability.
+            val outputRanks = inspected.mapIndexedNotNull { rank, candidate ->
+                candidate.conversionSegments
+                    .firstOrNull { it.inputStart == span.start && it.inputEnd == span.end }
+                    ?.output
+                    ?.takeIf { it in grouped }
+                    ?.let { rank }
+            }
+            if (!ZenzConfidenceGate.shouldRerank(outputRanks)) continue
 
             val outputs = grouped.keys.asSequence().filter { it.isNotEmpty() }.distinct().take(8).toList()
             if (outputs.size < 2) continue
