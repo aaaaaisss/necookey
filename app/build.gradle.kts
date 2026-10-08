@@ -2,6 +2,7 @@ plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
 }
+
 android {
     namespace = "com.aaaaaisss.necokey"
     compileSdk = 36
@@ -10,9 +11,27 @@ android {
         minSdk = 29
         targetSdk = 36
         versionCode = 1
-        versionName = "0.2.0"
+        versionName = "0.3.0"
+    }
+
+    sourceSets {
+        getByName("main") {
+            java.srcDirs(
+                file("../vendor/sumire/app/src/main/java/com/kazumaproject/markdownhelperkeyboard/converter"),
+                file("../vendor/sumire/app/src/main/java/com/kazumaproject/markdownhelperkeyboard/ime_service/extensions")
+            )
+            assets.srcDir(file("../vendor/sumire/app/src/main/assets"))
+            java.exclude("**/converter/engine/EnglishEngine.kt")
+            java.exclude("**/converter/glide/**")
+            java.exclude("**/converter/english/**")
+        }
     }
 }
+
 dependencies {
     implementation(project(":sumireCustomKeyboard"))
+    implementation(project(":sumireCore"))
+    implementation("androidx.core:core-ktx:1.16.0")
+    implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.9.1")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
 }

@@ -7,7 +7,6 @@ import android.view.inputmethod.EditorInfo
 import android.widget.LinearLayout
 import android.widget.TextView
 import com.kazumaproject.custom_keyboard.data.KeyAction
-import com.kazumaproject.custom_keyboard.data.KeyboardLayout
 import com.kazumaproject.custom_keyboard.layout.KeyboardDefaultLayouts
 import com.kazumaproject.custom_keyboard.view.FlickKeyboardView
 
@@ -17,6 +16,11 @@ class NecokeYInputMethodService : InputMethodService() {
     private lateinit var composingView: TextView
     private lateinit var candidatesView: LinearLayout
     private lateinit var keyboardView: FlickKeyboardView
+
+    override fun onCreate() {
+        super.onCreate()
+        engine.initialize(this)
+    }
 
     override fun onCreateInputView(): View {
         val root = LinearLayout(this).apply {
