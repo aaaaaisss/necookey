@@ -9,12 +9,20 @@ import android.widget.TextView
 import com.kazumaproject.custom_keyboard.data.KeyAction
 import com.kazumaproject.custom_keyboard.layout.KeyboardDefaultLayouts
 import com.kazumaproject.custom_keyboard.view.FlickKeyboardView
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.io.File
 
 class NecokeYInputMethodService : InputMethodService() {
     private val engine = CandidateEngine()
     private val zenzScorer = ZenzCandidateScorer()
     private val zenzReranker = ZenzSegmentReranker(zenzScorer)
+    private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+    private var refreshGeneration = 0L
     private var composing = ""
     private lateinit var composingView: TextView
     private lateinit var candidatesView: LinearLayout
@@ -22,15 +30,24 @@ class NecokeYInputMethodService : InputMethodService() {
 
     override fun onCreate() {
         super.onCreate()
-        engine.initialize(this)
+
+        // Dictionary initialization is CPU-heavy, so never block IME startup.
+        serviceScope.launch {
+            engine.initialize(this@NecokeYInputMethodService)
+        }
 
         // Model loading is optional. A missing model keeps normal conversion intact.
         val model = File(filesDir, "zenz/zenz.gguf")
         if (model.isFile) {
-            Thread {
+            serviceScope.launch(Dispatchers.Default) {
                 zenzScorer.loadModel(model.absolutePath)
-            }.start()
+            }
         }
+    }
+
+    override fun onDestroy() {
+        serviceScope.cancel()
+        super.onDestroy()
     }
 
     override fun onCreateInputView(): View {
@@ -102,21 +119,28 @@ class NecokeYInputMethodService : InputMethodService() {
     }
 
     private fun refresh(showCandidates: Boolean = false) {
+        val generation = ++refreshGeneration
         composingView.text = composing
         candidatesView.removeAllViews()
         if (!showCandidates || composing.isEmpty()) return
 
-        val detailed = engine.detailedCandidates(composing)
-        val visibleCandidates = zenzReranker.rerank(composing, detailed)
-
-        visibleCandidates.forEach { candidate ->
-            TextView(this).apply {
-                text = candidate
-                textSize = 18f
-                setTextColor(Color.WHITE)
-                setPadding(20, 8, 20, 8)
-                setOnClickListener { commitCandidate(candidate) }
-                candidatesView.addView(this)
+        val input = composing
+        serviceScope.launch(Dispatchers.Default) {
+            val detailed = engine.detailedCandidates(input)
+            val visibleCandidates = zenzReranker.rerank(input, detailed)
+            withContext(Dispatchers.Main.immediate) {
+                if (generation != refreshGeneration || input != composing) return@withContext
+                candidatesView.removeAllViews()
+                visibleCandidates.forEach { candidate ->
+                    TextView(this@NecokeYInputMethodService).apply {
+                        text = candidate
+                        textSize = 18f
+                        setTextColor(Color.WHITE)
+                        setPadding(20, 8, 20, 8)
+                        setOnClickListener { commitCandidate(candidate) }
+                        candidatesView.addView(this)
+                    }
+                }
             }
         }
     }
