@@ -48,6 +48,7 @@ class NecokeYInputMethodService : InputMethodService() {
 
     override fun onDestroy() {
         serviceScope.cancel()
+        runCatching { zenzScorer.closeModel() }
         super.onDestroy()
     }
 
