@@ -58,8 +58,11 @@ class ZenzSegmentReranker(
                 .groupBy { it.output }
                 .mapValues { (_, values) -> values.minOf { it.pathScore } }
 
+            // One output means there is no ambiguity for this input span.
             if (grouped.size < 2) continue
 
+            // Candidate.score is a whole-path cost. It is used only as a cheap
+            // ambiguity gate here, never as a zenz probability.
             val scoreList = grouped.values.sorted()
             if (!ZenzConfidenceGate.shouldRerank(scoreList.map(Int::toLong))) continue
 
@@ -103,7 +106,7 @@ class ZenzSegmentReranker(
             RerankedCandidate(
                 candidate = candidate,
                 originalIndex = index,
-                zenzScore = zenzTotal,
+                zenzAverageScore = if (matched == 0) 0.0f else zenzTotal / matched,
                 matchedSegments = matched,
             )
         }
@@ -111,7 +114,7 @@ class ZenzSegmentReranker(
         return ordered
             .sortedWith(
                 compareByDescending<RerankedCandidate> { it.matchedSegments > 0 }
-                    .thenByDescending { it.zenzScore }
+                    .thenByDescending { it.zenzAverageScore }
                     .thenBy { it.candidate.score }
                     .thenBy { it.originalIndex }
             )
@@ -122,7 +125,7 @@ class ZenzSegmentReranker(
     private data class RerankedCandidate(
         val candidate: Candidate,
         val originalIndex: Int,
-        val zenzScore: Float,
+        val zenzAverageScore: Float,
         val matchedSegments: Int,
     )
 }
