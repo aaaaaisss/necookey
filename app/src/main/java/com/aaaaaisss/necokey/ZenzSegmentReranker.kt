@@ -1,31 +1,25 @@
 package com.aaaaaisss.necokey
 
 import com.kazumaproject.markdownhelperkeyboard.converter.candidate.Candidate
+import com.kazumaproject.markdownhelperkeyboard.converter.candidate.CandidateConversionSegment
 
 /**
- * necookey-owned per-segment zenz integration.
+ * Reranks only existing Sumire paths.
  *
- * Sumire remains responsible for lattice construction and candidate generation.
- * This layer only observes Candidate.conversionSegments, detects spans whose
- * top candidates disagree, and asks zenz to score those segment alternatives.
- *
- * Pipeline:
- *   1. Sumire generates the full candidate lattice.
- *   2. The confidence gate checks each input span for ambiguity.
- *   3. Only ambiguous spans are sent to zenz. The scorer builds the prompt
- *      from left/right context and the reading, then Teacher-Forces each
- *      explicitly supplied candidate token sequence.
- *   4. zenz scores reorder the existing Sumire candidates. No text is generated.
- *
- * This layer never calls zenz for a span with one output and never invents a
- * candidate that Sumire did not generate.
+ * Important distinction:
+ * Candidate.conversionSegments are lattice/node segments, not bunsetsu.
+ * The bunsetsu boundaries come from Sumire's splitPatternByCandidateString.
+ * zenz therefore scores actual bunsetsu alternatives, while the final result
+ * remains one of the valid paths already produced by Sumire.
  */
 class ZenzSegmentReranker(
     private val scorer: ZenzCandidateScorer,
 ) {
-    private data class Span(
-        val start: Int,
-        val end: Int,
+    private data class Span(val start: Int, val end: Int)
+
+    private data class BunsetsuSegment(
+        val span: Span,
+        val output: String,
     )
 
     private data class SegmentEvidence(
@@ -41,32 +35,43 @@ class ZenzSegmentReranker(
     fun rerank(
         input: String,
         candidates: List<Candidate>,
+        splitPatternByCandidateString: Map<String, List<Int>> = emptyMap(),
         maxCandidatesToInspect: Int = 16,
-    ): List<Candidate> = rerankDetailed(input, candidates, maxCandidatesToInspect).candidates
+    ): List<Candidate> =
+        rerankDetailed(input, candidates, splitPatternByCandidateString, maxCandidatesToInspect).candidates
 
     fun rerankDetailed(
         input: String,
         candidates: List<Candidate>,
+        splitPatternByCandidateString: Map<String, List<Int>> = emptyMap(),
         maxCandidatesToInspect: Int = 16,
     ): RerankResult {
-        if (!scorer.isReady() || candidates.size < 2 || input.isEmpty()) {
-            val distinct = candidates.distinctBy(Candidate::string)
-            return RerankResult(distinct, fallbackFirstAlternatives(distinct))
+        val distinct = candidates.distinctBy(Candidate::string)
+        if (!scorer.isReady() || distinct.size < 2 || input.isEmpty()) {
+            return RerankResult(
+                distinct,
+                fallbackFirstAlternatives(input, distinct, splitPatternByCandidateString),
+            )
         }
 
-        val inspected = candidates.asSequence().distinctBy(Candidate::string).take(maxCandidatesToInspect.coerceAtLeast(2)).toList()
+        val inspected = distinct.take(maxCandidatesToInspect.coerceAtLeast(2))
+        val bunsetsuByCandidate = inspected.associateWith { candidate ->
+            buildBunsetsuSegments(
+                input = input,
+                candidate = candidate,
+                splitPositions = splitPatternByCandidateString[candidate.string].orEmpty(),
+            )
+        }
+
+        if (bunsetsuByCandidate.values.any { it == null }) {
+            // A malformed/missing split map must never cause us to invent segmentation.
+            // Candidates with usable Sumire metadata can still be reranked.
+        }
+
         val bySpan = linkedMapOf<Span, MutableList<SegmentEvidence>>()
-
-        inspected.forEach { candidate ->
-            candidate.conversionSegments.forEach { segment ->
-                if (segment.inputStart < 0 ||
-                    segment.inputEnd <= segment.inputStart ||
-                    segment.inputEnd > input.length ||
-                    segment.output.isEmpty()
-                ) return@forEach
-
-                val span = Span(segment.inputStart, segment.inputEnd)
-                bySpan.getOrPut(span) { mutableListOf() }
+        bunsetsuByCandidate.forEach { (candidate, segments) ->
+            segments.orEmpty().forEach { segment ->
+                bySpan.getOrPut(segment.span) { mutableListOf() }
                     .add(SegmentEvidence(segment.output, candidate.score))
             }
         }
@@ -78,44 +83,42 @@ class ZenzSegmentReranker(
                 .groupBy { it.output }
                 .mapValues { (_, values) -> values.minOf { it.pathScore } }
 
-            // One output means there is no ambiguity for this input span.
             if (grouped.size < 2) continue
 
-            // Use Sumire's candidate rank, not an absolute Candidate.score gap.
-            // Candidate.score is a whole-path cost and is not a probability.
+            // Gate on actual top-ranked Sumire ambiguity for this exact bunsetsu.
             val outputRanks = grouped.keys.mapNotNull { output ->
                 inspected.indexOfFirst { candidate ->
-                    candidate.conversionSegments.any {
-                        it.inputStart == span.start &&
-                            it.inputEnd == span.end &&
-                            it.output == output
+                    bunsetsuByCandidate[candidate].orEmpty().any {
+                        it.span == span && it.output == output
                     }
                 }.takeIf { it >= 0 }
             }
             if (!ZenzConfidenceGate.shouldRerank(outputRanks)) continue
 
-            val outputs = grouped.keys.asSequence().filter { it.isNotEmpty() }.distinct().take(8).toList()
+            val outputs = grouped.keys
+                .asSequence()
+                .filter(String::isNotEmpty)
+                .take(8)
+                .toList()
             if (outputs.size < 2) continue
+
+            // One context is shared for the span so one zenz call can score all
+            // competing outputs. Use the best Sumire path that contains this span.
             val reference = inspected
                 .asSequence()
-                .filter { candidate ->
-                    candidate.conversionSegments.any {
-                        it.inputStart == span.start && it.inputEnd == span.end
-                    }
-                }
-                .minByOrNull { it.score }
+                .filter { candidate -> bunsetsuByCandidate[candidate].orEmpty().any { it.span == span } }
+                .minByOrNull(Candidate::score)
                 ?: continue
-            val referenceSegments = reference.conversionSegments
+            val referenceSegments = bunsetsuByCandidate[reference].orEmpty()
 
             val leftContext = referenceSegments
-                .filter { it.inputEnd <= span.start }
+                .filter { it.span.end <= span.start }
                 .joinToString(separator = "") { it.output }
             val rightContext = referenceSegments
-                .filter { it.inputStart >= span.end }
+                .filter { it.span.start >= span.end }
                 .joinToString(separator = "") { it.output }
 
             val reading = input.substring(span.start, span.end)
-            // Gate first. Only an ambiguous span reaches the Teacher Forcing scorer.
             val scores = scorer.scoreTeacherForced(
                 input = reading,
                 candidates = outputs,
@@ -123,65 +126,107 @@ class ZenzSegmentReranker(
                 rightContext = rightContext,
             ) ?: continue
 
-            if (scores.any { !it.isFinite() }) continue
-
+            if (scores.size != outputs.size || scores.any { !it.isFinite() }) continue
             zenzBySpan[span] = outputs.indices.associate { outputs[it] to scores[it] }
         }
 
         if (zenzBySpan.isEmpty()) {
-            val distinct = candidates.distinctBy(Candidate::string)
-            return RerankResult(distinct, fallbackFirstAlternatives(distinct))
+            return RerankResult(
+                distinct,
+                fallbackFirstAlternatives(input, distinct, splitPatternByCandidateString),
+            )
         }
 
-        val ordered = candidates.mapIndexed { index, candidate ->
-            var zenzTotal = 0.0f
+        val ordered = distinct.mapIndexed { index, candidate ->
+            val segments = bunsetsuByCandidate[candidate].orEmpty()
+            var total = 0.0f
             var matched = 0
-
-            candidate.conversionSegments.forEach { segment ->
-                val span = Span(segment.inputStart, segment.inputEnd)
-                val score = zenzBySpan[span]?.get(segment.output) ?: return@forEach
-                zenzTotal += score
-                matched++
+            segments.forEach { segment ->
+                zenzBySpan[segment.span]?.get(segment.output)?.let {
+                    total += it
+                    matched++
+                }
             }
 
             RerankedCandidate(
                 candidate = candidate,
                 originalIndex = index,
-                zenzAverageScore = if (matched == 0) 0.0f else zenzTotal / matched,
+                zenzAverageScore = if (matched == 0) Float.NEGATIVE_INFINITY else total / matched,
                 matchedSegments = matched,
             )
-        }
+        }.sortedWith(
+            compareByDescending<RerankedCandidate> { it.matchedSegments > 0 }
+                .thenByDescending { it.zenzAverageScore }
+                .thenBy { it.candidate.score }
+                .thenBy { it.originalIndex }
+        )
 
-        // Keep the Sumire path intact. zenz only supplies an ordering signal.
-        val reranked = ordered
-            .sortedWith(
-                compareByDescending<RerankedCandidate> { it.matchedSegments > 0 }
-                    .thenByDescending { it.zenzAverageScore }
-                    .thenBy { it.candidate.score }
-                    .thenBy { it.originalIndex }
-            )
-            .map { it.candidate }
-            .distinctBy(Candidate::string)
-
-        val first = reranked.firstOrNull()?.conversionSegments?.firstOrNull()
-        val firstSpan = first?.let { Span(it.inputStart, it.inputEnd) }
+        val reranked = ordered.map { it.candidate }
+        val main = reranked.firstOrNull()
+        val firstSegments = main?.let { bunsetsuByCandidate[it].orEmpty() }
+        val firstSpan = firstSegments?.firstOrNull()?.span
         val firstAlternatives = firstSpan
             ?.let { zenzBySpan[it] }
             ?.entries
             ?.sortedByDescending { it.value }
             ?.map { it.key }
-            ?.filter { it != first.output }
+            ?.filter { output -> output != firstSegments.first().output }
             ?.take(3)
-            ?: fallbackFirstAlternatives(reranked)
+            ?: fallbackFirstAlternatives(input, reranked, splitPatternByCandidateString)
 
         return RerankResult(reranked, firstAlternatives)
     }
 
-    private fun fallbackFirstAlternatives(candidates: List<Candidate>): List<String> {
-        val first = candidates.firstOrNull()?.conversionSegments?.firstOrNull() ?: return emptyList()
+    private fun buildBunsetsuSegments(
+        input: String,
+        candidate: Candidate,
+        splitPositions: List<Int>,
+    ): List<BunsetsuSegment>? {
+        val validSplits = splitPositions
+            .distinct()
+            .filter { it > 0 && it < input.length }
+            .sorted()
+        val boundaries = listOf(0) + validSplits + listOf(input.length)
+        val nodes = candidate.conversionSegments.sortedBy { it.inputStart }
+
+        if (nodes.isEmpty()) return null
+        if (nodes.first().inputStart != 0 || nodes.last().inputEnd != input.length) return null
+
+        return boundaries.zipWithNext().mapNotNull { (start, end) ->
+            val contained = nodes.filter {
+                it.inputStart >= start && it.inputEnd <= end
+            }
+            if (contained.isEmpty() || contained.first().inputStart != start || contained.last().inputEnd != end) {
+                return null
+            }
+            BunsetsuSegment(
+                span = Span(start, end),
+                output = contained.joinToString(separator = "") { it.output },
+            )
+        }
+    }
+
+    private fun fallbackFirstAlternatives(
+        input: String,
+        candidates: List<Candidate>,
+        splitPatternByCandidateString: Map<String, List<Int>>,
+    ): List<String> {
+        val first = candidates.firstOrNull() ?: return emptyList()
+        val firstSegment = buildBunsetsuSegments(
+            input,
+            first,
+            splitPatternByCandidateString[first.string].orEmpty(),
+        )?.firstOrNull() ?: return emptyList()
+
         return candidates.asSequence()
-            .mapNotNull { it.conversionSegments.firstOrNull() }
-            .filter { it.inputStart == first.inputStart && it.inputEnd == first.inputEnd && it.output != first.output }
+            .mapNotNull { candidate ->
+                buildBunsetsuSegments(
+                    input,
+                    candidate,
+                    splitPatternByCandidateString[candidate.string].orEmpty(),
+                )?.firstOrNull()
+            }
+            .filter { it.span == firstSegment.span && it.output != firstSegment.output }
             .map { it.output }
             .distinct()
             .take(3)
