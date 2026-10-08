@@ -131,6 +131,7 @@ class ZenzSegmentReranker(
             )
         }
 
+        // Keep the Sumire path intact. zenz only supplies an ordering signal.
         return ordered
             .sortedWith(
                 compareByDescending<RerankedCandidate> { it.matchedSegments > 0 }
