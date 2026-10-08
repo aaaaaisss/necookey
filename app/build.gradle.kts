@@ -37,7 +37,6 @@ android {
         getByName("main") {
             java.srcDirs(
                 file("../vendor/sumire/app/src/main/java/com/kazumaproject/markdownhelperkeyboard/converter"),
-                file("../vendor/sumire/app/src/main/java/com/kazumaproject/markdownhelperkeyboard/ime_service/extensions")
             )
             assets.srcDir(file("../vendor/sumire/app/src/main/assets"))
         }
