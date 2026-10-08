@@ -1,0 +1,4 @@
+[submodule "vendor/sumire"]
+	path = vendor/sumire
+	url = https://github.com/KazumaProject/JapaneseKeyboard.git
+	branch = dev

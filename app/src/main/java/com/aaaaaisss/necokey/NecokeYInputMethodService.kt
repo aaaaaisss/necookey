@@ -2,7 +2,6 @@ package com.aaaaaisss.necokey
 
 import android.inputmethodservice.InputMethodService
 import android.graphics.Color
-import android.view.Gravity
 import android.view.View
 import android.view.inputmethod.EditorInfo
 import android.widget.Button
@@ -12,7 +11,6 @@ import android.widget.TextView
 
 class NecokeYInputMethodService : InputMethodService() {
     private val engine = CandidateEngine()
-    private val roman = StringBuilder()
     private var composing = ""
     private lateinit var composingView: TextView
     private lateinit var candidatesView: LinearLayout
@@ -106,7 +104,6 @@ class NecokeYInputMethodService : InputMethodService() {
 
     override fun onStartInput(attribute: EditorInfo?, restarting: Boolean) {
         super.onStartInput(attribute, restarting)
-        roman.clear()
         composing = ""
     }
 }
