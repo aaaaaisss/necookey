@@ -6,9 +6,14 @@ import android.view.inputmethod.InputMethodManager
 import android.content.Context
 import android.content.Intent
 import android.widget.Button
+import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
+import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 class MainActivity : Activity() {
     private val pickDictionary = 1001

@@ -34,7 +34,8 @@ class SumireKanaKanjiConverter(private val context: Context) {
     )
 
     private val engine = KanaKanjiEngine()
-    private val userDictionary = UserDictionaryRepository()
+    private val userDictionary = UserDictionaryRepository(context.applicationContext)
+    private val learnRepository = LearnRepository(context.applicationContext)
     private val utDictionary = NecokeyUtDictionaryManager(context.applicationContext)
     
     init {
@@ -122,7 +123,7 @@ class SumireKanaKanjiConverter(private val context: Context) {
             mozcUTNeologd = true,
             mozcUTWeb = false,
             userDictionaryRepository = userDictionary,
-            learnRepository = null,
+            learnRepository = learnRepository,
             typoCorrectionOffsetScore = 0,
             omissionSearchOffsetScore = 0,
             predictionConfig = PredictionConfig(

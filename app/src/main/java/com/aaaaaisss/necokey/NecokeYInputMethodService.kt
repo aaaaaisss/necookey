@@ -170,10 +170,10 @@ class NecokeYInputMethodService : InputMethodService() {
                 if (generation != refreshGeneration || input != composing) return@withContext
                 conversionRow.removeAllViews()
                 predictionRow.removeAllViews()
-                mainCandidate?.let { addCandidateView(conversionRow, it.string) }
+                mainCandidate?.let { candidate -> addCandidateView(conversionRow, candidate.string) { commitCandidate(candidate.string, input) } }
                 alternatives.forEach { first ->
                     addCandidateView(conversionRow, first.output) {
-                        commitSegmentAlternative(first.output, mainCandidate!!)
+                        commitSegmentAlternative(first.output, mainCandidate!!, input)
                     }
                 }
                 predictionCandidates.forEach { addCandidateView(predictionRow, it.string) }
@@ -203,7 +203,7 @@ class NecokeYInputMethodService : InputMethodService() {
         }
     }
 
-    private fun commitSegmentAlternative(firstSegmentOutput: String, mainCandidate: Candidate) {
+    private fun commitSegmentAlternative(firstSegmentOutput: String, mainCandidate: Candidate, input: String) {
         val text = buildString {
             append(firstSegmentOutput)
             mainCandidate.conversionSegments.drop(1).forEach { append(it.output) }
