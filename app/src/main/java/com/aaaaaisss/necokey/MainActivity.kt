@@ -51,10 +51,7 @@ class MainActivity : Activity() {
         if (requestCode != pickDictionary || resultCode != RESULT_OK) return
         val uri = data?.data ?: return
         val result = NecokeyUtDictionaryManager(this).importZip(uri)
-        val message = result.fold(
-            onSuccess = { it.message + "\n次回のIME起動から反映します。" },
-            onFailure = { "辞書更新に失敗しました: ${it.message}" },
-        )
+        val message = result.message + "\n次回のIME起動から反映します。"
         Toast.makeText(this, message, Toast.LENGTH_LONG).show()
     }
 }
