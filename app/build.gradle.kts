@@ -36,6 +36,7 @@ android {
     sourceSets {
         getByName("main") {
             java.srcDirs(
+                file("src/main/java"),
                 file("../vendor/sumire/app/src/main/java/com/kazumaproject/markdownhelperkeyboard/converter"),
                 file("../vendor/sumire/app/src/main/java/com/kazumaproject/markdownhelperkeyboard/ime_service/extensions"),
                 file("../vendor/sumire/app/src/main/java/com/kazumaproject/markdownhelperkeyboard/dictionary_override"),
