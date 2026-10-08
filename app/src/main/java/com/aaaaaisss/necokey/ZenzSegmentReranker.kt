@@ -101,7 +101,7 @@ class ZenzSegmentReranker(
         }
 
         if (zenzBySpan.isEmpty()) {
-            return candidates.map(Candidate::string).distinct()
+            return candidates.distinctBy(Candidate::string)
         }
 
         val ordered = candidates.mapIndexed { index, candidate ->
