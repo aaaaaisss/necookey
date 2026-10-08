@@ -169,7 +169,7 @@ class NecokeYInputMethodService : InputMethodService() {
                 if (generation != refreshGeneration || input != composing) return@withContext
                 conversionRow.removeAllViews()
                 predictionRow.removeAllViews()
-                mainCandidate?.let { candidate -> addCandidateView(conversionRow, candidate.string) { commitCandidate(candidate.string, input) } }
+                mainCandidate?.let { candidate -> addCandidateView(conversionRow, candidate.string) { commitCandidate(candidate.string) } }
                 alternatives.forEach { first ->
                     addCandidateView(conversionRow, first.output) {
                         commitSegmentAlternative(first.output, mainCandidate!!, input)
