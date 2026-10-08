@@ -25,7 +25,8 @@ class NecokeYInputMethodService : InputMethodService() {
     private var refreshGeneration = 0L
     private var composing = ""
     private lateinit var composingView: TextView
-    private lateinit var candidatesView: LinearLayout
+    private lateinit var conversionRow: LinearLayout
+    private lateinit var predictionRow: LinearLayout
     private lateinit var keyboardView: FlickKeyboardView
 
     override fun onCreate() {
@@ -62,9 +63,14 @@ class NecokeYInputMethodService : InputMethodService() {
             setPadding(20, 12, 20, 12)
             text = ""
         }
-        candidatesView = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            setPadding(8, 4, 8, 4)
+        conversionRow = createCandidateRow()
+        predictionRow = createCandidateRow()
+
+        val candidatesView = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(8, 2, 8, 2)
+            addView(conversionRow, LinearLayout.LayoutParams(-1, 0, 1f))
+            addView(predictionRow, LinearLayout.LayoutParams(-1, 0, 1f))
         }
 
         keyboardView = FlickKeyboardView(this).apply {
@@ -88,13 +94,13 @@ class NecokeYInputMethodService : InputMethodService() {
     private fun appendText(text: String) {
         if (text.isEmpty()) return
         composing += text
-        refresh()
+        refresh(showCandidates = true)
     }
 
     private fun deleteLast() {
         if (composing.isNotEmpty()) {
             composing = composing.dropLast(1)
-            refresh()
+            refresh(showCandidates = true)
         } else {
             currentInputConnection?.deleteSurroundingText(1, 0)
         }
@@ -121,28 +127,88 @@ class NecokeYInputMethodService : InputMethodService() {
     private fun refresh(showCandidates: Boolean = false) {
         val generation = ++refreshGeneration
         composingView.text = composing
-        candidatesView.removeAllViews()
+        conversionRow.removeAllViews()
+        predictionRow.removeAllViews()
         if (!showCandidates || composing.isEmpty()) return
 
         val input = composing
         serviceScope.launch(Dispatchers.Default) {
-            val detailed = engine.detailedCandidates(input)
-            val visibleCandidates = zenzReranker.rerank(input, detailed)
+            val detailed = engine.detailedCandidates(input, 16)
+            val prediction = engine.predictionCandidates(input, 16)
+            val reranked = zenzReranker.rerank(input, detailed)
+            val mainString = reranked.firstOrNull() ?: detailed.firstOrNull()?.string ?: input
+            val mainCandidate = detailed.firstOrNull { it.string == mainString }
+            val firstSegment = mainCandidate?.conversionSegments?.firstOrNull()
+
+            val alternatives = if (mainCandidate != null && firstSegment != null) {
+                detailed.asSequence()
+                    .mapNotNull { candidate ->
+                        val first = candidate.conversionSegments.firstOrNull() ?: return@mapNotNull null
+                        if (first.inputStart != firstSegment.inputStart ||
+                            first.inputEnd != firstSegment.inputEnd ||
+                            first.output == firstSegment.output) {
+                            return@mapNotNull null
+                        }
+                        first
+                    }
+                    .distinctBy { it.output }
+                    .take(3)
+                    .toList()
+            } else {
+                emptyList()
+            }
+
+            val topStrings = buildSet {
+                mainCandidate?.let { add(it.string) }
+                alternatives.forEach { add(it.output) }
+            }
+            val predictionCandidates = prediction
+                .filter { it.string !in topStrings }
+                .take(8)
+
             withContext(Dispatchers.Main.immediate) {
                 if (generation != refreshGeneration || input != composing) return@withContext
-                candidatesView.removeAllViews()
-                visibleCandidates.forEach { candidate ->
-                    TextView(this@NecokeYInputMethodService).apply {
-                        text = candidate
-                        textSize = 18f
-                        setTextColor(Color.WHITE)
-                        setPadding(20, 8, 20, 8)
-                        setOnClickListener { commitCandidate(candidate) }
-                        candidatesView.addView(this)
+                conversionRow.removeAllViews()
+                predictionRow.removeAllViews()
+                mainCandidate?.let { addCandidateView(conversionRow, it.string) }
+                alternatives.forEach { first ->
+                    addCandidateView(conversionRow, first.output) {
+                        commitSegmentAlternative(first.output, mainCandidate!!)
                     }
                 }
+                predictionCandidates.forEach { addCandidateView(predictionRow, it.string) }
             }
         }
+    }
+
+    private fun createCandidateRow(): LinearLayout =
+        LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            setPadding(0, 0, 0, 0)
+        }
+
+    private fun addCandidateView(
+        row: LinearLayout,
+        text: String,
+        onClick: (() -> Unit)? = null
+    ) {
+        TextView(this).apply {
+            this.text = text
+            textSize = 18f
+            setTextColor(Color.WHITE)
+            setPadding(16, 6, 16, 6)
+            setSingleLine(true)
+            setOnClickListener { (onClick ?: { commitCandidate(text) })() }
+            row.addView(this, LinearLayout.LayoutParams(0, -1, 1f))
+        }
+    }
+
+    private fun commitSegmentAlternative(firstSegmentOutput: String, mainCandidate: Candidate) {
+        val text = buildString {
+            append(firstSegmentOutput)
+            mainCandidate.conversionSegments.drop(1).forEach { append(it.output) }
+        }
+        commitCandidate(text)
     }
 
     private inner class ActionListener : FlickKeyboardView.OnKeyboardActionListener {
