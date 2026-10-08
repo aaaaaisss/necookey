@@ -47,6 +47,12 @@ jobs:
           yes | sdkmanager --licenses >/dev/null || true
           sdkmanager "platform-tools" "platforms;android-36" "build-tools;36.0.0" "ndk;29.0.14206865"
 
+      - name: Remove unused Sumire converter sources
+        run: |
+          rm -f vendor/sumire/app/src/main/java/com/kazumaproject/markdownhelperkeyboard/converter/engine/EnglishEngine.kt
+          rm -rf vendor/sumire/app/src/main/java/com/kazumaproject/markdownhelperkeyboard/converter/glide
+          rm -rf vendor/sumire/app/src/main/java/com/kazumaproject/markdownhelperkeyboard/converter/english
+
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
