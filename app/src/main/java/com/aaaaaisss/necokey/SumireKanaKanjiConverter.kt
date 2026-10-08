@@ -22,7 +22,7 @@ import java.io.BufferedInputStream
 import java.io.ObjectInputStream
 import java.util.zip.ZipInputStream
 
-class SumireKanaKanjiConverter(context: Context) {
+class SumireKanaKanjiConverter(private val context: Context) {
     private data class TripleDictionary(
         val tango: LOUDS,
         val yomi: LOUDSWithTermId,
@@ -35,6 +35,7 @@ class SumireKanaKanjiConverter(context: Context) {
 
     private val engine = KanaKanjiEngine()
     private val userDictionary = UserDictionaryRepository()
+    private val utDictionary = NecokeyUtDictionaryManager(context.applicationContext)
     
     init {
         val connection = loadConnectionMatrix(context)
@@ -143,17 +144,17 @@ class SumireKanaKanjiConverter(context: Context) {
         zipped: Boolean,
     ): TripleDictionary {
         val tango = LOUDS()
-        openAsset(context, tangoPath, zipped).use { input ->
+        openDictionary(tangoPath, zipped).use { input ->
             ObjectInputStream(BufferedInputStream(input)).use { tango.readExternalNotCompress(it) }
         }
 
         val yomi = LOUDSWithTermId()
-        openAsset(context, yomiPath, zipped).use { input ->
+        openDictionary(yomiPath, zipped).use { input ->
             ObjectInputStream(BufferedInputStream(input)).use { yomi.readExternalNotCompress(it) }
         }
 
         val token = TokenArray()
-        openAsset(context, tokenPath, zipped).use { input ->
+        openDictionary(tokenPath, zipped).use { input ->
             ObjectInputStream(BufferedInputStream(input)).use { token.readExternal(it) }
         }
         context.assets.open("pos_table.dat").use { input ->
@@ -179,11 +180,17 @@ class SumireKanaKanjiConverter(context: Context) {
         }
     }
 
-    private fun openAsset(
-        context: Context,
+    private fun openDictionary(
         path: String,
         zipped: Boolean,
-    ) = if (zipped) {
+    ): java.io.InputStream {
+        val override = utDictionary.openOverride(path)
+        if (override != null) {
+            return if (zipped) ZipInputStream(override).also {
+                require(it.nextEntry != null) { "Override ZIP is empty: $path" }
+            } else override
+        }
+        return if (zipped) {
         ZipInputStream(context.assets.open(path)).also {
             require(it.nextEntry != null) { "Asset ZIP is empty: $path" }
         }
