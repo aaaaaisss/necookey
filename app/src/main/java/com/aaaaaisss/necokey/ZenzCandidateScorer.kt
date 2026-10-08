@@ -1,6 +1,6 @@
 package com.aaaaaisss.necokey
 
-import com.aaaaaisss.necokey.zenz.ZenzEngine
+import com.kazumaproject.zenz.ZenzEngine
 
 /**
  * necookey-owned bridge to the standalone zenz scorer.

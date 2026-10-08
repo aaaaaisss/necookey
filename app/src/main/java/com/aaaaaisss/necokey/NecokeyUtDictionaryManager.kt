@@ -64,9 +64,8 @@ class NecokeyUtDictionaryManager(private val context: Context) {
                 check(tmp.renameTo(target)) { "辞書の保存に失敗しました: $name" }
             }
             Result(updated, "更新済み: ${updated.joinToString("、")}")
-        }.getOrElse { error ->
+        }.onFailure {
             root.listFiles()?.filter { it.name.endsWith(".tmp") }?.forEach(File::delete)
-            Result(emptyList(), "辞書更新に失敗しました: ${error.message ?: error.javaClass.simpleName}")
         }
     }
 

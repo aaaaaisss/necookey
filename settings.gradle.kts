@@ -8,7 +8,5 @@ dependencyResolutionManagement {
 rootProject.name = "Necookey"
 include(":app")
 include(":sumireCore")
-include(":sumireCustomKeyboard")
 include(":zenz")
 project(":sumireCore").projectDir = file("vendor/sumire/core")
-project(":sumireCustomKeyboard").projectDir = file("vendor/sumire/custom_keyboard")

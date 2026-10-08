@@ -51,7 +51,6 @@ jobs:
         run: |
           rm -f vendor/sumire/app/src/main/java/com/kazumaproject/markdownhelperkeyboard/converter/engine/EnglishEngine.kt
           rm -rf vendor/sumire/app/src/main/java/com/kazumaproject/markdownhelperkeyboard/converter/glide
-          rm -rf vendor/sumire/app/src/main/java/com/kazumaproject/markdownhelperkeyboard/converter/english
           sed -i "s/project(':core')/project(':sumireCore')/" vendor/sumire/custom_keyboard/build.gradle
 
       - name: Set up Gradle
