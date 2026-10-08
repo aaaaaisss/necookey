@@ -37,9 +37,9 @@ class ZenzSegmentReranker(
         input: String,
         candidates: List<Candidate>,
         maxCandidatesToInspect: Int = 8,
-    ): List<String> {
+    ): List<Candidate> {
         if (!scorer.isReady() || candidates.size < 2 || input.isEmpty()) {
-            return candidates.map(Candidate::string).distinct()
+            return candidates.distinctBy(Candidate::string)
         }
 
         val inspected = candidates.asSequence().distinctBy(Candidate::string).take(maxCandidatesToInspect.coerceAtLeast(2)).toList()
@@ -130,8 +130,8 @@ class ZenzSegmentReranker(
                     .thenBy { it.candidate.score }
                     .thenBy { it.originalIndex }
             )
-            .map { it.candidate.string }
-            .distinct()
+            .map { it.candidate }
+            .distinctBy(Candidate::string)
     }
 
     private data class RerankedCandidate(
