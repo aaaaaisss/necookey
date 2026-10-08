@@ -135,24 +135,13 @@ class NecokeYInputMethodService : InputMethodService() {
         serviceScope.launch(Dispatchers.Default) {
             val detailed = engine.detailedCandidates(input, 16)
             val prediction = engine.predictionCandidates(input, 16)
-            val reranked = zenzReranker.rerank(input, detailed)
+            val rerankResult = zenzReranker.rerankDetailed(input, detailed)
+            val reranked = rerankResult.candidates
             val mainCandidate = reranked.firstOrNull() ?: detailed.firstOrNull()
-            val firstSegment = mainCandidate?.conversionSegments?.firstOrNull()
+            val firstAlternatives = rerankResult.firstSegmentAlternatives
 
-            val alternatives = if (mainCandidate != null && firstSegment != null) {
-                reranked.asSequence()
-                    .mapNotNull { candidate ->
-                        val first = candidate.conversionSegments.firstOrNull() ?: return@mapNotNull null
-                        if (first.inputStart != firstSegment.inputStart ||
-                            first.inputEnd != firstSegment.inputEnd ||
-                            first.output == firstSegment.output) {
-                            return@mapNotNull null
-                        }
-                        first
-                    }
-                    .distinctBy { it.output }
-                    .take(3)
-                    .toList()
+            val alternatives = if (mainCandidate != null) {
+                firstAlternatives
             } else {
                 emptyList()
             }
