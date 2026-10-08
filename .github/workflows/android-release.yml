@@ -33,6 +33,12 @@ jobs:
           yes | sdkmanager --licenses >/dev/null || true
           sdkmanager "platform-tools" "platforms;android-36" "build-tools;36.0.0" "ndk;27.2.12479018"
 
+      - name: Remove unused converter sources
+        run: |
+          rm -f vendor/sumire/app/src/main/java/com/kazumaproject/markdownhelperkeyboard/converter/engine/EnglishEngine.kt
+          rm -rf vendor/sumire/app/src/main/java/com/kazumaproject/markdownhelperkeyboard/converter/glide
+          rm -rf vendor/sumire/app/src/main/java/com/kazumaproject/markdownhelperkeyboard/converter/english
+
       - name: Download Gradle
         run: |
           curl -L --fail --retry 3 -o gradle.zip https://services.gradle.org/distributions/gradle-8.11.1-bin.zip
