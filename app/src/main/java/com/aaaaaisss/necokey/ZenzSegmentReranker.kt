@@ -51,7 +51,7 @@ class ZenzSegmentReranker(
     ): RerankResult {
         if (!scorer.isReady() || candidates.size < 2 || input.isEmpty()) {
             val distinct = candidates.distinctBy(Candidate::string)
-            return RerankResult(distinct, emptyList())
+            return RerankResult(distinct, fallbackFirstAlternatives(distinct))
         }
 
         val inspected = candidates.asSequence().distinctBy(Candidate::string).take(maxCandidatesToInspect.coerceAtLeast(2)).toList()
