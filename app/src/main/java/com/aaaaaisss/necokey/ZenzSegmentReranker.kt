@@ -83,12 +83,14 @@ class ZenzSegmentReranker(
 
             // Use Sumire's candidate rank, not an absolute Candidate.score gap.
             // Candidate.score is a whole-path cost and is not a probability.
-            val outputRanks = inspected.mapIndexedNotNull { rank, candidate ->
-                candidate.conversionSegments
-                    .firstOrNull { it.inputStart == span.start && it.inputEnd == span.end }
-                    ?.output
-                    ?.takeIf { it in grouped }
-                    ?.let { rank }
+            val outputRanks = grouped.keys.mapNotNull { output ->
+                inspected.indexOfFirst { candidate ->
+                    candidate.conversionSegments.any {
+                        it.inputStart == span.start &&
+                            it.inputEnd == span.end &&
+                            it.output == output
+                    }
+                }.takeIf { it >= 0 }
             }
             if (!ZenzConfidenceGate.shouldRerank(outputRanks)) continue
 
