@@ -162,7 +162,12 @@ class NecokeYInputMethodService : InputMethodService() {
                 mainCandidate?.let { candidate -> addCandidateView(conversionRow, candidate.string) { commitCandidate(candidate.string) } }
                 alternatives.forEach { firstOutput ->
                     addCandidateView(conversionRow, firstOutput) {
-                        commitSegmentAlternative(firstOutput, mainCandidate!!, input)
+                        commitSegmentAlternative(
+                            firstOutput,
+                            mainCandidate!!,
+                            input,
+                            bunsetsuResult.splitPatternByCandidateString[mainCandidate.string].orEmpty(),
+                        )
                     }
                 }
                 predictionCandidates.forEach { addCandidateView(predictionRow, it.string) }
@@ -192,12 +197,20 @@ class NecokeYInputMethodService : InputMethodService() {
         }
     }
 
-    private fun commitSegmentAlternative(firstSegmentOutput: String, mainCandidate: Candidate, input: String) {
-        val text = buildString {
-            append(firstSegmentOutput)
-            mainCandidate.conversionSegments.drop(1).forEach { append(it.output) }
-        }
-        commitCandidate(text)
+    private fun commitSegmentAlternative(
+        firstSegmentOutput: String,
+        mainCandidate: Candidate,
+        input: String,
+        splitPositions: List<Int>,
+    ) {
+        val boundaries = (listOf(0) + splitPositions.filter { it > 0 && it < input.length }.distinct().sorted() + input.length)
+            .zipWithNext()
+        val nodes = mainCandidate.conversionSegments.sortedBy { it.inputStart }
+        val firstEnd = boundaries.firstOrNull()?.second ?: input.length
+        val laterText = nodes
+            .filter { it.inputStart >= firstEnd && it.inputEnd <= input.length }
+            .joinToString(separator = "") { it.output }
+        commitCandidate(firstSegmentOutput + laterText)
     }
 
     private inner class ActionListener : FlickKeyboardView.OnKeyboardActionListener {
