@@ -134,9 +134,14 @@ class NecokeYInputMethodService : InputMethodService() {
 
         val input = composing
         serviceScope.launch(Dispatchers.Default) {
-            val detailed = engine.detailedCandidates(input, 16)
+            val bunsetsuResult = engine.detailedCandidatesWithBunsetsu(input, 16)
+            val detailed = bunsetsuResult.candidates
             val prediction = engine.predictionCandidates(input, 16)
-            val rerankResult = zenzReranker.rerankDetailed(input, detailed)
+            val rerankResult = zenzReranker.rerankDetailed(
+                input = input,
+                candidates = detailed,
+                splitPatternByCandidateString = bunsetsuResult.splitPatternByCandidateString,
+            )
             val reranked = rerankResult.candidates
             val mainCandidate = reranked.firstOrNull() ?: detailed.firstOrNull()
             val firstAlternatives = rerankResult.firstSegmentAlternatives
