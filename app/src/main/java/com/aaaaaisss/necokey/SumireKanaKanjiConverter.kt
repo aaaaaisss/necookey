@@ -120,7 +120,7 @@ class SumireKanaKanjiConverter(private val context: Context) {
             mozcUTPlaces = true,
             mozcUTWiki = true,
             mozcUTNeologd = true,
-            mozcUTWeb = true,
+            mozcUTWeb = false,
             userDictionaryRepository = userDictionary,
             learnRepository = null,
             typoCorrectionOffsetScore = 0,
@@ -196,6 +196,7 @@ class SumireKanaKanjiConverter(private val context: Context) {
         }
     } else {
         context.assets.open(path)
+    }
     }
 
     private fun loadMozcAssets(context: Context): Pair<MozcSegmenter?, MozcNodeAttributeTable?> {
