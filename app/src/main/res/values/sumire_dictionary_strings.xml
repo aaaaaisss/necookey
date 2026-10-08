@@ -1,0 +1,18 @@
+<resources>
+    <string name="external_dictionary_file_connection_id">connection_id</string>
+    <string name="external_dictionary_file_pos_table">pos_table</string>
+    <string name="external_dictionary_file_id_def">id.def</string>
+    <string name="external_dictionary_file_tango">tango</string>
+    <string name="external_dictionary_file_yomi">yomi</string>
+    <string name="external_dictionary_file_token">token</string>
+    <string name="external_dictionary_file_english_reading">english_reading</string>
+    <string name="external_dictionary_file_english_word">english_word</string>
+    <string name="external_dictionary_file_english_token">english_token</string>
+    <string name="external_dictionary_compat_connection_id_invalid_size">connection_id size is invalid</string>
+    <string name="external_dictionary_compat_connection_id_unreadable">connection_id is unreadable</string>
+    <string name="external_dictionary_compat_pos_table_row_mismatch">pos table row count mismatch</string>
+    <string name="external_dictionary_compat_pos_table_id_out_of_range">pos table id is out of range</string>
+    <string name="external_dictionary_compat_pos_table_unreadable">pos table is unreadable</string>
+    <string name="external_dictionary_compat_token_negative_pos_index">token contains a negative pos index</string>
+    <string name="external_dictionary_compat_token_requires_pos_table_rows">token requires pos table rows</string>
+</resources>

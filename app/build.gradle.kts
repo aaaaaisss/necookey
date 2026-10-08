@@ -41,7 +41,6 @@ android {
                 file("../vendor/sumire/app/src/main/java/com/kazumaproject/markdownhelperkeyboard/dictionary_override"),
             )
             assets.srcDir(file("../vendor/sumire/app/src/main/assets"))
-            res.srcDir(file("../vendor/sumire/app/src/main/res"))
             // English/QWERTY conversion is intentionally omitted: necokey is Japanese-only.
         }
     }
