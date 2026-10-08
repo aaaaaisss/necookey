@@ -34,7 +34,7 @@ class ZenzSegmentReranker(
             return candidates.map(Candidate::string).distinct()
         }
 
-        val inspected = candidates.take(maxCandidatesToInspect.coerceAtLeast(2))
+        val inspected = candidates.asSequence().distinctBy(Candidate::string).take(maxCandidatesToInspect.coerceAtLeast(2)).toList()
         val bySpan = linkedMapOf<Span, MutableList<SegmentEvidence>>()
 
         inspected.forEach { candidate ->
@@ -66,7 +66,8 @@ class ZenzSegmentReranker(
             val scoreList = grouped.values.sorted()
             if (!ZenzConfidenceGate.shouldRerank(scoreList.map(Int::toLong))) continue
 
-            val outputs = grouped.keys.toList()
+            val outputs = grouped.keys.asSequence().filter { it.isNotEmpty() }.distinct().take(8).toList()
+            if (outputs.size < 2) continue
             val reference = inspected.minByOrNull { it.score } ?: continue
             val referenceSegments = reference.conversionSegments
 
@@ -84,6 +85,8 @@ class ZenzSegmentReranker(
                 leftContext = leftContext,
                 rightContext = rightContext,
             ) ?: continue
+
+            if (scores.any { !it.isFinite() }) continue
 
             zenzBySpan[span] = outputs.indices.associate { outputs[it] to scores[it] }
         }
