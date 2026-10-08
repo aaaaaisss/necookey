@@ -76,7 +76,15 @@ class ZenzSegmentReranker(
 
             val outputs = grouped.keys.asSequence().filter { it.isNotEmpty() }.distinct().take(8).toList()
             if (outputs.size < 2) continue
-            val reference = inspected.minByOrNull { it.score } ?: continue
+            val reference = inspected
+                .asSequence()
+                .filter { candidate ->
+                    candidate.conversionSegments.any {
+                        it.inputStart == span.start && it.inputEnd == span.end
+                    }
+                }
+                .minByOrNull { it.score }
+                ?: continue
             val referenceSegments = reference.conversionSegments
 
             val leftContext = referenceSegments
