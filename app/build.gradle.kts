@@ -11,7 +11,7 @@ android {
         minSdk = 29
         targetSdk = 36
         versionCode = 1
-        versionName = "0.3.0"
+        versionName = "0.3.1"
     }
 
     sourceSets {
@@ -31,6 +31,7 @@ android {
 dependencies {
     implementation(project(":sumireCustomKeyboard"))
     implementation(project(":sumireCore"))
+    implementation(project(":zenz"))
     implementation("androidx.core:core-ktx:1.16.0")
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.9.1")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
