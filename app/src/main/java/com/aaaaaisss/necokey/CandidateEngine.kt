@@ -2,6 +2,7 @@ package com.aaaaaisss.necokey
 
 import android.content.Context
 import com.kazumaproject.markdownhelperkeyboard.converter.candidate.Candidate
+import com.kazumaproject.markdownhelperkeyboard.converter.candidate.BunsetsuCandidateResult
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -32,6 +33,19 @@ class CandidateEngine {
         val current = converter ?: return emptyList()
         return withContext(Dispatchers.Default) {
             current.candidates(input, n)
+        }
+    }
+
+    suspend fun detailedCandidatesWithBunsetsu(
+        input: String,
+        n: Int = 12,
+    ): BunsetsuCandidateResult {
+        val current = converter ?: return BunsetsuCandidateResult(
+            candidates = emptyList(),
+            splitPatterns = emptyList(),
+        )
+        return withContext(Dispatchers.Default) {
+            current.candidatesWithBunsetsu(input, n)
         }
     }
 
