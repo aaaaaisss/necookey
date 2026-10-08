@@ -140,7 +140,7 @@ class NecokeYInputMethodService : InputMethodService() {
             val firstSegment = mainCandidate?.conversionSegments?.firstOrNull()
 
             val alternatives = if (mainCandidate != null && firstSegment != null) {
-                detailed.asSequence()
+                reranked.asSequence()
                     .mapNotNull { candidate ->
                         val first = candidate.conversionSegments.firstOrNull() ?: return@mapNotNull null
                         if (first.inputStart != firstSegment.inputStart ||
