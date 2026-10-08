@@ -35,9 +35,13 @@ android {
                 file("../vendor/sumire/app/src/main/java/com/kazumaproject/markdownhelperkeyboard/ime_service/extensions")
             )
             assets.srcDir(file("../vendor/sumire/app/src/main/assets"))
-            java.exclude("**/converter/engine/EnglishEngine.kt")
-            java.exclude("**/converter/glide/**")
-            java.exclude("**/converter/english/**")
+            java.setExcludes(
+                setOf(
+                    "**/converter/engine/EnglishEngine.kt",
+                    "**/converter/glide/**",
+                    "**/converter/english/**",
+                )
+            )
         }
     }
 }
