@@ -63,9 +63,16 @@ jobs:
         run: gradle --no-daemon --stacktrace :app:assembleRelease
 
       - name: Verify APK ABIs
+        shell: bash
         run: |
-          APK="app/build/outputs/apk/release/app-release.apk"
-          test -f "$APK"
+          set -euo pipefail
+          APK="$(find app/build/outputs/apk/release -maxdepth 1 -type f -name '*.apk' -print -quit)"
+          if [[ -z "$APK" ]]; then
+            echo "ERROR: No release APK was produced. APK output files:"
+            find app/build/outputs -maxdepth 5 -type f -print || true
+            exit 1
+          fi
+          echo "Verifying APK: $APK"
           "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK" | tee apk-badging.txt
           unzip -l "$APK" | grep -E 'lib/(arm64-v8a|armeabi-v7a)/' || true
           if unzip -l "$APK" | grep -E 'lib/(x86|x86_64)/'; then
@@ -77,6 +84,6 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: necookey-release-arm
-          path: app/build/outputs/apk/release/app-release.apk
+          path: app/build/outputs/apk/release/*.apk
           if-no-files-found: error
           retention-days: 14
