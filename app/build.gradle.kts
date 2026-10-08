@@ -44,7 +44,6 @@ android {
 }
 
 dependencies {
-    implementation(project(":sumireCustomKeyboard"))
     implementation(project(":sumireCore"))
     implementation(project(":zenz"))
     implementation("androidx.core:core-ktx:1.16.0")
