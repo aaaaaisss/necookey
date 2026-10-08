@@ -9,9 +9,12 @@ import android.widget.TextView
 import com.kazumaproject.custom_keyboard.data.KeyAction
 import com.kazumaproject.custom_keyboard.layout.KeyboardDefaultLayouts
 import com.kazumaproject.custom_keyboard.view.FlickKeyboardView
+import java.io.File
 
 class NecokeYInputMethodService : InputMethodService() {
     private val engine = CandidateEngine()
+    private val zenzScorer = ZenzCandidateScorer()
+    private val zenzReranker = ZenzSegmentReranker(zenzScorer)
     private var composing = ""
     private lateinit var composingView: TextView
     private lateinit var candidatesView: LinearLayout
@@ -20,6 +23,14 @@ class NecokeYInputMethodService : InputMethodService() {
     override fun onCreate() {
         super.onCreate()
         engine.initialize(this)
+
+        // Model loading is optional. A missing model keeps normal conversion intact.
+        val model = File(filesDir, "zenz/zenz.gguf")
+        if (model.isFile) {
+            Thread {
+                zenzScorer.loadModel(model.absolutePath)
+            }.start()
+        }
     }
 
     override fun onCreateInputView(): View {
@@ -95,7 +106,10 @@ class NecokeYInputMethodService : InputMethodService() {
         candidatesView.removeAllViews()
         if (!showCandidates || composing.isEmpty()) return
 
-        engine.candidates(composing).forEach { candidate ->
+        val detailed = engine.detailedCandidates(composing)
+        val visibleCandidates = zenzReranker.rerank(composing, detailed)
+
+        visibleCandidates.forEach { candidate ->
             TextView(this).apply {
                 text = candidate
                 textSize = 18f

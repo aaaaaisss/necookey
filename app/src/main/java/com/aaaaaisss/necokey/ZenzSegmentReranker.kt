@@ -1,0 +1,128 @@
+package com.aaaaaisss.necokey
+
+import com.kazumaproject.markdownhelperkeyboard.converter.candidate.Candidate
+
+/**
+ * necookey-owned per-segment zenz integration.
+ *
+ * Sumire remains responsible for lattice construction and candidate generation.
+ * This layer only observes Candidate.conversionSegments, detects spans whose
+ * top candidates disagree, and asks zenz to score those segment alternatives.
+ *
+ * This is intentionally a first integration layer rather than a replacement
+ * for Sumire's path search. It never calls zenz for a span with one output.
+ */
+class ZenzSegmentReranker(
+    private val scorer: ZenzCandidateScorer,
+) {
+    private data class Span(
+        val start: Int,
+        val end: Int,
+    )
+
+    private data class SegmentEvidence(
+        val output: String,
+        val pathScore: Int,
+    )
+
+    fun rerank(
+        input: String,
+        candidates: List<Candidate>,
+        maxCandidatesToInspect: Int = 8,
+    ): List<String> {
+        if (!scorer.isReady() || candidates.size < 2 || input.isEmpty()) {
+            return candidates.map(Candidate::string).distinct()
+        }
+
+        val inspected = candidates.take(maxCandidatesToInspect.coerceAtLeast(2))
+        val bySpan = linkedMapOf<Span, MutableList<SegmentEvidence>>()
+
+        inspected.forEach { candidate ->
+            candidate.conversionSegments.forEach { segment ->
+                if (segment.inputStart < 0 ||
+                    segment.inputEnd <= segment.inputStart ||
+                    segment.inputEnd > input.length ||
+                    segment.output.isEmpty()
+                ) return@forEach
+
+                val span = Span(segment.inputStart, segment.inputEnd)
+                bySpan.getOrPut(span) { mutableListOf() }
+                    .add(SegmentEvidence(segment.output, candidate.score))
+            }
+        }
+
+        val zenzBySpan = mutableMapOf<Span, Map<String, Float>>()
+
+        for ((span, evidence) in bySpan) {
+            val grouped = evidence
+                .groupBy { it.output }
+                .mapValues { (_, values) -> values.minOf { it.pathScore } }
+
+            if (grouped.size < 2) continue
+
+            val scoreList = grouped.values.sorted()
+            if (!ZenzConfidenceGate.shouldRerank(scoreList.map(Int::toLong))) continue
+
+            val outputs = grouped.keys.toList()
+            val reference = inspected.minByOrNull { it.score } ?: continue
+            val referenceSegments = reference.conversionSegments
+
+            val leftContext = referenceSegments
+                .filter { it.inputEnd <= span.start }
+                .joinToString(separator = "") { it.output }
+            val rightContext = referenceSegments
+                .filter { it.inputStart >= span.end }
+                .joinToString(separator = "") { it.output }
+
+            val reading = input.substring(span.start, span.end)
+            val scores = scorer.score(
+                input = reading,
+                candidates = outputs,
+                leftContext = leftContext,
+                rightContext = rightContext,
+            ) ?: continue
+
+            zenzBySpan[span] = outputs.indices.associate { outputs[it] to scores[it] }
+        }
+
+        if (zenzBySpan.isEmpty()) {
+            return candidates.map(Candidate::string).distinct()
+        }
+
+        val ordered = candidates.mapIndexed { index, candidate ->
+            var zenzTotal = 0.0f
+            var matched = 0
+
+            candidate.conversionSegments.forEach { segment ->
+                val span = Span(segment.inputStart, segment.inputEnd)
+                val score = zenzBySpan[span]?.get(segment.output) ?: return@forEach
+                zenzTotal += score
+                matched++
+            }
+
+            RerankedCandidate(
+                candidate = candidate,
+                originalIndex = index,
+                zenzScore = zenzTotal,
+                matchedSegments = matched,
+            )
+        }
+
+        return ordered
+            .sortedWith(
+                compareByDescending<RerankedCandidate> { it.matchedSegments > 0 }
+                    .thenByDescending { it.zenzScore }
+                    .thenBy { it.candidate.score }
+                    .thenBy { it.originalIndex }
+            )
+            .map { it.candidate.string }
+            .distinct()
+    }
+
+    private data class RerankedCandidate(
+        val candidate: Candidate,
+        val originalIndex: Int,
+        val zenzScore: Float,
+        val matchedSegments: Int,
+    )
+}

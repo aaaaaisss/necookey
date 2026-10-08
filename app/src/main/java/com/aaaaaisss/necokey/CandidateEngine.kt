@@ -14,6 +14,17 @@ class CandidateEngine {
         }
     }
 
+    /**
+     * necookey-owned adapter around Sumire's Candidate objects.
+     *
+     * The upstream Candidate, including conversionSegments, stays in vendor/sumire.
+     * necookey keeps that metadata until reranking has finished.
+     */
+    fun detailedCandidates(input: String, n: Int = 12): List<Candidate> {
+        val current = converter ?: return emptyList()
+        return runBlocking { current.candidates(input, n) }
+    }
+
     fun candidates(input: String): List<String> {
         val current = converter ?: return listOf(input)
         return runBlocking {

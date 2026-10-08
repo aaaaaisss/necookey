@@ -3,11 +3,10 @@ package com.aaaaaisss.necokey
 import com.kazumaproject.zenz.ZenzEngine
 
 /**
- * Optional zenz reranker.
+ * necookey-owned bridge to the standalone zenz scorer.
  *
- * The Lite conversion engine remains the source of candidates. zenz only
- * scores an already generated candidate set. If no model is loaded, this
- * class is a no-op and normal conversion continues unchanged.
+ * zenz never creates candidates. Sumire creates them first, then this class
+ * scores only the strings explicitly supplied by necookey.
  */
 class ZenzCandidateScorer {
     @Volatile
@@ -23,14 +22,14 @@ class ZenzCandidateScorer {
 
     fun isReady(): Boolean = ready
 
-    fun rerank(
+    fun score(
         input: String,
         candidates: List<String>,
         leftContext: String = "",
         rightContext: String = ""
-    ): List<String> {
-        if (!ready || candidates.size < 2) return candidates
-        val scores = runCatching {
+    ): FloatArray? {
+        if (!ready || candidates.size < 2) return null
+        return runCatching {
             ZenzEngine.scoreCandidatesV32(
                 profile = null,
                 topic = null,
@@ -41,9 +40,16 @@ class ZenzCandidateScorer {
                 input = input,
                 candidates = candidates.toTypedArray()
             )
-        }.getOrNull() ?: return candidates
+        }.getOrNull()?.takeIf { it.size == candidates.size }
+    }
 
-        if (scores.size != candidates.size) return candidates
+    fun rerank(
+        input: String,
+        candidates: List<String>,
+        leftContext: String = "",
+        rightContext: String = ""
+    ): List<String> {
+        val scores = score(input, candidates, leftContext, rightContext) ?: return candidates
         return candidates.indices
             .sortedByDescending { scores[it] }
             .map { candidates[it] }
