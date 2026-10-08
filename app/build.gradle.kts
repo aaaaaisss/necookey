@@ -17,6 +17,14 @@ android {
         }
     }
 
+    // This APK is intended for ARM devices only. Explicitly exclude x86 JNI
+    // libraries that may be contributed by transitive/vendor dependencies.
+    packaging {
+        jniLibs {
+            excludes += setOf("lib/x86/**", "lib/x86_64/**")
+        }
+    }
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
