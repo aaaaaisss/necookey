@@ -24,7 +24,6 @@ class ZenzSegmentReranker(
 
     private data class SegmentEvidence(
         val output: String,
-        val pathScore: Int,
     )
 
     data class RerankResult(
@@ -72,16 +71,14 @@ class ZenzSegmentReranker(
         bunsetsuByCandidate.forEach { (candidate, segments) ->
             segments.orEmpty().forEach { segment ->
                 bySpan.getOrPut(segment.span) { mutableListOf() }
-                    .add(SegmentEvidence(segment.output, candidate.score))
+                    .add(SegmentEvidence(segment.output))
             }
         }
 
         val zenzBySpan = mutableMapOf<Span, Map<String, Float>>()
 
         for ((span, evidence) in bySpan) {
-            val grouped = evidence
-                .groupBy { it.output }
-                .mapValues { (_, values) -> values.minOf { it.pathScore } }
+            val grouped = evidence.groupBy { it.output }
 
             if (grouped.size < 2) continue
 
