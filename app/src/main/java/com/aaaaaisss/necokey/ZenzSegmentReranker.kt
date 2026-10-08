@@ -121,7 +121,8 @@ class ZenzSegmentReranker(
         }
 
         if (zenzBySpan.isEmpty()) {
-            return RerankResult(candidates.distinctBy(Candidate::string), emptyList())
+            val distinct = candidates.distinctBy(Candidate::string)
+            return RerankResult(distinct, fallbackFirstAlternatives(distinct))
         }
 
         val ordered = candidates.mapIndexed { index, candidate ->
@@ -166,6 +167,17 @@ class ZenzSegmentReranker(
             ?: emptyList()
 
         return RerankResult(reranked, firstAlternatives)
+    }
+
+    private fun fallbackFirstAlternatives(candidates: List<Candidate>): List<String> {
+        val first = candidates.firstOrNull()?.conversionSegments?.firstOrNull() ?: return emptyList()
+        return candidates.asSequence()
+            .mapNotNull { it.conversionSegments.firstOrNull() }
+            .filter { it.inputStart == first.inputStart && it.inputEnd == first.inputEnd && it.output != first.output }
+            .map { it.output }
+            .distinct()
+            .take(3)
+            .toList()
     }
 
     private data class RerankedCandidate(
