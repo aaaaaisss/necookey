@@ -136,8 +136,7 @@ class NecokeYInputMethodService : InputMethodService() {
             val detailed = engine.detailedCandidates(input, 16)
             val prediction = engine.predictionCandidates(input, 16)
             val reranked = zenzReranker.rerank(input, detailed)
-            val mainString = reranked.firstOrNull() ?: detailed.firstOrNull()?.string ?: input
-            val mainCandidate = detailed.firstOrNull { it.string == mainString }
+            val mainCandidate = reranked.firstOrNull() ?: detailed.firstOrNull()
             val firstSegment = mainCandidate?.conversionSegments?.firstOrNull()
 
             val alternatives = if (mainCandidate != null && firstSegment != null) {
