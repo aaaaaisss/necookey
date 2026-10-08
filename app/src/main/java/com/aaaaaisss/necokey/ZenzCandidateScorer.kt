@@ -22,6 +22,13 @@ class ZenzCandidateScorer {
 
     fun isReady(): Boolean = ready
 
+    @Synchronized
+    fun closeModel() {
+        if (!ready) return
+        runCatching { ZenzEngine.closeModel() }
+        ready = false
+    }
+
     /**
      * Scores explicitly supplied candidates with zenz Teacher Forcing.
      *
