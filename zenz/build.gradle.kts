@@ -10,7 +10,7 @@ android {
         minSdk = 29
         targetSdk = 36
         ndk {
-            abiFilters += listOf("arm64-v8a", "armeabi-v7a")
+            abiFilters += listOf("arm64-v8a")
         }
     }
     externalNativeBuild {
