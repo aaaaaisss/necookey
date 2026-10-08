@@ -26,6 +26,15 @@ jobs:
           distribution: temurin
           java-version: '17'
 
+      - name: Cache Android SDK and Gradle
+        uses: actions/cache@v4
+        with
+          path: |
+            /usr/local/lib/android/sdk
+            ~/.gradle
+          key: ${{ runner.os }}-android-${{ hashFiles('**/build.gradle*', '**/gradle.properties', '**/settings.gradle*') }}
+          restore-keys: |
+            ${{ runner.os }}-android-
       - name: Prepare Android SDK
         run: |
           export ANDROID_HOME=/usr/local/lib/android/sdk
