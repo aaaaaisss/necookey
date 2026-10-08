@@ -1,109 +1,133 @@
 package com.aaaaaisss.necokey
 
-import android.inputmethodservice.InputMethodService
 import android.graphics.Color
+import android.inputmethodservice.InputMethodService
 import android.view.View
 import android.view.inputmethod.EditorInfo
-import android.widget.Button
-import android.widget.HorizontalScrollView
 import android.widget.LinearLayout
 import android.widget.TextView
+import com.kazumaproject.custom_keyboard.data.KeyAction
+import com.kazumaproject.custom_keyboard.data.KeyboardLayout
+import com.kazumaproject.custom_keyboard.layout.KeyboardDefaultLayouts
+import com.kazumaproject.custom_keyboard.view.FlickKeyboardView
 
 class NecokeYInputMethodService : InputMethodService() {
     private val engine = CandidateEngine()
     private var composing = ""
     private lateinit var composingView: TextView
     private lateinit var candidatesView: LinearLayout
+    private lateinit var keyboardView: FlickKeyboardView
 
     override fun onCreateInputView(): View {
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setBackgroundColor(Color.rgb(35, 35, 35))
+            setBackgroundColor(Color.rgb(32, 32, 32))
         }
+
         composingView = TextView(this).apply {
-            textSize = 18f
             setTextColor(Color.WHITE)
+            textSize = 20f
             setPadding(20, 12, 20, 12)
             text = ""
         }
-        root.addView(composingView, LinearLayout.LayoutParams(-1, 52))
-        val scroll = HorizontalScrollView(this)
-        candidatesView = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
-        scroll.addView(candidatesView)
-        root.addView(scroll, LinearLayout.LayoutParams(-1, 58))
-        val rows = listOf(
-            "あいうえおかきくけこ",
-            "さしすせそたちつてと",
-            "なにぬねのはひふへほ",
-            "まみむめもやゆよらりる",
-            "るれろわをん"
-        )
-        rows.forEach { chars ->
-            val row = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
-            chars.forEach { ch ->
-                row.addView(key(ch.toString()) { commitKana(ch.toString()) },
-                    LinearLayout.LayoutParams(0, 56, 1f))
-            }
-            root.addView(row)
+        candidatesView = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            setPadding(8, 4, 8, 4)
         }
-        val controls = LinearLayout(this)
-        controls.addView(key("変換") { showCandidates() }, LinearLayout.LayoutParams(0, 56, 1f))
-        controls.addView(key("空白") { commitText(" ") }, LinearLayout.LayoutParams(0, 56, 1f))
-        controls.addView(key("⌫") { backspace() }, LinearLayout.LayoutParams(0, 56, 1f))
-        controls.addView(key("確定") { commitComposing() }, LinearLayout.LayoutParams(0, 56, 1f))
-        root.addView(controls)
+
+        keyboardView = FlickKeyboardView(this).apply {
+            setOnKeyboardActionListener(ActionListener())
+            setKeyboard(KeyboardDefaultLayouts.defaultLayout())
+            setBackgroundColor(Color.rgb(48, 48, 48))
+        }
+
+        root.addView(composingView, LinearLayout.LayoutParams(-1, 0, 1f))
+        root.addView(candidatesView, LinearLayout.LayoutParams(-1, 0, 0.55f))
+        root.addView(keyboardView, LinearLayout.LayoutParams(-1, 0, 3.45f))
         return root
-    }
-
-    private fun key(label: String, action: () -> Unit) = Button(this).apply {
-        text = label
-        textSize = 15f
-        setOnClickListener { action() }
-    }
-
-    private fun commitKana(kana: String) {
-        composing += kana
-        composingView.text = composing
-        updateCandidates()
-    }
-
-    private fun updateCandidates() {
-        candidatesView.removeAllViews()
-        engine.candidates(composing).take(6).forEach { candidate ->
-            candidatesView.addView(key(candidate) {
-                currentInputConnection?.commitText(candidate, 1)
-                composing = ""
-                composingView.text = ""
-                candidatesView.removeAllViews()
-            })
-        }
-    }
-
-    private fun showCandidates() = updateCandidates()
-
-    private fun commitComposing() {
-        if (composing.isNotEmpty()) currentInputConnection?.commitText(composing, 1)
-        composing = ""
-        composingView.text = ""
-        candidatesView.removeAllViews()
-    }
-
-    private fun commitText(text: String) {
-        currentInputConnection?.commitText(text, 1)
-    }
-
-    private fun backspace() {
-        if (composing.isNotEmpty()) {
-            composing = composing.dropLast(1)
-            composingView.text = composing
-            updateCandidates()
-        } else {
-            currentInputConnection?.deleteSurroundingText(1, 0)
-        }
     }
 
     override fun onStartInput(attribute: EditorInfo?, restarting: Boolean) {
         super.onStartInput(attribute, restarting)
         composing = ""
+        refresh()
+    }
+
+    private fun appendText(text: String) {
+        if (text.isEmpty()) return
+        composing += text
+        refresh()
+    }
+
+    private fun deleteLast() {
+        if (composing.isNotEmpty()) {
+            composing = composing.dropLast(1)
+            refresh()
+        } else {
+            currentInputConnection?.deleteSurroundingText(1, 0)
+        }
+    }
+
+    private fun convert() {
+        refresh(showCandidates = true)
+    }
+
+    private fun commitComposing() {
+        if (composing.isNotEmpty()) {
+            currentInputConnection?.commitText(composing, 1)
+            composing = ""
+        }
+        refresh()
+    }
+
+    private fun commitCandidate(text: String) {
+        currentInputConnection?.commitText(text, 1)
+        composing = ""
+        refresh()
+    }
+
+    private fun refresh(showCandidates: Boolean = false) {
+        composingView.text = composing
+        candidatesView.removeAllViews()
+        if (!showCandidates || composing.isEmpty()) return
+
+        engine.candidates(composing).forEach { candidate ->
+            TextView(this).apply {
+                text = candidate
+                textSize = 18f
+                setTextColor(Color.WHITE)
+                setPadding(20, 8, 20, 8)
+                setOnClickListener { commitCandidate(candidate) }
+                candidatesView.addView(this)
+            }
+        }
+    }
+
+    private inner class ActionListener : FlickKeyboardView.OnKeyboardActionListener {
+        override fun onPress(action: KeyAction) = Unit
+
+        override fun onAction(action: KeyAction, isFlick: Boolean) {
+            when (action) {
+                is KeyAction.Text -> appendText(action.text)
+                is KeyAction.InputText -> appendText(action.text)
+                KeyAction.Delete, KeyAction.Backspace -> deleteLast()
+                KeyAction.Convert, KeyAction.Space -> convert()
+                KeyAction.Confirm, KeyAction.Enter -> commitComposing()
+                KeyAction.NewLine, KeyAction.ForceNewLine -> {
+                    commitComposing()
+                    currentInputConnection?.commitText("\n", 1)
+                }
+                else -> Unit
+            }
+        }
+
+        override fun onActionLongPress(action: KeyAction) = Unit
+        override fun onActionUpAfterLongPress(action: KeyAction) = Unit
+        override fun onFlickDirectionChanged(direction: com.kazumaproject.custom_keyboard.data.FlickDirection) = Unit
+        override fun onFlickActionLongPress(action: KeyAction) = Unit
+        override fun onFlickActionUpAfterLongPress(
+            action: KeyAction,
+            isFlick: Boolean
+        ) = Unit
     }
 }
