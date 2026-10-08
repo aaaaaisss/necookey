@@ -137,6 +137,39 @@ class SumireKanaKanjiConverter(private val context: Context) {
         )
     }
 
+    suspend fun candidatesWithBunsetsu(
+        input: String,
+        n: Int = 12,
+    ): com.kazumaproject.markdownhelperkeyboard.converter.candidate.BunsetsuCandidateResult {
+        if (input.isEmpty()) {
+            return com.kazumaproject.markdownhelperkeyboard.converter.candidate.BunsetsuCandidateResult(
+                candidates = emptyList(),
+                splitPatterns = emptyList(),
+            )
+        }
+        return engine.getCandidatesWithoutPredictionWithBunsetsu(
+            input = input,
+            n = n,
+            mozcUtPersonName = true,
+            mozcUTPlaces = true,
+            mozcUTWiki = true,
+            mozcUTNeologd = true,
+            mozcUTWeb = false,
+            userDictionaryRepository = userDictionary,
+            learnRepository = learnRepository,
+            typoCorrectionOffsetScore = 0,
+            omissionSearchOffsetScore = 0,
+            predictionConfig = PredictionConfig(
+                japanesePredictionEnabled = false,
+                englishPredictionEnabled = false,
+                symbolEmojiEnabled = false,
+                showSymbolCandidates = false,
+                showEmojiCandidates = false,
+                showEmoticonCandidates = false,
+            ),
+        )
+    }
+
     private fun loadTriple(
         context: Context,
         tangoPath: String,
