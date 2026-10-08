@@ -1,23 +1,22 @@
 package com.aaaaaisss.necokey
 
 /**
- * Heuristic gate for the first zenz integration.
+ * Conservative gate for zenz reranking.
  *
- * Sumire's Candidate.score is a path cost, not a probability. Therefore this
- * gate deliberately uses only rank/score-gap information and does not call it
- * a probability or Mozc structure_cost.
+ * Sumire's Candidate.score is a whole-path cost. Its absolute scale is not
+ * treated as a probability and is not used with a magic numeric gap.
+ *
+ * zenz is invoked only when the normal Sumire result already shows a real
+ * ambiguity for the same input span: at least two different outputs for that
+ * span occur within the inspected top ranks.
  */
 object ZenzConfidenceGate {
     fun shouldRerank(
-        candidateScores: List<Long>,
+        outputRanks: Collection<Int>,
         maxRank: Int = 3,
-        maxGap: Long = 120L
     ): Boolean {
-        if (candidateScores.size < 2) return false
-        val limit = maxRank.coerceAtLeast(1).coerceAtMost(candidateScores.size)
-        val top = candidateScores.take(limit)
-        val best = top.minOrNull() ?: return false
-        val second = top.drop(1).minOrNull() ?: return false
-        return second - best <= maxGap
+        if (outputRanks.size < 2) return false
+        val limit = maxRank.coerceAtLeast(2)
+        return outputRanks.distinct().count { it < limit } >= 2
     }
 }
