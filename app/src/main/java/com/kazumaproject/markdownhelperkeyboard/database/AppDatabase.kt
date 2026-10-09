@@ -27,8 +27,6 @@ import com.kazumaproject.markdownhelperkeyboard.custom_romaji.database.RomajiMap
 import com.kazumaproject.markdownhelperkeyboard.custom_romaji.database.RomajiMapEntity
 import com.kazumaproject.markdownhelperkeyboard.delete_key_flick.database.DeleteKeyFlickDeleteTarget
 import com.kazumaproject.markdownhelperkeyboard.delete_key_flick.database.DeleteKeyFlickDeleteTargetDao
-import com.kazumaproject.markdownhelperkeyboard.gemma.database.GemmaPromptTemplate
-import com.kazumaproject.markdownhelperkeyboard.gemma.database.GemmaPromptTemplateDao
 import com.kazumaproject.markdownhelperkeyboard.learning.database.LearnDao
 import com.kazumaproject.markdownhelperkeyboard.learning.database.LearnEntity
 import com.kazumaproject.markdownhelperkeyboard.ngram_rule.database.NgramRuleDao
@@ -74,7 +72,6 @@ import com.kazumaproject.markdownhelperkeyboard.zeroquery.custom.CustomZeroQuery
         ShortcutItem::class,
         SystemUserDictionaryEntry::class,
         NgramRuleEntity::class,
-        GemmaPromptTemplate::class,
         DeleteKeyFlickDeleteTarget::class,
         PhysicalKeyboardShortcutItem::class,
         SpacerDefinition::class,
@@ -84,7 +81,7 @@ import com.kazumaproject.markdownhelperkeyboard.zeroquery.custom.CustomZeroQuery
         CustomZeroQueryEntry::class,
         TextMacro::class,
     ],
-    version = 48,
+    version = 49,
     exportSchema = false
 )
 @TypeConverters(
@@ -106,7 +103,6 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun shortcutDao(): ShortcutDao
     abstract fun systemUserDictionaryDao(): SystemUserDictionaryDao
     abstract fun ngramRuleDao(): NgramRuleDao
-    abstract fun gemmaPromptTemplateDao(): GemmaPromptTemplateDao
     abstract fun deleteKeyFlickDeleteTargetDao(): DeleteKeyFlickDeleteTargetDao
     abstract fun physicalKeyboardShortcutDao(): PhysicalKeyboardShortcutDao
     abstract fun candidateOrderOverrideDao(): CandidateOrderOverrideDao
@@ -1207,6 +1203,17 @@ abstract class AppDatabase : RoomDatabase() {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE romaji_maps ADD COLUMN autoSokuon INTEGER NOT NULL DEFAULT 1")
                 db.execSQL("ALTER TABLE romaji_maps ADD COLUMN autoN INTEGER NOT NULL DEFAULT 1")
+            }
+        }
+
+        /** necookey: Gemma prompt templates were removed with the Gemma feature. */
+        val MIGRATION_48_49 = object : Migration(48, 49) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("DROP INDEX IF EXISTS `index_gemma_prompt_template_sortOrder`")
+                db.execSQL("DROP INDEX IF EXISTS `index_gemma_prompt_template_isEnabled`")
+                db.execSQL("DROP INDEX IF EXISTS `index_gemma_prompt_template_inputModality_isEnabled`")
+                db.execSQL("DROP INDEX IF EXISTS `index_gemma_prompt_template_builtInKey`")
+                db.execSQL("DROP TABLE IF EXISTS `gemma_prompt_template`")
             }
         }
 

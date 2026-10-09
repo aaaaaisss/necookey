@@ -1,13 +1,10 @@
 package com.kazumaproject.markdownhelperkeyboard.ime_service
 
 import com.kazumaproject.markdownhelperkeyboard.converter.candidate.Candidate
-import com.kazumaproject.markdownhelperkeyboard.gemma.database.GemmaPromptTemplate
 
-/** A selected-text action. Local macro actions never cross into a model-backed branch. */
+/** A selected-text action (local text macros only). */
 internal sealed interface SelectionAction {
     data class TextMacro(val id: Long) : SelectionAction
-    data object Translate : SelectionAction
-    data class CustomPrompt(val template: GemmaPromptTemplate) : SelectionAction
 }
 
 internal data class SelectionActionEntry(
@@ -35,8 +32,7 @@ internal object SelectionActionSessionComposer {
     fun compose(
         selectedText: String,
         localMacros: List<SelectionActionEntry>,
-        translationAndPrompts: List<SelectionActionEntry>,
-    ): SelectionActionSession? = (localMacros + translationAndPrompts)
+    ): SelectionActionSession? = localMacros
         .takeIf { it.isNotEmpty() }
         ?.let { SelectionActionSession(selectedText = selectedText, entries = it) }
 }

@@ -33,7 +33,6 @@ object SettingTabRegistry {
     const val TAB_TABLET = "tablet"
     const val TAB_HARDWARE_KEYBOARD = "hardware_keyboard"
     const val TAB_ZENZ = "zenz"
-    const val TAB_GEMMA = "gemma"
 
     fun createTabs(): List<SettingTabSpec> {
         val tabs = mutableListOf(
@@ -60,16 +59,6 @@ object SettingTabRegistry {
                 xmlRes = R.xml.pref_zenz,
                 destinationId = R.id.zenzPreferenceFragment,
                 fragmentFactory = { ZenzPreferenceFragment() },
-            )
-        }
-
-        if (AppVariantConfig.hasGemma) {
-            tabs += SettingTabSpec(
-                key = TAB_GEMMA,
-                title = { "Gemma" },
-                xmlRes = R.xml.pref_gemma,
-                destinationId = R.id.gemmaPreferenceFragment,
-                fragmentFactory = { GemmaPreferenceFragment() },
             )
         }
 

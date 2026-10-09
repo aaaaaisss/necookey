@@ -5,7 +5,7 @@ import android.graphics.drawable.ColorDrawable
 import android.view.View
 import com.kazumaproject.markdownhelperkeyboard.converter.candidate.Candidate
 import com.kazumaproject.markdownhelperkeyboard.custom_keyboard.data.CustomKeyboardLayout
-import com.kazumaproject.markdownhelperkeyboard.gemma.GemmaTranslationManager
+import com.kazumaproject.markdownhelperkeyboard.converter.candidate.CANDIDATE_TYPE_TEXT_MACRO
 import com.kazumaproject.markdownhelperkeyboard.ime_service.candidate.CandidateStripContent
 import com.kazumaproject.markdownhelperkeyboard.ime_service.candidate.ClipboardPreviewState
 import com.kazumaproject.markdownhelperkeyboard.ime_service.candidate.InlineSuggestionToggle
@@ -654,12 +654,12 @@ class SuggestionAdapterDisplayItemTest {
     private fun selectionActions(): List<Candidate> =
         listOf(
             candidate(
-                string = "Translate",
-                type = GemmaTranslationManager.SELECTION_TRANSLATE_ACTION_CANDIDATE_TYPE.toByte()
+                string = "Quote",
+                type = CANDIDATE_TYPE_TEXT_MACRO
             ),
             candidate(
-                string = "Prompt",
-                type = GemmaTranslationManager.SELECTION_PROMPT_ACTION_CANDIDATE_TYPE.toByte()
+                string = "Bold",
+                type = CANDIDATE_TYPE_TEXT_MACRO
             )
         )
 

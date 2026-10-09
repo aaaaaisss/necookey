@@ -66,7 +66,6 @@ android {
         full {
             dimension "edition"
             buildConfigField "boolean", "HAS_ZENZ", "true"
-            buildConfigField "boolean", "HAS_GEMMA", "true"
             buildConfigField "String", "APP_EDITION", "\"full\""
         }
         lite {
@@ -74,7 +73,6 @@ android {
             applicationIdSuffix ".lite"
             versionNameSuffix "-lite"
             buildConfigField "boolean", "HAS_ZENZ", "false"
-            buildConfigField "boolean", "HAS_GEMMA", "false"
             buildConfigField "String", "APP_EDITION", "\"lite\""
         }
         standard {
@@ -1153,9 +1151,6 @@ dependencies {
     testImplementation "org.robolectric:robolectric:4.14.1"
 
     implementation 'com.google.code.gson:gson:2.13.1'
-    fullRuntimeOnly('com.google.ai.edge.litertlm:litertlm-android:0.14.0') {
-        transitive = false
-    }
 
     implementation "androidx.hilt:hilt-navigation-fragment:1.2.0"
 

@@ -110,8 +110,6 @@ internal object FrequentSettingFilters {
 
             R.id.aiConversionPreferenceFragment,
             R.id.zenzPreferenceFragment,
-            R.id.gemmaPreferenceFragment,
-            R.id.gemmaPromptTemplateFragment,
                 -> SettingCategory.AI_CONVERSION
 
             R.id.clipboardShortcutPreferenceFragment,

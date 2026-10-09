@@ -101,9 +101,6 @@
             android:id="@+id/action_navigation_setting_to_ngramRuleFragment"
             app:destination="@id/ngramRuleFragment" />
         <action
-            android:id="@+id/action_navigation_setting_to_gemmaPromptTemplateFragment"
-            app:destination="@id/gemmaPromptTemplateFragment" />
-        <action
             android:id="@+id/action_navigation_setting_to_deleteKeyFlickTargetsFragment"
             app:destination="@id/deleteKeyFlickTargetsFragment" />
         <action
@@ -220,10 +217,6 @@
         android:name="com.kazumaproject.markdownhelperkeyboard.setting_activity.ui.setting.ZenzPreferenceFragment"
         android:label="zenz" />
 
-    <fragment
-        android:id="@+id/gemmaPreferenceFragment"
-        android:name="com.kazumaproject.markdownhelperkeyboard.setting_activity.ui.setting.GemmaPreferenceFragment"
-        android:label="Gemma" />
 
     <fragment
         android:id="@+id/kanaPreferenceFragment"
@@ -559,11 +552,6 @@
         android:name="com.kazumaproject.markdownhelperkeyboard.ngram_rule.ui.NgramRuleFragment"
         android:label="@string/n_gram_rule_preference_title"
         tools:layout="@layout/fragment_ngram_rule" />
-    <fragment
-        android:id="@+id/gemmaPromptTemplateFragment"
-        android:name="com.kazumaproject.markdownhelperkeyboard.gemma.ui.GemmaPromptTemplateFragment"
-        android:label="@string/gemma_prompt_template_fragment_title"
-        tools:layout="@layout/fragment_gemma_prompt_template" />
     <fragment
         android:id="@+id/deleteKeyFlickTargetsFragment"
         android:name="com.kazumaproject.markdownhelperkeyboard.delete_key_flick.ui.DeleteKeyFlickTargetsFragment"

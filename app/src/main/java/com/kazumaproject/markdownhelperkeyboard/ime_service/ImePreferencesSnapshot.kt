@@ -266,7 +266,6 @@ data class ImePreferencesSnapshot(
     val enableTypoCorrectionJapaneseFlickKeyboardOffsetScorePreference: Int,
     val enableTypoCorrectionJapaneseFlickKeyboardPreference: Boolean,
     val enableTypoCorrectionQwertyEnglishKeyboardPreference: Boolean,
-    val enableGemmaTranslationPreference: Boolean,
     val utilityCandidateConfig: UtilityCandidateConfig,
     val dateCandidateConfig: DateCandidateConfig,
     val keyboardSkin: KeyboardSkinId = KeyboardSkinId.DEFAULT,
@@ -800,8 +799,6 @@ data class ImePreferencesSnapshot(
                     appPreference.enable_typo_correction_japanese_flick_keyboard_preference,
                 enableTypoCorrectionQwertyEnglishKeyboardPreference =
                     appPreference.enable_typo_correction_qwerty_english_keyboard_preference,
-                enableGemmaTranslationPreference =
-                    AppVariantConfig.hasGemma && appPreference.enable_gemma_translation_preference,
                 utilityCandidateConfig = appPreference.utility_candidate_config,
                 dateCandidateConfig = appPreference.date_candidate_config,
             )

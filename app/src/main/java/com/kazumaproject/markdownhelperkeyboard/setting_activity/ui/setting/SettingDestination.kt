@@ -123,7 +123,6 @@ object SettingDestinations {
         "ng_word_preference",
         "physical_keyboard_shortcut_setting_preference",
         "sumire_special_key_editor_preference",
-        "gemma_prompt_template_management_preference",
         "system_user_dictionary_builder_preference",
         "external_dictionary_settings_preference",
         "n_gram_rule_preference",
@@ -384,7 +383,7 @@ object SettingDestinations {
                 title = context.getString(R.string.setting_category_ai_conversion_title),
                 summary = context.getString(R.string.setting_category_ai_conversion_summary),
                 category = SettingCategory.FREQUENT,
-                keywords = listOf("ai", "zenz", "gemma"),
+                keywords = listOf("ai", "zenz"),
                 destinationId = R.id.aiConversionPreferenceFragment,
                 iconRes = CoreR.drawable.lightbulb_24dp,
             )
@@ -398,19 +397,6 @@ object SettingDestinations {
                     category = SettingCategory.FREQUENT,
                     keywords = listOf("zenz", "ai", "conversion", "neural"),
                     destinationId = R.id.zenzPreferenceFragment,
-                    iconRes = CoreR.drawable.lightbulb_24dp,
-                )
-            )
-        }
-        if (AppVariantConfig.hasGemma) {
-            add(
-                destination(
-                    key = "setting_route_gemma_preferences",
-                    title = "Gemma",
-                    summary = context.getString(R.string.setting_route_gemma_summary),
-                    category = SettingCategory.FREQUENT,
-                    keywords = listOf("gemma", "ai", "conversion", "translation"),
-                    destinationId = R.id.gemmaPreferenceFragment,
                     iconRes = CoreR.drawable.lightbulb_24dp,
                 )
             )
@@ -543,9 +529,6 @@ object SettingDestinations {
         "zenz_model_select_preference",
         "enable_zenz_right_context_preference",
         "zenz_debounce_time_preference",
-        "gemma_translation_enable_preference",
-        "gemma_translation_target_language_preference",
-        "gemma_prompt_template_management_preference",
     )
 
     fun categories(context: Context): List<SettingDestination> = listOf(
@@ -608,7 +591,7 @@ object SettingDestinations {
             title = context.getString(R.string.setting_category_ai_conversion_title),
             summary = context.getString(R.string.setting_category_ai_conversion_summary),
             category = SettingCategory.AI_CONVERSION,
-            keywords = listOf("ai", "zenz", "gemma"),
+            keywords = listOf("ai", "zenz"),
             destinationId = R.id.aiConversionPreferenceFragment,
             iconRes = CoreR.drawable.lightbulb_24dp,
         ),
@@ -800,7 +783,6 @@ object SettingDestinations {
             "setting_route_hardware_keyboard_preferences" -> R.id.hardwareKeyboardPreferenceFragment
             "setting_route_common_preferences" -> R.id.commonPreferenceFragment
             "setting_route_zenz_preferences" -> R.id.zenzPreferenceFragment.takeIf { AppVariantConfig.hasZenz }
-            "setting_route_gemma_preferences" -> R.id.gemmaPreferenceFragment.takeIf { AppVariantConfig.hasGemma }
             "custom_romaji_preference" -> R.id.romajiMapFragment
             "shortcut_toolbar_item_preference" -> R.id.shortcutSettingFragment
             "shortcut_toolbar_size_setting_fragment_preference" ->
@@ -823,7 +805,6 @@ object SettingDestinations {
             "candidate_order_override_preference" -> R.id.candidateOrderOverrideFragment
             "custom_zero_query_dictionary_preference" -> R.id.customZeroQueryDictionaryFragment
             "ng_word_preference" -> R.id.ngWordFragment
-            "gemma_prompt_template_management_preference" -> R.id.gemmaPromptTemplateFragment
             "kana_keyboard_letter_size_preference" -> R.id.tenKeyCandidateLetterSizeFragment
             "tenkey_popup_view_style_preference" -> R.id.tenKeyPopupStyleSettingFragment
             "qwerty_button_size_preference" -> R.id.qwertyMarginSettingFragment

@@ -890,7 +890,6 @@ open class CommonPreferenceFragment : AsyncPreferenceFragment() {
             "setting_route_hardware_keyboard_preferences" to R.id.hardwareKeyboardPreferenceFragment,
             "setting_route_common_preferences" to R.id.commonPreferenceFragment,
             "setting_route_zenz_preferences" to R.id.zenzPreferenceFragment,
-            "setting_route_gemma_preferences" to R.id.gemmaPreferenceFragment,
         )
 
         routeTargets.forEach { (key, destinationId) ->
@@ -902,8 +901,6 @@ open class CommonPreferenceFragment : AsyncPreferenceFragment() {
 
         findPreference<Preference>("setting_route_zenz_preferences")?.isVisible =
             AppVariantConfig.hasZenz
-        findPreference<Preference>("setting_route_gemma_preferences")?.isVisible =
-            AppVariantConfig.hasGemma
     }
 
     override fun onPreferencesResumed() {

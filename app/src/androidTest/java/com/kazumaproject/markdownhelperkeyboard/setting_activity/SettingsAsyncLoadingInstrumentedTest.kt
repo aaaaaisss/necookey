@@ -165,21 +165,6 @@ class SettingsAsyncLoadingInstrumentedTest {
         }
     }
 
-    @Test fun gemmaModelDiscoveryNeverBlocksMain() {
-        assumeTrue(AppVariantConfig.hasGemma)
-        ActivityScenario.launch(MainActivity::class.java).use { scenario ->
-            scenario.awaitSettingsContentReady()
-            awaitPreference(scenario, R.id.kanaPreferenceFragment, "tenkey_space_flick_preference")
-            val gate = Gate(SettingsLoadStage.MODELS)
-            gate.install()
-            scenario.onActivity { nav(it).navigate(R.id.gemmaPreferenceFragment) }
-            gate.awaitEntry()
-            assertProgressAndHeartbeat(scenario)
-            gate.release()
-            awaitCurrentPreference(scenario, "gemma_model_selection_preference")
-        }
-    }
-
     @Test fun everyLegacyPreferenceTabBindsItsItemsWithoutLoadingErrors() {
         for (newHome in listOf(false, true)) {
             AppPreference.setting_use_new_home_screen_preference = newHome

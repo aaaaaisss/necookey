@@ -398,14 +398,11 @@ class SettingInlinePreferenceClassificationInstrumentedTest {
         add(R.xml.pref_custom)
         add(R.xml.pref_tablet)
         add(R.xml.pref_hardware_keyboard)
-        if (AppVariantConfig.hasZenz || AppVariantConfig.hasGemma) {
+        if (AppVariantConfig.hasZenz) {
             add(R.xml.pref_ai_conversion)
         }
         if (AppVariantConfig.hasZenz) {
             add(R.xml.pref_zenz)
-        }
-        if (AppVariantConfig.hasGemma) {
-            add(R.xml.pref_gemma)
         }
     }
 
@@ -423,9 +420,6 @@ class SettingInlinePreferenceClassificationInstrumentedTest {
         add(R.xml.pref_hardware_keyboard)
         if (AppVariantConfig.hasZenz) {
             add(R.xml.pref_zenz)
-        }
-        if (AppVariantConfig.hasGemma) {
-            add(R.xml.pref_gemma)
         }
     }
 

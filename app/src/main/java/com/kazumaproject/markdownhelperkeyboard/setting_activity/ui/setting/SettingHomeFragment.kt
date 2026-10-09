@@ -461,7 +461,6 @@ class SettingHomeFragment : Fragment() {
             "setting_route_ai_conversion" -> getString(
                 R.string.setting_home_ai_status_summary,
                 statusLabel(appPreference.enable_zenz_preference),
-                statusLabel(appPreference.enable_gemma_translation_preference),
             )
 
             "setting_route_clipboard_shortcut" -> getString(

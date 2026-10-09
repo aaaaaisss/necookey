@@ -16,11 +16,6 @@
             android:summary="@string/setting_route_zenz_summary"
             android:title="zenz" />
 
-        <Preference
-            android:icon="@drawable/lightbulb_24dp"
-            android:key="setting_route_gemma_preferences"
-            android:summary="@string/setting_route_gemma_summary"
-            android:title="Gemma" />
 
     </PreferenceCategory>
 

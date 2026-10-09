@@ -47,7 +47,6 @@ import com.kazumaproject.markdownhelperkeyboard.converter.candidate.CANDIDATE_TY
 import com.kazumaproject.markdownhelperkeyboard.converter.candidate.Candidate
 import com.kazumaproject.markdownhelperkeyboard.converter.candidate.QWERTY_GLIDE_CANDIDATE_TYPE
 import com.kazumaproject.markdownhelperkeyboard.custom_keyboard.data.CustomKeyboardLayout
-import com.kazumaproject.markdownhelperkeyboard.gemma.GemmaTranslationManager
 import com.kazumaproject.markdownhelperkeyboard.ime_service.CandidateStripLayoutPolicy
 import com.kazumaproject.markdownhelperkeyboard.ime_service.candidate.CandidateStripContent
 import com.kazumaproject.markdownhelperkeyboard.ime_service.candidate.InlineSuggestionToggle
@@ -824,11 +823,6 @@ class SuggestionAdapter internal constructor(
                 submitContent(
                     if (value.isEmpty()) {
                         CandidateStripContent.Empty
-                    } else if (value.all { it.isSelectionActionCandidate() }) {
-                        CandidateStripContent.SelectionActions(
-                            actions = value,
-                            showShortcutEntry = false
-                        )
                     } else {
                         CandidateStripContent.Candidates(
                             candidates = value
@@ -1217,8 +1211,8 @@ class SuggestionAdapter internal constructor(
     }
 
     inner class SelectionActionViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
-        val badgeText: MaterialTextView = itemView.findViewById(R.id.suggestion_gemma_action_badge)
-        val actionText: MaterialTextView = itemView.findViewById(R.id.suggestion_gemma_action_text)
+        val badgeText: MaterialTextView = itemView.findViewById(R.id.suggestion_selection_action_badge)
+        val actionText: MaterialTextView = itemView.findViewById(R.id.suggestion_selection_action_text)
     }
 
     inner class InlineSuggestionToggleViewHolder(itemView: View) :
@@ -1373,7 +1367,7 @@ class SuggestionAdapter internal constructor(
 
             VIEW_TYPE_SELECTION_ACTION -> {
                 val itemView = LayoutInflater.from(parent.context)
-                    .inflate(R.layout.suggestion_gemma_action_item, parent, false)
+                    .inflate(R.layout.suggestion_selection_action_item, parent, false)
                 itemView.setBackgroundResource(
                     if (isDynamicColorEnable) com.kazumaproject.core.R.drawable.recyclerview_item_bg_material else com.kazumaproject.core.R.drawable.recyclerview_item_bg
                 )
@@ -2256,10 +2250,6 @@ class SuggestionAdapter internal constructor(
             (39).toByte() -> ""
             (40).toByte() -> "[AI]"
             QWERTY_GLIDE_CANDIDATE_TYPE -> ""
-            GemmaTranslationManager.TRANSLATED_CANDIDATE_TYPE.toByte() -> "[訳]"
-            GemmaTranslationManager.PROMPT_RESULT_CANDIDATE_TYPE.toByte() -> "[AI]"
-            GemmaTranslationManager.SELECTION_TRANSLATE_ACTION_CANDIDATE_TYPE.toByte() -> "[訳]"
-            GemmaTranslationManager.SELECTION_PROMPT_ACTION_CANDIDATE_TYPE.toByte() -> "[AI]"
             else -> ""
         }
         holder.itemView.isPressed = position == highlightedPosition
@@ -2344,11 +2334,7 @@ class SuggestionAdapter internal constructor(
         holder.itemView.contentDescription = null
         holder.actionText.text = suggestion.string
         holder.actionText.textSize = candidateTextSize
-        holder.badgeText.text = when (suggestion.type) {
-            GemmaTranslationManager.SELECTION_TRANSLATE_ACTION_CANDIDATE_TYPE.toByte() -> "訳"
-            GemmaTranslationManager.SELECTION_PROMPT_ACTION_CANDIDATE_TYPE.toByte() -> "AI"
-            else -> ""
-        }
+        holder.badgeText.text = ""
 
         candidateTextColor?.let { color ->
             holder.actionText.setTextColor(color)
@@ -2482,9 +2468,5 @@ class SuggestionAdapter internal constructor(
         }
     }
 
-    private fun Candidate.isSelectionActionCandidate(): Boolean {
-        return type == GemmaTranslationManager.SELECTION_TRANSLATE_ACTION_CANDIDATE_TYPE.toByte() ||
-                type == GemmaTranslationManager.SELECTION_PROMPT_ACTION_CANDIDATE_TYPE.toByte()
-    }
 
 }

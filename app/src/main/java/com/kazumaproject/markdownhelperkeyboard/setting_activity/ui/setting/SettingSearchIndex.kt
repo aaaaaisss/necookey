@@ -92,7 +92,6 @@ object SettingSearchIndex {
         R.id.generalInfoPreferenceFragment,
         R.id.advancedPreferenceFragment,
         R.id.zenzPreferenceFragment,
-        R.id.gemmaPreferenceFragment,
         R.id.legacyCommonPreferenceFragment,
     )
 
@@ -357,9 +356,6 @@ object SettingSearchIndex {
         if (AppVariantConfig.hasZenz) {
             add(PreferenceXmlSource(R.xml.pref_zenz, R.id.zenzPreferenceFragment, SettingCategory.AI_CONVERSION))
         }
-        if (AppVariantConfig.hasGemma) {
-            add(PreferenceXmlSource(R.xml.pref_gemma, R.id.gemmaPreferenceFragment, SettingCategory.AI_CONVERSION))
-        }
         add(PreferenceXmlSource(R.xml.pref_clipboard_shortcut, R.id.clipboardShortcutPreferenceFragment, SettingCategory.CLIPBOARD_SHORTCUT))
         add(PreferenceXmlSource(R.xml.pref_operation_feedback, R.id.operationFeedbackPreferenceFragment, SettingCategory.OPERATION_FEEDBACK))
         add(PreferenceXmlSource(R.xml.pref_general_info, R.id.generalInfoPreferenceFragment, SettingCategory.APP_INFO))
@@ -391,8 +387,7 @@ object SettingSearchIndex {
             SettingTabRegistry.TAB_CONVERSION_ENGINE -> SettingCategory.CONVERSION_ENGINE
             SettingTabRegistry.TAB_DICTIONARY -> SettingCategory.DICTIONARY
             SettingTabRegistry.TAB_TEXT_MACRO -> SettingCategory.TEXT_MACRO
-            SettingTabRegistry.TAB_ZENZ,
-            SettingTabRegistry.TAB_GEMMA -> SettingCategory.AI_CONVERSION
+            SettingTabRegistry.TAB_ZENZ -> SettingCategory.AI_CONVERSION
             SettingTabRegistry.TAB_COMMON -> SettingCategory.ADVANCED
             else -> SettingCategory.INPUT_METHOD
         }
@@ -530,7 +525,6 @@ object SettingSearchIndex {
     private fun isVisibleInCurrentVariant(key: String): Boolean =
         when (key) {
             "setting_route_zenz_preferences" -> AppVariantConfig.hasZenz
-            "setting_route_gemma_preferences" -> AppVariantConfig.hasGemma
             else -> true
         }
 
