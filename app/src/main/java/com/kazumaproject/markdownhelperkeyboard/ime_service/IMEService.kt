@@ -25440,8 +25440,11 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
     ): BunsetsuAnalysis {
         if (analysis.slots.size < 2) return analysis
         val candidatesByRange = LinkedHashMap<Pair<Int, Int>, List<Candidate>>()
-        for (slot in analysis.slots) {
-            if (slot.alternatives.size >= 2) continue
+        val queryTargets = analysis.slots.filter { slot ->
+            slot.alternatives.size < 2 ||
+                slot.isAmbiguous(necookeyCandidateBarConfig.gateNormalizedGapThreshold)
+        }.take(necookeyCandidateBarConfig.maxZenzBunsetsuPerRequest.coerceAtLeast(0))
+        for (slot in queryTargets) {
             if (!shouldApplyCandidateResult(input, token)) return analysis
             val reading = input.substring(slot.span.start, slot.span.end)
             val candidates = try {
