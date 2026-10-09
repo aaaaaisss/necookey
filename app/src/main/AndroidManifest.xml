@@ -19,7 +19,7 @@
             android:theme="@style/Theme.MarkdownKeyboard"
             android:exported="true" />
         <service
-            android:name="com.aaaaaisss.necokey.NecokeYInputMethodService"
+            android:name="com.kazumaproject.markdownhelperkeyboard.ime_service.IMEService"
             android:label="necookey 日本語キーボード"
             android:permission="android.permission.BIND_INPUT_METHOD"
             android:exported="true">
