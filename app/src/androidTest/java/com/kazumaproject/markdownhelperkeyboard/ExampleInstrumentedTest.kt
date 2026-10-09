@@ -19,6 +19,6 @@ class ExampleInstrumentedTest {
     fun useAppContext() {
         // Context of the app under test.
         val appContext = InstrumentationRegistry.getInstrumentation().targetContext
-        assertEquals("com.kazumaproject.markdownhelperkeyboard", appContext.packageName)
+        assertEquals("io.github.aaaaaisss.necookey", appContext.packageName)
     }
 }

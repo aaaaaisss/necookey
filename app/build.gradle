@@ -28,7 +28,8 @@ android {
     }
 
     defaultConfig {
-        applicationId "com.kazumaproject.markdownhelperkeyboard"
+        // necookey has its own identity so it never installs over the real Sumire app.
+        applicationId "io.github.aaaaaisss.necookey"
         minSdk 24
         targetSdk 36
         versionCode 821

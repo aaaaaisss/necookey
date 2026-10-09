@@ -3,6 +3,8 @@
 > necookey keeps Sumire's engine and build as-is and adds a two-row candidate bar where the
 > top-left slot is Sumire's bunsetsu conversion, with low-confidence bunsetsu re-chosen by the
 > bundled zenz-v3.2-xsmall model (on-device, no network). See `docs/necookey-candidate-bar.md`.
+> necookey installs as its own app (`io.github.aaaaaisss.necookey`, name "necookey"), next to
+> Sumire rather than as an update to it. Sumire's settings and user dictionary are not shared.
 > The original Sumire README follows.
 
 # Sumire (スミレ) — The Privacy-First Japanese Keyboard
