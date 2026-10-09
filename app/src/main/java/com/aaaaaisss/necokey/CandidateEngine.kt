@@ -53,8 +53,12 @@ class CandidateEngine {
      * Fallback suggestions until a dedicated prefix-prediction API is wired in.
      * Keeps the suggestion row populated with converter alternatives.
      */
-    suspend fun predictionCandidates(input: String, n: Int = 12): List<Candidate> =
-        detailedCandidates(input, n)
+    suspend fun predictionCandidates(input: String, n: Int = 12): List<Candidate> {
+        val current = converter ?: return emptyList()
+        return withContext(Dispatchers.Default) {
+            current.predictionCandidates(input, n)
+        }
+    }
 
     suspend fun candidates(input: String): List<String> {
         val current = converter ?: return listOf(input)
