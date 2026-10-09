@@ -3,6 +3,7 @@ package com.kazumaproject.markdownhelperkeyboard.database
 import android.content.Context
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
+import com.kazumaproject.markdownhelperkeyboard.converter.engine.PredictionConfig
 import com.kazumaproject.markdownhelperkeyboard.learning.database.LearnEntity
 import com.kazumaproject.markdownhelperkeyboard.user_dictionary.database.UserWord
 import kotlinx.coroutines.runBlocking
@@ -62,8 +63,31 @@ class PredictionDictionaryQueryTest {
             prefix = "かな",
             prefixUpperBound = "かな\uFFFF",
             limit = 2,
+            maxReadingLength = PredictionConfig.MAX_PREDICTION_INPUT_LENGTH,
         )
 
         assertEquals(listOf("low", "middle"), result.map { it.out })
+    }
+
+    @Test
+    fun learnedPredictionExcludesReadingsLongerThanConfiguredMaximum() = runBlocking {
+        val maxLength = PredictionConfig.MAX_PREDICTION_INPUT_LENGTH
+        val overLimitReading = "かな" + "あ".repeat(maxLength)
+        database.learnDao().insertAll(
+            listOf(
+                LearnEntity(input = "かな", out = "仮名"),
+                LearnEntity(input = "かなあ", out = "仮名あ"),
+                LearnEntity(input = overLimitReading, out = "長い予測"),
+            )
+        )
+
+        val result = database.learnDao().predictiveSearchByInput(
+            prefix = "かな",
+            prefixUpperBound = "かな\uFFFF",
+            limit = 8,
+            maxReadingLength = maxLength,
+        )
+
+        assertEquals(listOf("仮名", "仮名あ"), result.map { it.out })
     }
 }

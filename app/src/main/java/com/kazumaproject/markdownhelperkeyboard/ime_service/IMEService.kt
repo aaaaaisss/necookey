@@ -8014,7 +8014,7 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
 
             PhysicalKeyboardShortcutAction.COMMIT -> {
                 if (isBunsetsuCursorMoveSessionActive()) {
-                    commitBunsetsuConversionSession()
+                    commitBunsetsuConversionSession(explicitlySelected = true)
                 } else {
                     handleJapaneseEnterFloating(mainView, insertString, suggestions)
                 }
@@ -8363,7 +8363,7 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
             romajiConverter?.clear()
             return true
         }
-        if (commitBunsetsuConversionSession()) {
+        if (commitBunsetsuConversionSession(explicitlySelected = true)) {
             romajiConverter?.clear()
             return true
         }
@@ -11125,7 +11125,7 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         char: Char?, insertString: String, sb: StringBuilder, _mainView: MainLayoutBinding
     ) {
         if (isHenkan.get()) {
-            commitCurrentHenkanForNewInput()
+            commitCurrentHenkanForNewInput(currentTenkeyInputMode(_mainView))
             char?.let {
                 sendCharFlick(
                     charToSend = it, insertString = "", sb = sb
@@ -11151,7 +11151,7 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         _floatingKeyboardLayoutBinding: FloatingKeyboardLayoutBinding
     ) {
         if (isHenkan.get()) {
-            commitCurrentHenkanForNewInput()
+            commitCurrentHenkanForNewInput(currentFloatingKanaInputMode(_floatingKeyboardLayoutBinding))
             char?.let {
                 sendCharFlick(
                     charToSend = it, insertString = "", sb = sb
@@ -11177,7 +11177,7 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
             if (dispatchDirectTextIfNeeded(it.toString())) return
         }
         if (isHenkan.get()) {
-            commitCurrentHenkanForNewInput()
+            commitCurrentHenkanForNewInput(currentTenkeyInputMode(_mainView))
             char?.let {
                 sendCharTap(
                     charToSend = it, insertString = "", sb = sb
@@ -11226,7 +11226,7 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         _floatingKeyboardLayoutBinding: FloatingKeyboardLayoutBinding
     ) {
         if (isHenkan.get()) {
-            commitCurrentHenkanForNewInput()
+            commitCurrentHenkanForNewInput(currentFloatingKanaInputMode(_floatingKeyboardLayoutBinding))
             char?.let {
                 sendCharTap(
                     charToSend = it, insertString = "", sb = sb
@@ -20308,7 +20308,8 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
             val updatedSegment = segment.copy(
                 selectedIndex = nextIndex,
                 displayText = displayTextFromCandidate(segment.candidates[nextIndex]),
-                overrideDisplayCandidate = null
+                overrideDisplayCandidate = null,
+                explicitlySelected = true,
             )
             val updatedSegments = loadedSession.segments.toMutableList()
             updatedSegments[loadedSession.focusedIndex] = updatedSegment
@@ -20318,7 +20319,7 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         return true
     }
 
-    private fun commitBunsetsuConversionSession(): Boolean {
+    private fun commitBunsetsuConversionSession(explicitlySelected: Boolean): Boolean {
         val session = bunsetsuConversionSession ?: return false
         val commitString = session.segments.joinToString(separator = "") { it.displayText }
         val tailText = session.tailText
@@ -20326,6 +20327,7 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
             originalReading = session.rawInput,
             segments = session.segments,
             complete = tailText.isEmpty(),
+            explicitlySelected = explicitlySelected,
         )
         val shouldRememberZeroQuery = tailText.isEmpty() && commitString.isNotBlank()
         if (tailText.isEmpty()) {
@@ -22721,7 +22723,7 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
                                 insertString
                             }
                             val inputForAppend = if (isHenkan.get()) {
-                                commitCurrentHenkanForNewInput()
+                                commitCurrentHenkanForNewInput(currentInputModeForSession)
                                 ""
                             } else {
                                 effectiveInsertString
@@ -23267,7 +23269,8 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
                 candidate = candidate,
                 insertString = insertString,
                 currentInputMode = currentInputMode,
-                position = position
+                position = position,
+                explicitlySelected = true,
             )
             setCursorLeftAfterCommitPair(candidate.string)
         }
@@ -23320,7 +23323,8 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
                 val updatedSegments = session.segments.toMutableList()
                 updatedSegments[focusedIndex] = targetSegment.copy(
                     displayText = displayTextFromCandidate(candidate),
-                    overrideDisplayCandidate = candidate
+                    overrideDisplayCandidate = candidate,
+                    explicitlySelected = true,
                 )
                 bunsetsuConversionSession = session.copy(segments = updatedSegments)
                 renderBunsetsuConversionSession(mainView, floatingKeyboardBinding)
@@ -23353,7 +23357,8 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         updatedSegments[focusedIndex] = targetSegment.copy(
             displayText = candidateDisplayText,
             selectedIndex = segmentIndex,
-            overrideDisplayCandidate = null
+            overrideDisplayCandidate = null,
+            explicitlySelected = true,
         )
         bunsetsuConversionSession = session.copy(segments = updatedSegments)
         commitBunsetsuConversionUntilFocusedSegment(
@@ -23948,7 +23953,8 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         candidateString: String,
         candidate: Candidate,
         currentInputMode: InputMode,
-        position: Int
+        position: Int,
+        explicitlySelected: Boolean,
     ) {
         recordCandidateLearning(
             currentInputMode = currentInputMode,
@@ -23958,6 +23964,7 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
             candidate = candidate,
             candidateIndex = position,
             complete = stringInTail.get().isEmpty(),
+            explicitlySelected = explicitlySelected,
         )
         commitLearnedCandidate(insertString, candidateString)
     }
@@ -24004,9 +24011,10 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         return inputString.value + stringInTail.get()
     }
 
-    private fun commitCurrentHenkanForNewInput() {
+    private fun commitCurrentHenkanForNewInput(currentInputMode: InputMode) {
         if (!isHenkan.get()) return
 
+        recordCurrentHenkanCandidateLearning(currentInputMode)
         val currentHenkanText = resolveCurrentHenkanCommitText()
         suppressedSelectionCleanupCount += 1
 
@@ -24024,15 +24032,76 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         resetFlagsEnterKeyNotHenkan()
     }
 
+    private fun recordCurrentHenkanCandidateLearning(currentInputMode: InputMode) {
+        val input = inputString.value
+        if (input.isEmpty()) return
+        val suggestions = suggestionAdapter?.suggestions.orEmpty()
+        if (suggestions.isEmpty()) return
+        val requestedIndex = if (suggestionClickNum <= 0) 0 else suggestionClickNum - 1
+        val selectedIndex = resolveNonLoadingCandidateIndex(
+            suggestions = suggestions,
+            insertString = input,
+            requestedIndex = requestedIndex,
+        ) ?: return
+        val candidate = suggestions[selectedIndex]
+        val candidateLength = candidate.length.toInt()
+        if (
+            candidate.type == CANDIDATE_TYPE_TEXT_MACRO ||
+            candidate.commitText.isBlank() ||
+            candidateLength <= 0
+        ) return
+        val excludedType = when (candidate.type.toInt()) {
+            CANDIDATE_TYPE_CALCULATION.toInt(),
+            CANDIDATE_TYPE_UNIT_CONVERSION.toInt(),
+            CANDIDATE_TYPE_UTILITY_LITERAL.toInt(),
+            9, 11, 12, 13, 14, 15, 28, 30,
+            CANDIDATE_TYPE_TIME.toInt(),
+            CANDIDATE_TYPE_ERA.toInt(),
+            CANDIDATE_TYPE_USER_TEMPLATE.toInt() -> true
+            else -> false
+        }
+        if (excludedType) return
+        val reading = candidate.yomi?.takeIf { it.length == candidateLength }
+            ?: input.takeIf { it.length == candidateLength }
+            ?: return
+        val tail = stringInTail.get()
+        recordCandidateLearning(
+            currentInputMode = currentInputMode,
+            originalReading = reading + tail,
+            segmentReading = reading,
+            output = getCandidateCommitString(candidate),
+            candidate = candidate,
+            candidateIndex = selectedIndex,
+            complete = tail.isEmpty(),
+            explicitlySelected = selectedIndex != 0,
+        )
+    }
+
     private fun handlePartialOrExcessLength(
         insertString: String,
         candidate: Candidate,
         currentInputMode: InputMode,
         position: Int,
+        explicitlySelected: Boolean,
     ) {
         val candidateLength = candidate.length.toInt()
         val candidateString = candidate.commitText
-        if (insertString.length > candidateLength) {
+        if (insertString.length < candidateLength) {
+            val fullReading = candidate.yomi?.takeIf { it.length == candidateLength }
+            if (fullReading != null) {
+                val tail = stringInTail.get()
+                recordCandidateLearning(
+                    currentInputMode = currentInputMode,
+                    originalReading = fullReading + tail,
+                    segmentReading = fullReading,
+                    output = candidateString,
+                    candidate = candidate,
+                    candidateIndex = position,
+                    complete = tail.isEmpty(),
+                    explicitlySelected = explicitlySelected,
+                )
+            }
+        } else if (insertString.length > candidateLength) {
             recordCandidateLearning(
                 currentInputMode = currentInputMode,
                 originalReading = insertString,
@@ -24041,6 +24110,7 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
                 candidate = candidate,
                 candidateIndex = position,
                 complete = false,
+                explicitlySelected = explicitlySelected,
             )
             stringInTail.set(insertString.substring(candidateLength))
         }
@@ -24066,7 +24136,11 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
     }
 
     private fun processCandidate(
-        candidate: Candidate, insertString: String, currentInputMode: InputMode, position: Int
+        candidate: Candidate,
+        insertString: String,
+        currentInputMode: InputMode,
+        position: Int,
+        explicitlySelected: Boolean,
     ) {
         Timber.d("processCandidate ${candidate.type.toInt()} ${insertString.length == candidate.length.toInt()}")
         val qwertyGlideDecision = QwertyGlideCommitPolicy.resolveTapCommitDecision(
@@ -24112,7 +24186,8 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
                         candidateString = candidate.string,
                         candidate = candidate,
                         currentInputMode = currentInputMode,
-                        position = position
+                        position = position,
+                        explicitlySelected = explicitlySelected,
                     )
                 } else {
                     handlePartialOrExcessLength(
@@ -24120,6 +24195,7 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
                         candidate = candidate,
                         currentInputMode = currentInputMode,
                         position = position,
+                        explicitlySelected = explicitlySelected,
                     )
                 }
             }
@@ -24151,6 +24227,7 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         candidate: Candidate,
         candidateIndex: Int,
         complete: Boolean,
+        explicitlySelected: Boolean,
     ) {
         if (currentInputMode != InputMode.ModeJapanese || !isLearningWriteEnabled()) {
             conversionLearningSession.cancel()
@@ -24165,6 +24242,7 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
                 candidateIndex = candidateIndex,
                 leftId = candidate.leftId,
                 rightId = candidate.rightId,
+                explicitlySelected = explicitlySelected,
             )
         )
         if (complete) persistCompletedLearningSession()
@@ -24174,6 +24252,7 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         originalReading: String,
         segments: List<BunsetsuSegmentState>,
         complete: Boolean,
+        explicitlySelected: Boolean = false,
     ) {
         if (!isLearningWriteEnabled()) {
             conversionLearningSession.cancel()
@@ -24191,7 +24270,8 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
                     candidateIndex = segment.selectedIndex,
                     leftId = candidate?.leftId,
                     rightId = candidate?.rightId,
-                    explicitlySelected = segment.overrideDisplayCandidate != null,
+                    explicitlySelected = explicitlySelected || segment.explicitlySelected ||
+                        segment.overrideDisplayCandidate != null,
                 )
             )
         }
@@ -24635,7 +24715,8 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
             candidate = nextSuggestion,
             insertString = insertString,
             currentInputMode = currentInputMode,
-            position = index
+            position = index,
+            explicitlySelected = true,
         )
         clearSuggestionStateAfterCommit()
         resetFlagsEnterKey()
@@ -27230,7 +27311,7 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         if (!fromPhysicalKeyboard) flushCustomScreenComposition()
         if (dispatchDirectEnterIfNeeded()) return
         if (commitExplicitUtilityCandidateOnEnter(suggestions, insertString)) return
-        if (commitBunsetsuConversionSession()) {
+        if (commitBunsetsuConversionSession(explicitlySelected = true)) {
             return
         }
         if (isGojuonSurface()) {
@@ -27280,7 +27361,7 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         flushCustomScreenComposition()
         if (dispatchDirectEnterIfNeeded()) return
         if (commitExplicitUtilityCandidateOnEnter(suggestions, insertString)) return
-        if (commitBunsetsuConversionSession()) {
+        if (commitBunsetsuConversionSession(explicitlySelected = true)) {
             return
         }
         floatingKeyboardLayoutBinding.apply {

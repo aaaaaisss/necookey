@@ -1,6 +1,7 @@
 package com.kazumaproject.markdownhelperkeyboard.repository
 
 import android.database.sqlite.SQLiteConstraintException
+import com.kazumaproject.markdownhelperkeyboard.converter.engine.PredictionConfig
 import com.kazumaproject.markdownhelperkeyboard.learning.LearningEligibilityPolicy
 import com.kazumaproject.markdownhelperkeyboard.learning.database.LearnDao
 import com.kazumaproject.markdownhelperkeyboard.learning.database.LearnEntity
@@ -88,8 +89,19 @@ class LearnRepository @Inject constructor(
      * @param limit The maximum number of results.
      * @return A list of matching LearnEntity objects.
      */
-    suspend fun predictiveSearchByInput(prefix: String, limit: Int): List<LearnEntity> =
-        learnDao.predictiveSearchByInput(prefix, prefix.upperBound(), limit)
+    suspend fun predictiveSearchByInput(
+        prefix: String,
+        limit: Int,
+        maxReadingLength: Int = PredictionConfig.MAX_PREDICTION_INPUT_LENGTH,
+    ): List<LearnEntity> {
+        if (maxReadingLength <= 0) return emptyList()
+        return learnDao.predictiveSearchByInput(
+            prefix = prefix,
+            prefixUpperBound = prefix.upperBound(),
+            limit = limit,
+            maxReadingLength = maxReadingLength,
+        ).filter { it.input.length <= maxReadingLength }
+    }
 
     /**
      * Calls the DAO to find entries that are a common prefix of the given search term.

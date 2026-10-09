@@ -18,6 +18,7 @@ internal data class BunsetsuSegmentState(
     val candidates: List<Candidate> = emptyList(),
     val selectedIndex: Int = 0,
     val overrideDisplayCandidate: Candidate? = null,
+    val explicitlySelected: Boolean = false,
     val hasConvertedDisplay: Boolean = false,
     val candidatesLoaded: Boolean = false,
 )

@@ -218,8 +218,9 @@ private class FakeLearnDao(
         prefix: String,
         prefixUpperBound: String,
         limit: Int,
+        maxReadingLength: Int,
     ): List<LearnEntity> =
-        entries.filter { it.input.startsWith(prefix) }.take(limit)
+        entries.filter { it.input.startsWith(prefix) && it.input.length <= maxReadingLength }.take(limit)
 
     override suspend fun findCommonPrefixes(searchTerm: String): List<LearnEntity> =
         entries.filter { searchTerm.startsWith(it.input) }

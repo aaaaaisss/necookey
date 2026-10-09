@@ -57,6 +57,7 @@ interface LearnDao {
         """
         SELECT * FROM learn_table
         WHERE input >= :prefix AND input < :prefixUpperBound
+          AND LENGTH(input) <= :maxReadingLength
         ORDER BY CASE WHEN input = :prefix THEN 0 ELSE 1 END,
                  score ASC,
                  lastUsedAt DESC,
@@ -69,6 +70,7 @@ interface LearnDao {
         prefix: String,
         prefixUpperBound: String,
         limit: Int,
+        maxReadingLength: Int,
     ): List<LearnEntity>
 
     /**

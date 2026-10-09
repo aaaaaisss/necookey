@@ -53,6 +53,25 @@ class ConversionLearningSessionTest {
         assertEquals("紫雲清夏", finished(learnFirst = true).single { it.isPhrase }.out)
     }
 
+    @Test
+    fun explicitlySelectedFirstCandidateIsLearnedWhenPreferenceIsDisabled() {
+        val session = ConversionLearningSession()
+        session.beginIfNeeded("しうん")
+        session.record(
+            LearningFragment(
+                reading = "しうん",
+                output = "紫雲",
+                candidateScore = 40_000,
+                candidateIndex = 0,
+                explicitlySelected = true,
+            )
+        )
+
+        val entries = session.finish(learnFirstCandidate = false, timestamp = 123L)
+
+        assertTrue(entries.any { it.input == "しうん" && it.out == "紫雲" })
+    }
+
     private fun fragment(reading: String, output: String, index: Int) = LearningFragment(
         reading = reading,
         output = output,
