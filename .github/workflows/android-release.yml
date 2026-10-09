@@ -63,6 +63,15 @@ jobs:
           s = s.replace('            "dictionary_fragment_request" -> {', '            "custom_keyboard_fragment_request" -> {\n                currentNavController().navigate(R.id.keyboardListFragment)\n                true\n            }\n\n            "dictionary_fragment_request" -> {')
           p.write_text(s)
           PY
+          # Only the converter and keyboard primitives are used from Sumire's app.
+          # Its settings and dictionary-management screens target a different data API.
+          rm -rf \
+            vendor/sumire/app/src/main/java/com/kazumaproject/markdownhelperkeyboard/setting_activity \
+            vendor/sumire/app/src/main/java/com/kazumaproject/markdownhelperkeyboard/system_user_dictionary \
+            vendor/sumire/app/src/main/java/com/kazumaproject/markdownhelperkeyboard/user_dictionary \
+            vendor/sumire/app/src/main/java/com/kazumaproject/markdownhelperkeyboard/variant \
+            vendor/sumire/app/src/main/java/com/kazumaproject/markdownhelperkeyboard/zenz/runtime
+          rm -f vendor/sumire/app/src/main/java/com/kazumaproject/markdownhelperkeyboard/user_template/database/UserTemplate.kt
 
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
