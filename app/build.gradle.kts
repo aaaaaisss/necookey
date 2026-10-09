@@ -53,6 +53,18 @@ android {
                 file("src/main/java"),
                 file("../vendor/sumire/app/src/main/java"),
             )
+            // NecokeY uses Sumire's converter and keyboard primitives, not its
+            // older settings/dictionary UI. Those app sources target a different
+            // repository API and collide with NecokeY's compatibility adapters.
+            java.exclude(
+                "**/setting_activity/**",
+                "**/system_user_dictionary/**",
+                "**/user_dictionary/**",
+                "**/variant/**",
+                "**/zenz/runtime/**",
+                "**/user_template/database/UserTemplate.kt",
+                "**/user_dictionary/PosMapper.kt",
+            )
             res.srcDir(file("../vendor/sumire/app/src/main/res"))
             assets.srcDir(file("../vendor/sumire/app/src/main/assets"))
         }
@@ -64,13 +76,10 @@ dependencies {
     implementation(project(":sumireCore"))
     implementation(project(":necokeyZenz"))
 
-    // Sumire's original keyboard, layout editor, persistence, and settings UI.
-    implementation(project(":sumireFlexbox"))
-    implementation(project(":sumireTenkey"))
+    // Keyboard support modules used by Sumire's FlickKeyboardView.
     implementation(project(":sumireSymbolKeyboard"))
     implementation(project(":sumireGojuonKeyboard"))
     implementation(project(":sumireQwertyKeyboard"))
-    implementation(project(":sumireZenz"))
 
     implementation("androidx.core:core-ktx:1.16.0")
     implementation("androidx.appcompat:appcompat:1.7.1")
