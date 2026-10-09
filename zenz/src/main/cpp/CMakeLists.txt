@@ -16,11 +16,13 @@ set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
 add_definitions(-D__ANDROID__)
 add_subdirectory("${LLAMA_DIR}" llama-build)
 
-add_library(zenz SHARED "${ZENZ_BRIDGE}")
-target_include_directories(zenz PRIVATE
+# Keep necookey's JNI bridge separate from Sumire's own libzenz.so.
+# Both modules compile the same bridge source but expose different Kotlin APIs.
+add_library(necookey_zenz SHARED "${ZENZ_BRIDGE}")
+target_include_directories(necookey_zenz PRIVATE
     "${LLAMA_DIR}/include"
     "${LLAMA_DIR}/ggml/include"
     "${LLAMA_DIR}/common"
 )
 find_library(log-lib log)
-target_link_libraries(zenz PRIVATE llama ggml ${log-lib})
+target_link_libraries(necookey_zenz PRIVATE llama ggml ${log-lib})
