@@ -64,6 +64,10 @@ jobs:
           p = Path("vendor/sumire/zenz/build.gradle")
           s = p.read_text()
           s = s.replace('tasks.named("preBuild").configure {\n    dependsOn(prepareZenzModel)\n}\n', "")
+          p = Path("vendor/sumire/app/src/main/java/com/kazumaproject/markdownhelperkeyboard/setting_activity/MainActivity.kt")
+          s = p.read_text()
+          s = s.replace('            "dictionary_fragment_request" -> {', '            "custom_keyboard_fragment_request" -> {\n                currentNavController().navigate(R.id.keyboardListFragment)\n                true\n            }\n\n            "dictionary_fragment_request" -> {')
+          p.write_text(s)
           p.write_text(s)
           PY
 
