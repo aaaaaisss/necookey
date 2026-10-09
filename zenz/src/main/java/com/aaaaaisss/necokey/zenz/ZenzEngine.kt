@@ -2,7 +2,7 @@ package com.aaaaaisss.necokey.zenz
 
 object ZenzEngine {
     init {
-        System.loadLibrary("zenz")
+        System.loadLibrary("necookey_zenz")
     }
 
     external fun initModel(modelPath: String): Boolean
