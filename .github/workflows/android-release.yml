@@ -49,8 +49,6 @@ jobs:
 
       - name: Remove unused Sumire converter sources
         run: |
-          rm -f vendor/sumire/app/src/main/java/com/kazumaproject/markdownhelperkeyboard/converter/engine/EnglishEngine.kt
-          rm -rf vendor/sumire/app/src/main/java/com/kazumaproject/markdownhelperkeyboard/converter/glide
           find vendor/sumire -type f -name '*.gradle' -exec sed -i \
             -e "s/project(':core')/project(':sumireCore')/g" \
             -e "s/project(':custom_keyboard')/project(':sumireCustomKeyboard')/g" \
@@ -61,6 +59,13 @@ jobs:
             -e "s/project(':qwerty_keyboard')/project(':sumireQwertyKeyboard')/g" \
             -e "s/project(':zenz')/project(':sumireZenz')/g" {} +
           rm -f vendor/sumire/app/src/main/res/xml/method.xml
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path("vendor/sumire/zenz/build.gradle")
+          s = p.read_text()
+          s = s.replace('tasks.named("preBuild").configure {\n    dependsOn(prepareZenzModel)\n}\n', "")
+          p.write_text(s)
+          PY
 
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
