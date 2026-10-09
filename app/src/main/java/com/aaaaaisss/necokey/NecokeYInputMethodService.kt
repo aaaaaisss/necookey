@@ -26,6 +26,9 @@ class NecokeYInputMethodService : InputMethodService() {
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private var refreshGeneration = 0L
     private var composing = ""
+    private var conversionMode = false
+    private var selectedBunsetsuEnd: Int? = null
+    private var availableBunsetsuBoundaries: List<Int> = emptyList()
     private lateinit var composingView: TextView
     private lateinit var conversionRow: LinearLayout
     private lateinit var predictionRow: LinearLayout
@@ -103,6 +106,8 @@ class NecokeYInputMethodService : InputMethodService() {
 
     private fun appendText(text: String) {
         if (text.isEmpty()) return
+        conversionMode = false
+        selectedBunsetsuEnd = null
         composing += text
         // Keep the reading in Android's composing region, not only in our candidate strip.
         currentInputConnection?.setComposingText(composing, 1)
@@ -125,7 +130,27 @@ class NecokeYInputMethodService : InputMethodService() {
     }
 
     private fun convert() {
+        conversionMode = true
+        selectedBunsetsuEnd = null
         refresh(showCandidates = true)
+    }
+
+    private fun moveBunsetsuSelection(direction: Int) {
+        if (composing.isEmpty()) return
+        if (!conversionMode) {
+            convert()
+            return
+        }
+        val boundaries = availableBunsetsuBoundaries
+        if (boundaries.size < 2) return
+        val current = selectedBunsetsuEnd ?: boundaries.getOrElse(1) { composing.length }
+        val currentIndex = boundaries.indexOf(current).let { if (it < 0) 1.coerceAtMost(boundaries.lastIndex) else it }
+        val nextIndex = (currentIndex + direction).coerceIn(1, boundaries.lastIndex)
+        val next = boundaries[nextIndex]
+        if (next != current) {
+            selectedBunsetsuEnd = next
+            refresh(showCandidates = true)
+        }
     }
 
     private fun commitComposing() {
@@ -134,6 +159,9 @@ class NecokeYInputMethodService : InputMethodService() {
             composing = ""
         }
         currentInputConnection?.finishComposingText()
+        conversionMode = false
+        selectedBunsetsuEnd = null
+        availableBunsetsuBoundaries = emptyList()
         refresh()
     }
 
@@ -141,6 +169,9 @@ class NecokeYInputMethodService : InputMethodService() {
         // commitText replaces the composing region previously created by setComposingText.
         currentInputConnection?.commitText(text, 1)
         composing = ""
+        conversionMode = false
+        selectedBunsetsuEnd = null
+        availableBunsetsuBoundaries = emptyList()
         currentInputConnection?.finishComposingText()
         refresh()
     }
@@ -163,10 +194,31 @@ class NecokeYInputMethodService : InputMethodService() {
             val bunsetsuResult = engine.detailedCandidatesWithBunsetsu(input, 16)
             val detailed = bunsetsuResult.candidates
             val prediction = engine.predictionCandidates(input, 16)
+            val baseSplits = bunsetsuResult.splitPatternByCandidateString
+            val baseMain = detailed.firstOrNull()
+            val baseBoundaries = (listOf(0) +
+                baseMain?.let { baseSplits[it.string].orEmpty() }.orEmpty()
+                    .filter { it > 0 && it < input.length } +
+                input.length).distinct().sorted()
+            val activeEnd = if (conversionMode) {
+                (selectedBunsetsuEnd ?: baseBoundaries.getOrElse(1) { input.length })
+                    .coerceIn(1, input.length)
+            } else null
+            val activeSplits = if (activeEnd != null) {
+                detailed.associate { candidate ->
+                    candidate.string to (
+                        listOf(activeEnd) +
+                            baseSplits[candidate.string].orEmpty()
+                                .filter { it > activeEnd && it < input.length }
+                                .distinct()
+                                .sorted()
+                        )
+                }
+            } else baseSplits
             val rerankResult = zenzReranker.rerankDetailed(
                 input = input,
                 candidates = detailed,
-                splitPatternByCandidateString = bunsetsuResult.splitPatternByCandidateString,
+                splitPatternByCandidateString = activeSplits,
             )
             val reranked = rerankResult.candidates
             val mainCandidate = reranked.firstOrNull() ?: detailed.firstOrNull()
@@ -190,6 +242,10 @@ class NecokeYInputMethodService : InputMethodService() {
                 if (generation != refreshGeneration || input != composing) return@withContext
                 conversionRow.removeAllViews()
                 predictionRow.removeAllViews()
+                if (conversionMode) {
+                    availableBunsetsuBoundaries = baseBoundaries.filter { it > 0 }
+                    selectedBunsetsuEnd = activeEnd
+                }
                 mainCandidate?.let { candidate -> addCandidateView(conversionRow, candidate.string) { commitCandidate(candidate.string) } }
                 alternatives.forEach { firstOutput ->
                     addCandidateView(conversionRow, firstOutput) {
@@ -197,7 +253,7 @@ class NecokeYInputMethodService : InputMethodService() {
                             firstOutput,
                             mainCandidate!!,
                             input,
-                            bunsetsuResult.splitPatternByCandidateString[mainCandidate.string].orEmpty(),
+                            activeSplits[mainCandidate.string].orEmpty(),
                         )
                     }
                 }
@@ -256,6 +312,8 @@ class NecokeYInputMethodService : InputMethodService() {
                 is KeyAction.InputText -> appendText(action.text)
                 KeyAction.Delete, KeyAction.Backspace -> deleteLast()
                 KeyAction.Convert -> convert()
+                KeyAction.MoveCursorLeft -> moveBunsetsuSelection(-1)
+                KeyAction.MoveCursorRight -> moveBunsetsuSelection(1)
                 KeyAction.Space -> {
                     if (composing.isNotEmpty()) {
                         convert()
