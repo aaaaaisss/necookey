@@ -42,7 +42,7 @@ env:
   GRADLE_FLAGS: >-
     --build-cache --configuration-cache --configuration-cache-problems=warn
     --parallel --stacktrace
-    -Pandroid.injected.build.abi=arm64-v8a
+    -PnecookeyAbi=arm64-v8a
     -PzenzDebugNativeAbis=arm64-v8a
     -PzenzDebugOptimizedNative=true
 
@@ -145,6 +145,8 @@ jobs:
           AAPT=$(ls "$ANDROID_HOME"/build-tools/*/aapt2 | sort -V | tail -1)
           "$AAPT" dump permissions "$APK" | tee perms.txt
           if grep -q 'android.permission.INTERNET' perms.txt; then echo "INTERNET permission present"; exit 1; fi
+          # A testOnly APK is refused by the phone's package installer.
+          if "$AAPT" dump xmltree --file AndroidManifest.xml "$APK" | grep -q 'testOnly'; then echo "APK is testOnly"; exit 1; fi
           APKSIGNER=$(ls "$ANDROID_HOME"/build-tools/*/apksigner | sort -V | tail -1)
           "$APKSIGNER" verify --print-certs "$APK" | tee certs.txt
           # Must be the committed keystore/necookey-ci.jks key, so CI APKs update each other.
