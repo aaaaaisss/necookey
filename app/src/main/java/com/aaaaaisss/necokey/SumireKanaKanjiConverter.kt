@@ -138,6 +138,43 @@ class SumireKanaKanjiConverter(private val context: Context) {
         )
     }
 
+    /**
+     * Full-reading prediction path. Unlike candidates(), this enables Sumire/Mozc's
+     * dictionary completion logic so the lower strip is not merely duplicate N-best
+     * conversion candidates.
+     */
+    suspend fun predictionCandidates(input: String, n: Int = 12): List<Candidate> {
+        if (input.isEmpty()) return emptyList()
+        return engine.getCandidates(
+            input = input,
+            n = n,
+            mozcUtPersonName = true,
+            mozcUTPlaces = true,
+            mozcUTWiki = true,
+            mozcUTNeologd = true,
+            mozcUTWeb = false,
+            userDictionaryRepository = userDictionary,
+            learnRepository = learnRepository,
+            isOmissionSearchEnable = false,
+            enableTypoCorrectionJapaneseFlick = false,
+            enableTypoCorrectionQwertyEnglish = false,
+            typoCorrectionOffsetScore = 0,
+            omissionSearchOffsetScore = 0,
+            predictionConfig = PredictionConfig(
+                japanesePredictionEnabled = true,
+                englishPredictionEnabled = false,
+                systemCandidateLimit = n.coerceIn(1, 16),
+                symbolEmojiEnabled = false,
+                showSymbolCandidates = false,
+                showEmojiCandidates = false,
+                showEmoticonCandidates = false,
+            ),
+        ).filter { candidate ->
+            val reading = candidate.yomi
+            reading != null && reading.length > input.length
+        }.distinctBy(Candidate::string).take(n)
+    }
+
     suspend fun candidatesWithBunsetsu(
         input: String,
         n: Int = 12,
