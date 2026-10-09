@@ -30,9 +30,10 @@ data class ZenzReselection(
  * Confidence-gated bunsetsu re-selection.
  *
  * Walks the primary's bunsetsu left to right. A bunsetsu whose Sumire cost gap is below the
- * threshold is scored by zenz over its top-K Sumire alternatives, with the editor's left context
- * plus the outputs already chosen for the preceding bunsetsu as left context. Confident
- * bunsetsu keep Sumire's output untouched. Cancellation of the calling coroutine propagates.
+ * threshold is scored by zenz over its top-K Sumire alternatives. Each score call receives the
+ * editor's left context plus preceding chosen outputs, and following primary outputs plus the
+ * editor's right context. Confident bunsetsu keep Sumire's output untouched. Cancellation of the
+ * calling coroutine propagates.
  */
 class ZenzBunsetsuReselector(
     private val config: NecookeyCandidateBarConfig = NecookeyCandidateBarConfig.DEFAULT,
@@ -57,7 +58,6 @@ class ZenzBunsetsuReselector(
         }
         val changed = mutableListOf<Int>()
         val scored = mutableListOf<Int>()
-        val right = editorRightContext.take(config.maxRightContextChars.coerceAtLeast(0))
 
         for (index in targets) {
             currentCoroutineContext().ensureActive()
@@ -75,6 +75,10 @@ class ZenzBunsetsuReselector(
                 append(editorLeftContext)
                 for (i in 0 until index) append(outputs[i])
             }.takeLast(config.maxLeftContextChars.coerceAtLeast(0))
+            val right = buildString {
+                for (i in index + 1 until outputs.size) append(outputs[i])
+                append(editorRightContext)
+            }.take(config.maxRightContextChars.coerceAtLeast(0))
             val reading = analysis.input.substring(slot.span.start, slot.span.end)
                 .hiraganaToKatakanaForZenz()
 

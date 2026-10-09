@@ -102,6 +102,43 @@ class NecookeyCandidateBarTest {
     }
 
     @Test
+    fun exactSpanCandidatesFillRivalsMissingFromFullInputNBest() = runBlocking {
+        val base = analysis()
+        val enriched = BunsetsuAnalyzer.addSpanCandidates(
+            base,
+            mapOf(
+                (4 to 6) to listOf(
+                    cand("晴天", 4800, length = 2),
+                    cand("読み長不一致", 100, length = 1),
+                    cand("", 0, length = 2),
+                ),
+            ),
+        )
+
+        assertEquals("晴れ", enriched.slots[1].alternatives.first().output)
+        assertEquals(listOf("晴れ", "腫れ", "晴天"), enriched.slots[1].alternatives.map { it.output })
+        assertTrue(enriched.slots[1].isAmbiguous(1000.0))
+
+        val scorer = RecordingScorer { options -> FloatArray(options.size) { i -> if (options[i] == "晴天") 0f else -1f } }
+        val result = ZenzBunsetsuReselector(
+            NecookeyCandidateBarConfig(gateNormalizedGapThreshold = 1000.0),
+        ).reselect(enriched, "", "", scorer)
+        assertEquals("晴天", result.outputs[1])
+        assertEquals(listOf(0, 1), result.scoredSlots)
+    }
+
+    @Test
+    fun spanCandidateMergeKeepsPrimaryFirstAndUsesLowestDuplicateCost() {
+        val enriched = BunsetsuAnalyzer.addSpanCandidates(
+            analysis(),
+            mapOf((4 to 6) to listOf(cand("腫れ", 4700, length = 2), cand("新候補", 4000, length = 2))),
+        )
+
+        assertEquals(listOf("晴れ", "腫れ", "新候補"), enriched.slots[1].alternatives.map { it.output })
+        assertEquals(listOf(5000, 4700, 4000), enriched.slots[1].alternatives.map { it.pathCost })
+    }
+
+    @Test
     fun gateNormalizesGapByReadingLength() {
         val a = analysis()
         assertEquals(300.0 / 4, a.slots[0].normalizedCostGap()!!, 1e-9)
@@ -169,7 +206,7 @@ class NecookeyCandidateBarTest {
         assertEquals(listOf("きょうは", "腫れ"), result.outputs)
         assertEquals(listOf(0, 1), result.changedSlots)
         assertEquals(2, scorer.calls.size)
-        assertEquals(listOf("昨日は雨。", "", "キョウハ", "今日は", "きょうは", "京は", "今日歯"), scorer.calls[0])
+        assertEquals(listOf("昨日は雨。", "晴れ", "キョウハ", "今日は", "きょうは", "京は", "今日歯"), scorer.calls[0])
         // the second bunsetsu sees the zenz-chosen first bunsetsu as left context
         assertEquals(listOf("昨日は雨。きょうは", "", "ハレ", "晴れ", "腫れ"), scorer.calls[1])
     }
@@ -207,13 +244,25 @@ class NecookeyCandidateBarTest {
     @Test
     fun contextsAreTruncated() = runBlocking {
         val config = NecookeyCandidateBarConfig(
-            gateNormalizedGapThreshold = 1000.0, maxLeftContextChars = 3, maxRightContextChars = 2,
+            gateNormalizedGapThreshold = 1000.0, maxLeftContextChars = 3, maxRightContextChars = 4,
             maxZenzBunsetsuPerRequest = 1,
         )
         val scorer = RecordingScorer { FloatArray(it.size) { 0f } }
         ZenzBunsetsuReselector(config).reselect(analysis(), "あいうえお", "かきくけこ", scorer)
         assertEquals("うえお", scorer.calls[0][0])
-        assertEquals("かき", scorer.calls[0][1])
+        assertEquals("晴れかき", scorer.calls[0][1]) // following bunsetsu is nearest; then editor text
+    }
+
+    @Test
+    fun zeroRightContextLimitSuppressesFollowingAndEditorText() = runBlocking {
+        val config = NecookeyCandidateBarConfig(
+            gateNormalizedGapThreshold = 1000.0,
+            maxRightContextChars = 0,
+            maxZenzBunsetsuPerRequest = 1,
+        )
+        val scorer = RecordingScorer { FloatArray(it.size) { 0f } }
+        ZenzBunsetsuReselector(config).reselect(analysis(), "", "外側", scorer)
+        assertEquals("", scorer.calls.first()[1])
     }
 
     @Test

@@ -25361,8 +25361,28 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         )
         if (!shouldApplyCandidateResult(insertString, token)) return
 
-        val analysis = core?.let { result -> analyzeNecookeyBunsetsu(insertString, result) }
-        val cacheKey = analysis?.let { necookeyZenzCacheKey(insertString, it) }
+        val baseAnalysis = core?.let { result -> analyzeNecookeyBunsetsu(insertString, result) }
+        val gateEnabled = baseAnalysis != null && necookeyZenzGateEnabled()
+        // Capture editor context before publishing the initial bar, which may apply live
+        // conversion and mutate the composing text. This exact snapshot is used for both the
+        // cache identity and the later asynchronous scoring calls.
+        val context = if (gateEnabled) getZenzContext(insertString) else null
+        val profile = zenzProfilePreference.orEmpty()
+        if (!shouldApplyCandidateResult(insertString, token)) return
+
+        val cacheKey = if (baseAnalysis != null && context != null) {
+            buildNecookeyZenzOverrideCacheKey(
+                input = insertString,
+                analysis = baseAnalysis,
+                profile = profile,
+                editorLeftContext = context.leftContext,
+                editorRightContext = context.rightContext,
+                maxLeftContextChars = necookeyCandidateBarConfig.maxLeftContextChars,
+                maxRightContextChars = necookeyCandidateBarConfig.maxRightContextChars,
+            )
+        } else {
+            null
+        }
         val cachedOverride = cacheKey?.let { key ->
             synchronized(necookeyZenzOverrideCache) { necookeyZenzOverrideCache[key] }
         }
@@ -25370,7 +25390,7 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         val bar = TwoRowCandidateBarPlanner.plan(
             input = insertString,
             conversionCandidates = conversion,
-            analysis = analysis,
+            analysis = baseAnalysis,
             primaryOverride = cachedOverride,
             predictionCandidates = predictions,
             config = necookeyCandidateBarConfig,
@@ -25379,14 +25399,17 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         publishNecookeyTwoRowBar(insertString, bar, token, applyLiveConversion = true)
 
         if (
-            analysis != null && cacheKey != null && cachedOverride == null &&
-            necookeyZenzGateEnabled() &&
-            necookeyZenzReselector.ambiguousSlotIndices(analysis).isNotEmpty()
+            baseAnalysis != null && cacheKey != null && cachedOverride == null &&
+            gateEnabled && context != null &&
+            (necookeyZenzReselector.ambiguousSlotIndices(baseAnalysis).isNotEmpty() ||
+                (baseAnalysis.slots.size > 1 && baseAnalysis.slots.any { it.alternatives.size < 2 }))
         ) {
             launchNecookeyZenzReselection(
                 insertString = insertString,
-                analysis = analysis,
+                analysis = baseAnalysis,
                 cacheKey = cacheKey,
+                context = context,
+                profile = profile,
                 conversion = conversion,
                 predictions = predictions,
                 token = token,
@@ -25410,8 +25433,32 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         )
     }
 
-    private fun necookeyZenzCacheKey(input: String, analysis: BunsetsuAnalysis): String =
-        input + '\u0001' + analysis.primary.string
+    private suspend fun loadNecookeySpanCandidates(
+        input: String,
+        analysis: BunsetsuAnalysis,
+        token: CandidateRequestToken,
+    ): BunsetsuAnalysis {
+        if (analysis.slots.size < 2) return analysis
+        val candidatesByRange = LinkedHashMap<Pair<Int, Int>, List<Candidate>>()
+        for (slot in analysis.slots) {
+            if (slot.alternatives.size >= 2) continue
+            if (!shouldApplyCandidateResult(input, token)) return analysis
+            val reading = input.substring(slot.span.start, slot.span.end)
+            val candidates = try {
+                queryBunsetsuConversion(reading).candidates.map { candidate ->
+                    candidate.copy(string = displayTextFromCandidate(candidate))
+                }
+            } catch (cancellation: CancellationException) {
+                throw cancellation
+            } catch (error: Exception) {
+                Timber.w(error, "necookey span candidate lookup failed")
+                emptyList()
+            }
+            if (!shouldApplyCandidateResult(input, token)) return analysis
+            candidatesByRange[slot.span.start to slot.span.end] = candidates
+        }
+        return BunsetsuAnalyzer.addSpanCandidates(analysis, candidatesByRange)
+    }
 
     private suspend fun publishNecookeyTwoRowBar(
         insertString: String,
@@ -25448,19 +25495,22 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         insertString: String,
         analysis: BunsetsuAnalysis,
         cacheKey: String,
+        context: ZenzContext,
+        profile: String,
         conversion: List<Candidate>,
         predictions: List<Candidate>,
         token: CandidateRequestToken,
     ) {
         necookeyZenzJob = scope.launch {
-            val reselection = try {
-                val context = getZenzContext(insertString)
+            val (scoringAnalysis, reselection) = try {
+                val scoringAnalysis = loadNecookeySpanCandidates(insertString, analysis, token)
+                if (!shouldApplyCandidateResult(insertString, token)) return@launch
                 val scorer = ZenzSpanScorer { left, right, reading, options ->
                     withContext(Dispatchers.Default) {
                         val runtimeConfig = resolveZenzRuntimeConfig() ?: return@withContext null
                         zenzRuntimeClient.score(
                             config = runtimeConfig,
-                            profile = zenzProfilePreference ?: "",
+                            profile = profile,
                             topic = "",
                             style = "",
                             preference = "",
@@ -25471,15 +25521,16 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
                         )
                     }
                 }
-                measureDebugStage("IMEService.Necookey.zenzBunsetsuGate") {
+                val reselection = measureDebugStage("IMEService.Necookey.zenzBunsetsuGate") {
                     necookeyZenzReselector.reselect(
-                        analysis = analysis,
+                        analysis = scoringAnalysis,
                         editorLeftContext = context.leftContext,
                         // getZenzContext already returns "" when right context is disabled.
                         editorRightContext = context.rightContext,
                         scorer = scorer,
                     )
                 }
+                scoringAnalysis to reselection
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
@@ -25493,24 +25544,24 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
                 reselection.scoredSlots.size,
                 reselection.changedSlots.size,
             )
-            val override = analysis.primaryWithOutputs(reselection.outputs).copy(
+            val override = scoringAnalysis.primaryWithOutputs(reselection.outputs).copy(
                 zenzAdjusted = reselection.changedSlots.isNotEmpty(),
             )
+            if (inputString.value != insertString || !shouldApplyCandidateResult(insertString, token)) {
+                return@launch
+            }
+            if (!shouldUseNecookeyTwoRowBar()) return@launch
             synchronized(necookeyZenzOverrideCache) { necookeyZenzOverrideCache[cacheKey] = override }
             Timber.d(
                 "necookey zenz gate: scored_bunsetsu=%d changed_bunsetsu=%d",
                 reselection.scoredSlots.size, reselection.changedSlots.size,
             )
             if (reselection.changedSlots.isEmpty()) return@launch
-            if (inputString.value != insertString || !shouldApplyCandidateResult(insertString, token)) {
-                return@launch
-            }
-            if (!shouldUseNecookeyTwoRowBar()) return@launch
 
             val bar = TwoRowCandidateBarPlanner.plan(
                 input = insertString,
                 conversionCandidates = conversion,
-                analysis = analysis,
+                analysis = scoringAnalysis,
                 primaryOverride = override,
                 predictionCandidates = predictions,
                 config = necookeyCandidateBarConfig,
