@@ -5,6 +5,7 @@ import android.net.Uri
 import android.os.Bundle
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
+import androidx.navigation.fragment.findNavController
 import androidx.preference.Preference
 import com.kazumaproject.markdownhelperkeyboard.R
 import com.kazumaproject.markdownhelperkeyboard.setting_activity.AppPreference
@@ -22,6 +23,11 @@ class ZenzPreferenceFragment : AsyncPreferenceFragment() {
         }
 
     override fun onPreferencesReady(savedInstanceState: Bundle?, rootKey: String?) {
+
+        findPreference<Preference>("zenz_diagnostics_preference")?.setOnPreferenceClickListener {
+            findNavController().navigate(R.id.zenzDiagnosticsFragment)
+            true
+        }
 
         val modelPref = findPreference<Preference>("zenz_model_select_preference")
         modelPref?.setOnPreferenceClickListener {

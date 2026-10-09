@@ -21,4 +21,6 @@ data class Candidate(
     val conversionSegments: List<CandidateConversionSegment> = emptyList(),
     /** Date format identity for daily date candidates that can be reordered or disabled. */
     val dateFormat: DateCandidateFormat? = null,
+    /** True when the two-row bar's primary was selected by the zenz bunsetsu gate. */
+    val zenzAdjusted: Boolean = false,
 )

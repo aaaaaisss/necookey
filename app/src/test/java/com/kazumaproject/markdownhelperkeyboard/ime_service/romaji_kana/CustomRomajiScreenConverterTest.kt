@@ -56,6 +56,16 @@ class CustomRomajiScreenConverterTest {
         }
     }
 
+    @Test fun multiCharacterCustomOutputCanContinueTheComposingReading() {
+        val converter = CustomRomajiScreenConverter(rules)
+        var composing = converter.convert("sho")
+        assertEquals("しょ", composing)
+        composing = converter.convert(composing + "u")
+        assertEquals("しょう", composing)
+        composing = converter.convert(composing + "ga")
+        assertEquals("しょうが", composing)
+    }
+
     @Test fun nBoundariesAndWidthAreExplicit() {
         for (fullWidth in listOf(false, true)) {
             val converter = CustomRomajiScreenConverter(if (fullWidth) rules.mapKeys { wide(it.key) } else rules)

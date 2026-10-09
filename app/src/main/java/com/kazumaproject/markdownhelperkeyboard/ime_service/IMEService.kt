@@ -215,6 +215,7 @@ import com.kazumaproject.markdownhelperkeyboard.converter.candidate.CandidateCon
 import com.kazumaproject.markdownhelperkeyboard.converter.candidate.ExactInputCandidatePromotionPolicy
 import com.kazumaproject.markdownhelperkeyboard.converter.candidate.QWERTY_GLIDE_CANDIDATE_TYPE
 import com.kazumaproject.markdownhelperkeyboard.converter.candidate.ZenzCandidate
+import com.kazumaproject.markdownhelperkeyboard.ime_service.zenz.ZenzDiagnosticsStore
 import com.kazumaproject.markdownhelperkeyboard.converter.candidate.buildRomajiCandidates
 import com.kazumaproject.markdownhelperkeyboard.converter.candidate.toUserTemplateCandidates
 import com.kazumaproject.markdownhelperkeyboard.converter.engine.EnglishEngine
@@ -660,7 +661,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
     private val zenzModelPathMutex = Mutex()
     private var cachedZenzModelSource: String? = null
     private var cachedZenzModelPath: String? = null
-    private var isCustomKeyboardTwoWordsOutputEnable: Boolean? = false
     private var tenkeyQWERTYSwitchNumber: Boolean? = false
     private var tenkeyUseThreeStateKeyboard: Boolean = true
     private var tenkeyNumberSymbolKeyGapDp: Int = 4
@@ -3811,7 +3811,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         stabilizeCandidateStripHeightPreference = preferences.stabilizeCandidateStripHeightPreference
         symbolKeyboardFirstItem = preferences.symbolKeyboardFirstItem
         defaultEmojiSkinTonePreference = preferences.defaultEmojiSkinTone
-        isCustomKeyboardTwoWordsOutputEnable = preferences.isCustomKeyboardTwoWordsOutputEnable
         tenkeyQWERTYSwitchNumber = preferences.tenkeyQWERTYSwitchNumber
         tenkeyUseThreeStateKeyboard = preferences.tenkeyUseThreeStateKeyboard
         tenkeyNumberSymbolKeyGapDp = preferences.tenkeyNumberSymbolKeyGapDp
@@ -6095,7 +6094,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         zenzMaximumThreadSizePreference = null
         symbolKeyboardFirstItem = null
         userDictionaryPrefixMatchNumber = null
-        isCustomKeyboardTwoWordsOutputEnable = null
         tenkeyQWERTYSwitchNumber = null
         tenkeyUseThreeStateKeyboard = true
         tenkeyNumberSymbolKeyGapDp = 4
@@ -14378,33 +14376,27 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
                                     }
 
                                 } else {
-                                    if (isCustomKeyboardTwoWordsOutputEnable == true) {
-                                        finishComposingText()
-                                        setComposingText("", 0)
-                                        commitText(shiftedText, 1)
-                                    } else {
-                                        if (isCustomLayoutRomajiMode) {
-                                            val insertString = inputString.value
-                                            val sb = StringBuilder()
-                                            sb.append(insertString).append(shiftedText)
-                                            romajiConverter?.let { converter ->
-                                                if (isDefaultRomajiHenkanMap) {
-                                                    _inputString.update {
-                                                        converter.convertCustomLayout(sb.toString())
-                                                    }
-                                                } else {
-                                                    _inputString.update {
-                                                        customRomajiScreenConverter?.convert(sb.toString())
-                                                            ?: sb.toString()
-                                                    }
+                                    if (isCustomLayoutRomajiMode) {
+                                        val insertString = inputString.value
+                                        val sb = StringBuilder()
+                                        sb.append(insertString).append(shiftedText)
+                                        romajiConverter?.let { converter ->
+                                            if (isDefaultRomajiHenkanMap) {
+                                                _inputString.update {
+                                                    converter.convertCustomLayout(sb.toString())
+                                                }
+                                            } else {
+                                                _inputString.update {
+                                                    customRomajiScreenConverter?.convert(sb.toString())
+                                                        ?: sb.toString()
                                                 }
                                             }
-                                        } else {
-                                            val insertString = inputString.value
-                                            val sb = StringBuilder()
-                                            sb.append(insertString).append(shiftedText)
-                                            _inputString.update { sb.toString() }
                                         }
+                                    } else {
+                                        val insertString = inputString.value
+                                        val sb = StringBuilder()
+                                        sb.append(insertString).append(shiftedText)
+                                        _inputString.update { sb.toString() }
                                     }
                                 }
                                 consumeCustomKeyboardOneShotShift()
@@ -25492,15 +25484,22 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
                 throw e
             } catch (e: Exception) {
                 Timber.e(e, "necookey zenz bunsetsu re-selection failed")
+                ZenzDiagnosticsStore.recordFailure(applicationContext)
                 null
             } ?: return@launch
 
-            val override = analysis.primaryWithOutputs(reselection.outputs)
+            ZenzDiagnosticsStore.recordEvaluation(
+                applicationContext,
+                reselection.scoredSlots.size,
+                reselection.changedSlots.size,
+            )
+            val override = analysis.primaryWithOutputs(reselection.outputs).copy(
+                zenzAdjusted = reselection.changedSlots.isNotEmpty(),
+            )
             synchronized(necookeyZenzOverrideCache) { necookeyZenzOverrideCache[cacheKey] = override }
             Timber.d(
-                "necookey zenz gate: input=%s scored=%s changed=%s %s -> %s",
-                insertString, reselection.scoredSlots, reselection.changedSlots,
-                analysis.primary.string, override.string,
+                "necookey zenz gate: scored_bunsetsu=%d changed_bunsetsu=%d",
+                reselection.scoredSlots.size, reselection.changedSlots.size,
             )
             if (reselection.changedSlots.isEmpty()) return@launch
             if (inputString.value != insertString || !shouldApplyCandidateResult(insertString, token)) {

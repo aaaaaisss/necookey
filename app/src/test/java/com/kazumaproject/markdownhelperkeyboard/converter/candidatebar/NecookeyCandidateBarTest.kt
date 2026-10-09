@@ -288,10 +288,12 @@ class NecookeyCandidateBarTest {
     @Test
     fun zenzOverrideReplacesLeftmostAndKeepsEnginePrimaryReachable() {
         val a = analysis()
-        val override = a.primaryWithOutputs(listOf("今日は", "腫れ"))
+        val override = a.primaryWithOutputs(listOf("今日は", "腫れ")).copy(zenzAdjusted = true)
         val bar = TwoRowCandidateBarPlanner.plan(input, conversionList, a, override, emptyList())
         assertEquals("今日は腫れ", bar.primary!!.string)
+        assertTrue(bar.primary!!.zenzAdjusted)
         assertEquals("今日は晴れ", bar.firstBunsetsuAlternatives[0].string)
+        assertFalse(bar.firstBunsetsuAlternatives[0].zenzAdjusted)
         assertEquals(listOf("今日は", "きょうは", "京は", "今日歯"), bar.firstBunsetsuAlternatives.drop(1).map { it.string })
     }
 

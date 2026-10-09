@@ -145,7 +145,6 @@ data class ImePreferencesSnapshot(
     val stabilizeCandidateStripHeightPreference: Boolean,
     val symbolKeyboardFirstItem: SymbolMode,
     val defaultEmojiSkinTone: String,
-    val isCustomKeyboardTwoWordsOutputEnable: Boolean,
     val tenkeyQWERTYSwitchNumber: Boolean,
     val tenkeyUseThreeStateKeyboard: Boolean,
     val independentMultiTouchEnabled: Boolean,
@@ -525,8 +524,6 @@ data class ImePreferencesSnapshot(
                     appPreference.stabilize_candidate_strip_height_preference,
                 symbolKeyboardFirstItem = appPreference.symbol_mode_preference,
                 defaultEmojiSkinTone = appPreference.default_emoji_skin_tone_preference,
-                isCustomKeyboardTwoWordsOutputEnable =
-                    appPreference.custom_keyboard_two_words_output ?: true,
                 tenkeyQWERTYSwitchNumber =
                     appPreference.tenkey_qwerty_switch_number_layout ?: false,
                 independentMultiTouchEnabled = appPreference.independent_multi_touch_preference,

@@ -7,6 +7,7 @@ import android.graphics.Rect
 import android.graphics.drawable.GradientDrawable
 import android.graphics.drawable.StateListDrawable
 import android.text.SpannableString
+import android.text.SpannableStringBuilder
 import android.text.Spanned
 import android.text.style.RelativeSizeSpan
 import android.view.Gravity
@@ -2160,7 +2161,7 @@ class SuggestionAdapter internal constructor(
             holder.yomiText.setTextColor(color)
         }
 
-        holder.typeText.text = when (suggestion.type) {
+        val typeLabel: CharSequence = when (suggestion.type) {
             (1).toByte() -> ""
             /** 予測 **/
             (9).toByte() -> ""
@@ -2251,6 +2252,13 @@ class SuggestionAdapter internal constructor(
             (40).toByte() -> "[AI]"
             QWERTY_GLIDE_CANDIDATE_TYPE -> ""
             else -> ""
+        }
+        holder.typeText.text = if (suggestion.zenzAdjusted) {
+            val badge = holder.itemView.context.getString(R.string.candidate_badge_zenz_gate)
+            if (typeLabel.toString().isBlank()) badge
+            else SpannableStringBuilder(typeLabel).append(" ").append(badge)
+        } else {
+            typeLabel
         }
         holder.itemView.isPressed = position == highlightedPosition
         holder.itemView.setOnClickListener {

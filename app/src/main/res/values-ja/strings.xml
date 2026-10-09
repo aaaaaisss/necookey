@@ -309,9 +309,6 @@
     <string name="default_emoji_skin_tone_medium_dark">やや暗い</string>
     <string name="default_emoji_skin_tone_dark">暗い</string>
 
-    <string name="custom_keyboard_two_words_title">２文字以上の出力を自動で確定</string>
-    <string name="custom_keyboard_two_words_summary_on">カスタムキーで2文字以上を出力したとき、自動で確定します。</string>
-    <string name="custom_keyboard_two_words_summary_off">カスタムキーで2文字以上を出力しても、自動で確定しません。</string>
     <string name="custom_keyboard_suggestion_title">未入力時の表示</string>
     <string name="custom_keyboard_suggestion_summary_on">文字を入力していないときは、カスタムタブの一覧を表示します。</string>
     <string name="custom_keyboard_suggestion_summary_off">文字を入力していないときは、標準の表示（クリップボードなど）のままにします。</string>
@@ -1681,6 +1678,21 @@ ABC abc 0123456789　ＡＢＣ　１２３４５
     <string name="necookey_two_row_candidate_bar_summary">上段に変換結果と最初の文節の別候補、下段に予測候補を表示します（通常のソフトウェアキーボードのみ）。</string>
     <string name="necookey_zenz_bunsetsu_gate_title">自信のない文節を zenz で確認</string>
     <string name="necookey_zenz_bunsetsu_gate_summary">辞書のスコア差が小さい文節だけ、端末内の zenz で上位候補を採点し、左端の候補を選び直します。</string>
+    <string name="candidate_badge_zenz_gate">[Z]</string>
+    <string name="zenz_diagnostics_title">zenz 診断</string>
+    <string name="zenz_diagnostics_entry_summary">ゲートの状態と直近の端末内採点結果を確認します。</string>
+    <string name="zenz_diagnostics_gate_enabled">文節ゲート：有効</string>
+    <string name="zenz_diagnostics_gate_disabled">文節ゲート：無効</string>
+    <string name="zenz_diagnostics_last_result">直近のzenzゲート結果</string>
+    <string name="zenz_diagnostics_not_run">まだ採点結果は記録されていません。</string>
+    <string name="zenz_diagnostics_changed">%1$d文節をzenzに送り、%2$d文節の主候補が変わりました。</string>
+    <string name="zenz_diagnostics_unchanged">%1$d文節をzenzに送りました。主候補に変更はありません。</string>
+    <string name="zenz_diagnostics_no_targets">zenzに送られた文節はありません。不確かな文節がないか、入力長の上限を超えている可能性があります。</string>
+    <string name="zenz_diagnostics_error">直近の採点処理に失敗しました。</string>
+    <string name="zenz_diagnostics_timestamp">記録時刻：%1$s</string>
+    <string name="zenz_diagnostics_privacy">この診断履歴には時刻と文節数だけを保存し、入力文・文脈・候補文字列は含めません。</string>
+    <string name="zenz_diagnostics_refresh">更新</string>
+    <string name="zenz_diagnostics_badge_explanation">[Z] は、zenz文節ゲートが選び直した主候補を示します。</string>
     <string name="necookey_bunsetsu_resize_title">矢印キーで文節の長さを変える</string>
     <string name="necookey_bunsetsu_resize_summary">変換中、カスタムキーボードの ←/→ をタップすると注目文節を縮める/伸ばす（残りは再変換）。←/→ の長押しで前後の文節へ移動します。</string>
     <string name="cursor_move_target_pairs_not_set">未設定</string>

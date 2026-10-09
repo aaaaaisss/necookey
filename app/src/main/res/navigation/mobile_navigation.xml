@@ -217,6 +217,11 @@
         android:name="com.kazumaproject.markdownhelperkeyboard.setting_activity.ui.setting.ZenzPreferenceFragment"
         android:label="zenz" />
 
+    <fragment
+        android:id="@+id/zenzDiagnosticsFragment"
+        android:name="com.kazumaproject.markdownhelperkeyboard.setting_activity.ui.setting.ZenzDiagnosticsFragment"
+        android:label="@string/zenz_diagnostics_title"
+        tools:layout="@layout/fragment_zenz_diagnostics" />
 
     <fragment
         android:id="@+id/kanaPreferenceFragment"

@@ -286,9 +286,6 @@ object AppPreference {
     private val HIERARCHICAL_FLICK_MODE_SWITCH_ANGLE_MARGIN =
         Pair("hierarchical_flick_mode_switch_angle_margin_preference", 20)
 
-    private val CUSTOM_KEYBOARD_TWO_WORDS_OUTPUTS =
-        Pair("custom_keyboard_two_words_preference", true)
-
     private val QWERTY_SHOW_IME_SWITCH_BUTTON =
         Pair("qwerty_show_switch_ime_button_preference", true)
 
@@ -1206,14 +1203,6 @@ object AppPreference {
         )
         set(value) = preferences.edit {
             it.putBoolean(CLIPBOARD_HISTORY_ENABLE.first, value ?: false)
-        }
-
-    var custom_keyboard_two_words_output: Boolean?
-        get() = preferences.getBoolean(
-            CUSTOM_KEYBOARD_TWO_WORDS_OUTPUTS.first, CUSTOM_KEYBOARD_TWO_WORDS_OUTPUTS.second
-        )
-        set(value) = preferences.edit {
-            it.putBoolean(CUSTOM_KEYBOARD_TWO_WORDS_OUTPUTS.first, value ?: false)
         }
 
     var tenkey_qwerty_switch_number_layout: Boolean?

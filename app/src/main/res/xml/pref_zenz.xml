@@ -16,6 +16,11 @@
             app:defaultValue="true"
             app:summary="@string/necookey_zenz_bunsetsu_gate_summary" />
 
+        <Preference
+            android:key="zenz_diagnostics_preference"
+            android:title="@string/zenz_diagnostics_title"
+            app:summary="@string/zenz_diagnostics_entry_summary" />
+
         <SwitchPreferenceCompat
             android:key="necookey_bunsetsu_resize_with_arrows_preference"
             android:title="@string/necookey_bunsetsu_resize_title"
