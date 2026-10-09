@@ -1,5 +1,5 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
-    <application android:theme="@style/AppTheme" android:label="NecokeY" android:allowBackup="false" android:supportsRtl="true">
+    <application android:theme="@style/AppTheme" android:label="necookey" android:allowBackup="false" android:supportsRtl="true">
         <activity android:name="com.aaaaaisss.necokey.MainActivity" android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
@@ -8,7 +8,7 @@
         </activity>
         <service
             android:name="com.aaaaaisss.necokey.NecokeYInputMethodService"
-            android:label="NecokeY"
+            android:label="necookey 日本語キーボード"
             android:permission="android.permission.BIND_INPUT_METHOD"
             android:exported="true">
             <intent-filter><action android:name="android.view.InputMethod" /></intent-filter>
