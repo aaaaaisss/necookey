@@ -2,8 +2,9 @@ package com.aaaaaisss.necokey
 
 import android.app.Activity
 import android.os.Bundle
-import android.content.Context
-import android.view.inputmethod.InputMethodManager
+import android.provider.Settings
+import android.content.Intent
+import android.graphics.Color
 import android.widget.Button
 import android.widget.LinearLayout
 import android.widget.TextView
@@ -11,23 +12,26 @@ import android.widget.TextView
 class MainActivity : Activity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(32, 48, 32, 32)
+            setBackgroundColor(Color.BLACK)
         }
         root.addView(TextView(this).apply {
-            text = "NecokeY\nオフライン日本語IME"
+            text = "necookey\nオフライン日本語IME"
             textSize = 24f
+            setTextColor(Color.WHITE)
         })
         root.addView(TextView(this).apply {
-            text = "\n設定からキーボードを有効化すると、日本語入力に使えます。"
+            text = "\nキーボードを有効にして、入力方法として選択してください。"
             textSize = 16f
+            setTextColor(Color.WHITE)
         })
         root.addView(Button(this).apply {
-            text = "キーボード設定を開く"
+            text = "キーボードを有効にする"
             setOnClickListener {
-                (getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager)
-                    .showInputMethodPicker()
+                startActivity(Intent(Settings.ACTION_INPUT_METHOD_SETTINGS))
             }
         })
         setContentView(root)
