@@ -2,6 +2,21 @@
 <androidx.preference.PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto">
 
+    <PreferenceCategory android:title="@string/necookey_candidate_bar_category_title">
+        <SwitchPreferenceCompat
+            android:key="necookey_two_row_candidate_bar_preference"
+            android:title="@string/necookey_two_row_candidate_bar_title"
+            app:defaultValue="true"
+            app:summary="@string/necookey_two_row_candidate_bar_summary" />
+
+        <SwitchPreferenceCompat
+            android:dependency="necookey_two_row_candidate_bar_preference"
+            android:key="necookey_zenz_bunsetsu_gate_preference"
+            android:title="@string/necookey_zenz_bunsetsu_gate_title"
+            app:defaultValue="true"
+            app:summary="@string/necookey_zenz_bunsetsu_gate_summary" />
+    </PreferenceCategory>
+
     <PreferenceCategory android:title="@string/zenz_preference_category_title">
         <SwitchPreferenceCompat
             android:defaultValue="false"

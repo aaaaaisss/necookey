@@ -281,14 +281,56 @@ __attribute__((used)) static const char rightContextTag[] = u8"\uEE07";
 
 static std::string sanitize_prompt_field(std::string_view text);
 
+// necookey fix: GetStringUTFChars returns JNI *modified* UTF-8 (supplementary
+// characters as CESU-8 surrogate pairs, U+0000 as C0 80). decode_utf8_codepoint
+// rejects those sequences, so any emoji / rare kanji outside the BMP silently
+// truncated the left/right context and made such candidates score -inf.
+// Convert from the UTF-16 code units instead, emitting standard UTF-8 and
+// replacing lone surrogates with U+FFFD.
+static void append_utf8(std::string &out, uint32_t cp) {
+    if (cp <= 0x7F) {
+        out.push_back(static_cast<char>(cp));
+    } else if (cp <= 0x7FF) {
+        out.push_back(static_cast<char>(0xC0 | (cp >> 6)));
+        out.push_back(static_cast<char>(0x80 | (cp & 0x3F)));
+    } else if (cp <= 0xFFFF) {
+        out.push_back(static_cast<char>(0xE0 | (cp >> 12)));
+        out.push_back(static_cast<char>(0x80 | ((cp >> 6) & 0x3F)));
+        out.push_back(static_cast<char>(0x80 | (cp & 0x3F)));
+    } else {
+        out.push_back(static_cast<char>(0xF0 | (cp >> 18)));
+        out.push_back(static_cast<char>(0x80 | ((cp >> 12) & 0x3F)));
+        out.push_back(static_cast<char>(0x80 | ((cp >> 6) & 0x3F)));
+        out.push_back(static_cast<char>(0x80 | (cp & 0x3F)));
+    }
+}
+
 static std::string jstring_to_string(JNIEnv *env, jstring value) {
     if (!value) {
         return "";
     }
-    const char *chars = env->GetStringUTFChars(value, nullptr);
-    std::string result(chars ? chars : "");
-    if (chars) {
-        env->ReleaseStringUTFChars(value, chars);
+    const jsize length = env->GetStringLength(value);
+    if (length <= 0) {
+        return "";
+    }
+    std::vector<jchar> units((size_t) length);
+    env->GetStringRegion(value, 0, length, units.data());
+
+    std::string result;
+    result.reserve((size_t) length * 3);
+    for (size_t i = 0; i < units.size(); ++i) {
+        uint32_t cp = units[i];
+        if (cp >= 0xD800 && cp <= 0xDBFF) {
+            if (i + 1 < units.size() && units[i + 1] >= 0xDC00 && units[i + 1] <= 0xDFFF) {
+                cp = 0x10000 + ((cp - 0xD800) << 10) + ((uint32_t) units[i + 1] - 0xDC00);
+                ++i;
+            } else {
+                cp = 0xFFFD;
+            }
+        } else if (cp >= 0xDC00 && cp <= 0xDFFF) {
+            cp = 0xFFFD;
+        }
+        append_utf8(result, cp);
     }
     return result;
 }
@@ -1131,9 +1173,17 @@ static float score_candidate_avg_logprob_reuse_prompt_locked(
         return -INFINITY;
     }
 
+    // Row i of the logits predicts the token at batch position i + 1, so the
+    // first candidate token is read from the row of prompt_tokens.back() and
+    // the end-of-sequence term (when present) from the row of the last
+    // candidate token.
     float total_score = 0.0f;
     for (size_t i = 0; i < candidate_tokens.size(); ++i) {
         llama_token expected_token = candidate_tokens[i];
+        if (expected_token < 0 || expected_token >= n_vocab) {
+            llama_batch_free(batch);
+            return -INFINITY;
+        }
         float *logits = all_logits + ((size_t) i * (size_t) n_vocab);
 
         float max_logit = logits[0];
@@ -1653,6 +1703,14 @@ static jfloatArray score_candidates_with_context(
                     /*add_bos=*/false,
                     /*add_eos=*/false
             );
+            // necookey: score the end-of-sequence token too. zenz emits EOS right
+            // after the conversion of the whole input, so without this term a
+            // candidate that is a strict prefix of a better one (or that stops
+            // half-way through the reading) is never penalised for ending early.
+            const llama_token eos = llama_vocab_eos(g_vocab);
+            if (!candidate_tokens_list[(size_t) i].empty() && eos != LLAMA_TOKEN_NULL) {
+                candidate_tokens_list[(size_t) i].push_back(eos);
+            }
         }
 
         for (jsize i = 0; i < candidate_count; ++i) {

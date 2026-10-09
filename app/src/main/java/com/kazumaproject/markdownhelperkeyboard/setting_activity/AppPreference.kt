@@ -726,6 +726,12 @@ object AppPreference {
     private val ENABLE_ZENZ_RERANK_PREFERENCE =
         Pair("enable_zenz_rerank_preference", false)
 
+    // necookey
+    private val NECOOKEY_TWO_ROW_CANDIDATE_BAR_PREFERENCE =
+        Pair("necookey_two_row_candidate_bar_preference", true)
+    private val NECOOKEY_ZENZ_BUNSETSU_GATE_PREFERENCE =
+        Pair("necookey_zenz_bunsetsu_gate_preference", true)
+
     private val ZENZ_DEBOUNCE_TIME_PREFERENCE = Pair("zenz_debounce_time_preference", 300)
 
     private val ZENZ_MAXIMUM_LETTER_SIZE_PREFERENCE =
@@ -3899,6 +3905,24 @@ object AppPreference {
         )
         set(value) = preferences.edit {
             it.putBoolean(ENABLE_ZENZ_CONVERSION_LONG_PRESS_PREFERENCE.first, value)
+        }
+
+    var necookey_two_row_candidate_bar_preference: Boolean
+        get() = preferences.getBoolean(
+            NECOOKEY_TWO_ROW_CANDIDATE_BAR_PREFERENCE.first,
+            NECOOKEY_TWO_ROW_CANDIDATE_BAR_PREFERENCE.second
+        )
+        set(value) = preferences.edit {
+            it.putBoolean(NECOOKEY_TWO_ROW_CANDIDATE_BAR_PREFERENCE.first, value)
+        }
+
+    var necookey_zenz_bunsetsu_gate_preference: Boolean
+        get() = preferences.getBoolean(
+            NECOOKEY_ZENZ_BUNSETSU_GATE_PREFERENCE.first,
+            NECOOKEY_ZENZ_BUNSETSU_GATE_PREFERENCE.second
+        )
+        set(value) = preferences.edit {
+            it.putBoolean(NECOOKEY_ZENZ_BUNSETSU_GATE_PREFERENCE.first, value)
         }
 
     var enable_zenz_rerank_preference: Boolean

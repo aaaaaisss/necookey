@@ -1884,4 +1884,9 @@ ABC abc 0123456789　ＡＢＣ　１２３４５
     <string name="settings_loading">設定を読み込んでいます…</string>
     <string name="settings_loading_failed">設定を読み込めませんでした。</string>
     <string name="settings_loading_retry">再試行</string>
+    <string name="necookey_candidate_bar_category_title">necookey（2段候補バー）</string>
+    <string name="necookey_two_row_candidate_bar_title">2段の候補バー</string>
+    <string name="necookey_two_row_candidate_bar_summary">上段に変換結果と最初の文節の別候補、下段に予測候補を表示します（通常のソフトウェアキーボードのみ）。</string>
+    <string name="necookey_zenz_bunsetsu_gate_title">自信のない文節を zenz で確認</string>
+    <string name="necookey_zenz_bunsetsu_gate_summary">辞書のスコア差が小さい文節だけ、端末内の zenz で上位候補を採点し、左端の候補を選び直します。</string>
 </resources>

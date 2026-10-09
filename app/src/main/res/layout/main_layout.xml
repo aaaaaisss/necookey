@@ -112,10 +112,24 @@
             android:layout_height="wrap_content"
             android:clipToPadding="false"
             android:visibility="visible"
+            app:layout_constraintBottom_toTopOf="@+id/necookey_prediction_row"
+            app:layout_constraintEnd_toStartOf="@+id/suggestion_visibility"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="parent"
+            app:layout_constraintVertical_chainStyle="packed" />
+
+        <!-- necookey: bottom row of the two-row candidate bar (prediction candidates).
+             GONE unless the two-row bar is active, so Sumire's single-row layout is unchanged. -->
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/necookey_prediction_row"
+            android:layout_width="0dp"
+            android:layout_height="44dp"
+            android:clipToPadding="false"
+            android:visibility="gone"
             app:layout_constraintBottom_toBottomOf="parent"
             app:layout_constraintEnd_toStartOf="@+id/suggestion_visibility"
             app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toTopOf="parent" />
+            app:layout_constraintTop_toBottomOf="@+id/suggestion_recycler_view" />
 
         <!-- Visibility Toggle Button -->
         <com.google.android.material.imageview.ShapeableImageView

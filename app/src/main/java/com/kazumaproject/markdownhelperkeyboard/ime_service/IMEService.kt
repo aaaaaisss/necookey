@@ -200,6 +200,13 @@ import com.kazumaproject.markdownhelperkeyboard.R
 import com.kazumaproject.markdownhelperkeyboard.clipboard_history.database.ClipboardHistoryItem
 import com.kazumaproject.markdownhelperkeyboard.clipboard_history.database.ItemType
 import com.kazumaproject.markdownhelperkeyboard.converter.candidate.BunsetsuCandidateResult
+import com.kazumaproject.markdownhelperkeyboard.converter.candidatebar.BunsetsuAnalysis
+import com.kazumaproject.markdownhelperkeyboard.converter.candidatebar.BunsetsuAnalyzer
+import com.kazumaproject.markdownhelperkeyboard.converter.candidatebar.NecookeyCandidateBarConfig
+import com.kazumaproject.markdownhelperkeyboard.converter.candidatebar.TwoRowCandidateBar
+import com.kazumaproject.markdownhelperkeyboard.converter.candidatebar.TwoRowCandidateBarPlanner
+import com.kazumaproject.markdownhelperkeyboard.converter.candidatebar.ZenzBunsetsuReselector
+import com.kazumaproject.markdownhelperkeyboard.converter.candidatebar.ZenzSpanScorer
 import com.kazumaproject.markdownhelperkeyboard.converter.candidate.CANDIDATE_TYPE_ERA
 import com.kazumaproject.markdownhelperkeyboard.converter.candidate.CANDIDATE_TYPE_CALCULATION
 import com.kazumaproject.markdownhelperkeyboard.converter.candidate.CANDIDATE_TYPE_FORMULA_TEX
@@ -1158,6 +1165,7 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
             toggle = inlineSuggestionToggleForCandidateStrip(),
         )
         suggestionAdapter?.submitContent(content, inlineSuggestionState)
+        syncNecookeyPredictionRow(effectiveCandidatesShown)
         if (floatingCandidateSurfaceActive || isKeyboardFloatingMode != true) {
             mainLayoutBinding?.let { binding ->
                 setMainSuggestionColumn(binding)
@@ -2150,6 +2158,8 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         private const val DEFAULT_DELAY_MS = 1000L
         private const val DEFAULT_LIVE_CONVERSION_APPLY_DELAY_MS = 120L
         private const val PAGE_SIZE: Int = 5
+        /** Height of necookey's bottom (prediction) candidate row. */
+        private const val NECOOKEY_PREDICTION_ROW_HEIGHT_DP = 44
         private const val ZENZ_LIVE_SLOT_EMPTY_TEXT = "..."
         private val ZENZ_LIVE_SLOT_TYPE = (33).toByte()
         private val ZENZ_LIVE_SLOT_TYPES = setOf(
@@ -2318,6 +2328,21 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
     private var zenzLiveLatestResultMeta: ZenzLiveResultMeta? = null
     private var zenzRerankJob: Job? = null
     private var zenzRerankRequestToken: Long = 0L
+
+    // necookey: two-row candidate bar + confidence-gated zenz bunsetsu re-selection.
+    private val necookeyCandidateBarConfig = NecookeyCandidateBarConfig.DEFAULT
+    private val necookeyZenzReselector = ZenzBunsetsuReselector(necookeyCandidateBarConfig)
+    private var necookeyZenzJob: Job? = null
+    private var necookeyPredictionAdapter: SuggestionAdapter? = null
+    /** Input the bottom row currently belongs to; the row hides itself for any other input. */
+    private var necookeyPredictionRowInput: String = ""
+    private var necookeyPredictionRowCandidates: List<Candidate> = emptyList()
+    /** input + engine primary -> zenz-corrected primary (or the engine primary when unchanged). */
+    private val necookeyZenzOverrideCache =
+        object : LinkedHashMap<String, Candidate>(16, 0.75f, true) {
+            override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, Candidate>?): Boolean =
+                size > 32
+        }
     @Volatile
     private var latestCandidateSegmentInput: String = ""
     @Volatile
@@ -3024,6 +3049,7 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
             }
         }
         suggestionAdapterFull = SuggestionAdapter()
+        necookeyPredictionAdapter = SuggestionAdapter()
         shortcutAdapter = ShortcutAdapter()
         keyboardLayoutEditController = KeyboardLayoutEditController(this)
         currentNightMode = resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK
@@ -6294,6 +6320,10 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         kanaKanjiEngineActivationJob?.cancel()
         suggestionAdapter?.release()
         suggestionAdapter = null
+        necookeyZenzJob?.cancel()
+        necookeyZenzJob = null
+        necookeyPredictionAdapter?.release()
+        necookeyPredictionAdapter = null
         shortcutAdapter = null
         suggestionAdapterFull = null
         keyboardLayoutEditController = null
@@ -19203,7 +19233,7 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
                 widthPref = tenkeyWidthPreferenceValue ?: 100,
                 bottomMargin = tenkeyBottomMarginPreferenceValue ?: 0,
                 positionIsEnd = tenkeyPositionPreferenceValue ?: true,
-                candidateHeight = candidateViewHeightPreferenceValue ?: 60,
+                candidateHeight = (candidateViewHeightPreferenceValue ?: 60) + necookeyPredictionRowBudgetDp(),
                 candidateEmptyHeight = candidateViewHeightEmptyPreferenceValue ?: 60,
                 qwertyHeightPref = qwertyHeightPreferenceValue ?: 280,
                 qwertyWidthPref = qwertyWidthPreferenceValue ?: 100,
@@ -19220,7 +19250,7 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
                 widthPref = tenkeyWidthLandScapePreferenceValue ?: 100,
                 bottomMargin = tenkeyLandScapeBottomMarginPreferenceValue ?: 0,
                 positionIsEnd = tenkeyLandScapePositionPreferenceValue ?: true,
-                candidateHeight = candidateViewLandScapeHeightPreferenceValue ?: 60,
+                candidateHeight = (candidateViewLandScapeHeightPreferenceValue ?: 60) + necookeyPredictionRowBudgetDp(),
                 candidateEmptyHeight = candidateViewLandScapeHeightEmptyPreferenceValue ?: 60,
                 qwertyHeightPref = qwertyHeightLandScapePreferenceValue ?: 280,
                 qwertyWidthPref = qwertyWidthLandScapePreferenceValue ?: 100,
@@ -21927,6 +21957,20 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
             }
             adapter.setOnZeroQueryCloseClickListener {
                 toggleZeroQueryVisibility()
+            }
+        }
+        necookeyPredictionAdapter?.let { adapter ->
+            adapter.setOnItemClickListener { candidate, position ->
+                val insertString = inputString.value
+                if (insertString.isEmpty()) return@setOnItemClickListener
+                vibrate()
+                setCandidateClick(
+                    candidate = candidate,
+                    insertString = insertString,
+                    currentInputMode = currentTenkeyInputMode(mainView),
+                    position = position,
+                    displayedCandidates = adapter.suggestions
+                )
             }
         }
         suggestionAdapterFull?.let { adapter ->
@@ -26108,6 +26152,14 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         mode: CandidateQueryMode,
         token: CandidateRequestToken,
     ) {
+        if (
+            (mode == CandidateQueryMode.NO_TAB_DEFAULT || mode == CandidateQueryMode.CONVERSION) &&
+            shouldUseNecookeyTwoRowBar()
+        ) {
+            setCandidatesNecookeyTwoRow(input, mainView, token)
+            return
+        }
+        cancelNecookeyTwoRowBar()
         when (mode) {
             CandidateQueryMode.NO_TAB_DEFAULT -> setCandidatesOriginal(input, mainView, token)
             CandidateQueryMode.PREDICTION -> setCandidates(input, mainView, token)
@@ -26392,6 +26444,273 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
                 }
             }
         }
+    }
+
+    // ------------------------------------------------------------------------------------------
+    // necookey: two-row candidate bar
+    //
+    // Top row:    [Sumire bunsetsu conversion, ambiguous bunsetsu re-chosen by zenz]
+    //             + alternatives for the first bunsetsu (same reading range), Sumire order.
+    // Bottom row: prediction candidates (queryPrediction) not already in the top row.
+    //
+    // Only the docked keyboard with a software keyboard uses it, and only while composing (no
+    // henkan / bunsetsu-session / tail state). Every other state falls back to Sumire's own bar.
+    // ------------------------------------------------------------------------------------------
+
+    private fun isNecookeyTwoRowSurfaceAvailable(): Boolean =
+        appPreference.necookey_two_row_candidate_bar_preference &&
+            isKeyboardFloatingMode != true &&
+            !floatingCandidateSurfaceActive &&
+            splitController == null &&
+            hasHardwareKeyboardConnected != true &&
+            physicalKeyboardEnable.replayCache.firstOrNull() != true
+
+    private fun shouldUseNecookeyTwoRowBar(): Boolean =
+        isNecookeyTwoRowSurfaceAvailable() &&
+            stringInTail.get().isEmpty() &&
+            !isHenkan.get() &&
+            suggestionClickNum == 0 &&
+            !isBunsetsuCursorMoveSessionActive()
+
+    /** Extra candidate-strip height reserved for the bottom row (0 when the bar is off). */
+    private fun necookeyPredictionRowBudgetDp(): Int =
+        if (isNecookeyTwoRowSurfaceAvailable()) NECOOKEY_PREDICTION_ROW_HEIGHT_DP else 0
+
+    private fun necookeyZenzGateEnabled(): Boolean =
+        AppVariantConfig.hasZenz && appPreference.necookey_zenz_bunsetsu_gate_preference
+
+    private fun isNecookeyActionCandidate(candidate: Candidate): Boolean =
+        candidate.type == CANDIDATE_TYPE_TEXT_MACRO || isSelectionActionCandidate(candidate)
+
+    private fun cancelNecookeyTwoRowBar() {
+        necookeyZenzJob?.cancel()
+        necookeyZenzJob = null
+        if (necookeyPredictionRowInput.isNotEmpty() || necookeyPredictionRowCandidates.isNotEmpty()) {
+            necookeyPredictionRowInput = ""
+            necookeyPredictionRowCandidates = emptyList()
+            runOnMainThread { syncNecookeyPredictionRow(candidatesShown = false) }
+        }
+    }
+
+    private suspend fun setCandidatesNecookeyTwoRow(
+        insertString: String,
+        mainView: MainLayoutBinding,
+        token: CandidateRequestToken,
+    ) {
+        beginZenzRerankRequest()
+        clearZenzLiveSlot("necookey two-row bar")
+        necookeyZenzJob?.cancel()
+        necookeyZenzJob = null
+
+        // Prediction first: both lookups update the shared bunsetsu state, and the conversion
+        // result must be the one left behind for space / henkan handling.
+        val predictions = getSuggestionList(insertString, mainView, token)
+        if (!shouldApplyCandidateResult(insertString, token)) return
+
+        var core: KanaKanjiQueryResult? = null
+        val conversion = getSuggestionListWithoutPrediction(
+            insertString = insertString,
+            token = token,
+            nBestOverride = maxOf(nBest ?: 4, necookeyCandidateBarConfig.conversionNBest),
+            forceBunsetsuSegments = true,
+            coreResultSink = { core = it },
+        )
+        if (!shouldApplyCandidateResult(insertString, token)) return
+
+        val analysis = core?.let { result -> analyzeNecookeyBunsetsu(insertString, result) }
+        val cacheKey = analysis?.let { necookeyZenzCacheKey(insertString, it) }
+        val cachedOverride = cacheKey?.let { key ->
+            synchronized(necookeyZenzOverrideCache) { necookeyZenzOverrideCache[key] }
+        }
+
+        val bar = TwoRowCandidateBarPlanner.plan(
+            input = insertString,
+            conversionCandidates = conversion,
+            analysis = analysis,
+            primaryOverride = cachedOverride,
+            predictionCandidates = predictions,
+            config = necookeyCandidateBarConfig,
+            isActionCandidate = ::isNecookeyActionCandidate,
+        )
+        publishNecookeyTwoRowBar(insertString, bar, token, applyLiveConversion = true)
+
+        if (
+            analysis != null && cacheKey != null && cachedOverride == null &&
+            necookeyZenzGateEnabled() &&
+            necookeyZenzReselector.ambiguousSlotIndices(analysis).isNotEmpty()
+        ) {
+            launchNecookeyZenzReselection(
+                insertString = insertString,
+                analysis = analysis,
+                cacheKey = cacheKey,
+                conversion = conversion,
+                predictions = predictions,
+                token = token,
+            )
+        }
+    }
+
+    private fun analyzeNecookeyBunsetsu(
+        input: String,
+        result: KanaKanjiQueryResult,
+    ): BunsetsuAnalysis? {
+        val enginePrimary = result.candidates.firstOrNull { it.length.toInt() == input.length }
+            ?: return null
+        val splits = result.bunsetsuResult?.splitPatternByCandidateString?.get(enginePrimary.string)
+            ?: result.bunsetsuResult?.primarySplitPositions.orEmpty()
+        return BunsetsuAnalyzer.analyze(
+            input = input,
+            nBest = result.candidates,
+            segmentsByString = result.candidateSegmentsByString,
+            splitPositions = splits,
+        )
+    }
+
+    private fun necookeyZenzCacheKey(input: String, analysis: BunsetsuAnalysis): String =
+        input + '\u0001' + analysis.primary.string
+
+    private suspend fun publishNecookeyTwoRowBar(
+        insertString: String,
+        bar: TwoRowCandidateBar,
+        token: CandidateRequestToken,
+        applyLiveConversion: Boolean,
+    ) {
+        val topRow = composeUtilityCandidates(insertString, bar.topRow)
+        if (!shouldApplyCandidateResult(insertString, token)) return
+        withContext(Dispatchers.Main.immediate) {
+            if (!shouldApplyCandidateResult(insertString, token)) return@withContext
+            necookeyPredictionRowInput = insertString
+            necookeyPredictionRowCandidates = bar.predictions
+        }
+        if (!suppressSuggestions) {
+            updateSuggestionAdaptersOnMain(
+                candidates = topRow,
+                insertString = insertString,
+                fullCandidates = topRow + bar.predictions,
+                token = token,
+            )
+        }
+        if (applyLiveConversion && shouldStartLiveConversion(insertString) && !hasConvertedKatakana) {
+            delayBeforeApplyingLiveConversion()
+            if (!shouldApplyCandidateResult(insertString, token)) return
+            applyFirstSuggestionOnMainIfCurrent(
+                insertString = insertString,
+                candidate = candidateForAutomaticApplication(insertString, bar.primary),
+            )
+        }
+    }
+
+    private fun launchNecookeyZenzReselection(
+        insertString: String,
+        analysis: BunsetsuAnalysis,
+        cacheKey: String,
+        conversion: List<Candidate>,
+        predictions: List<Candidate>,
+        token: CandidateRequestToken,
+    ) {
+        necookeyZenzJob = scope.launch {
+            val reselection = try {
+                val context = getZenzContext(insertString)
+                val scorer = ZenzSpanScorer { left, right, reading, options ->
+                    withContext(Dispatchers.Default) {
+                        val runtimeConfig = resolveZenzRuntimeConfig() ?: return@withContext null
+                        zenzRuntimeClient.score(
+                            config = runtimeConfig,
+                            profile = zenzProfilePreference ?: "",
+                            topic = "",
+                            style = "",
+                            preference = "",
+                            leftContext = left,
+                            rightContext = right,
+                            input = reading,
+                            candidates = options.toTypedArray(),
+                        )
+                    }
+                }
+                measureDebugStage("IMEService.Necookey.zenzBunsetsuGate") {
+                    necookeyZenzReselector.reselect(
+                        analysis = analysis,
+                        editorLeftContext = context.leftContext,
+                        // getZenzContext already returns "" when right context is disabled.
+                        editorRightContext = context.rightContext,
+                        scorer = scorer,
+                    )
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                Timber.e(e, "necookey zenz bunsetsu re-selection failed")
+                null
+            } ?: return@launch
+
+            val override = analysis.primaryWithOutputs(reselection.outputs)
+            synchronized(necookeyZenzOverrideCache) { necookeyZenzOverrideCache[cacheKey] = override }
+            Timber.d(
+                "necookey zenz gate: input=%s scored=%s changed=%s %s -> %s",
+                insertString, reselection.scoredSlots, reselection.changedSlots,
+                analysis.primary.string, override.string,
+            )
+            if (reselection.changedSlots.isEmpty()) return@launch
+            if (inputString.value != insertString || !shouldApplyCandidateResult(insertString, token)) {
+                return@launch
+            }
+            if (!shouldUseNecookeyTwoRowBar()) return@launch
+
+            val bar = TwoRowCandidateBarPlanner.plan(
+                input = insertString,
+                conversionCandidates = conversion,
+                analysis = analysis,
+                primaryOverride = override,
+                predictionCandidates = predictions,
+                config = necookeyCandidateBarConfig,
+                isActionCandidate = ::isNecookeyActionCandidate,
+            )
+            publishNecookeyTwoRowBar(insertString, bar, token, applyLiveConversion = false)
+            if (
+                shouldStartLiveConversion(insertString) && !hasConvertedKatakana &&
+                inputString.value == insertString && bar.primary === override
+            ) {
+                if (getCandidateCommitString(override) != lastCandidate) {
+                    applyFirstSuggestion(override)
+                }
+            }
+        }
+    }
+
+    /** Main thread. Shows the bottom row only for the input it was built for. */
+    private fun syncNecookeyPredictionRow(candidatesShown: Boolean) {
+        val binding = mainLayoutBinding ?: return
+        val row = binding.necookeyPredictionRow
+        val adapter = necookeyPredictionAdapter ?: return
+        val show = candidatesShown &&
+            necookeyPredictionRowInput.isNotEmpty() &&
+            necookeyPredictionRowInput == inputString.value &&
+            shouldUseNecookeyTwoRowBar()
+        if (!show) {
+            if (row.visibility != View.GONE) row.visibility = View.GONE
+            if (adapter.suggestions.isNotEmpty()) adapter.suggestions = emptyList()
+            return
+        }
+        if (row.adapter !== adapter) {
+            row.layoutManager = LinearLayoutManager(this, LinearLayoutManager.HORIZONTAL, false)
+            row.itemAnimator = null
+            row.isFocusable = false
+            row.adapter = adapter
+        }
+        val colors = resolveCandidatePanelColors()
+        adapter.setCandidateTextColor(colors.text)
+        val heightPx = applicationContext.dpToPx(NECOOKEY_PREDICTION_ROW_HEIGHT_DP)
+        row.layoutParams?.let { params ->
+            if (params.height != heightPx) {
+                params.height = heightPx
+                row.layoutParams = params
+            }
+        }
+        if (adapter.suggestions != necookeyPredictionRowCandidates) {
+            adapter.suggestions = necookeyPredictionRowCandidates
+            row.scrollToPosition(0)
+        }
+        if (row.visibility != View.VISIBLE) row.visibility = View.VISIBLE
     }
 
     private suspend fun setCandidatesEnglishKana(
@@ -26726,6 +27045,9 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
     private suspend fun getSuggestionListWithoutPrediction(
         insertString: String,
         token: CandidateRequestToken,
+        nBestOverride: Int? = null,
+        forceBunsetsuSegments: Boolean = false,
+        coreResultSink: ((KanaKanjiQueryResult) -> Unit)? = null,
     ): List<Candidate> {
         val resultFromUserDictionary = if (isUserDictionaryEnable == true) {
             withContext(Dispatchers.IO) {
@@ -26779,8 +27101,12 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
                 input = insertString,
                 mode = CandidateQueryMode.CONVERSION,
                 learnRepository = suggestionLearnRepository,
+                nOverride = nBestOverride,
+                forceBunsetsuSeparation = forceBunsetsuSegments,
+                forceCollectSegments = forceBunsetsuSegments,
             )
         }
+        coreResultSink?.invoke(coreResult)
         val engineResult = coreResult.bunsetsuResult
         val engineCandidates = coreResult.candidates
 
@@ -26893,6 +27219,9 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         omissionSearchEnabled: Boolean = false,
         typoCorrectionJapaneseFlickEnabled: Boolean = false,
         typoCorrectionQwertyEnglishEnabled: Boolean = false,
+        nOverride: Int? = null,
+        forceBunsetsuSeparation: Boolean = false,
+        forceCollectSegments: Boolean = false,
     ): KanaKanjiQueryResult {
         val engine = awaitKanaKanjiEngineOrNull()
             ?: return KanaKanjiQueryResult(candidates = emptyList())
@@ -26907,8 +27236,8 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
             KanaKanjiQueryRequest(
                 input = input,
                 mode = mode,
-                bunsetsuSeparation = bunsetsuSeparation == true,
-                n = nBest ?: 4,
+                bunsetsuSeparation = forceBunsetsuSeparation || bunsetsuSeparation == true,
+                n = nOverride ?: nBest ?: 4,
                 mozcUtPersonName = mozcUTPersonName,
                 mozcUtPlaces = mozcUTPlaces,
                 mozcUtWiki = mozcUTWiki,
@@ -26924,7 +27253,7 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
                 omissionSearchOffsetScore = omissionSearchOffsetScorePreference ?: 1900,
                 beamWidth = conversionBeamWidth,
                 predictionConfig = predictionConfig,
-                collectCandidateSegments =
+                collectCandidateSegments = forceCollectSegments ||
                     appPreference.candidate_order_override_enable_preference == true ||
                         shouldUseBunsetsuCursorMoveSession() || shouldCollectCandidateRubySegments(),
                 dateCandidateConfig = dateCandidateConfig,
