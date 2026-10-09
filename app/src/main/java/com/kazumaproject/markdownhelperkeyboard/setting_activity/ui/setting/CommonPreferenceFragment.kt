@@ -142,57 +142,6 @@ open class CommonPreferenceFragment : AsyncPreferenceFragment() {
             }
         }
 
-    private val keyboardBackgroundImageLauncher =
-        registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
-            if (uri == null) return@registerForActivityResult
-            runCatching {
-                requireContext().contentResolver.takePersistableUriPermission(
-                    uri,
-                    Intent.FLAG_GRANT_READ_URI_PERMISSION
-                )
-                appPreference.keyboard_background_image_uri = uri.toString()
-            }.onSuccess {
-                toast(getString(R.string.keyboard_background_image_saved))
-            }.onFailure {
-                toast(
-                    getString(
-                        R.string.keyboard_background_image_failed,
-                        it.message ?: "unknown"
-                    )
-                )
-            }
-            updateKeyboardBackgroundImagePreferenceState()
-        }
-
-    private val keyboardBackgroundVideoLauncher =
-        registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
-            if (uri == null) return@registerForActivityResult
-            runCatching {
-                val oldUri = appPreference.keyboard_background_video_uri
-                if (oldUri.isNotBlank() && oldUri != uri.toString()) {
-                    requireContext().contentResolver.releasePersistableUriPermission(
-                        oldUri.toUri(),
-                        Intent.FLAG_GRANT_READ_URI_PERMISSION
-                    )
-                }
-                requireContext().contentResolver.takePersistableUriPermission(
-                    uri,
-                    Intent.FLAG_GRANT_READ_URI_PERMISSION
-                )
-                appPreference.keyboard_background_video_uri = uri.toString()
-            }.onSuccess {
-                toast(getString(R.string.keyboard_background_video_saved))
-            }.onFailure {
-                toast(
-                    getString(
-                        R.string.keyboard_background_video_failed,
-                        it.message ?: "unknown"
-                    )
-                )
-            }
-            updateKeyboardBackgroundVideoPreferenceState()
-        }
-
     // ヘルパーを class 内に追記
     private fun readTextFromUri(uri: Uri): String {
         val cr = requireContext().contentResolver
@@ -223,70 +172,6 @@ open class CommonPreferenceFragment : AsyncPreferenceFragment() {
 
     private fun toast(msg: String) {
         Toast.makeText(requireContext(), msg, Toast.LENGTH_SHORT).show()
-    }
-
-    private fun updateKeyboardBackgroundImagePreferenceState() {
-        val uriString = appPreference.keyboard_background_image_uri
-        val selectPreference = findPreference<Preference>("keyboard_background_image_select_preference")
-        val clearPreference = findPreference<Preference>("keyboard_background_image_clear_preference")
-
-        if (uriString.isBlank()) {
-            selectPreference?.summary = getString(R.string.keyboard_background_image_not_set)
-            clearPreference?.isEnabled = false
-            return
-        }
-
-        val displayName = runCatching {
-            uriString.toUri().lastPathSegment ?: uriString
-        }.getOrDefault(uriString)
-        selectPreference?.summary = getString(
-            R.string.keyboard_background_image_selected_summary,
-            displayName
-        )
-        clearPreference?.isEnabled = true
-    }
-
-    private fun releaseKeyboardBackgroundUriPermissionIfNeeded() {
-        val uriString = appPreference.keyboard_background_image_uri
-        if (uriString.isBlank()) return
-        runCatching {
-            requireContext().contentResolver.releasePersistableUriPermission(
-                uriString.toUri(),
-                Intent.FLAG_GRANT_READ_URI_PERMISSION
-            )
-        }
-    }
-
-    private fun updateKeyboardBackgroundVideoPreferenceState() {
-        val uriString = appPreference.keyboard_background_video_uri
-        val selectPreference = findPreference<Preference>("keyboard_background_video_select_preference")
-        val clearPreference = findPreference<Preference>("keyboard_background_video_clear_preference")
-
-        if (uriString.isBlank()) {
-            selectPreference?.summary = getString(R.string.keyboard_background_video_not_set)
-            clearPreference?.isEnabled = false
-            return
-        }
-
-        val displayName = runCatching {
-            uriString.toUri().lastPathSegment ?: uriString
-        }.getOrDefault(uriString)
-        selectPreference?.summary = getString(
-            R.string.keyboard_background_video_selected_summary,
-            displayName
-        )
-        clearPreference?.isEnabled = true
-    }
-
-    private fun releaseKeyboardBackgroundVideoUriPermissionIfNeeded() {
-        val uriString = appPreference.keyboard_background_video_uri
-        if (uriString.isBlank()) return
-        runCatching {
-            requireContext().contentResolver.releasePersistableUriPermission(
-                uriString.toUri(),
-                Intent.FLAG_GRANT_READ_URI_PERMISSION
-            )
-        }
     }
 
     private fun updateKeyboardTouchEffectPreferenceState(
@@ -561,38 +446,6 @@ open class CommonPreferenceFragment : AsyncPreferenceFragment() {
             true
         }
 
-        findPreference<Preference>("keyboard_background_image_select_preference")?.apply {
-            setOnPreferenceClickListener {
-                keyboardBackgroundImageLauncher.launch(arrayOf("image/*"))
-                true
-            }
-        }
-
-        findPreference<ListPreference>("keyboard_background_image_display_mode_preference")?.apply {
-            summaryProvider = ListPreference.SimpleSummaryProvider.getInstance()
-        }
-
-        findPreference<Preference>("keyboard_background_image_clear_preference")?.apply {
-            setOnPreferenceClickListener {
-                releaseKeyboardBackgroundUriPermissionIfNeeded()
-                appPreference.keyboard_background_image_uri = ""
-                toast(getString(R.string.keyboard_background_image_cleared))
-                updateKeyboardBackgroundImagePreferenceState()
-                true
-            }
-        }
-
-        findPreference<Preference>("keyboard_background_video_select_preference")?.apply {
-            setOnPreferenceClickListener {
-                keyboardBackgroundVideoLauncher.launch(arrayOf("video/*"))
-                true
-            }
-        }
-
-        findPreference<ListPreference>("keyboard_background_video_quality_preference")?.apply {
-            summaryProvider = ListPreference.SimpleSummaryProvider.getInstance()
-        }
-
         findPreference<ListPreference>("keyboard_touch_effect_type_preference")?.apply {
             summaryProvider = ListPreference.SimpleSummaryProvider.getInstance()
             val normalizedEffect = appPreference.keyboard_touch_effect_type_preference
@@ -616,16 +469,6 @@ open class CommonPreferenceFragment : AsyncPreferenceFragment() {
             setOnPreferenceChangeListener { _, newValue ->
                 val nextQuality = KeyboardTouchEffectQuality.normalize(newValue as? String)
                 appPreference.keyboard_touch_effect_quality_preference = nextQuality
-                true
-            }
-        }
-
-        findPreference<Preference>("keyboard_background_video_clear_preference")?.apply {
-            setOnPreferenceClickListener {
-                releaseKeyboardBackgroundVideoUriPermissionIfNeeded()
-                appPreference.keyboard_background_video_uri = ""
-                toast(getString(R.string.keyboard_background_video_cleared))
-                updateKeyboardBackgroundVideoPreferenceState()
                 true
             }
         }
@@ -829,8 +672,6 @@ open class CommonPreferenceFragment : AsyncPreferenceFragment() {
             }
         }
 
-        updateKeyboardBackgroundImagePreferenceState()
-        updateKeyboardBackgroundVideoPreferenceState()
         updateKeyboardTouchEffectPreferenceState()
 
         val keyboardSizeLandscapePreference =
@@ -1108,7 +949,7 @@ open class CommonPreferenceFragment : AsyncPreferenceFragment() {
             getString(
                 R.string.cursor_move_target_pairs_summary_current,
                 appPreference.cursor_move_after_commit_target_pairs_preference.joinToString(" ")
-                    .ifBlank { getString(R.string.keyboard_background_image_not_set) }
+                    .ifBlank { getString(R.string.cursor_move_target_pairs_not_set) }
             )
     }
 

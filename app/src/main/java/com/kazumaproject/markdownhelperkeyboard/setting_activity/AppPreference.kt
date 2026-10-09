@@ -869,14 +869,6 @@ object AppPreference {
             GEMMA_HANDWRITING_PEN_COLOR_KEY,
             GemmaHandwritingSettings.AUTOMATIC_PEN_COLOR,
         )
-    private val KEYBOARD_BACKGROUND_IMAGE_URI_PREFERENCE =
-        Pair("keyboard_background_image_uri_preference", "")
-    private val KEYBOARD_BACKGROUND_IMAGE_DISPLAY_MODE_PREFERENCE =
-        Pair("keyboard_background_image_display_mode_preference", "fit")
-    private val KEYBOARD_BACKGROUND_VIDEO_URI_PREFERENCE =
-        Pair("keyboard_background_video_uri_preference", "")
-    private val KEYBOARD_BACKGROUND_VIDEO_QUALITY_PREFERENCE =
-        Pair("keyboard_background_video_quality_preference", "high")
     private val SUMINAGASHI_INK_EFFECT_ENABLE =
         Pair("suminagashi_ink_effect_preference", false)
     private val KEYBOARD_TOUCH_EFFECT_TYPE =
@@ -4573,41 +4565,6 @@ object AppPreference {
             )
         }
 
-    var keyboard_background_image_uri: String
-        get() = preferences.getString(
-            KEYBOARD_BACKGROUND_IMAGE_URI_PREFERENCE.first,
-            KEYBOARD_BACKGROUND_IMAGE_URI_PREFERENCE.second
-        ) ?: ""
-        set(value) = preferences.edit {
-            it.putString(KEYBOARD_BACKGROUND_IMAGE_URI_PREFERENCE.first, value)
-        }
-
-    var keyboard_background_image_display_mode: String
-        get() = preferences.getString(
-            KEYBOARD_BACKGROUND_IMAGE_DISPLAY_MODE_PREFERENCE.first,
-            KEYBOARD_BACKGROUND_IMAGE_DISPLAY_MODE_PREFERENCE.second
-        ) ?: "fit"
-        set(value) = preferences.edit {
-            it.putString(KEYBOARD_BACKGROUND_IMAGE_DISPLAY_MODE_PREFERENCE.first, value)
-        }
-
-    var keyboard_background_video_uri: String
-        get() = preferences.getString(
-            KEYBOARD_BACKGROUND_VIDEO_URI_PREFERENCE.first,
-            KEYBOARD_BACKGROUND_VIDEO_URI_PREFERENCE.second
-        ) ?: ""
-        set(value) = preferences.edit {
-            it.putString(KEYBOARD_BACKGROUND_VIDEO_URI_PREFERENCE.first, value)
-        }
-
-    var keyboard_background_video_quality: String
-        get() = preferences.getString(
-            KEYBOARD_BACKGROUND_VIDEO_QUALITY_PREFERENCE.first,
-            KEYBOARD_BACKGROUND_VIDEO_QUALITY_PREFERENCE.second
-        ) ?: "high"
-        set(value) = preferences.edit {
-            it.putString(KEYBOARD_BACKGROUND_VIDEO_QUALITY_PREFERENCE.first, value)
-        }
 
     var suminagashi_ink_effect_preference: Boolean
         get() = preferences.getBoolean(

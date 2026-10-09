@@ -471,8 +471,6 @@ object SettingDestinations {
         "keyboard_floating_preference",
         "landscape_force_qwerty_preference",
         "keyboard_key_letter_size_fragment_preference",
-        "keyboard_background_image_select_preference",
-        "keyboard_background_video_select_preference",
         "keyboard_touch_effect_type_preference",
         "keyboard_touch_effect_liquid_ink_density_preference",
         "keyboard_touch_effect_aurora_ink_density_preference",

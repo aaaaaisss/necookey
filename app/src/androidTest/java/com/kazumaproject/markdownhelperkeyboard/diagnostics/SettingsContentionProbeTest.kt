@@ -208,41 +208,4 @@ class SettingsContentionProbeTest {
         }
     }
 
-    @androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
-    @Test fun blockedPlaybackThreadHasBoundedReleaseWait() {
-        prepare(false)
-        lateinit var player: androidx.media3.exoplayer.ExoPlayer
-        instrumentation.runOnMainSync { player = androidx.media3.exoplayer.ExoPlayer.Builder(context).build() }
-        val ready = CountDownLatch(1)
-        val release = CountDownLatch(1)
-        val completed = CountDownLatch(1)
-        val began = CountDownLatch(1)
-        var elapsed = 0L
-        Handler(player.playbackLooper).post {
-            ready.countDown()
-            release.await(10, TimeUnit.SECONDS)
-        }
-        try {
-            assertTrue(ready.await(3, TimeUnit.SECONDS))
-            Handler(Looper.getMainLooper()).post {
-                val start = android.os.SystemClock.uptimeMillis()
-                began.countDown()
-                try { player.release() } finally {
-                    elapsed = android.os.SystemClock.uptimeMillis() - start
-                    completed.countDown()
-                }
-            }
-            assertTrue(began.await(3, TimeUnit.SECONDS))
-            repeat(3) { sample ->
-                snapshot("video-release-$sample")
-                Thread.sleep(100)
-            }
-            assertTrue("Release must time out even while playback is held", completed.await(3, TimeUnit.SECONDS))
-            assertTrue("Expected timeout path", elapsed >= 400)
-            File(output, "video-release.result").writeText("PASS bounded_release_ms=$elapsed playback_still_held=true\n")
-        } finally {
-            release.countDown()
-            assertTrue(completed.await(5, TimeUnit.SECONDS))
-        }
-    }
 }

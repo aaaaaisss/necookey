@@ -12,30 +12,7 @@
         android:layout_width="match_parent"
         android:layout_height="306dp"
         android:clickable="false"
-        android:focusable="false">
-
-        <androidx.media3.ui.PlayerView
-            android:id="@+id/floating_keyboard_background_video"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:clickable="false"
-            android:focusable="false"
-            android:visibility="gone"
-            app:keep_content_on_player_reset="true"
-            app:surface_type="texture_view"
-            app:shutter_background_color="@android:color/transparent"
-            app:use_controller="false" />
-
-        <ImageView
-            android:id="@+id/floating_keyboard_background_image"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:clickable="false"
-            android:contentDescription="@null"
-            android:focusable="false"
-            android:scaleType="fitCenter"
-            android:visibility="gone" />
-    </FrameLayout>
+        android:focusable="false" />
 
     <FrameLayout
         android:id="@+id/floating_keyboard_touch_effect_container"

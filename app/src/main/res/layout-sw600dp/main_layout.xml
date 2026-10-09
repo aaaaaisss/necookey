@@ -12,25 +12,7 @@
         android:layout_height="@dimen/keyboard_height"
         android:layout_gravity="bottom"
         android:clickable="false"
-        android:focusable="false">
-
-        <androidx.media3.ui.PlayerView
-            android:id="@+id/keyboard_background_video"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:visibility="gone"
-            app:surface_type="texture_view"
-            app:shutter_background_color="@android:color/transparent"
-            app:use_controller="false" />
-
-        <ImageView
-            android:id="@+id/keyboard_background_image"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:contentDescription="@null"
-            android:scaleType="fitCenter"
-            android:visibility="gone" />
-    </FrameLayout>
+        android:focusable="false" />
 
     <FrameLayout
         android:id="@+id/keyboard_touch_effect_container"

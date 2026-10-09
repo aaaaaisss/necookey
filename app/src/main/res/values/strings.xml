@@ -1317,35 +1317,6 @@
     <string name="ngram_rule_import_done">Imported successfully.</string>
     <string name="ngram_rule_nothing_to_export">No rules to export.</string>
     <string name="ngram_rule_delete_all_message">Delete all N-gram rules?</string>
-
-    <string name="keyboard_background_image_select_title">Keyboard Background Image</string>
-    <string name="keyboard_background_image_select_summary">Choose an image from your files to use as the keyboard background.</string>
-    <string name="keyboard_background_image_display_mode_title">Background Image Display Mode</string>
-    <string name="keyboard_background_image_display_mode_summary">Choose how to display the background image.</string>
-    <string name="keyboard_background_image_display_mode_fit">Fit</string>
-    <string name="keyboard_background_image_display_mode_center_crop">Center Crop</string>
-    <string name="keyboard_background_image_clear_title">Clear Keyboard Background Image</string>
-    <string name="keyboard_background_image_clear_summary">Remove the selected image and restore the theme background.</string>
-    <string name="keyboard_background_image_not_set">Not set</string>
-    <string name="keyboard_background_image_selected_summary">Selected: %1$s</string>
-    <string name="keyboard_background_image_saved">Keyboard background image has been set.</string>
-    <string name="keyboard_background_image_cleared">Keyboard background image has been cleared.</string>
-    <string name="keyboard_background_image_failed">Failed to set keyboard background image: %1$s</string>
-
-    <string name="keyboard_background_video_select_title">Keyboard Background Video</string>
-    <string name="keyboard_background_video_select_summary">Choose a video from your files to use as the keyboard background.</string>
-    <string name="keyboard_background_video_quality_title">Background Video Quality</string>
-    <string name="keyboard_background_video_quality_summary">Choose the playback quality for the background video.</string>
-    <string name="keyboard_background_video_quality_high">High</string>
-    <string name="keyboard_background_video_quality_medium">Medium</string>
-    <string name="keyboard_background_video_quality_low">Low</string>
-    <string name="keyboard_background_video_clear_title">Clear Keyboard Background Video</string>
-    <string name="keyboard_background_video_clear_summary">Remove the selected video and restore image or theme background.</string>
-    <string name="keyboard_background_video_not_set">Not set</string>
-    <string name="keyboard_background_video_selected_summary">Selected: %1$s</string>
-    <string name="keyboard_background_video_saved">Keyboard background video has been set.</string>
-    <string name="keyboard_background_video_cleared">Keyboard background video has been cleared.</string>
-    <string name="keyboard_background_video_failed">Failed to set keyboard background video: %1$s</string>
     <string name="keyboard_touch_effect_category_title">Touch Effects</string>
     <string name="keyboard_touch_effect_type_title">Touch Effect</string>
     <string name="keyboard_touch_effect_type_summary">Choose the visual effect shown when touching the keyboard.</string>
@@ -1610,7 +1581,6 @@
     <string name="setting_category_app_info_summary">Version and open source licenses</string>
     <string name="setting_category_advanced_title">Advanced Settings</string>
     <string name="setting_category_advanced_summary">Detailed options for advanced users</string>
-    <string name="setting_category_keyboard_background_title">Keyboard Background</string>
     <string name="setting_category_keyboard_shape_title">Keyboard Shape</string>
     <string name="setting_route_keyboard_theme_summary">Choose keyboard colors and custom theme</string>
     <string name="setting_route_sumire_summary">Flick style, guides, and Sumire-specific input</string>
@@ -1890,4 +1860,5 @@ ABC abc 0123456789　ＡＢＣ　１２３４５
     <string name="necookey_zenz_bunsetsu_gate_summary">When the dictionary is unsure about a bunsetsu, the on-device zenz model picks the most likely of the top candidates for the leftmost slot.</string>
     <string name="necookey_bunsetsu_resize_title">Resize bunsetsu with arrow keys</string>
     <string name="necookey_bunsetsu_resize_summary">While converting, tap ←/→ on the custom keyboard to shrink/extend the focused bunsetsu (the rest is re-converted). Long-press ←/→ moves the focus to the previous/next bunsetsu.</string>
+    <string name="cursor_move_target_pairs_not_set">Not set</string>
 </resources>
