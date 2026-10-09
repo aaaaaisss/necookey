@@ -62,28 +62,28 @@ jobs:
       - name: Build release APK
         run: gradle --no-daemon --stacktrace :app:assembleRelease
 
-      - name: Verify APK ABIs
+      - name: Build installable debug APK
+        run: gradle --no-daemon --stacktrace :app:assembleDebug
+
+      - name: Verify installable APK
         shell: bash
         run: |
           set -euo pipefail
-          APK="$(find app/build/outputs/apk/release -maxdepth 1 -type f -name '*.apk' -print -quit)"
-          if [[ -z "$APK" ]]; then
-            echo "ERROR: No release APK was produced. APK output files:"
-            find app/build/outputs -maxdepth 5 -type f -print || true
-            exit 1
-          fi
+          APK="app/build/outputs/apk/debug/app-debug.apk"
+          test -f "$APK"
           echo "Verifying APK: $APK"
           "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK" | tee apk-badging.txt
+          "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --verbose "$APK"
           unzip -l "$APK" | grep -E 'lib/(arm64-v8a|armeabi-v7a)/' || true
           if unzip -l "$APK" | grep -E 'lib/(x86|x86_64)/'; then
             echo "ERROR: x86 ABI is present in the APK"
             exit 1
           fi
 
-      - name: Upload release APK
+      - name: Upload installable APK
         uses: actions/upload-artifact@v4
         with:
-          name: necookey-release-arm
-          path: app/build/outputs/apk/release/*.apk
+          name: necookey-installable-arm64
+          path: app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
           retention-days: 14
