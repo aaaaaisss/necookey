@@ -1,3 +1,10 @@
+> **necookey** — an offline Japanese IME built on a fork of
+> [Sumire / JapaneseKeyboard](https://github.com/KazumaProject/JapaneseKeyboard) (MIT, © KazumaProject).
+> necookey keeps Sumire's engine and build as-is and adds a two-row candidate bar where the
+> top-left slot is Sumire's bunsetsu conversion, with low-confidence bunsetsu re-chosen by the
+> bundled zenz-v3.2-xsmall model (on-device, no network). See `docs/necookey-candidate-bar.md`.
+> The original Sumire README follows.
+
 # Sumire (スミレ) — The Privacy-First Japanese Keyboard
 
 <p align="center">

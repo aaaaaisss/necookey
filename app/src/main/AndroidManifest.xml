@@ -7,6 +7,10 @@
     <uses-permission
         android:name="android.permission.ACCESS_NETWORK_STATE"
         tools:node="remove" />
+    <!-- necookey: the keyboard must stay fully offline, even if a library requests network access. -->
+    <uses-permission
+        android:name="android.permission.INTERNET"
+        tools:node="remove" />
 
     <queries>
         <intent>
