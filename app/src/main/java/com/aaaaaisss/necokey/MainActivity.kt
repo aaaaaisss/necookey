@@ -40,6 +40,12 @@ class MainActivity : Activity() {
             setPadding(0, 0, 0, dp(12))
         }
         root.addView(status)
+        root.addView(button("カスタムキーボード・設定を開く") {
+            startActivity(Intent().setClassName(
+                this,
+                "com.kazumaproject.markdownhelperkeyboard.setting_activity.MainActivity"
+            ))
+        })
         root.addView(button("キーボードを有効にする") {
             startActivity(Intent(Settings.ACTION_INPUT_METHOD_SETTINGS))
         })
