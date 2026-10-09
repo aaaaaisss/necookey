@@ -91,6 +91,19 @@ android {
         }
     }
 
+    // necookey CI: let ccache wrap the NDK compilers when the workflow asks for it.
+    // No effect on local builds unless ZENZ_USE_CCACHE=true is exported.
+    if (System.getenv("ZENZ_USE_CCACHE") == "true") {
+        defaultConfig {
+            externalNativeBuild {
+                cmake {
+                    arguments "-DCMAKE_C_COMPILER_LAUNCHER=ccache",
+                            "-DCMAKE_CXX_COMPILER_LAUNCHER=ccache"
+                }
+            }
+        }
+    }
+
     // Javaバージョンをターゲットフォーマットの "17" に統一
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_17

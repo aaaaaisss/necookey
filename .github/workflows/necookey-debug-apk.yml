@@ -1,13 +1,31 @@
 name: necookey debug APK
 
+# One variant only: fullStandard debug, arm64-v8a. No lint, no release, no other flavors.
 on:
   push:
-    branches:
-      - sumire-fork
-      - main
+    branches: [sumire-fork, main]
+    paths-ignore:
+      - '**/*.md'
+      - 'docs/**'
+      - 'images/**'
+      - 'fastlane/**'
+      - 'fdroid/**'
+      - 'investigation/**'
+      - 'LICENSE'
+      - 'ENGLISH_DICTIOANRY_LICENSE'
+      - '.idea/**'
   pull_request:
-    branches:
-      - main
+    branches: [main]
+    paths-ignore:
+      - '**/*.md'
+      - 'docs/**'
+      - 'images/**'
+      - 'fastlane/**'
+      - 'fdroid/**'
+      - 'investigation/**'
+      - 'LICENSE'
+      - 'ENGLISH_DICTIOANRY_LICENSE'
+      - '.idea/**'
   workflow_dispatch:
 
 permissions:
@@ -17,18 +35,37 @@ concurrency:
   group: necookey-debug-${{ github.ref }}
   cancel-in-progress: true
 
+env:
+  ZENZ_MODEL_CACHE_DIR: ${{ github.workspace }}/.zenz-model-cache
+  ZENZ_USE_CCACHE: 'true'
+  GRADLE_OPTS: -Dorg.gradle.jvmargs="-Xmx5g -XX:+UseParallelGC"
+  GRADLE_FLAGS: >-
+    --build-cache --configuration-cache --configuration-cache-problems=warn
+    --parallel --stacktrace
+    -Pandroid.injected.build.abi=arm64-v8a
+    -PzenzDebugNativeAbis=arm64-v8a
+    -PzenzDebugOptimizedNative=true
+
 jobs:
   build:
     runs-on: ubuntu-latest
-    timeout-minutes: 90
-    env:
-      ZENZ_MODEL_CACHE_DIR: ${{ github.workspace }}/.zenz-model-cache
-      GRADLE_OPTS: -Dorg.gradle.jvmargs=-Xmx4g
+    timeout-minutes: 60
     steps:
-      - name: Checkout (with llama.cpp submodule)
+      - name: Checkout (with llama.cpp submodule, shallow)
         uses: actions/checkout@v5
         with:
           submodules: recursive
+          fetch-depth: 2
+
+      - name: Detect touched modules
+        id: changes
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            app: ['app/**']
+            core: ['core/**']
+            zenz: ['zenz/**']
+            custom_keyboard: ['custom_keyboard/**']
 
       - name: Set up JDK 17
         uses: actions/setup-java@v5
@@ -36,43 +73,78 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
 
-      - name: Set up Android SDK
-        uses: android-actions/setup-android@v4
+      # Gradle user home + build cache + configuration cache, pruned by the action.
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
         with:
-          log-accepted-android-sdk-licenses: false
+          cache-read-only: ${{ github.ref != 'refs/heads/main' && github.ref != 'refs/heads/sumire-fork' }}
 
-      - name: Cache Gradle
+      # The runner image already ships the SDK, platform 36 and NDK 29. Only CMake 3.22.1 is
+      # missing; cache just that directory (~50 MB) instead of the whole SDK.
+      - name: Cache CMake 3.22.1
+        id: cmake-cache
         uses: actions/cache@v4
         with:
-          path: |
-            ~/.gradle/caches
-            ~/.gradle/wrapper
-          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
-          restore-keys: |
-            ${{ runner.os }}-gradle-
+          path: /usr/local/lib/android/sdk/cmake/3.22.1
+          key: android-cmake-3.22.1-${{ runner.os }}
+      - name: Install CMake 3.22.1
+        if: steps.cmake-cache.outputs.cache-hit != 'true'
+        run: yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "cmake;3.22.1" > /dev/null
 
-      - name: Cache Zenz model
-        uses: actions/cache@v4
+      - name: ccache for zenz / llama.cpp
+        uses: hendrikmuhs/ccache-action@v1.2
+        with:
+          key: zenz-arm64-${{ hashFiles('zenz/src/main/cpp/CMakeLists.txt') }}
+          max-size: 400M
+
+      # The GGUF is downloaded + quantized once and reused (restore/save split so a failed
+      # build still keeps the model).
+      - name: Restore zenz model
+        id: zenz-model
+        uses: actions/cache/restore@v4
         with:
           path: .zenz-model-cache
-          key: ${{ runner.os }}-zenz-model-v2-4f5423f0fad41a73b1242eb96fe5c12ae4fdca83-Q5_K_M-ggml-model-Q5_K_M.gguf
+          key: zenz-model-v2-4f5423f0fad41a73b1242eb96fe5c12ae4fdca83-Q5_K_M
 
-      - name: Build fullStandard debug APK
+      - name: Prepare zenz model
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
+        run: ./gradlew :zenz:prepareZenzModel $GRADLE_FLAGS
+
+      - name: Save zenz model
+        if: always() && steps.zenz-model.outputs.cache-hit != 'true' && hashFiles('.zenz-model-cache/*.gguf') != ''
+        uses: actions/cache/save@v4
+        with:
+          path: .zenz-model-cache
+          key: zenz-model-v2-4f5423f0fad41a73b1242eb96fe5c12ae4fdca83-Q5_K_M
+
+      - name: Build fullStandard debug APK (arm64-v8a)
+        run: ./gradlew :app:assembleFullStandardDebug $GRADLE_FLAGS
+
+      - name: JVM unit tests (touched modules only)
+        if: steps.changes.outputs.app == 'true' || steps.changes.outputs.core == 'true' || steps.changes.outputs.custom_keyboard == 'true' || steps.changes.outputs.zenz == 'true'
         run: |
-          ./gradlew :app:assembleFullStandardDebug --stacktrace --no-daemon --max-workers=2
+          TASKS=""
+          if [ "${{ steps.changes.outputs.app }}" = "true" ] || [ "${{ steps.changes.outputs.zenz }}" = "true" ]; then
+            # necookey's own tests; the full Sumire app suite (Robolectric) is not run on every push.
+            TASKS="$TASKS :app:testFullStandardDebugUnitTest --tests com.kazumaproject.markdownhelperkeyboard.converter.candidatebar.*"
+          fi
+          if [ "${{ steps.changes.outputs.core }}" = "true" ]; then TASKS="$TASKS :core:testDebugUnitTest"; fi
+          if [ "${{ steps.changes.outputs.custom_keyboard }}" = "true" ]; then TASKS="$TASKS :custom_keyboard:testDebugUnitTest"; fi
+          ./gradlew $TASKS $GRADLE_FLAGS
 
       - name: Verify no INTERNET permission
         run: |
           APK=$(ls app/build/outputs/apk/fullStandard/debug/*.apk | head -1)
-          AAPT=$(ls "$ANDROID_SDK_ROOT"/build-tools/*/aapt2 | sort | tail -1)
+          AAPT=$(ls "$ANDROID_HOME"/build-tools/*/aapt2 | sort -V | tail -1)
           "$AAPT" dump permissions "$APK" | tee perms.txt
           if grep -q 'android.permission.INTERNET' perms.txt; then echo "INTERNET permission present"; exit 1; fi
+          ls -la "$APK"
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: necookey-fullStandard-debug
+          name: necookey-fullStandard-debug-arm64
           path: app/build/outputs/apk/fullStandard/debug/*.apk
           if-no-files-found: error
+          retention-days: 14
