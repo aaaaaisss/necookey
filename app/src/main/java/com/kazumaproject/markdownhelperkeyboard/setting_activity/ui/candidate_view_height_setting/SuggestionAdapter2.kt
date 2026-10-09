@@ -35,8 +35,6 @@ import com.kazumaproject.markdownhelperkeyboard.setting_activity.AppPreference
 import com.kazumaproject.markdownhelperkeyboard.R
 import com.kazumaproject.markdownhelperkeyboard.converter.candidate.CANDIDATE_TYPE_ERA
 import com.kazumaproject.markdownhelperkeyboard.converter.candidate.CANDIDATE_TYPE_CALCULATION
-import com.kazumaproject.markdownhelperkeyboard.converter.candidate.CANDIDATE_TYPE_FORMULA_TEX
-import com.kazumaproject.markdownhelperkeyboard.converter.candidate.CANDIDATE_TYPE_FORMULA_UNICODE
 import com.kazumaproject.markdownhelperkeyboard.converter.candidate.CANDIDATE_TYPE_LEARNED_DICTIONARY
 import com.kazumaproject.markdownhelperkeyboard.converter.candidate.CANDIDATE_TYPE_TIME
 import com.kazumaproject.markdownhelperkeyboard.converter.candidate.CANDIDATE_TYPE_UNIT_CONVERSION
@@ -49,7 +47,6 @@ import com.kazumaproject.markdownhelperkeyboard.custom_keyboard.data.CustomKeybo
 import com.kazumaproject.markdownhelperkeyboard.gemma.GemmaTranslationManager
 import com.kazumaproject.markdownhelperkeyboard.ime_service.extensions.correctReading
 import com.kazumaproject.markdownhelperkeyboard.ime_service.extensions.debugPrintCodePoints
-import com.kazumaproject.markdownhelperkeyboard.ime_service.adapters.FormulaView
 import com.kazumaproject.markdownhelperkeyboard.ime_service.adapters.CandidateReadingTextView
 import com.kazumaproject.markdownhelperkeyboard.ime_service.adapters.resolveCandidateYomiPresentation
 import com.kazumaproject.markdownhelperkeyboard.short_cut.ShortcutType
@@ -511,7 +508,6 @@ class SuggestionAdapter2 : RecyclerView.Adapter<RecyclerView.ViewHolder>() {
         )
 
     inner class SuggestionViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
-        val formulaView: FormulaView = itemView.findViewById(R.id.suggestion_item_formula_view)
         val text: MaterialTextView = itemView.findViewById(R.id.suggestion_item_text_view)
         val yomiText: MaterialTextView = itemView.findViewById(R.id.suggestion_item_yomi_text_view)
         val typeText: MaterialTextView = itemView.findViewById(R.id.suggestion_item_type_text_view)
@@ -942,8 +938,6 @@ class SuggestionAdapter2 : RecyclerView.Adapter<RecyclerView.ViewHolder>() {
         applyCandidateItemBackground(holder.itemView)
         val suggestion = item.candidate
         val position = item.candidateIndex
-        val formulaPresentation = suggestion.presentation
-        val isFormula = formulaPresentation != null
         val paddingLength = when {
             position == 0 -> 4
             suggestion.string.length == 1 -> 4
@@ -961,10 +955,7 @@ class SuggestionAdapter2 : RecyclerView.Adapter<RecyclerView.ViewHolder>() {
             suggestion.string.padStart(suggestion.string.length + paddingLength)
                 .plus(" ".repeat(paddingLength))
         }
-        holder.formulaView.isVisible = isFormula
-        holder.formulaView.setPresentation(formulaPresentation)
-        holder.formulaView.setFormulaTextSizeSp(candidateTextSize)
-        holder.text.isVisible = !isFormula
+        holder.text.isVisible = true
 
         listOf(holder.text, holder.yomiText, holder.typeText).forEach {
             KeyboardFontApplicator.apply(
@@ -978,7 +969,7 @@ class SuggestionAdapter2 : RecyclerView.Adapter<RecyclerView.ViewHolder>() {
             readingTextSize = candidateYomiTextSize,
             readingMode = candidateYomiMode
         )
-        holder.yomiText.isVisible = yomiPresentation.isVisible && !isFormula
+        holder.yomiText.isVisible = yomiPresentation.isVisible
         holder.yomiText.text = yomiPresentation.text
         (holder.yomiText as CandidateReadingTextView).setRubyAnnotations(
             yomiPresentation.annotations, paddingLength
@@ -993,9 +984,6 @@ class SuggestionAdapter2 : RecyclerView.Adapter<RecyclerView.ViewHolder>() {
             holder.typeText.setTextColor(color)
             holder.yomiText.setTextColor(color)
         }
-        holder.formulaView.setFormulaTextColor(
-            candidateTextColor ?: holder.text.currentTextColor
-        )
 
         holder.typeText.text = when (suggestion.type) {
             (1).toByte() -> ""
@@ -1046,10 +1034,6 @@ class SuggestionAdapter2 : RecyclerView.Adapter<RecyclerView.ViewHolder>() {
                 holder.itemView.context.getString(R.string.candidate_badge_calculation)
             CANDIDATE_TYPE_UNIT_CONVERSION ->
                 holder.itemView.context.getString(R.string.candidate_badge_unit_conversion)
-            CANDIDATE_TYPE_FORMULA_UNICODE ->
-                holder.itemView.context.getString(R.string.candidate_badge_formula_unicode)
-            CANDIDATE_TYPE_FORMULA_TEX ->
-                holder.itemView.context.getString(R.string.candidate_badge_formula_tex)
             CANDIDATE_TYPE_USER_TEMPLATE ->
                 if (showDictionaryCandidateLabels) "定型" else ""
             CANDIDATE_TYPE_TEXT_MACRO -> "マクロ"

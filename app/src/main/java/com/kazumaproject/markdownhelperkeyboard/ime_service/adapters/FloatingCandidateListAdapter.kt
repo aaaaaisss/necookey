@@ -4,7 +4,6 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.TextView
-import androidx.core.content.ContextCompat
 import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
@@ -12,23 +11,15 @@ import com.kazumaproject.core.data.floating_candidate.CandidateItem
 import com.kazumaproject.core.ui.font.KeyboardFontApplicator
 import com.kazumaproject.core.ui.font.KeyboardFontSnapshot
 import com.kazumaproject.markdownhelperkeyboard.R
-import com.kazumaproject.markdownhelperkeyboard.converter.candidate.CANDIDATE_TYPE_CALCULATION
-import com.kazumaproject.markdownhelperkeyboard.converter.candidate.CANDIDATE_TYPE_FORMULA_TEX
-import com.kazumaproject.markdownhelperkeyboard.converter.candidate.CANDIDATE_TYPE_FORMULA_UNICODE
-import com.kazumaproject.markdownhelperkeyboard.converter.candidate.CANDIDATE_TYPE_UNIT_CONVERSION
-import com.kazumaproject.markdownhelperkeyboard.converter.utility.FormulaCandidateType
-import com.kazumaproject.markdownhelperkeyboard.converter.utility.FormulaParser
 import timber.log.Timber
 
 private const val VIEW_TYPE_SUGGESTION = 1
 private const val VIEW_TYPE_PAGER = 2
-private const val VIEW_TYPE_FORMULA = 3
 
 class FloatingCandidateListAdapter(
     private val pageSize: Int,
 ) : ListAdapter<CandidateItem, RecyclerView.ViewHolder>(DiffCallback()) {
     private var keyboardFontSnapshot = KeyboardFontApplicator.processSnapshot
-    private val formulaParser = FormulaParser()
     private var candidateTextSizeSp: Float = 14f
     private var candidateTextColor: Int? = null
 
@@ -40,7 +31,6 @@ class FloatingCandidateListAdapter(
     private fun applyKeyboardFont(holder: RecyclerView.ViewHolder) {
         when (holder) {
             is SuggestionViewHolder -> KeyboardFontApplicator.apply(holder.fontTarget, keyboardFontSnapshot)
-            is FormulaViewHolder -> KeyboardFontApplicator.apply(holder.badgeView, keyboardFontSnapshot)
             is PagerViewHolder -> KeyboardFontApplicator.apply(holder.fontTarget, keyboardFontSnapshot)
         }
     }
@@ -110,43 +100,6 @@ class FloatingCandidateListAdapter(
         }
     }
 
-    inner class FormulaViewHolder(view: View) : RecyclerView.ViewHolder(view) {
-        private val formulaView: FormulaView = view.findViewById(R.id.floating_formula_view)
-        val badgeView: TextView = view.findViewById(R.id.floating_formula_badge)
-
-        init {
-            itemView.setOnClickListener {
-                if (absoluteAdapterPosition != RecyclerView.NO_POSITION) {
-                    onSuggestionClicked?.invoke(getItem(absoluteAdapterPosition))
-                }
-            }
-        }
-
-        fun bind(item: CandidateItem) {
-            val parsed = item.formulaSource?.let(formulaParser::parse)
-            val type = when (item.candidateType) {
-                CANDIDATE_TYPE_FORMULA_TEX -> FormulaCandidateType.TEX
-                else -> FormulaCandidateType.UNICODE
-            }
-            formulaView.setPresentation(parsed?.presentation(type))
-            formulaView.setFallbackText(
-                if (parsed == null) item.formulaFallbackText ?: item.word else null
-            )
-            formulaView.setFormulaTextSizeSp(candidateTextSizeSp)
-            val textColor = candidateTextColor
-                ?: ContextCompat.getColor(itemView.context, com.kazumaproject.core.R.color.keyboard_icon_color)
-            formulaView.setFormulaTextColor(textColor)
-            badgeView.text = when (item.candidateType) {
-                CANDIDATE_TYPE_FORMULA_TEX -> itemView.context.getString(R.string.candidate_badge_formula_tex)
-                CANDIDATE_TYPE_FORMULA_UNICODE -> itemView.context.getString(R.string.candidate_badge_formula_unicode)
-                CANDIDATE_TYPE_CALCULATION -> itemView.context.getString(R.string.candidate_badge_calculation)
-                CANDIDATE_TYPE_UNIT_CONVERSION -> itemView.context.getString(R.string.candidate_badge_unit_conversion)
-                else -> ""
-            }
-            badgeView.setTextColor(textColor)
-        }
-    }
-
     // --- Pager ViewHolder ---
     inner class PagerViewHolder(view: View) : RecyclerView.ViewHolder(view) {
         private val textView: TextView = view.findViewById(R.id.text_view_item)
@@ -165,7 +118,6 @@ class FloatingCandidateListAdapter(
     override fun getItemViewType(position: Int): Int {
         return when {
             position == pageSize -> VIEW_TYPE_PAGER
-            getItem(position).formulaSource != null -> VIEW_TYPE_FORMULA
             else -> VIEW_TYPE_SUGGESTION
         }
     }
@@ -178,14 +130,6 @@ class FloatingCandidateListAdapter(
                     R.layout.floating_candidate_list_item_string,
                     parent,
                     false
-                )
-            )
-
-            VIEW_TYPE_FORMULA -> FormulaViewHolder(
-                inflater.inflate(
-                    R.layout.floating_candidate_list_item_formula,
-                    parent,
-                    false,
                 )
             )
 
@@ -208,7 +152,6 @@ class FloatingCandidateListAdapter(
         val currentItem = getItem(position)
         when (holder) {
             is SuggestionViewHolder -> holder.bind(currentItem.word)
-            is FormulaViewHolder -> holder.bind(currentItem)
             is PagerViewHolder -> holder.bind(currentItem.word)
         }
         applyKeyboardFont(holder)
@@ -225,7 +168,7 @@ class FloatingCandidateListAdapter(
 
     /**
      * ハイライトされているアイテムを選択し、対応するクリックイベントをトリガーします。
-     * ページャー以外の候補（組版数式を含む）で onSuggestionClicked を呼び出します。
+     * ページャー以外の候補で onSuggestionClicked を呼び出します。
      */
     fun selectHighlightedItem() {
         // highlightedPosition が有効な範囲にあるか確認

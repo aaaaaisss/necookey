@@ -38,8 +38,6 @@ import com.kazumaproject.markdownhelperkeyboard.setting_activity.AppPreference
 import com.kazumaproject.markdownhelperkeyboard.R
 import com.kazumaproject.markdownhelperkeyboard.converter.candidate.CANDIDATE_TYPE_ERA
 import com.kazumaproject.markdownhelperkeyboard.converter.candidate.CANDIDATE_TYPE_CALCULATION
-import com.kazumaproject.markdownhelperkeyboard.converter.candidate.CANDIDATE_TYPE_FORMULA_TEX
-import com.kazumaproject.markdownhelperkeyboard.converter.candidate.CANDIDATE_TYPE_FORMULA_UNICODE
 import com.kazumaproject.markdownhelperkeyboard.converter.candidate.CANDIDATE_TYPE_LEARNED_DICTIONARY
 import com.kazumaproject.markdownhelperkeyboard.converter.candidate.CANDIDATE_TYPE_TIME
 import com.kazumaproject.markdownhelperkeyboard.converter.candidate.CANDIDATE_TYPE_UNIT_CONVERSION
@@ -1213,7 +1211,6 @@ class SuggestionAdapter internal constructor(
     }
 
     inner class SuggestionViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
-        val formulaView: FormulaView = itemView.findViewById(R.id.suggestion_item_formula_view)
         val text: MaterialTextView = itemView.findViewById(R.id.suggestion_item_text_view)
         val yomiText: MaterialTextView = itemView.findViewById(R.id.suggestion_item_yomi_text_view)
         val typeText: MaterialTextView = itemView.findViewById(R.id.suggestion_item_type_text_view)
@@ -1536,7 +1533,6 @@ class SuggestionAdapter internal constructor(
             if (holder is SuggestionViewHolder) {
                 holder.typeText.setTextColor(if (selected) colors.selectionText else ink)
                 holder.yomiText.setTextColor(if (selected) colors.selectionText else ink)
-                holder.formulaView.setFormulaTextColor(if (selected) colors.selectionText else ink)
             }
             root.findViewById<View>(R.id.candidate_divider)?.apply {
                 visibility = if (colors.cupertinoClassic) View.VISIBLE else View.GONE
@@ -2126,8 +2122,6 @@ class SuggestionAdapter internal constructor(
         applyCandidateItemBackground(holder.itemView)
         val suggestion = item.candidate
         val position = item.candidateIndex
-        val formulaPresentation = suggestion.presentation
-        val isFormula = formulaPresentation != null
         val paddingLength = if (floatingPanelWidth > 0) 0 else when {
             position == 0 -> 4
             suggestion.string.length == 1 -> 4
@@ -2145,10 +2139,7 @@ class SuggestionAdapter internal constructor(
             suggestion.string.padStart(suggestion.string.length + paddingLength)
                 .plus(" ".repeat(paddingLength))
         }
-        holder.formulaView.isVisible = isFormula
-        holder.formulaView.setPresentation(formulaPresentation)
-        holder.formulaView.setFormulaTextSizeSp(candidateTextSize)
-        holder.text.isVisible = !isFormula
+        holder.text.isVisible = true
 
         holder.text.textSize = candidateTextSize
         val yomiPresentation = resolveCandidateYomiPresentation(
@@ -2158,7 +2149,7 @@ class SuggestionAdapter internal constructor(
             readingTextSize = candidateYomiTextSize,
             readingMode = candidateYomiMode
         )
-        holder.yomiText.isVisible = yomiPresentation.isVisible && !isFormula
+        holder.yomiText.isVisible = yomiPresentation.isVisible
         holder.yomiText.text = yomiPresentation.text
         (holder.yomiText as CandidateReadingTextView).setRubyAnnotations(
             yomiPresentation.annotations, paddingLength
@@ -2174,9 +2165,6 @@ class SuggestionAdapter internal constructor(
             holder.typeText.setTextColor(color)
             holder.yomiText.setTextColor(color)
         }
-        holder.formulaView.setFormulaTextColor(
-            candidateTextColor ?: holder.text.currentTextColor
-        )
 
         holder.typeText.text = when (suggestion.type) {
             (1).toByte() -> ""
@@ -2248,10 +2236,6 @@ class SuggestionAdapter internal constructor(
                 holder.itemView.context.getString(R.string.candidate_badge_calculation)
             CANDIDATE_TYPE_UNIT_CONVERSION ->
                 holder.itemView.context.getString(R.string.candidate_badge_unit_conversion)
-            CANDIDATE_TYPE_FORMULA_UNICODE ->
-                holder.itemView.context.getString(R.string.candidate_badge_formula_unicode)
-            CANDIDATE_TYPE_FORMULA_TEX ->
-                holder.itemView.context.getString(R.string.candidate_badge_formula_tex)
             CANDIDATE_TYPE_USER_TEMPLATE ->
                 if (showDictionaryCandidateLabels) "[定型]" else ""
             CANDIDATE_TYPE_TEXT_MACRO -> "[マクロ]"

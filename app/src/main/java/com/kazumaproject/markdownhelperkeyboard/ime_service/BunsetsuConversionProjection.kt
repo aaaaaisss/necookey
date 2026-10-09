@@ -50,7 +50,7 @@ internal fun buildConvertedBunsetsuSegments(
         val reading = input.substring(start, end)
         val wholeCandidate = current?.candidates?.firstOrNull()?.takeIf {
             start == 0 && end == input.length && it.length.toInt() == input.length &&
-                it.sourceId == null && it.presentation == null && it.commitText == it.string
+                it.sourceId == null && it.commitText == it.string
         }?.let(displayText)
         val output = wholeCandidate ?: path?.takeIf { nodes ->
             nodes.any { it.inputStart == start } && nodes.any { it.inputEnd == end }

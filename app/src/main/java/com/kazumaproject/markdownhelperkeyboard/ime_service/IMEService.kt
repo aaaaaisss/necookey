@@ -210,8 +210,6 @@ import com.kazumaproject.markdownhelperkeyboard.converter.candidatebar.ZenzBunse
 import com.kazumaproject.markdownhelperkeyboard.converter.candidatebar.ZenzSpanScorer
 import com.kazumaproject.markdownhelperkeyboard.converter.candidate.CANDIDATE_TYPE_ERA
 import com.kazumaproject.markdownhelperkeyboard.converter.candidate.CANDIDATE_TYPE_CALCULATION
-import com.kazumaproject.markdownhelperkeyboard.converter.candidate.CANDIDATE_TYPE_FORMULA_TEX
-import com.kazumaproject.markdownhelperkeyboard.converter.candidate.CANDIDATE_TYPE_FORMULA_UNICODE
 import com.kazumaproject.markdownhelperkeyboard.converter.candidate.CANDIDATE_TYPE_LEARNED_DICTIONARY
 import com.kazumaproject.markdownhelperkeyboard.converter.candidate.CANDIDATE_TYPE_TIME
 import com.kazumaproject.markdownhelperkeyboard.converter.candidate.CANDIDATE_TYPE_UNIT_CONVERSION
@@ -989,7 +987,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         AppPreference.UTILITY_CALCULATION_ENABLED_KEY,
         AppPreference.UTILITY_UNIT_CONVERSION_ENABLED_KEY,
         AppPreference.UTILITY_EXPRESSION_CANDIDATE_ENABLED_KEY,
-        AppPreference.UTILITY_FORMULA_CANDIDATE_ENABLED_KEY,
         AppPreference.UTILITY_ANGLE_MODE_KEY,
         AppPreference.UTILITY_CALCULATION_PRECISION_KEY,
         AppPreference.UTILITY_REGIONAL_PROFILE_KEY,
@@ -1562,10 +1559,7 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         if (!hasConvertedKatakana) {
             if (
                 candidate != null &&
-                candidate.type != CANDIDATE_TYPE_TEXT_MACRO &&
-                candidate.type != CANDIDATE_TYPE_FORMULA_UNICODE &&
-                candidate.type != CANDIDATE_TYPE_FORMULA_TEX &&
-                candidate.presentation == null
+                candidate.type != CANDIDATE_TYPE_TEXT_MACRO
             ) {
                 applyFirstSuggestion(candidate)
             } else {
@@ -3081,7 +3075,7 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
                 originalInput = inputString.value,
                 selectedCandidateLength = suggestion.length.toInt()
             )
-            val commitWord = suggestion.formulaFallbackText ?: suggestion.word
+            val commitWord = suggestion.word
             stringInTail.set(tail)
             if (tail.isNotEmpty()) {
                 commitText(commitWord, 1)
@@ -7547,7 +7541,7 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         } else if (keyboardThemeMode == "custom") {
             customThemeCandidateTextColor ?: Color.BLACK
         } else {
-            // Let FormulaViewHolder resolve the color from its popup context.  The popup is
+            // Let the popup's view holders resolve the color from their context.  The popup is
             // themed separately from the service and therefore has the correct night-mode
             // resource even when the service's base context does not.
             null
@@ -7859,7 +7853,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
                     }
                     // The physical-keyboard candidate popup is rendered in a separate
                     // PopupWindow, so it does not inherit the candidate-strip TextView color.
-                    // Keep its formula renderer in sync with the active keyboard theme.
                     applyCandidateAppearance()
                     applySymbolKeyboardAppearance()
                     mainView.root.outlineProvider = ViewOutlineProvider.BACKGROUND
@@ -9292,7 +9285,7 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
     ): FloatingCandidateComposition? {
         val session = ensurePhysicalCandidateCompositionSession(insertString) ?: return null
         val composition = session.resolve(
-            suggestion.formulaFallbackText ?: suggestion.word,
+            suggestion.word,
             suggestion.length.toInt(),
         ) ?: run {
             Timber.e("Invalid physical candidate range: reason=%s generation=%d", reason, session.generation)
@@ -9438,7 +9431,7 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
             originalInput = insertString,
             selectedCandidateLength = selectedSuggestion.length.toInt()
         )
-        val commitWord = selectedSuggestion.formulaFallbackText ?: selectedSuggestion.word
+        val commitWord = selectedSuggestion.word
         stringInTail.set(tail)
         Timber.d("displayComposingTextInHardwareKeyboardConnected: $commitWord ${selectedSuggestion.length} $insertString $tail ${insertString.length} ${selectedSuggestion.length.toInt()}")
         val spannableString = SpannableString(commitWord + tail)
@@ -9476,7 +9469,7 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
             }
 
             val subString = stringInTail.get()
-            val commitWord = selectedSuggestion.formulaFallbackText ?: selectedSuggestion.word
+            val commitWord = selectedSuggestion.word
             if (subString.isNotEmpty()) {
                 commitText(commitWord, 1)
                 updateSuggestionsForFloatingCandidate(emptyList())
@@ -19080,8 +19073,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         length = length,
         candidateType = type,
         sourceId = sourceId,
-        formulaSource = presentation?.normalizedTex,
-        formulaFallbackText = commitText,
     )
 
     private fun candidateForAutomaticApplication(
@@ -20666,7 +20657,7 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         return if (candidate.type == (15).toByte()) {
             candidate.string.correctReading().first
         } else {
-            candidate.presentation?.unicodeText ?: candidate.string
+            candidate.string
         }
     }
 
@@ -25336,11 +25327,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
             }
 
             CANDIDATE_TYPE_UTILITY_LITERAL.toInt() -> {
-                commitUtilityCandidate(candidate.commitText)
-            }
-
-            CANDIDATE_TYPE_FORMULA_UNICODE.toInt(),
-            CANDIDATE_TYPE_FORMULA_TEX.toInt() -> {
                 commitUtilityCandidate(candidate.commitText)
             }
 

@@ -186,7 +186,6 @@ data class BunsetsuAnalysis(
             string = string,
             commitText = string,
             conversionSegments = segments,
-            presentation = null,
         )
     }
 }

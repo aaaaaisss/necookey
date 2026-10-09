@@ -1,6 +1,5 @@
 package com.kazumaproject.markdownhelperkeyboard.converter.candidate
 
-import com.kazumaproject.markdownhelperkeyboard.converter.utility.FormulaCandidatePresentation
 import com.kazumaproject.markdownhelperkeyboard.converter.date.DateCandidateFormat
 
 /**
@@ -18,8 +17,6 @@ data class Candidate(
     val sourceId: Long? = null,
     /** Text sent to InputConnection. Defaults to the legacy candidate string. */
     val commitText: String = string,
-    /** Optional non-text presentation, currently used by formula candidates. */
-    val presentation: FormulaCandidatePresentation? = null,
     /** Exact conversion path used only to align live candidate readings. */
     val conversionSegments: List<CandidateConversionSegment> = emptyList(),
     /** Date format identity for daily date candidates that can be reordered or disabled. */
