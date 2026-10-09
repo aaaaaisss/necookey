@@ -101,6 +101,9 @@ class NecokeYInputMethodService : InputMethodService() {
     override fun onStartInput(attribute: EditorInfo?, restarting: Boolean) {
         super.onStartInput(attribute, restarting)
         composing = ""
+        conversionMode = false
+        selectedBunsetsuEnd = null
+        availableBunsetsuBoundaries = emptyList()
         refresh()
     }
 
