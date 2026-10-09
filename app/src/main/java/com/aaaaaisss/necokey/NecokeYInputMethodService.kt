@@ -80,17 +80,23 @@ class NecokeYInputMethodService : InputMethodService() {
             addView(predictionRow, LinearLayout.LayoutParams(-1, 0, 1f))
         }
 
-        keyboardView = FlickKeyboardView(this).apply {
-            setOnKeyboardActionListener(ActionListener())
-            setKeyboard(KeyboardDefaultLayouts.defaultLayout())
-            setBackgroundColor(Color.rgb(48, 48, 48))
+        val keyboard: View = try {
+            keyboardView = FlickKeyboardView(this).apply {
+                setOnKeyboardActionListener(ActionListener())
+                setKeyboard(KeyboardDefaultLayouts.defaultLayout())
+                setBackgroundColor(Color.rgb(48, 48, 48))
+            }
+            keyboardView
+        } catch (error: Throwable) {
+            Log.e("necookey", "Sumire keyboard view failed to initialize; using basic fallback", error)
+            createFallbackKeyboard()
         }
 
         // The IME input frame can measure this root with WRAP_CONTENT height.
         // Give its children real heights so the keyboard cannot collapse to 0 px.
         root.addView(composingView, LinearLayout.LayoutParams(-1, dp(40)))
         root.addView(candidatesView, LinearLayout.LayoutParams(-1, dp(56)))
-        root.addView(keyboardView, LinearLayout.LayoutParams(-1, dp(240)))
+        root.addView(keyboard, LinearLayout.LayoutParams(-1, dp(240)))
         refresh()
         return root
     }
@@ -193,6 +199,44 @@ class NecokeYInputMethodService : InputMethodService() {
                 predictionCandidates.forEach { addCandidateView(predictionRow, it.string) }
             }
         }
+    }
+
+    private fun createFallbackKeyboard(): View {
+        val root = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setBackgroundColor(Color.rgb(32, 32, 32))
+            setPadding(dp(4), dp(4), dp(4), dp(4))
+        }
+        val rows = listOf(
+            listOf("あ", "か", "さ", "た", "な"),
+            listOf("は", "ま", "や", "ら", "わ"),
+            listOf("、", "。", "？", "！", "ー"),
+            listOf("削除", "空白", "確定", "改行")
+        )
+        rows.forEach { labels ->
+            val row = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
+            labels.forEach { label ->
+                val button = android.widget.Button(this).apply {
+                    text = label
+                    textSize = 16f
+                    setOnClickListener {
+                        when (label) {
+                            "削除" -> deleteLast()
+                            "空白" -> appendText(" ")
+                            "確定" -> commitComposing()
+                            "改行" -> {
+                                commitComposing()
+                                currentInputConnection?.commitText("\\n", 1)
+                            }
+                            else -> appendText(label)
+                        }
+                    }
+                }
+                row.addView(button, LinearLayout.LayoutParams(0, -1, 1f))
+            }
+            root.addView(row, LinearLayout.LayoutParams(-1, 0, 1f))
+        }
+        return root
     }
 
     private fun dp(value: Int): Int =
