@@ -49,6 +49,9 @@ env:
 jobs:
   build:
     runs-on: ubuntu-latest
+    permissions:
+      # contents: write only so pushes to main can update the rolling `nightly` prerelease.
+      contents: write
     timeout-minutes: 60
     steps:
       - name: Checkout (with llama.cpp submodule, shallow)
@@ -142,6 +145,10 @@ jobs:
           AAPT=$(ls "$ANDROID_HOME"/build-tools/*/aapt2 | sort -V | tail -1)
           "$AAPT" dump permissions "$APK" | tee perms.txt
           if grep -q 'android.permission.INTERNET' perms.txt; then echo "INTERNET permission present"; exit 1; fi
+          APKSIGNER=$(ls "$ANDROID_HOME"/build-tools/*/apksigner | sort -V | tail -1)
+          "$APKSIGNER" verify --print-certs "$APK" | tee certs.txt
+          # Must be the committed keystore/necookey-ci.jks key, so CI APKs update each other.
+          grep -qi 'SHA-256 digest: 1059b9983918fe69a979ddc552a7bde3e3f4b011dcdcbc253efefb33a366fa1f' certs.txt || { echo "APK not signed with keystore/necookey-ci.jks"; exit 1; }
           ls -la "$APK"
 
       - name: Upload APK
@@ -151,3 +158,22 @@ jobs:
           path: ${{ steps.apk.outputs.path }}
           if-no-files-found: error
           retention-days: 14
+
+      # Phones cannot download zipped Actions artifacts without signing in, so pushes to main
+      # also publish the plain APK to the rolling `nightly` prerelease (asset replaced each run):
+      # https://github.com/${{ github.repository }}/releases/download/nightly/necookey-arm64.apk
+      - name: Publish APK to the nightly prerelease
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          cp "${{ steps.apk.outputs.path }}" necookey-arm64.apk
+          git tag -f nightly "$GITHUB_SHA"
+          git push -f origin refs/tags/nightly
+          NOTES="Rolling CI build of main @ ${GITHUB_SHA::7}. Signed with keystore/necookey-ci.jks; installs as an update over earlier nightly builds."
+          if gh release view nightly > /dev/null 2>&1; then
+            gh release edit nightly --prerelease --title "necookey nightly" --notes "$NOTES"
+          else
+            gh release create nightly --prerelease --title "necookey nightly" --notes "$NOTES" --target "$GITHUB_SHA"
+          fi
+          gh release upload nightly necookey-arm64.apk --clobber

@@ -5,6 +5,10 @@
 > bundled zenz-v3.2-xsmall model (on-device, no network). See `docs/necookey-candidate-bar.md`.
 > necookey installs as its own app (`io.github.aaaaaisss.necookey`, name "necookey"), next to
 > Sumire rather than as an update to it. Sumire's settings and user dictionary are not shared.
+> **Signing:** CI APKs are signed with `keystore/necookey-ci.jks` (PKCS12, alias `necookey-ci`,
+> store/key password `necookey-ci`, SHA-256 `10:59:B9:98:39:18:FE:69:A9:79:DD:C5:52:A7:BD:E3:E3:F4:B0:11:DC:DC:BC:25:3E:FE:FB:33:A3:66:FA:1F`).
+> It is committed on purpose so every CI build installs as an update over the previous one. It is
+> public, so it proves nothing about who built an APK; never use it for a store release.
 > The original Sumire README follows.
 
 # Sumire (スミレ) — The Privacy-First Japanese Keyboard

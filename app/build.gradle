@@ -17,6 +17,15 @@ android {
     }
 
     signingConfigs {
+        // Dedicated, publicly committed key for CI-built APKs so every CI APK installs as an
+        // update over the previous one. Not a Play/production key. See README "Signing".
+        necookeyCi {
+            storeFile rootProject.file("keystore/necookey-ci.jks")
+            storeType "pkcs12"
+            storePassword "necookey-ci"
+            keyAlias "necookey-ci"
+            keyPassword "necookey-ci"
+        }
         release {
             if (localProperties['KEYSTORE_FILE']) {
                 storeFile file(localProperties['KEYSTORE_FILE'])
@@ -94,6 +103,9 @@ android {
     }
 
     buildTypes {
+        debug {
+            signingConfig signingConfigs.necookeyCi
+        }
         release {
             def releaseSigning = signingConfigs.findByName("release")
             if (releaseSigning?.storeFile) {
