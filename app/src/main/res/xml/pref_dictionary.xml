@@ -1,0 +1,240 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.preference.PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+
+    <PreferenceCategory
+        android:title="@string/system_user_dictionary">
+
+        <Preference
+            android:key="system_user_dictionary_builder_preference"
+            android:title="@string/system_user_dictionary_builder_title"
+            app:summary="@string/system_user_dictionary_builder_summary" />
+
+    </PreferenceCategory>
+
+    <PreferenceCategory android:title="@string/external_dictionary_settings_title">
+
+        <Preference
+            android:key="external_dictionary_settings_preference"
+            android:title="@string/external_dictionary_settings_title"
+            app:summary="@string/external_dictionary_settings_summary" />
+
+    </PreferenceCategory>
+
+    <PreferenceCategory android:title="@string/dictionary_candidate_label_category_title">
+
+        <SwitchPreferenceCompat
+            android:defaultValue="false"
+            android:key="show_dictionary_candidate_labels_preference"
+            android:title="@string/show_dictionary_candidate_labels_title"
+            app:iconSpaceReserved="false"
+            app:summary="@string/show_dictionary_candidate_labels_summary" />
+
+    </PreferenceCategory>
+
+    <PreferenceCategory android:title="@string/dictionary_candidate_display_category_title">
+
+        <SwitchPreferenceCompat
+            android:defaultValue="false"
+            android:key="suppress_hentaigana_candidates_preference"
+            android:title="@string/suppress_hentaigana_candidates_title"
+            app:iconSpaceReserved="false"
+            app:summary="@string/suppress_hentaigana_candidates_summary" />
+
+    </PreferenceCategory>
+
+    <PreferenceCategory android:title="@string/conversion_beam_width_category_title">
+
+        <SeekBarPreference
+            android:defaultValue="20"
+            android:key="conversion_beam_width_preference"
+            android:max="100"
+            android:summary="@string/conversion_beam_width_preference_summary"
+            android:title="@string/conversion_beam_width_preference_title"
+            app:min="1"
+            app:showSeekBarValue="true" />
+
+    </PreferenceCategory>
+
+    <PreferenceCategory
+        android:title="N-gram">
+
+        <SwitchPreferenceCompat
+            android:defaultValue="true"
+            android:key="system_ngram_dictionary_enable_preference"
+            android:summaryOff="@string/system_ngram_dictionary_enable_summary_off"
+            android:summaryOn="@string/system_ngram_dictionary_enable_summary_on"
+            android:title="@string/system_ngram_dictionary_enable_title"
+            app:iconSpaceReserved="false" />
+
+        <SwitchPreferenceCompat
+            android:defaultValue="true"
+            android:key="custom_ngram_dictionary_enable_preference"
+            android:summaryOff="@string/custom_ngram_dictionary_enable_summary_off"
+            android:summaryOn="@string/custom_ngram_dictionary_enable_summary_on"
+            android:title="@string/custom_ngram_dictionary_enable_title"
+            app:iconSpaceReserved="false" />
+
+        <Preference
+            android:key="n_gram_rule_preference"
+            android:title="@string/n_gram_rule_preference_title"
+            app:summary="@string/n_gram_rule_preference_summary" />
+
+    </PreferenceCategory>
+
+    <PreferenceCategory android:title="@string/candidate_order_override_fragment_title">
+
+        <SwitchPreferenceCompat
+            android:defaultValue="false"
+            android:key="candidate_order_override_enable_preference"
+            android:summaryOff="@string/candidate_order_override_enable_summary_off"
+            android:summaryOn="@string/candidate_order_override_enable_summary_on"
+            android:title="@string/candidate_order_override_enable_title"
+            app:iconSpaceReserved="false" />
+
+        <Preference
+            android:key="candidate_order_override_preference"
+            android:title="@string/candidate_order_override_preference_title"
+            app:iconSpaceReserved="false"
+            app:summary="@string/candidate_order_override_preference_summary" />
+
+    </PreferenceCategory>
+
+    <PreferenceCategory
+        android:title="@string/category_ng_word_title"
+        app:summary="@string/category_ng_word_summary">
+
+        <SwitchPreferenceCompat
+            android:defaultValue="true"
+            android:key="ng_word_enable_preference" />
+
+        <Preference
+            android:icon="@drawable/outline_border_color_24"
+            android:key="ng_word_preference"
+            android:title="@string/ng_word_list_title"
+            app:summary="@string/ng_word_list_summary" />
+
+    </PreferenceCategory>
+
+    <PreferenceCategory android:title="@string/category_learning_dictionary_title">
+        <SwitchPreferenceCompat
+            android:defaultValue="true"
+            android:key="learn_dictionary_preference"
+            android:summaryOff="@string/learn_dictionary_summary_off"
+            android:summaryOn="@string/learn_dictionary_summary_on"
+            android:title="@string/learn_dictionary_title" />
+
+        <SwitchPreferenceCompat
+            android:dependency="learn_dictionary_preference"
+            android:key="learn_first_candidate_dictionary_preference"
+            android:title="@string/learn_dictionary_preference_title"
+            app:defaultValue="false"
+            app:summary="@string/learn_dictionary_preference_summary" />
+
+        <SwitchPreferenceCompat
+            android:dependency="learn_dictionary_preference"
+            android:key="learn_dictionary_allow_mixed_symbols_numbers_preference"
+            android:title="@string/learn_dictionary_allow_mixed_symbols_numbers_title"
+            app:defaultValue="true"
+            app:summary="@string/learn_dictionary_allow_mixed_symbols_numbers_summary" />
+
+        <SwitchPreferenceCompat
+            android:dependency="learn_dictionary_preference"
+            android:key="enable_prediction_search_learn_dictionary_preference"
+            android:title="@string/enable_prediction_search_learn_dictionary_preference_titile"
+            app:defaultValue="false"
+            app:summary="@string/enable_prediction_search_learn_dictionary_preference_summary" />
+
+        <SeekBarPreference
+            android:defaultValue="4"
+            android:dependency="enable_prediction_search_learn_dictionary_preference"
+            android:key="learn_prediction_preference"
+            android:max="8"
+            android:title="@string/user_dictionary_prefix_match_title"
+            app:min="1"
+            app:showSeekBarValue="true" />
+
+        <SeekBarPreference
+            android:defaultValue="4"
+            android:dependency="enable_prediction_search_learn_dictionary_preference"
+            android:key="learn_dictionary_prediction_candidate_limit_preference"
+            android:max="8"
+            android:summary="@string/learn_dictionary_prediction_candidate_limit_summary"
+            android:title="@string/dictionary_prediction_candidate_limit_title"
+            app:min="1"
+            app:showSeekBarValue="true" />
+
+    </PreferenceCategory>
+
+    <PreferenceCategory android:title="@string/dictionary_word_registration_category_title">
+        <SwitchPreferenceCompat
+            android:defaultValue="false"
+            android:key="preserve_dictionary_word_whitespace_preference"
+            android:title="@string/preserve_dictionary_word_whitespace_title"
+            app:iconSpaceReserved="false"
+            app:summary="@string/preserve_dictionary_word_whitespace_summary" />
+    </PreferenceCategory>
+
+    <PreferenceCategory android:title="@string/category_user_dictionary_title">
+        <SwitchPreferenceCompat
+            android:defaultValue="true"
+            android:key="user_dictionary_preference"
+            android:summaryOff="@string/user_dictionary_summary_off"
+            android:summaryOn="@string/user_dictionary_summary_on"
+            android:title="@string/user_dictionary_title" />
+
+        <SeekBarPreference
+            android:defaultValue="2"
+            android:dependency="user_dictionary_preference"
+            android:key="user_dictionary_prefix_match_number"
+            android:max="8"
+            android:title="@string/user_dictionary_prefix_match_title"
+            app:min="2"
+            app:showSeekBarValue="true" />
+
+        <SeekBarPreference
+            android:defaultValue="4"
+            android:dependency="user_dictionary_preference"
+            android:key="user_dictionary_prediction_candidate_limit_preference"
+            android:max="8"
+            android:summary="@string/user_dictionary_prediction_candidate_limit_summary"
+            android:title="@string/dictionary_prediction_candidate_limit_title"
+            app:min="1"
+            app:showSeekBarValue="true" />
+    </PreferenceCategory>
+
+    <PreferenceCategory android:title="@string/user_template_title">
+        <SwitchPreferenceCompat
+            android:defaultValue="true"
+            android:key="user_template_preference"
+            android:summaryOff="@string/user_template_summary_off"
+            android:summaryOn="@string/user_template_summary_on"
+            android:title="@string/user_template_title" />
+    </PreferenceCategory>
+
+    <PreferenceCategory android:title="@string/text_macro_title">
+        <SwitchPreferenceCompat
+            android:defaultValue="true"
+            android:key="text_macro_candidate_preference"
+            android:summaryOff="@string/text_macro_candidate_summary_off"
+            android:summaryOn="@string/text_macro_candidate_summary_on"
+            android:title="@string/text_macro_candidate_title" />
+
+    </PreferenceCategory>
+
+    <PreferenceCategory android:title="@string/category_zero_query_suggestion_title">
+        <SwitchPreferenceCompat
+            android:defaultValue="false"
+            android:key="zero_query_suggestion_preference"
+            android:summaryOff="@string/zero_query_suggestion_summary_off"
+            android:summaryOn="@string/zero_query_suggestion_summary_on"
+            android:title="@string/zero_query_suggestion_title" />
+
+        <Preference
+            android:key="custom_zero_query_dictionary_preference"
+            android:title="@string/custom_zero_query_dictionary_title"
+            app:iconSpaceReserved="false"
+            app:summary="@string/custom_zero_query_dictionary_summary" />
+    </PreferenceCategory>
+
+</androidx.preference.PreferenceScreen>

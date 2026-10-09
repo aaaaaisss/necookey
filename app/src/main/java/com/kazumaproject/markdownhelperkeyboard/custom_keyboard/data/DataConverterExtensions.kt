@@ -1,0 +1,208 @@
+package com.kazumaproject.markdownhelperkeyboard.custom_keyboard.data
+
+
+import com.kazumaproject.custom_keyboard.data.FlickAction
+import com.kazumaproject.custom_keyboard.data.KeyAction
+import com.kazumaproject.custom_keyboard.data.KeyIconRef
+import com.kazumaproject.custom_keyboard.data.KeyIconType
+
+private fun iconRefFromDb(iconType: String?, iconValue: String?): KeyIconRef? {
+    val type = KeyIconType.fromDbValue(iconType) ?: return null
+    return when (type) {
+        KeyIconType.ACTION_DEFAULT -> KeyIconRef.ActionDefault
+        KeyIconType.DRAWABLE_RESOURCE_NAME,
+        KeyIconType.USER_IMAGE_FILE -> iconValue
+            ?.takeIf { it.isNotBlank() }
+            ?.let { KeyIconRef(type, it) }
+    }
+}
+
+private fun KeyAction.circularLabel(actionValue: String?): String? {
+    return when (this) {
+        KeyAction.MoveCustomKeyboardTab ->
+            actionValue ?: CircularFlickSlotActionMapper.SWITCH_MAP_LABEL
+
+        KeyAction.ShowEmojiKeyboard ->
+            actionValue ?: CircularFlickSlotActionMapper.EMOJI_KEYBOARD_LABEL
+
+        is KeyAction.MoveToCustomKeyboard -> null
+        else -> actionValue
+    }
+}
+
+/**
+ * DBから取得したFlickMappingを、UIで扱うFlickActionに変換します。
+ */
+fun FlickMapping.toFlickAction(): FlickAction {
+    val iconRef = iconRefFromDb(iconType, iconValue)
+    val action = when (this.actionType) {
+        "INPUT_TEXT" -> return FlickAction.Input(this.actionValue ?: "", icon = iconRef)
+        "DoNothing" -> KeyAction.DoNothing
+        "DELETE" -> KeyAction.Delete
+        "BACKSPACE" -> KeyAction.Backspace
+        "SPACE" -> KeyAction.Space
+        "CommitAndInsertSpace" -> KeyAction.CommitAndInsertSpace
+        "NEW_LINE" -> KeyAction.NewLine
+        "ForceNewLine" -> KeyAction.ForceNewLine
+        "ENTER" -> KeyAction.Enter
+        "CONVERT" -> KeyAction.Convert
+        "CONFIRM" -> KeyAction.Confirm
+        "MOVE_CURSOR_LEFT" -> KeyAction.MoveCursorLeft
+        "MOVE_CURSOR_UP" -> KeyAction.MoveCursorUp
+        "MOVE_CURSOR_DOWN" -> KeyAction.MoveCursorDown
+        "MOVE_CURSOR_RIGHT" -> KeyAction.MoveCursorRight
+        "SELECT_ALL" -> KeyAction.SelectAll
+        "CUT" -> KeyAction.Cut
+        "PASTE" -> KeyAction.Paste
+        "COPY" -> KeyAction.Copy
+        "CHANGE_INPUT_MODE" -> KeyAction.ChangeInputMode
+        "SWITCH_TO_NEXT_IME" -> KeyAction.SwitchToNextIme
+        "TOGGLE_DAKUTEN" -> KeyAction.ToggleDakuten
+        "ToggleDakutenOnly" -> KeyAction.ToggleDakutenOnly
+        "ToggleHandakutenOnly" -> KeyAction.ToggleHandakutenOnly
+        "TOGGLE_CASE" -> KeyAction.ToggleCase
+        "ForceHalfWidthSpace" -> KeyAction.ForceHalfWidthSpace
+        "ForceFullWidthSpace" -> KeyAction.ForceFullWidthSpace
+        "ShowEmojiKeyboard" -> KeyAction.ShowEmojiKeyboard
+        "SwitchToEnglish" -> KeyAction.SwitchToEnglishLayout
+        "SwitchToNumber" -> KeyAction.SwitchToNumberLayout
+        "DeleteUntilSymbol" -> KeyAction.DeleteUntilSymbol
+        "DeleteAfterCursorUntilSymbol" -> KeyAction.DeleteAfterCursorUntilSymbol
+        "DeleteAfterCursor" -> KeyAction.DeleteAfterCursor
+        "UndoLastDelete" -> KeyAction.UndoLastDelete
+        "SwitchKatakana" -> KeyAction.ToggleKatakana
+        "VoiceInput" -> KeyAction.VoiceInput
+        "ShiftKey" -> KeyAction.ShiftKey
+        "CapLockKey" -> KeyAction.CapLockKey
+        "SwitchRomajiEnglish" -> KeyAction.SwitchRomajiEnglish
+        "SwitchDirectMode" -> KeyAction.SwitchDirectMode
+        "MoveCustomKeyboardTab" -> KeyAction.MoveCustomKeyboardTab
+        "MoveToCustomKeyboard" -> this.actionValue
+            ?.takeIf { it.isNotBlank() }
+            ?.let { KeyAction.MoveToCustomKeyboard(it) }
+
+        else -> null
+    }
+    return if (action != null) {
+        FlickAction.Action(action, label = action.circularLabel(this.actionValue), icon = iconRef)
+    } else if (this.actionType.startsWith("INPUT_")) {
+        // 将来的なINPUT_*アクションのために
+        FlickAction.Input(this.actionValue ?: "")
+    } else {
+        FlickAction.Input("") // 不明な場合はデフォルトのアクション
+    }
+}
+
+fun CircularFlickMapping.toFlickAction(): FlickAction {
+    val iconRef = iconRefFromDb(iconType, iconValue)
+    val action = when (this.actionType) {
+        "INPUT_TEXT" -> return FlickAction.Input(this.actionValue ?: "", icon = iconRef)
+        "DoNothing" -> KeyAction.DoNothing
+        "DELETE" -> KeyAction.Delete
+        "BACKSPACE" -> KeyAction.Backspace
+        "SPACE" -> KeyAction.Space
+        "CommitAndInsertSpace" -> KeyAction.CommitAndInsertSpace
+        "NEW_LINE" -> KeyAction.NewLine
+        "ENTER" -> KeyAction.Enter
+        "CONVERT" -> KeyAction.Convert
+        "CONFIRM" -> KeyAction.Confirm
+        "MOVE_CURSOR_LEFT" -> KeyAction.MoveCursorLeft
+        "MOVE_CURSOR_UP" -> KeyAction.MoveCursorUp
+        "MOVE_CURSOR_DOWN" -> KeyAction.MoveCursorDown
+        "MOVE_CURSOR_RIGHT" -> KeyAction.MoveCursorRight
+        "SELECT_ALL" -> KeyAction.SelectAll
+        "CUT" -> KeyAction.Cut
+        "PASTE" -> KeyAction.Paste
+        "COPY" -> KeyAction.Copy
+        "CHANGE_INPUT_MODE" -> KeyAction.ChangeInputMode
+        "SWITCH_TO_NEXT_IME" -> KeyAction.SwitchToNextIme
+        "TOGGLE_DAKUTEN" -> KeyAction.ToggleDakuten
+        "ToggleDakutenOnly" -> KeyAction.ToggleDakutenOnly
+        "ToggleHandakutenOnly" -> KeyAction.ToggleHandakutenOnly
+        "TOGGLE_CASE" -> KeyAction.ToggleCase
+        "ForceHalfWidthSpace" -> KeyAction.ForceHalfWidthSpace
+        "ForceFullWidthSpace" -> KeyAction.ForceFullWidthSpace
+        "ShowEmojiKeyboard" -> KeyAction.ShowEmojiKeyboard
+        "SwitchToEnglish" -> KeyAction.SwitchToEnglishLayout
+        "SwitchToNumber" -> KeyAction.SwitchToNumberLayout
+        "DeleteUntilSymbol" -> KeyAction.DeleteUntilSymbol
+        "DeleteAfterCursorUntilSymbol" -> KeyAction.DeleteAfterCursorUntilSymbol
+        "DeleteAfterCursor" -> KeyAction.DeleteAfterCursor
+        "UndoLastDelete" -> KeyAction.UndoLastDelete
+        "SwitchKatakana" -> KeyAction.ToggleKatakana
+        "VoiceInput" -> KeyAction.VoiceInput
+        "ShiftKey" -> KeyAction.ShiftKey
+        "CapLockKey" -> KeyAction.CapLockKey
+        "ForceNewLine" -> KeyAction.ForceNewLine
+        "SwitchDirectMode" -> KeyAction.SwitchDirectMode
+        "SwitchRomajiEnglish" -> KeyAction.SwitchRomajiEnglish
+        "MoveCustomKeyboardTab" -> KeyAction.MoveCustomKeyboardTab
+        "MoveToCustomKeyboard" -> this.actionValue
+            ?.takeIf { it.isNotBlank() }
+            ?.let { KeyAction.MoveToCustomKeyboard(it) }
+
+        else -> null
+    }
+    return if (action != null) {
+        FlickAction.Action(action, label = action.circularLabel(this.actionValue), icon = iconRef)
+    } else if (this.actionType.startsWith("INPUT_")) {
+        FlickAction.Input(this.actionValue ?: "")
+    } else {
+        FlickAction.Input("")
+    }
+}
+
+/**
+ * UIのFlickActionを、DBに保存可能な2つの文字列に変換します。
+ * @return Pair<ActionType: String, ActionValue: String?>
+ */
+fun FlickAction.toDbStrings(): Pair<String, String?> {
+    return when (this) {
+        is FlickAction.Input -> "INPUT_TEXT" to this.char
+        is FlickAction.Action -> when (val action = this.action) {
+            is KeyAction.InputText -> "INPUT_TEXT" to action.text
+            KeyAction.DoNothing -> "DoNothing" to null
+            KeyAction.Delete -> "DELETE" to null
+            KeyAction.Backspace -> "BACKSPACE" to null
+            KeyAction.Space -> "SPACE" to null
+            KeyAction.CommitAndInsertSpace -> "CommitAndInsertSpace" to null
+            KeyAction.NewLine -> "NEW_LINE" to null
+            KeyAction.Enter -> "ENTER" to null
+            KeyAction.Convert -> "CONVERT" to null
+            KeyAction.Confirm -> "CONFIRM" to null
+            KeyAction.MoveCursorLeft -> "MOVE_CURSOR_LEFT" to null
+            KeyAction.MoveCursorUp -> "MOVE_CURSOR_UP" to null
+            KeyAction.MoveCursorDown -> "MOVE_CURSOR_DOWN" to null
+            KeyAction.MoveCursorRight -> "MOVE_CURSOR_RIGHT" to null
+            KeyAction.SelectAll -> "SELECT_ALL" to null
+            KeyAction.Cut -> "CUT" to null
+            KeyAction.Paste -> "PASTE" to null
+            KeyAction.Copy -> "COPY" to null
+            KeyAction.ChangeInputMode -> "CHANGE_INPUT_MODE" to null
+            KeyAction.SwitchToNextIme -> "SWITCH_TO_NEXT_IME" to null
+            KeyAction.ToggleDakuten -> "TOGGLE_DAKUTEN" to null
+            KeyAction.ToggleDakutenOnly -> "ToggleDakutenOnly" to null
+            KeyAction.ToggleHandakutenOnly -> "ToggleHandakutenOnly" to null
+            KeyAction.ToggleCase -> "TOGGLE_CASE" to null
+            KeyAction.ForceHalfWidthSpace -> "ForceHalfWidthSpace" to null
+            KeyAction.ForceFullWidthSpace -> "ForceFullWidthSpace" to null
+            KeyAction.ShowEmojiKeyboard -> "ShowEmojiKeyboard" to CircularFlickSlotActionMapper.EMOJI_KEYBOARD_LABEL
+            KeyAction.SwitchToEnglishLayout -> "SwitchToEnglish" to null
+            KeyAction.SwitchToNumberLayout -> "SwitchToNumber" to null
+            KeyAction.DeleteUntilSymbol -> "DeleteUntilSymbol" to null
+            KeyAction.DeleteAfterCursorUntilSymbol -> "DeleteAfterCursorUntilSymbol" to null
+            KeyAction.DeleteAfterCursor -> "DeleteAfterCursor" to null
+            KeyAction.UndoLastDelete -> "UndoLastDelete" to null
+            KeyAction.ToggleKatakana -> "SwitchKatakana" to null
+            KeyAction.VoiceInput -> "VoiceInput" to null
+            KeyAction.ShiftKey -> "ShiftKey" to null
+            KeyAction.CapLockKey -> "CapLockKey" to null
+            KeyAction.SwitchDirectMode -> "SwitchDirectMode" to null
+            KeyAction.SwitchRomajiEnglish -> "SwitchRomajiEnglish" to null
+            KeyAction.ForceNewLine -> "ForceNewLine" to null
+            KeyAction.MoveCustomKeyboardTab -> "MoveCustomKeyboardTab" to CircularFlickSlotActionMapper.SWITCH_MAP_LABEL
+            is KeyAction.MoveToCustomKeyboard -> "MoveToCustomKeyboard" to action.stableId
+            else -> "UNKNOWN" to null // 未対応のアクション
+        }
+    }
+}

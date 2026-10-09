@@ -1,0 +1,27 @@
+package com.kazumaproject.markdownhelperkeyboard.learning.database
+
+import androidx.room.Entity
+import androidx.room.Index
+import androidx.room.PrimaryKey
+
+@Entity(
+    tableName = "learn_table",
+    indices = [
+        Index(value = ["input"], unique = false),
+        Index(
+            value = ["input", "out"],
+            unique = true
+        )]
+)
+data class LearnEntity(
+    val input: String,
+    val out: String,
+    val score: Int = 3000,
+    val leftId: Short? = null,
+    val rightId: Short? = null,
+    val usageCount: Int = 1,
+    val lastUsedAt: Long = 0L,
+    val isPhrase: Boolean = false,
+    @PrimaryKey(autoGenerate = true)
+    val id: Int? = null
+)

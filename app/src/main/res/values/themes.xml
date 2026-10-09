@@ -1,0 +1,52 @@
+<resources>
+    <!-- Base application theme. -->
+    <style name="Theme.MarkdownKeyboard" parent="Theme.Material3.DynamicColors.DayNight">
+        <!-- Primary brand color. -->
+        <item name="colorPrimary">@color/enter_key_bg</item>
+        <item name="colorPrimaryVariant">@color/blue_primary_color</item>
+        <item name="colorOnPrimary">@color/white</item>
+        <!-- Secondary brand color. -->
+        <item name="colorSecondary">@color/main_text_color</item>
+        <item name="colorSecondaryVariant">@color/main_text_color</item>
+        <item name="colorOnSecondary">@color/black</item>
+        <!-- Status bar color. -->
+        <item name="android:statusBarColor">?attr/colorPrimaryVariant</item>
+        <!-- Customize your theme here. -->
+        <item name="android:splitMotionEvents">false</item>
+    </style>
+
+    <style name="Theme.MarkdownKeyboard.ManualSeed" parent="Theme.AppCompat.DayNight">
+        <item name="colorPrimary">@color/enter_key_bg</item>
+        <item name="colorPrimaryVariant">@color/blue_primary_color</item>
+        <item name="colorOnPrimary">@color/white</item>
+        <item name="colorSecondary">@color/main_text_color</item>
+        <item name="colorSecondaryVariant">@color/main_text_color</item>
+        <item name="colorOnSecondary">@color/black</item>
+        <item name="android:statusBarColor">?attr/colorPrimaryVariant</item>
+        <item name="android:splitMotionEvents">false</item>
+    </style>
+
+    <style name="Key">
+        <item name="android:layout_width">wrap_content</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:textColor">@color/main_text_color</item>
+        <item name="android:textAlignment">center</item>
+        <item name="android:minWidth">48dp</item>
+        <item name="android:layout_columnWeight">1</item>
+        <item name="android:backgroundTint">@color/keyboard_bg</item>
+    </style>
+
+    <style name="Theme.App.ImeDialog" parent="Theme.MaterialComponents.DayNight.Dialog.Alert" />
+
+    <style
+        name="Theme.MarkdownKeyboard.PhotoPickerBridge"
+        parent="Theme.AppCompat.DayNight.NoActionBar">
+        <item name="android:windowIsTranslucent">true</item>
+        <item name="android:windowNoTitle">true</item>
+        <item name="android:windowDisablePreview">true</item>
+        <item name="android:windowIsFloating">false</item>
+        <item name="android:backgroundDimEnabled">false</item>
+        <item name="android:colorBackground">@android:color/transparent</item>
+    </style>
+
+</resources>

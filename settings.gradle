@@ -1,0 +1,29 @@
+pluginManagement {
+    repositories {
+        google()
+        mavenCentral()
+        gradlePluginPortal()
+    }
+}
+dependencyResolutionManagement {
+    repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
+    repositories {
+        google()
+        mavenCentral()
+    }
+}
+rootProject.name = "MarkdownHelperKeyboard"
+include ':app'
+include ':flexbox'
+include ':tenkey'
+include ':symbol_keyboard'
+include ':core'
+include ':gojuon_keyboard'
+include ':qwerty_keyboard'
+include ':custom_keyboard'
+include ':zenz'
+
+// Opt-in device laboratory; never packaged with the keyboard.
+if (providers.gradleProperty('enterParityLab').isPresent()) {
+    include ':enter-parity-lab'
+}

@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <item
+        android:id="@+id/navigation_setting"
+        android:icon="@drawable/baseline_settings_24"
+        android:title="@string/setting_fragment_title" />
+
+    <item
+        android:id="@+id/navigation_learn_dictionary"
+        android:icon="@drawable/table_lamp_24px"
+        android:title="@string/learn_dictionary_fragment_title" />
+
+    <item
+        android:id="@+id/navigation_user_dictionary"
+        android:icon="@drawable/dictionary_24px"
+        android:title="@string/user_dictionary_title" />
+
+    <item
+        android:id="@+id/userTemplateFragment"
+        android:icon="@drawable/book_3_24px"
+        android:title="@string/user_template" />
+
+    <item
+        android:id="@+id/keyboardListFragment"
+        android:icon="@drawable/keyboard_24px"
+        android:title="@string/custom_keyboard_fragment_label" />
+
+</menu>

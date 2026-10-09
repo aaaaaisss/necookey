@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="utf-8"?>
+<PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+
+    <PreferenceCategory android:title="@string/setting_home_categories_title">
+
+        <Preference
+            android:icon="@drawable/keyboard_24px"
+            android:key="setting_route_keyboard_display"
+            android:summary="@string/setting_category_keyboard_display_summary"
+            android:title="@string/setting_category_keyboard_display_title" />
+
+        <Preference
+            android:icon="@drawable/input_24px"
+            android:key="setting_route_input_method"
+            android:summary="@string/setting_category_input_method_summary"
+            android:title="@string/setting_category_input_method_title" />
+
+        <Preference
+            android:icon="@drawable/arrows_output_24px"
+            android:key="setting_route_candidate_conversion"
+            android:summary="@string/setting_category_candidate_conversion_summary"
+            android:title="@string/setting_category_candidate_conversion_title" />
+
+        <Preference
+            android:icon="@drawable/swap_horiz_24px"
+            android:key="setting_route_conversion_engine"
+            android:summary="@string/setting_category_conversion_engine_summary"
+            android:title="@string/conversion_engine_category_title" />
+
+        <Preference
+            android:icon="@drawable/dictionary_24px"
+            android:key="setting_route_dictionary"
+            android:summary="@string/setting_category_dictionary_summary"
+            android:title="@string/category_dictionary" />
+
+        <Preference
+            android:icon="@drawable/lightbulb_24dp"
+            android:key="setting_route_ai_conversion"
+            android:summary="@string/setting_category_ai_conversion_summary"
+            android:title="@string/setting_category_ai_conversion_title" />
+
+        <Preference
+            android:icon="@drawable/content_paste_24px"
+            android:key="setting_route_clipboard_shortcut"
+            android:summary="@string/setting_category_clipboard_shortcut_summary"
+            android:title="@string/setting_category_clipboard_shortcut_title" />
+
+        <Preference
+            android:icon="@drawable/baseline_settings_24"
+            android:key="setting_route_operation_feedback"
+            android:summary="@string/setting_category_operation_feedback_summary"
+            android:title="@string/setting_category_operation_feedback_title" />
+
+        <Preference
+            android:icon="@drawable/baseline_save_24"
+            android:key="setting_route_general_info"
+            android:summary="@string/setting_category_general_info_summary"
+            android:title="@string/setting_category_general_info_title" />
+
+        <Preference
+            android:icon="@drawable/more_vert_24px"
+            android:key="setting_route_advanced"
+            android:summary="@string/setting_category_advanced_summary"
+            android:title="@string/setting_category_advanced_title" />
+
+    </PreferenceCategory>
+
+    <PreferenceCategory android:title="@string/inline_suggestion_settings_category_title">
+        <SwitchPreferenceCompat
+            android:defaultValue="true"
+            android:key="inline_suggestion_enabled_preference"
+            android:summaryOff="@string/inline_suggestion_enabled_summary_off"
+            android:summaryOn="@string/inline_suggestion_enabled_summary_on"
+            android:title="@string/inline_suggestion_enabled_title" />
+    </PreferenceCategory>
+
+</PreferenceScreen>

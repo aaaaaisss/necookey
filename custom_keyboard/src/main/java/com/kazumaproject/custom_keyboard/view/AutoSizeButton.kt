@@ -1,0 +1,242 @@
+package com.kazumaproject.custom_keyboard.view
+
+import android.content.Context
+import android.graphics.Canvas
+import android.graphics.Color
+import android.graphics.Paint
+import android.graphics.Rect
+import android.graphics.drawable.Drawable
+import android.graphics.drawable.InsetDrawable
+import android.graphics.drawable.LayerDrawable
+import android.util.AttributeSet
+import android.util.TypedValue
+import androidx.appcompat.widget.AppCompatButton
+import com.kazumaproject.core.ui.font.KeyboardFontAware
+import com.kazumaproject.core.ui.font.KeyboardFontApplicator
+import com.kazumaproject.core.ui.font.KeyboardFontSnapshot
+import com.kazumaproject.custom_keyboard.layout.SegmentedBackgroundDrawable
+import kotlin.math.min
+
+class AutoSizeButton @JvmOverloads constructor(
+    context: Context,
+    attrs: AttributeSet? = null,
+    defStyleAttr: Int = androidx.appcompat.R.attr.buttonStyle
+) : AppCompatButton(context, attrs, defStyleAttr), KeyboardFontAware {
+
+    data class FlickGuideLabels(
+        val tap: String = "",
+        val up: String = "",
+        val upRight: String = "",
+        val right: String = "",
+        val downRight: String = "",
+        val down: String = "",
+        val downLeft: String = "",
+        val left: String = "",
+        val upLeft: String = ""
+    ) {
+        fun hasVisibleGuides(): Boolean {
+            return up.isNotEmpty() ||
+                    upRight.isNotEmpty() ||
+                    right.isNotEmpty() ||
+                    downRight.isNotEmpty() ||
+                    down.isNotEmpty() ||
+                    downLeft.isNotEmpty() ||
+                    left.isNotEmpty() ||
+                    upLeft.isNotEmpty()
+        }
+    }
+
+    private var defaultTextSize = 14f
+
+    private val textBounds = Rect()
+    private val guidePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        textAlign = Paint.Align.CENTER
+    }
+    private val centerGuidePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        textAlign = Paint.Align.CENTER
+    }
+
+    private var flickGuideLabels: FlickGuideLabels? = null
+    private var flickGuideTextColor: Int = Color.BLACK
+    private var flickGuideTextSizeSp: Float? = null
+
+    override fun setKeyboardFont(snapshot: KeyboardFontSnapshot) {
+        KeyboardFontApplicator.track(this)
+        KeyboardFontApplicator.apply(this, snapshot)
+        KeyboardFontApplicator.apply(guidePaint, snapshot)
+        KeyboardFontApplicator.apply(centerGuidePaint, snapshot)
+        applyKeyboardFontToDrawable(background, snapshot)
+        refreshTextSize()
+    }
+
+    private fun applyKeyboardFontToDrawable(drawable: Drawable?, snapshot: KeyboardFontSnapshot) {
+        when (drawable) {
+            is SegmentedBackgroundDrawable -> drawable.setKeyboardFont(snapshot)
+            is LayerDrawable -> repeat(drawable.numberOfLayers) { index ->
+                applyKeyboardFontToDrawable(drawable.getDrawable(index), snapshot)
+            }
+            is InsetDrawable -> applyKeyboardFontToDrawable(drawable.drawable, snapshot)
+        }
+    }
+
+    override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
+        super.onSizeChanged(w, h, oldw, oldh)
+        if (w > 0 && h > 0) {
+            adjustTextSize(w, h)
+        }
+    }
+
+    fun setDefaultTextSize(textSize: Float) {
+        this.defaultTextSize = textSize
+        refreshTextSize()
+    }
+
+    fun refreshTextSize() {
+        if (width > 0 && height > 0) {
+            adjustTextSize(width, height)
+        } else {
+            requestLayout()
+            invalidate()
+        }
+    }
+
+    override fun setText(text: CharSequence?, type: BufferType?) {
+        super.setText(text, type)
+        refreshTextSize()
+    }
+
+    override fun onDraw(canvas: Canvas) {
+        super.onDraw(canvas)
+        drawFlickGuides(canvas)
+    }
+
+    fun setFlickGuideLabels(labels: FlickGuideLabels?, textColor: Int = currentTextColor) {
+        flickGuideLabels = labels
+        flickGuideTextColor = textColor
+        invalidate()
+    }
+
+    fun setFlickGuideTextSizeSp(sizeSp: Float) {
+        val coerced = sizeSp.coerceIn(6f, 16f)
+        if (flickGuideTextSizeSp == coerced) return
+        flickGuideTextSizeSp = coerced
+        invalidate()
+    }
+
+    private fun adjustTextSize(buttonWidth: Int, buttonHeight: Int) {
+        if (text.isNullOrEmpty() || buttonWidth <= 0 || buttonHeight <= 0) return
+
+        var currentTextSizePx = TypedValue.applyDimension(
+            TypedValue.COMPLEX_UNIT_SP,
+            defaultTextSize,
+            context.resources.displayMetrics
+        )
+        paint.textSize = currentTextSizePx
+
+        // ★修正点1: 利用可能な「高さ」も計算する
+        val availableWidth = buttonWidth - paddingLeft - paddingRight
+        val availableHeight = buttonHeight - paddingTop - paddingBottom
+
+        paint.getTextBounds(text.toString(), 0, text.length, textBounds)
+
+        fun exceedsAvailableSpace(): Boolean {
+            // TextView lays out a line using glyph advances, which can exceed its ink bounds.
+            // Include both widths so a fitted single-line label cannot wrap or lose its last glyph.
+            val textWidth = if (maxLines == 1) {
+                maxOf(textBounds.width().toFloat(), paint.measureText(text.toString()))
+            } else {
+                textBounds.width().toFloat()
+            }
+            return textWidth > availableWidth || textBounds.height() > availableHeight
+        }
+
+        if (exceedsAvailableSpace()) {
+            while (exceedsAvailableSpace()) {
+                currentTextSizePx -= 1f // 1ピクセルずつ小さくする
+                if (currentTextSizePx <= 2f) { // 小さくなりすぎないように下限を設定
+                    break
+                }
+                paint.textSize = currentTextSizePx
+                paint.getTextBounds(text.toString(), 0, text.length, textBounds)
+            }
+        }
+
+        // 最終的なテキストサイズをピクセル単位で設定
+        setTextSize(TypedValue.COMPLEX_UNIT_PX, currentTextSizePx)
+    }
+
+    private fun drawFlickGuides(canvas: Canvas) {
+        val labels = flickGuideLabels ?: return
+        if (!labels.hasVisibleGuides() && !shouldDrawCenterTap(labels)) return
+
+        val availableWidth = width - paddingLeft - paddingRight
+        val availableHeight = height - paddingTop - paddingBottom
+        if (availableWidth <= 0 || availableHeight <= 0) return
+
+        val minContentSize = min(availableWidth, availableHeight).toFloat()
+        val configuredGuideTextSizeSp =
+            flickGuideTextSizeSp ?: (defaultTextSize * 0.58f).coerceIn(8f, 13f)
+        val guideTextSize = min(
+            spToPx(configuredGuideTextSizeSp.coerceIn(6f, 16f)),
+            minContentSize * 0.22f
+        )
+        if (guideTextSize <= 0f) return
+
+        guidePaint.color = flickGuideTextColor
+        guidePaint.textSize = guideTextSize
+        guidePaint.typeface = typeface
+
+        centerGuidePaint.color = flickGuideTextColor
+        centerGuidePaint.textSize = textSize
+        centerGuidePaint.typeface = typeface
+
+        val centerX = width / 2f
+        val centerY = height / 2f
+        val guideFm = guidePaint.fontMetrics
+        val topBaseline = paddingTop + dpToPx(3) - guideFm.ascent
+        val bottomBaseline = height - paddingBottom - dpToPx(3) - guideFm.descent
+        val sideBaseline = centerY - (guideFm.ascent + guideFm.descent) / 2f
+        val sideInset = maxOf(dpToPx(10).toFloat(), availableWidth * 0.16f)
+        val cornerInsetX = maxOf(dpToPx(8).toFloat(), availableWidth * 0.22f)
+
+        drawGuideText(canvas, labels.upLeft, paddingLeft + cornerInsetX, topBaseline)
+        drawGuideText(canvas, labels.up, centerX, topBaseline)
+        drawGuideText(canvas, labels.upRight, width - paddingRight - cornerInsetX, topBaseline)
+        drawGuideText(canvas, labels.right, width - paddingRight - sideInset, sideBaseline)
+        drawGuideText(canvas, labels.downRight, width - paddingRight - cornerInsetX, bottomBaseline)
+        drawGuideText(canvas, labels.down, centerX, bottomBaseline)
+        drawGuideText(canvas, labels.downLeft, paddingLeft + cornerInsetX, bottomBaseline)
+        drawGuideText(canvas, labels.left, paddingLeft + sideInset, sideBaseline)
+
+        if (shouldDrawCenterTap(labels)) {
+            val centerFm = centerGuidePaint.fontMetrics
+            val centerBaseline = centerY - (centerFm.ascent + centerFm.descent) / 2f
+            canvas.drawText(labels.tap, centerX, centerBaseline, centerGuidePaint)
+        }
+    }
+
+    private fun drawGuideText(canvas: Canvas, text: String, x: Float, baselineY: Float) {
+        if (text.isEmpty()) return
+        canvas.drawText(text, x, baselineY, guidePaint)
+    }
+
+    private fun shouldDrawCenterTap(labels: FlickGuideLabels): Boolean {
+        return labels.tap.isNotEmpty() && Color.alpha(currentTextColor) == 0
+    }
+
+    private fun spToPx(sp: Float): Float {
+        return TypedValue.applyDimension(
+            TypedValue.COMPLEX_UNIT_SP,
+            sp,
+            resources.displayMetrics
+        )
+    }
+
+    private fun dpToPx(dp: Int): Int {
+        return TypedValue.applyDimension(
+            TypedValue.COMPLEX_UNIT_DIP,
+            dp.toFloat(),
+            resources.displayMetrics
+        ).toInt()
+    }
+}

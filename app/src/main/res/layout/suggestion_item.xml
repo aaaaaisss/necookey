@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="utf-8"?>
+<com.kazumaproject.markdownhelperkeyboard.ime_service.adapters.CandidateReadingLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content"
+    android:clipChildren="false"
+    android:clipToPadding="false"
+    android:background="@drawable/recyclerview_item_bg"
+    android:paddingHorizontal="5dp">
+
+    <LinearLayout
+        android:id="@+id/suggestion_text_container"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:gravity="center_vertical"
+        android:orientation="vertical"
+        android:clipChildren="false"
+        android:clipToPadding="false"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent">
+
+        <com.kazumaproject.markdownhelperkeyboard.ime_service.adapters.FormulaView
+            android:id="@+id/suggestion_item_formula_view"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:contentDescription="@null"
+            android:visibility="gone" />
+
+        <com.kazumaproject.markdownhelperkeyboard.ime_service.adapters.CandidateReadingTextView
+            android:id="@+id/suggestion_item_yomi_text_view"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:gravity="start"
+            android:maxLines="1"
+            android:textAlignment="viewStart"
+            android:textColor="@color/main_text_color"
+            android:textSize="10sp"
+            android:visibility="gone" />
+
+        <com.google.android.material.textview.MaterialTextView
+            android:id="@+id/suggestion_item_text_view"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:gravity="start"
+            android:maxLines="1"
+            android:textAlignment="viewStart"
+            android:textColor="@color/main_text_color"
+            android:textSize="14sp" />
+
+    </LinearLayout>
+
+    <com.google.android.material.textview.MaterialTextView
+        android:id="@+id/suggestion_item_type_text_view"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="1dp"
+        android:layout_marginEnd="8dp"
+        android:textAlignment="center"
+        android:textColor="@color/main_text_color"
+        android:textSize="8sp"
+        app:layout_constraintBottom_toBottomOf="@+id/suggestion_text_container"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toEndOf="@+id/suggestion_text_container"
+        app:layout_constraintTop_toTopOf="@+id/suggestion_text_container"
+        app:layout_constraintVertical_bias="1" />
+
+    <View
+        android:id="@+id/candidate_divider"
+        android:layout_width="1dp"
+        android:layout_height="0dp"
+        android:layout_marginVertical="18dp"
+        android:background="@color/sub_text_color"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintTop_toTopOf="parent" />
+
+</com.kazumaproject.markdownhelperkeyboard.ime_service.adapters.CandidateReadingLayout>

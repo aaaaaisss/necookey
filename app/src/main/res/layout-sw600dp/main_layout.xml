@@ -1,0 +1,210 @@
+<?xml version="1.0" encoding="utf-8"?>
+<com.kazumaproject.markdownhelperkeyboard.ime_service.image_effect.InkTouchDispatchFrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_gravity="bottom"
+    android:background="@color/keyboard_bg">
+
+    <FrameLayout
+        android:id="@+id/keyboard_background_container"
+        android:layout_width="match_parent"
+        android:layout_height="@dimen/keyboard_height"
+        android:layout_gravity="bottom"
+        android:clickable="false"
+        android:focusable="false">
+
+        <androidx.media3.ui.PlayerView
+            android:id="@+id/keyboard_background_video"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:visibility="gone"
+            app:surface_type="texture_view"
+            app:shutter_background_color="@android:color/transparent"
+            app:use_controller="false" />
+
+        <ImageView
+            android:id="@+id/keyboard_background_image"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:contentDescription="@null"
+            android:scaleType="fitCenter"
+            android:visibility="gone" />
+    </FrameLayout>
+
+    <FrameLayout
+        android:id="@+id/keyboard_touch_effect_container"
+        android:layout_width="match_parent"
+        android:layout_height="@dimen/keyboard_height"
+        android:layout_gravity="bottom"
+        android:clickable="false"
+        android:focusable="false"
+        android:importantForAccessibility="no">
+
+        <com.kazumaproject.markdownhelperkeyboard.ime_service.image_effect.SuminagashiInkView
+            android:id="@+id/suminagashi_ink_view"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:clickable="false"
+            android:focusable="false"
+            android:importantForAccessibility="no"
+            android:visibility="gone" />
+
+        <com.kazumaproject.markdownhelperkeyboard.ime_service.image_effect.LiquidRippleEffectView
+            android:id="@+id/liquid_ripple_effect_view"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:clickable="false"
+            android:focusable="false"
+            android:importantForAccessibility="no"
+            android:visibility="gone" />
+
+        <com.kazumaproject.markdownhelperkeyboard.ime_service.image_effect.SprayPaintEffectView
+            android:id="@+id/spray_paint_effect_view"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:clickable="false"
+            android:focusable="false"
+            android:importantForAccessibility="no"
+            android:visibility="gone" />
+
+        <com.kazumaproject.markdownhelperkeyboard.ime_service.image_effect.LuminousBlobEffectView
+            android:id="@+id/luminous_blob_effect_view"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:clickable="false"
+            android:focusable="false"
+            android:importantForAccessibility="no"
+            android:visibility="gone" />
+
+        <com.kazumaproject.markdownhelperkeyboard.ime_service.image_effect.CinematicWaveEffectView
+            android:id="@+id/cinematic_wave_effect_view"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:clickable="false"
+            android:focusable="false"
+            android:importantForAccessibility="no"
+            android:visibility="gone" />
+    </FrameLayout>
+
+    <!-- Container for Suggestion List and Visibility Icon -->
+    <androidx.constraintlayout.widget.ConstraintLayout
+        android:id="@+id/suggestionView_parent"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="@dimen/keyboard_height"
+        android:background="@color/keyboard_bg">
+
+        <ProgressBar
+            android:id="@+id/suggestion_progressbar"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:visibility="gone"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="parent" />
+
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/suggestion_recycler_view"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:clipToPadding="false"
+            android:visibility="visible"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintEnd_toStartOf="@+id/suggestion_visibility"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="parent" />
+
+        <!-- Visibility Toggle Button -->
+        <com.google.android.material.imageview.ShapeableImageView
+            android:id="@+id/suggestion_visibility"
+            android:layout_width="42dp"
+            android:layout_height="42dp"
+            android:layout_marginTop="6dp"
+            android:background="@drawable/recyclerview_size_button_bg"
+            android:scaleType="center"
+            android:src="@drawable/outline_arrow_drop_down_24"
+            android:tint="@color/keyboard_icon_color"
+            android:visibility="visible"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintTop_toTopOf="parent" />
+    </androidx.constraintlayout.widget.ConstraintLayout>
+
+    <com.google.android.material.tabs.TabLayout
+        android:id="@+id/candidate_tab_layout"
+        android:layout_width="match_parent"
+        android:layout_height="36dp" />
+
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/shortcut_toolbar_recyclerview"
+        android:layout_width="match_parent"
+        android:layout_height="36dp" />
+
+    <!-- Custom Keyboard View -->
+    <com.kazumaproject.tenkey.TenKey
+        android:id="@+id/keyboard_view"
+        android:layout_width="match_parent"
+        android:layout_height="@dimen/keyboard_height"
+        android:layout_gravity="bottom"
+        android:clickable="true"
+        android:focusable="true"
+        android:importantForAccessibility="yes"
+        android:visibility="gone" />
+
+    <com.kazumaproject.gojuon_keyboard.GojuonKeyboardView
+        android:id="@+id/gojuon_view"
+        android:layout_width="match_parent"
+        android:layout_height="@dimen/keyboard_height"
+        android:layout_gravity="bottom"
+        android:clickable="true"
+        android:focusable="true"
+        android:importantForAccessibility="yes"
+        android:paddingBottom="4dp"
+        android:visibility="gone" />
+
+    <com.kazumaproject.qwerty_keyboard.ui.QWERTYKeyboardView
+        android:id="@+id/qwerty_view"
+        android:layout_width="match_parent"
+        android:layout_height="@dimen/keyboard_height"
+        android:layout_gravity="bottom"
+        android:clickable="true"
+        android:focusable="true"
+        android:importantForAccessibility="yes"
+        android:visibility="gone" />
+
+    <com.kazumaproject.custom_keyboard.view.FlickKeyboardView
+        android:id="@+id/custom_layout_default"
+        android:layout_width="match_parent"
+        android:layout_height="@dimen/keyboard_height"
+        android:layout_gravity="bottom"
+        android:clickable="true"
+        android:focusable="true"
+        android:importantForAccessibility="yes"
+        android:visibility="gone" />
+
+    <com.kazumaproject.markdownhelperkeyboard.gemma.handwriting.GemmaHandwritingKeyboardView
+        android:id="@+id/gemma_handwriting_keyboard"
+        android:layout_width="match_parent"
+        android:layout_height="@dimen/keyboard_height"
+        android:layout_gravity="bottom"
+        android:clickable="true"
+        android:focusable="true"
+        android:importantForAccessibility="yes"
+        android:visibility="gone" />
+
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/candidates_row_view"
+        android:layout_width="match_parent"
+        android:layout_height="@dimen/keyboard_height"
+        android:layout_gravity="bottom"
+        android:visibility="gone" />
+
+    <com.kazumaproject.symbol_keyboard.CustomSymbolKeyboardView
+        android:id="@+id/keyboard_symbol_view"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom"
+        android:visibility="gone" />
+</com.kazumaproject.markdownhelperkeyboard.ime_service.image_effect.InkTouchDispatchFrameLayout>

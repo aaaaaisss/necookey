@@ -1,0 +1,1007 @@
+package com.kazumaproject.custom_keyboard.controller
+
+import android.annotation.SuppressLint
+import android.content.Context
+import android.graphics.PointF
+import android.view.MotionEvent
+import android.view.View
+import android.view.ViewConfiguration
+import android.widget.Button
+import com.kazumaproject.core.data.popup.PopupViewStyle
+import com.kazumaproject.core.domain.flick.FixedGestureSessionConfigSource
+import com.kazumaproject.core.domain.flick.FlickDirection as CoreFlickDirection
+import com.kazumaproject.core.domain.flick.FlickGestureMath
+import com.kazumaproject.core.domain.flick.GestureSessionConfig
+import com.kazumaproject.core.domain.flick.GestureSessionConfigSource
+import com.kazumaproject.custom_keyboard.data.FlickAction
+import com.kazumaproject.custom_keyboard.data.FlickDirection
+import com.kazumaproject.custom_keyboard.data.FlickPopupColorTheme
+import com.kazumaproject.custom_keyboard.data.KeyAction
+import com.kazumaproject.custom_keyboard.data.KeyActionMapper
+import com.kazumaproject.custom_keyboard.view.DirectionalKeyPopupView
+import com.kazumaproject.custom_keyboard.view.CrossFlickPopupView
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+
+class CrossFlickInputController(
+    private val context: Context,
+    private val gestureConfigSource: GestureSessionConfigSource
+) {
+
+    constructor(
+        context: Context,
+        flickSensitivity: Int = 80
+    ) : this(
+        context = context,
+        gestureConfigSource = FixedGestureSessionConfigSource(
+            GestureSessionConfig(
+                settingsRevision = 0L,
+                flickSensitivity = 100,
+                flickThresholdPx = flickSensitivity.toFloat().coerceAtLeast(1f),
+                longPressTimeoutMillis =
+                    ViewConfiguration.getLongPressTimeout().toLong().coerceIn(100L, 2_000L)
+            )
+        )
+    )
+
+    interface CrossFlickListener {
+        fun onPress(action: KeyAction)
+        fun onPress(action: KeyAction, direction: FlickDirection) {
+            onPress(action)
+        }
+
+        fun onFlick(action: KeyAction, isFlick: Boolean)
+        fun onFlick(action: KeyAction, isFlick: Boolean, direction: FlickDirection) {
+            onFlick(action, isFlick)
+        }
+        fun onFlick(
+            action: KeyAction,
+            isFlick: Boolean,
+            direction: FlickDirection,
+            isLongPress: Boolean,
+        ) {
+            onFlick(action, isFlick, direction)
+        }
+        fun onFlickCommitted(
+            fallbackAction: KeyAction?,
+            isFlick: Boolean,
+            direction: FlickDirection
+        ) {
+            fallbackAction?.let { onFlick(it, isFlick, direction) }
+        }
+
+        fun onFlickLongPress(action: KeyAction)
+        fun onFlickLongPress(action: KeyAction, direction: FlickDirection) {
+            onFlickLongPress(action)
+        }
+
+        fun onFlickUpAfterLongPress(action: KeyAction, isFlick: Boolean)
+        fun onFlickUpAfterLongPress(
+            action: KeyAction,
+            isFlick: Boolean,
+            direction: FlickDirection
+        ) {
+            onFlickUpAfterLongPress(action, isFlick)
+        }
+
+        fun onFlickLongPressCanceled(
+            action: KeyAction,
+            direction: FlickDirection
+        ) {}
+        fun onTextSelectionChanged(text: String?, isFlick: Boolean) {}
+        fun onCanceled() {}
+    }
+
+    private enum class InputMode {
+        ACTION,
+        TEXT
+    }
+
+    var listener: CrossFlickListener? = null
+
+    private var popupOverlayHostProvider: (() -> View?)? = null
+
+    private var inputMode: InputMode = InputMode.ACTION
+    private var anchorView: View? = null
+    private var initialTouchPoint = PointF(0f, 0f)
+    private var currentDirection = FlickDirection.TAP
+    private var activeGestureConfig: GestureSessionConfig? = null
+
+    private var flickActionMap: Map<FlickDirection, FlickAction> = emptyMap()
+    private var textMap: Map<FlickDirection, String> = emptyMap()
+    private var longPressTextMap: Map<FlickDirection, String> = emptyMap()
+
+    private val actionPopupViews = mutableMapOf<FlickDirection, CrossFlickPopupView>()
+
+    private val directionalPopupMap = mutableMapOf<FlickDirection, DirectionalKeyPopupView>()
+    private var currentVisibleDirectionalPopup: DirectionalKeyPopupView? = null
+    private var currentVisibleDirectional: FlickDirection? = null
+    private var directionalPopupCacheDirty = true
+    private var directionalPopupAnchorWidth = -1
+    private var directionalPopupAnchorHeight = -1
+    private var originalKeyText: CharSequence? = null
+    private val popupAnchorLocation = IntArray(2)
+    private val popupKeyLocationScratch = IntArray(2)
+    private val popupHostLocationScratch = IntArray(2)
+    private val popupPositionScratch = IntArray(2)
+    private val popupOverlay = KeyboardPopupOverlay(::positionVisiblePopupsBeforeDraw)
+    private val gridPopupView = CrossFlickPopupView(context).apply {
+        elevation = 8f
+    }
+
+    private val controllerScope = CoroutineScope(Dispatchers.Main + SupervisorJob())
+    private var longPressJob: Job? = null
+    private var isLongPressMode = false
+    private var isLongPressTriggered = false
+
+    private var popupColorTheme: FlickPopupColorTheme? = null
+    private var inputTextTransform: (String) -> String = { it }
+    private var directionalPopupStyle = PopupViewStyle(100, 28f)
+    private var crossPopupStyle = PopupViewStyle(100, 18f)
+    private val displayActionsByClass by lazy {
+        KeyActionMapper.getDisplayActions(context).associateBy { it.action::class }
+    }
+
+    // 色設定。FlickPopupColorTheme をまとめて受け取り、全ポップアップに適用する。
+    fun setPopupColors(theme: FlickPopupColorTheme) {
+        popupColorTheme = theme
+        invalidateDirectionalPopupCache()
+    }
+
+    fun applyPopupViewStyleSet(
+        directional: PopupViewStyle,
+        cross: PopupViewStyle
+    ) {
+        directionalPopupStyle = PopupViewStyle(
+            sizeScalePercent = directional.sizeScalePercent.coerceIn(50, 200),
+            textSizeSp = directional.textSizeSp.coerceIn(8f, 48f),
+            backgroundColor = directional.backgroundColor,
+            textColor = directional.textColor,
+            skinId = directional.skinId
+        )
+        crossPopupStyle = PopupViewStyle(
+            sizeScalePercent = cross.sizeScalePercent.coerceIn(50, 200),
+            textSizeSp = cross.textSizeSp.coerceIn(8f, 48f),
+            backgroundColor = cross.backgroundColor,
+            textColor = cross.textColor,
+            skinId = cross.skinId
+        )
+        actionPopupViews.values.forEach { it.applyPopupViewStyle(crossPopupStyle) }
+        gridPopupView.applyPopupViewStyle(crossPopupStyle)
+        invalidateDirectionalPopupCache()
+    }
+
+    fun setPopupOverlayHostProvider(provider: (() -> View?)?) {
+        popupOverlayHostProvider = provider
+    }
+
+    fun setInputTextTransform(transform: (String) -> String) {
+        inputTextTransform = transform
+        gridPopupView.setInputTextTransform(transform)
+        actionPopupViews.values.forEach { it.setInputTextTransform(transform) }
+        invalidateDirectionalPopupCache()
+    }
+
+    // コントローラを破棄する。ビューのデタッチやキーボードビューの再構築時に FlickKeyboardView から呼ばれる。
+    fun cancel() {
+        listener?.onCanceled()
+        activeGestureConfig = null
+        longPressJob?.cancel()
+        controllerScope.cancel()
+        restoreOriginalButtonText()
+        dismissAllPopups(clearDirectionalCache = true)
+    }
+
+    // ACTION モードでビューにアタッチする。CROSS_FLICK キー（アイコン付き特殊キー）向け。
+    @SuppressLint("ClickableViewAccessibility")
+    fun attach(view: View, map: Map<FlickDirection, FlickAction>) {
+        inputMode = InputMode.ACTION
+        flickActionMap = map.mapValues { (_, action) -> action.withDisplayMetadata() }
+        textMap = emptyMap()
+        longPressTextMap = emptyMap()
+        invalidateDirectionalPopupCache()
+        view.setOnTouchListener { v, event -> handleTouchEvent(v, event) }
+    }
+
+    // TEXT モードでビューにアタッチする。PETAL_FLICK キー（文字入力キー）向け。
+    // longPressMap を省略するとグリッドポップアップには通常 map の文字がそのまま表示される
+    @SuppressLint("ClickableViewAccessibility")
+    fun attachText(
+        view: View,
+        map: Map<FlickDirection, String>,
+        longPressMap: Map<FlickDirection, String> = emptyMap()
+    ) {
+        inputMode = InputMode.TEXT
+        textMap = map
+        longPressTextMap = longPressMap
+        flickActionMap = emptyMap()
+        invalidateDirectionalPopupCache()
+        view.setOnTouchListener { v, event -> handleTouchEvent(v, event) }
+    }
+
+    // タッチイベントの中枢。ACTION_DOWN/MOVE/UP・CANCEL をまとめて処理し、長押しタイマーも管理する。
+    private fun handleTouchEvent(view: View, event: MotionEvent): Boolean {
+        when (event.action) {
+            MotionEvent.ACTION_DOWN -> {
+                val gestureConfig = gestureConfigSource.snapshot()
+                activeGestureConfig = gestureConfig
+                view.isPressed = true
+                view.drawableHotspotChanged(event.x, event.y)
+
+                isLongPressMode = false
+                isLongPressTriggered = false
+                anchorView = view
+                initialTouchPoint.set(event.rawX, event.rawY)
+                currentDirection = FlickDirection.TAP
+
+                notifyPressAction()
+
+                if (inputMode == InputMode.TEXT) {
+                    (anchorView as? Button)?.let { button ->
+                        originalKeyText = button.text
+                        button.text = ""
+                    }
+                    ensureDirectionalPopups()
+                    showDirectionalPopup(FlickDirection.TAP)
+                }
+
+                longPressJob?.cancel()
+                longPressJob = controllerScope.launch {
+                    delay(gestureConfig.longPressTimeoutMillis)
+                    isLongPressTriggered = true
+                    isLongPressMode = true
+                    onLongPressTriggered()
+                }
+                return true
+            }
+
+            MotionEvent.ACTION_MOVE -> {
+                view.drawableHotspotChanged(event.x, event.y)
+
+                val dx = event.rawX - initialTouchPoint.x
+                val dy = event.rawY - initialTouchPoint.y
+
+                if (inputMode == InputMode.TEXT && !isLongPressMode) {
+                    val cancelThreshold = currentFlickThreshold() * 0.5f
+                    val movedEnoughForFlick = FlickGestureMath.isThresholdCrossed(
+                        deltaX = dx,
+                        deltaY = dy,
+                        thresholdPx = cancelThreshold,
+                        thresholdShape = currentGestureConfig().flickThresholdShape
+                    )
+                    if (movedEnoughForFlick) {
+                        longPressJob?.cancel()
+                    }
+                }
+
+                val newDirection = calculateDirection(dx, dy)
+
+                if (newDirection != currentDirection) {
+                    currentDirection = newDirection
+                    if (isLongPressMode) {
+                        updateLongPressHighlight(newDirection)
+                    } else {
+                        updateNormalPopup(newDirection)
+                    }
+                    if (inputMode == InputMode.TEXT) {
+                        listener?.onTextSelectionChanged(
+                            resolveText(currentDirection, preferLongPress = isLongPressMode),
+                            currentDirection != FlickDirection.TAP
+                        )
+                    }
+                }
+                return true
+            }
+
+            MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                view.isPressed = false
+                longPressJob?.cancel()
+                longPressJob = null
+
+                if (event.action == MotionEvent.ACTION_UP) {
+                    commitAction()
+                } else {
+                    notifyLongPressCanceledIfNeeded()
+                    listener?.onCanceled()
+                }
+
+                restoreOriginalButtonText()
+                dismissAllPopups()
+                anchorView = null
+                activeGestureConfig = null
+                return true
+            }
+        }
+        return false
+    }
+
+    // 長押しタイマーが満了したときに呼ばれる。モードに応じてポップアップ表示を切り替える。
+    // ACTION: 全方向のアクションポップアップを展開。TEXT: TAP中のみグリッド表示に切り替え（フリック中は方向ポップアップを維持）。
+    private fun onLongPressTriggered() {
+        when (inputMode) {
+            InputMode.ACTION -> {
+                showAllActionPopups()
+                highlightActionPopup(currentDirection)
+                notifyLongPressActionPreview()
+            }
+
+            InputMode.TEXT -> {
+                if (currentDirection == FlickDirection.TAP) {
+                    dismissDirectionalPopups()
+                    showGridPopup()
+                    highlightGrid(currentDirection)
+                }
+                listener?.onTextSelectionChanged(
+                    resolveText(currentDirection, preferLongPress = true),
+                    currentDirection != FlickDirection.TAP
+                )
+            }
+        }
+    }
+
+    // ACTION_DOWN 時に listener へ押下通知を送る。TAP 方向のアクション／テキストを事前通知する。
+    private fun notifyPressAction() {
+        when (inputMode) {
+            InputMode.ACTION -> {
+                resolveAction(FlickDirection.TAP)?.let {
+                    listener?.onPress(it.toKeyAction(), FlickDirection.TAP)
+                }
+            }
+
+            InputMode.TEXT -> {
+                val text = resolveText(FlickDirection.TAP, preferLongPress = false)
+                if (!text.isNullOrEmpty()) {
+                    listener?.onPress(KeyAction.Text(text), FlickDirection.TAP)
+                }
+            }
+        }
+    }
+
+    // ACTION_UP 時に確定処理を行う。長押し済みかどうかで呼ぶコールバックを切り替える。
+    private fun commitAction() {
+        when (inputMode) {
+            InputMode.ACTION -> {
+                commitCrossFlickAction(
+                    currentDirection = currentDirection,
+                    flickActionMap = flickActionMap,
+                    isLongPressTriggered = isLongPressTriggered,
+                    listener = listener
+                )
+            }
+
+            InputMode.TEXT -> {
+                val isFlick = currentDirection != FlickDirection.TAP
+                val output = resolveText(currentDirection, preferLongPress = isLongPressMode)
+                if (!output.isNullOrEmpty()) {
+                    listener?.onFlick(
+                        KeyAction.Text(output),
+                        isFlick,
+                        currentDirection,
+                        isLongPressMode,
+                    )
+                }
+            }
+        }
+    }
+
+    private fun notifyLongPressCanceledIfNeeded() {
+        if (!isLongPressTriggered || inputMode != InputMode.ACTION) {
+            isLongPressTriggered = false
+            isLongPressMode = false
+            return
+        }
+
+        val action = resolveCrossFlickAction(currentDirection, flickActionMap)?.toKeyAction()
+            ?: KeyAction.Cancel
+        listener?.onFlickLongPressCanceled(action, currentDirection)
+        isLongPressTriggered = false
+        isLongPressMode = false
+    }
+
+    // 通常フリック中（長押し前）に方向が変わったときのポップアップ更新。ACTION_MOVE から呼ばれる。
+    private fun updateNormalPopup(direction: FlickDirection) {
+        when (inputMode) {
+            InputMode.ACTION -> {
+                dismissAllActionPopups()
+                showActionPopup(direction, highlighted = true)
+            }
+
+            InputMode.TEXT -> showDirectionalPopup(direction)
+        }
+    }
+
+    // 長押しモード中に指が動いたときのハイライト更新。ACTION_MOVE から呼ばれる。
+    private fun updateLongPressHighlight(direction: FlickDirection) {
+        when (inputMode) {
+            InputMode.ACTION -> {
+                highlightActionPopup(direction)
+                notifyLongPressActionPreview()
+            }
+
+            InputMode.TEXT -> {
+                if (popupOverlay.isShowing(gridPopupView)) {
+                    highlightGrid(direction)
+                } else {
+                    showDirectionalPopup(direction)
+                }
+            }
+        }
+    }
+
+    // ACTION モードの長押し中、現在ハイライトされている方向のアクションを listener へプレビュー通知する。
+    private fun notifyLongPressActionPreview() {
+        resolveAction(currentDirection)?.let {
+            listener?.onFlickLongPress(it.toKeyAction(), currentDirection)
+        }
+    }
+
+    // 初期タッチ位置からの直線距離と主軸を FlickDirection に変換する。
+    // LEFT は UP_LEFT_FAR、RIGHT は UP_RIGHT_FAR で表現する（フォールバック候補は getDirectionCandidates が担う）。
+    private fun calculateDirection(dx: Float, dy: Float): FlickDirection {
+        return when (
+            FlickGestureMath.cardinalDirection(
+                deltaX = dx,
+                deltaY = dy,
+                thresholdPx = currentFlickThreshold(),
+                thresholdShape = currentGestureConfig().flickThresholdShape
+            )
+        ) {
+            CoreFlickDirection.Tap -> FlickDirection.TAP
+            CoreFlickDirection.Left -> FlickDirection.UP_LEFT_FAR
+            CoreFlickDirection.Top -> FlickDirection.UP
+            CoreFlickDirection.Right -> FlickDirection.UP_RIGHT_FAR
+            CoreFlickDirection.Bottom -> FlickDirection.DOWN
+        }
+    }
+
+    private fun currentFlickThreshold(): Float {
+        return currentGestureConfig().flickThresholdPx
+    }
+
+    private fun currentGestureConfig(): GestureSessionConfig {
+        return activeGestureConfig ?: gestureConfigSource.snapshot()
+    }
+
+    // FlickDirection を候補リストに展開して flickActionMap を引く。near/far 両方に対応する。
+    private fun resolveAction(direction: FlickDirection): FlickAction? {
+        for (candidate in direction.directionCandidates()) {
+            val action = flickActionMap[candidate]
+            if (action != null) {
+                return action
+            }
+        }
+        return null
+    }
+
+    // FlickDirection に対応する出力テキストを解決する。preferLongPress=true のとき longPressTextMap を優先する。
+    private fun resolveText(
+        direction: FlickDirection,
+        preferLongPress: Boolean
+    ): String? {
+        if (preferLongPress) {
+            val longPress = resolveTextFromMap(direction, longPressTextMap)
+            if (!longPress.isNullOrEmpty()) {
+                return longPress
+            }
+        }
+        return resolveTextFromMap(direction, textMap)
+    }
+
+    // 指定した Map から FlickDirection に対応する文字列を候補順に検索して返す。
+    private fun resolveTextFromMap(
+        direction: FlickDirection,
+        source: Map<FlickDirection, String>
+    ): String? {
+        for (candidate in direction.directionCandidates()) {
+            val value = source[candidate]
+            if (!value.isNullOrEmpty()) {
+                return value
+            }
+        }
+        return null
+    }
+
+    // アクションに表示情報（アイコン/ラベル）が無い場合、KeyActionMapper の定義を補完して空表示を防ぐ。
+    private fun FlickAction.withDisplayMetadata(): FlickAction = when (this) {
+        is FlickAction.Input -> this
+        is FlickAction.Action -> {
+            val displayAction = displayActionsByClass[action::class]
+            if (displayAction == null) {
+                this
+            } else {
+                val resolvedLabel = label?.takeUnless { it.isBlank() } ?: displayAction.displayName
+                val resolvedDrawableResId = drawableResId ?: displayAction.iconResId
+                if (resolvedLabel == label && resolvedDrawableResId == drawableResId) {
+                    this
+                } else {
+                    copy(label = resolvedLabel, drawableResId = resolvedDrawableResId)
+                }
+            }
+        }
+    }
+
+    // FlickDirection を優先候補リストへ展開する。UP_LEFT_FAR/UP_RIGHT_FAR は near 方向へフォールバックする。
+    // UP_LEFT/UP_RIGHT は far→near の逆順でフォールバックし、どちらの表記で渡されても解決できる。
+    // 指定方向に CrossFlickPopupView を生成して表示する。通常フリック中は highlighted=true で単体表示する。
+    private fun showActionPopup(direction: FlickDirection, highlighted: Boolean) {
+        if (direction == FlickDirection.TAP) return
+
+        val flickAction = resolveAction(direction) ?: return
+        if (!isVisiblePopupAction(flickAction)) return
+        val anchor = anchorView ?: return
+        if (!anchor.isAttachedToWindow) return
+
+        val popupView = CrossFlickPopupView(context).apply {
+            setInputTextTransform(inputTextTransform)
+            applyPopupViewStyle(crossPopupStyle)
+            val scale = crossPopupStyle.sizeScalePercent.coerceIn(50, 200) / 100f
+            setCells(
+                mapOf(direction to flickAction),
+                (anchor.width * scale).toInt().coerceAtLeast(1),
+                (anchor.height * scale).toInt().coerceAtLeast(1)
+            )
+            popupColorTheme?.let { setColors(it) }
+            if (highlighted) highlightDirection(direction)
+            elevation = 8f
+        }
+        val scale = crossPopupStyle.sizeScalePercent.coerceIn(50, 200) / 100f
+        val popupWidth = (anchor.width * scale).toInt().coerceAtLeast(1)
+        val popupHeight = (anchor.height * scale).toInt().coerceAtLeast(1)
+
+        // Register first so the overlay's initial pre-draw placement can include this view.
+        actionPopupViews[direction] = popupView
+        val shown = popupOverlay.show(
+            anchor = anchor,
+            preferredHost = resolvePreferredOverlayHost(),
+            popupView = popupView,
+            width = popupWidth,
+            height = popupHeight
+        )
+
+        if (!shown) {
+            actionPopupViews.remove(direction)
+        }
+    }
+
+    // ACTION モードの長押し発動時に全方向のポップアップをまとめて表示する。
+    private fun showAllActionPopups() {
+        val anchor = anchorView ?: return
+        if (!anchor.isAttachedToWindow) return
+
+        listOf(
+            FlickDirection.UP,
+            FlickDirection.DOWN,
+            FlickDirection.UP_LEFT_FAR,
+            FlickDirection.UP_RIGHT_FAR
+        ).forEach { direction ->
+            val existingPopupView = actionPopupViews[direction]
+            if (
+                existingPopupView != null &&
+                popupOverlay.isShowing(existingPopupView)
+            ) {
+                existingPopupView.highlightDirection(null)
+            } else {
+                existingPopupView?.let(popupOverlay::dismiss)
+                actionPopupViews.remove(direction)
+                showActionPopup(direction, highlighted = false)
+            }
+        }
+    }
+
+    // 全アクションポップアップのうち指定方向だけをハイライト状態にする。長押し中の指移動で呼ばれる。
+    private fun highlightActionPopup(direction: FlickDirection) {
+        actionPopupViews.forEach { (dir, popupView) ->
+            popupView.highlightDirection(if (dir == direction) dir else null)
+        }
+    }
+
+    // 表示中のアクションポップアップを全て閉じてマップをクリアする。
+    private fun dismissAllActionPopups() {
+        actionPopupViews.values.forEach(popupOverlay::dismiss)
+        actionPopupViews.clear()
+    }
+
+    // TEXT モードの方向ポップアップを必要なときだけ生成し、同じキーでは再利用する。
+    private fun ensureDirectionalPopups() {
+        val currentAnchor = anchorView ?: return
+        val anchorSizeUnchanged =
+            directionalPopupAnchorWidth == currentAnchor.width &&
+                directionalPopupAnchorHeight == currentAnchor.height
+        if (!directionalPopupCacheDirty && anchorSizeUnchanged) {
+            return
+        }
+
+        directionalPopupMap.values.forEach(popupOverlay::dismiss)
+        directionalPopupMap.clear()
+        currentVisibleDirectionalPopup = null
+        currentVisibleDirectional = null
+
+        val directions = listOf(
+            FlickDirection.TAP,
+            FlickDirection.UP,
+            FlickDirection.DOWN,
+            FlickDirection.UP_LEFT_FAR,
+            FlickDirection.UP_RIGHT_FAR
+        )
+
+        directions.forEach { direction ->
+            val text = resolveText(direction, preferLongPress = false)
+            if (text.isNullOrEmpty()) return@forEach
+
+            val popupView = DirectionalKeyPopupView(context).apply {
+                this.text = inputTextTransform(text)
+                applyPopupViewStyle(directionalPopupStyle)
+                popupColorTheme?.let { setColors(it) }
+                setFlickDirection(direction)
+            }
+            val scale = directionalPopupStyle.sizeScalePercent.coerceIn(50, 200) / 100f
+
+            val popupHeight = when (direction) {
+                FlickDirection.UP, FlickDirection.DOWN -> {
+                    currentAnchor.height + (currentAnchor.height / 4)
+                }
+
+                else -> currentAnchor.height
+            }.let { (it * scale).toInt().coerceAtLeast(1) }
+
+            val popupWidth = when (direction) {
+                FlickDirection.UP, FlickDirection.DOWN -> {
+                    currentAnchor.width - (currentAnchor.height / 4)
+                }
+
+                FlickDirection.TAP -> currentAnchor.width
+                else -> {
+                    currentAnchor.width + (currentAnchor.width / 2 - currentAnchor.width / 4)
+                }
+            }.let { (it * scale).toInt().coerceAtLeast(1) }
+
+            popupView.elevation = 8f
+            popupView.measure(
+                View.MeasureSpec.makeMeasureSpec(popupWidth, View.MeasureSpec.EXACTLY),
+                View.MeasureSpec.makeMeasureSpec(popupHeight, View.MeasureSpec.EXACTLY)
+            )
+            directionalPopupMap[direction] = popupView
+        }
+
+        directionalPopupAnchorWidth = currentAnchor.width
+        directionalPopupAnchorHeight = currentAnchor.height
+        directionalPopupCacheDirty = false
+    }
+
+    // TEXT モードで指定方向のポップアップを表示し、直前に表示していたものを閉じる。
+    // 同じ方向が連続した場合はちらつき防止のためスキップする。
+    private fun showDirectionalPopup(direction: FlickDirection) {
+        if (direction == currentVisibleDirectional) {
+            return
+        }
+
+        currentVisibleDirectionalPopup?.let(popupOverlay::dismiss)
+
+        val popupToShow = directionalPopupMap[direction] ?: return
+        val currentAnchor = anchorView ?: return
+        if (!currentAnchor.isAttachedToWindow) {
+            currentVisibleDirectionalPopup = null
+            currentVisibleDirectional = null
+            return
+        }
+        currentVisibleDirectionalPopup = popupToShow
+        currentVisibleDirectional = direction
+        val shown = popupOverlay.show(
+            anchor = currentAnchor,
+            preferredHost = resolvePreferredOverlayHost(),
+            popupView = popupToShow,
+            width = popupToShow.measuredWidth,
+            height = popupToShow.measuredHeight
+        )
+
+        if (!shown) {
+            currentVisibleDirectionalPopup = null
+            currentVisibleDirectional = null
+        }
+    }
+
+    // TEXT モードの長押し発動時にグリッドポップアップを表示する。既に表示中なら位置を更新する。
+    private fun showGridPopup() {
+        val currentAnchor = anchorView ?: return
+        if (!currentAnchor.isAttachedToWindow) {
+            popupOverlay.dismiss(gridPopupView)
+            return
+        }
+
+        val popupView = gridPopupView
+        popupView.setInputTextTransform(inputTextTransform)
+        popupView.applyPopupViewStyle(crossPopupStyle)
+        popupColorTheme?.let { popupView.setColors(it) }
+        val scale = crossPopupStyle.sizeScalePercent.coerceIn(50, 200) / 100f
+
+        val actionMap = getLongPressDisplayMap().mapValues { (_, text) ->
+            FlickAction.Input(text)
+        }
+        popupView.setCells(
+            actionMap,
+            (currentAnchor.width * scale).toInt().coerceAtLeast(1),
+            (currentAnchor.height * scale).toInt().coerceAtLeast(1)
+        )
+        popupView.highlightDirection(currentDirection)
+
+        popupView.measure(View.MeasureSpec.UNSPECIFIED, View.MeasureSpec.UNSPECIFIED)
+        popupOverlay.show(
+            anchor = currentAnchor,
+            preferredHost = resolvePreferredOverlayHost(),
+            popupView = popupView,
+            width = popupView.measuredWidth,
+            height = popupView.measuredHeight
+        )
+    }
+
+    // グリッドポップアップ内の対応セルをハイライトする。長押し中の指移動で呼ばれる。
+    private fun highlightGrid(direction: FlickDirection) {
+        gridPopupView.highlightDirection(direction)
+    }
+
+    // グリッドポップアップに渡す表示文字マップを生成する。各方向で longPressTextMap を優先し、なければ textMap を使う。
+    private fun getLongPressDisplayMap(): Map<FlickDirection, String> {
+        val directions = listOf(
+            FlickDirection.TAP,
+            FlickDirection.UP,
+            FlickDirection.DOWN,
+            FlickDirection.UP_LEFT_FAR,
+            FlickDirection.UP_RIGHT_FAR
+        )
+        return directions.mapNotNull { dir ->
+            val text = resolveText(dir, preferLongPress = true)
+            if (!text.isNullOrEmpty()) dir to text else null
+        }.toMap()
+    }
+
+    // TEXT モードで ACTION_DOWN 時に消したボタンのラベルを復元する。ACTION_UP/CANCEL および cancel() から呼ばれる。
+    private fun restoreOriginalButtonText() {
+        (anchorView as? Button)?.let { button ->
+            if (inputMode == InputMode.TEXT) {
+                button.text = originalKeyText
+            }
+        }
+        originalKeyText = null
+    }
+
+    // TEXT モードのポップアップ（方向ポップアップとグリッドポップアップ）をすべて閉じる。
+    private fun dismissDirectionalPopups(clearCache: Boolean = false) {
+        currentVisibleDirectionalPopup?.let(popupOverlay::dismiss)
+        currentVisibleDirectionalPopup = null
+        currentVisibleDirectional = null
+        if (clearCache) {
+            directionalPopupMap.values.forEach(popupOverlay::dismiss)
+            directionalPopupMap.clear()
+            directionalPopupAnchorWidth = -1
+            directionalPopupAnchorHeight = -1
+            directionalPopupCacheDirty = true
+        }
+        popupOverlay.dismiss(gridPopupView)
+    }
+
+    // ACTION・TEXT 両モードのポップアップをすべて閉じる。
+    fun dismissAllPopups(clearDirectionalCache: Boolean = false) {
+        dismissAllActionPopups()
+        dismissDirectionalPopups(clearCache = clearDirectionalCache)
+        popupOverlay.dismissAll()
+    }
+
+    private fun invalidateDirectionalPopupCache() {
+        dismissDirectionalPopups(clearCache = true)
+    }
+
+    private fun resolvePreferredOverlayHost(): View? {
+        return popupOverlayHostProvider?.invoke()
+    }
+
+    private fun readPopupAnchorLocation(keyAnchor: View, overlayHost: View) {
+        getLocationRelativeToOverlayHost(
+            keyAnchor = keyAnchor,
+            overlayHost = overlayHost,
+            outLocation = popupAnchorLocation,
+            keyLocationScratch = popupKeyLocationScratch,
+            hostLocationScratch = popupHostLocationScratch
+        )
+    }
+
+    private fun resolveActionPopupPosition(
+        direction: FlickDirection,
+        anchor: View,
+        anchorX: Int,
+        anchorY: Int
+    ) {
+        popupPositionScratch[0] = when (direction) {
+            FlickDirection.UP_LEFT_FAR, FlickDirection.UP_LEFT -> anchorX - anchor.width
+            FlickDirection.UP_RIGHT_FAR, FlickDirection.UP_RIGHT -> anchorX + anchor.width
+            else -> anchorX
+        }
+        popupPositionScratch[1] = when (direction) {
+            FlickDirection.UP -> anchorY - anchor.height
+            FlickDirection.DOWN -> anchorY + anchor.height
+            else -> anchorY
+        }
+    }
+
+    private fun resolveDirectionalPopupPosition(
+        direction: FlickDirection,
+        anchorX: Int,
+        anchorY: Int,
+        keyWidth: Int,
+        keyHeight: Int,
+        popupWidth: Int,
+        popupHeight: Int
+    ) {
+        val anchorCenterX = anchorX + keyWidth / 2
+        val anchorCenterY = anchorY + keyHeight / 2
+        when (direction) {
+            FlickDirection.TAP -> {
+                popupPositionScratch[0] = anchorCenterX - popupWidth / 2
+                popupPositionScratch[1] = anchorCenterY - popupHeight / 2
+            }
+
+            FlickDirection.UP -> {
+                popupPositionScratch[0] = anchorCenterX - popupWidth / 2
+                popupPositionScratch[1] = anchorCenterY - popupHeight
+            }
+
+            FlickDirection.DOWN -> {
+                popupPositionScratch[0] = anchorCenterX - popupWidth / 2
+                popupPositionScratch[1] = anchorCenterY
+            }
+
+            FlickDirection.UP_LEFT_FAR, FlickDirection.UP_LEFT -> {
+                popupPositionScratch[0] = anchorCenterX - popupWidth
+                popupPositionScratch[1] = anchorCenterY - popupHeight / 2
+            }
+
+            FlickDirection.UP_RIGHT_FAR, FlickDirection.UP_RIGHT -> {
+                popupPositionScratch[0] = anchorCenterX
+                popupPositionScratch[1] = anchorCenterY - popupHeight / 2
+            }
+        }
+    }
+
+    private fun resolveCenteredPopupPosition(
+        anchorX: Int,
+        anchorY: Int,
+        keyWidth: Int,
+        keyHeight: Int,
+        popupWidth: Int,
+        popupHeight: Int
+    ) {
+        popupPositionScratch[0] = anchorX + keyWidth / 2 - popupWidth / 2
+        popupPositionScratch[1] = anchorY + keyHeight / 2 - popupHeight / 2
+    }
+
+    private fun positionVisiblePopupsBeforeDraw() {
+        val anchor = anchorView ?: run {
+            popupOverlay.dismissAll()
+            return
+        }
+        val overlayHost = popupOverlay.currentHost ?: return
+        if (!anchor.isAttachedToWindow || !overlayHost.isAttachedToWindow) {
+            popupOverlay.dismissAll()
+            return
+        }
+
+        readPopupAnchorLocation(anchor, overlayHost)
+        positionVisibleActionPopups(anchor)
+        positionVisibleDirectionalPopup(anchor)
+        positionGridPopup(anchor)
+    }
+
+    private fun positionVisibleActionPopups(anchor: View) {
+        actionPopupViews.forEach { (direction, popupView) ->
+            if (!popupOverlay.isShowing(popupView)) return@forEach
+            resolveActionPopupPosition(
+                direction = direction,
+                anchor = anchor,
+                anchorX = popupAnchorLocation[0],
+                anchorY = popupAnchorLocation[1]
+            )
+            popupOverlay.place(
+                popupView = popupView,
+                left = popupPositionScratch[0],
+                top = popupPositionScratch[1]
+            )
+        }
+    }
+
+    private fun positionVisibleDirectionalPopup(anchor: View) {
+        val popupView = currentVisibleDirectionalPopup ?: return
+        val direction = currentVisibleDirectional ?: return
+        if (!popupOverlay.isShowing(popupView)) return
+
+        resolveDirectionalPopupPosition(
+            direction = direction,
+            anchorX = popupAnchorLocation[0],
+            anchorY = popupAnchorLocation[1],
+            keyWidth = anchor.width,
+            keyHeight = anchor.height,
+            popupWidth = popupView.measuredWidth,
+            popupHeight = popupView.measuredHeight
+        )
+        popupOverlay.place(
+            popupView = popupView,
+            left = popupPositionScratch[0],
+            top = popupPositionScratch[1]
+        )
+    }
+
+    private fun positionGridPopup(anchor: View) {
+        if (!popupOverlay.isShowing(gridPopupView)) return
+        resolveCenteredPopupPosition(
+            anchorX = popupAnchorLocation[0],
+            anchorY = popupAnchorLocation[1],
+            keyWidth = anchor.width,
+            keyHeight = anchor.height,
+            popupWidth = gridPopupView.measuredWidth,
+            popupHeight = gridPopupView.measuredHeight
+        )
+        popupOverlay.place(
+            popupView = gridPopupView,
+            left = popupPositionScratch[0],
+            top = popupPositionScratch[1]
+        )
+    }
+}
+
+internal fun commitCrossFlickAction(
+    currentDirection: FlickDirection,
+    flickActionMap: Map<FlickDirection, FlickAction>,
+    isLongPressTriggered: Boolean,
+    listener: CrossFlickInputController.CrossFlickListener?
+) {
+    val isFlick = currentDirection != FlickDirection.TAP
+    val flickActionToCommit = resolveCrossFlickAction(currentDirection, flickActionMap)
+    if (isLongPressTriggered) {
+        listener?.onFlickUpAfterLongPress(
+            flickActionToCommit?.toKeyAction() ?: KeyAction.Cancel,
+            isFlick,
+            currentDirection
+        )
+    } else {
+        listener?.onFlickCommitted(
+            flickActionToCommit?.toKeyAction(),
+            isFlick,
+            currentDirection
+        )
+    }
+}
+
+internal fun resolveCrossFlickAction(
+    direction: FlickDirection,
+    flickActionMap: Map<FlickDirection, FlickAction>
+): FlickAction? {
+    for (candidate in direction.directionCandidates()) {
+        val action = flickActionMap[candidate]
+        if (action != null) return action
+    }
+    return null
+}
+
+internal fun isVisiblePopupAction(flickAction: FlickAction): Boolean {
+    return flickAction !is FlickAction.Action || flickAction.action != KeyAction.DoNothing
+}
+
+internal fun FlickDirection.directionCandidates(): List<FlickDirection> {
+    return when (this) {
+        FlickDirection.TAP -> listOf(FlickDirection.TAP)
+        FlickDirection.UP -> listOf(FlickDirection.UP)
+        FlickDirection.DOWN -> listOf(FlickDirection.DOWN)
+        FlickDirection.UP_LEFT_FAR -> listOf(FlickDirection.UP_LEFT_FAR, FlickDirection.UP_LEFT)
+        FlickDirection.UP_LEFT -> listOf(FlickDirection.UP_LEFT, FlickDirection.UP_LEFT_FAR)
+        FlickDirection.UP_RIGHT_FAR -> listOf(FlickDirection.UP_RIGHT_FAR, FlickDirection.UP_RIGHT)
+        FlickDirection.UP_RIGHT -> listOf(FlickDirection.UP_RIGHT, FlickDirection.UP_RIGHT_FAR)
+    }
+}
+
+internal fun FlickAction.toKeyAction(): KeyAction = when (this) {
+    is FlickAction.Input -> KeyAction.Text(char)
+    is FlickAction.Action -> action
+}

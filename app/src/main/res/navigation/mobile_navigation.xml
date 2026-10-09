@@ -1,0 +1,598 @@
+<?xml version="1.0" encoding="utf-8"?>
+<navigation xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/mobile_navigation"
+    app:startDestination="@+id/navigation_setting">
+
+    <fragment
+        android:id="@+id/navigation_setting"
+        android:name="com.kazumaproject.markdownhelperkeyboard.setting_activity.ui.setting.SettingHomeFragment"
+        android:label="@string/setting_fragment_title"
+        tools:layout="@layout/fragment_setting_home">
+        <action
+            android:id="@+id/action_navigation_dashboard_to_openSourceFragment"
+            app:destination="@id/openSourceFragment" />
+        <action
+            android:id="@+id/action_navigation_setting_to_dictionaryLearnFragment"
+            app:destination="@id/navigation_learn_dictionary" />
+        <action
+            android:id="@+id/action_navigation_setting_to_keyboardSettingFragment"
+            app:destination="@id/keyboardSettingFragment" />
+        <action
+            android:id="@+id/action_navigation_setting_to_keyboardSelectionFragment"
+            app:destination="@id/keyboardSelectionFragment" />
+        <action
+            android:id="@+id/action_navigation_setting_to_clipboardHistoryFragment"
+            app:destination="@id/clipboardHistoryFragment" />
+        <action
+            android:id="@+id/action_navigation_setting_to_romajiMapFragment"
+            app:destination="@id/romajiMapFragment" />
+        <action
+            android:id="@+id/action_navigation_setting_to_ngWordFragment"
+            app:destination="@id/ngWordFragment" />
+        <action
+            android:id="@+id/action_navigation_setting_to_keyCandidateLetterSizeFragment"
+            app:destination="@id/keyCandidateLetterSizeFragment" />
+        <action
+            android:id="@+id/action_navigation_setting_to_candidateViewHeightSettingFragment"
+            app:destination="@id/candidateViewHeightSettingFragment" />
+        <action
+            android:id="@+id/action_navigation_setting_to_keyboardSizeLandscapeFragment"
+            app:destination="@id/keyboardSizeLandscapeFragment" />
+        <action
+            android:id="@+id/action_navigation_setting_to_candidateHeightLandscapeSettingFragment"
+            app:destination="@id/candidateHeightLandscapeSettingFragment" />
+        <action
+            android:id="@+id/action_navigation_setting_to_candidateTabOrderFragment"
+            app:destination="@id/candidateTabOrderFragment" />
+        <action
+            android:id="@+id/action_navigation_setting_to_candidateOrderOverrideFragment"
+            app:destination="@id/candidateOrderOverrideFragment" />
+        <action
+            android:id="@+id/action_navigation_setting_to_customZeroQueryDictionaryFragment"
+            app:destination="@id/customZeroQueryDictionaryFragment" />
+        <action
+            android:id="@+id/action_navigation_setting_to_enableKeyboardFragment"
+            app:destination="@id/enableKeyboardFragment" />
+        <action
+            android:id="@+id/action_navigation_setting_to_shortcutSettingFragment"
+            app:destination="@id/shortcutSettingFragment" />
+        <action
+            android:id="@+id/action_navigation_setting_to_qwertyMarginSettingFragment"
+            app:destination="@id/qwertyMarginSettingFragment" />
+        <action
+            android:id="@+id/action_navigation_setting_to_qwertyNumberKeyFlickSettingFragment"
+            app:destination="@id/qwertyNumberKeyFlickSettingFragment" />
+        <action
+            android:id="@+id/action_navigation_setting_to_keyboardThemeFragment"
+            app:destination="@id/keyboardThemeFragment" />
+        <action
+            android:id="@+id/action_navigation_setting_to_tenKeyCandidateLetterSizeFragment"
+            app:destination="@id/tenKeyCandidateLetterSizeFragment" />
+        <action
+            android:id="@+id/action_navigation_setting_to_tenKeyPopupStyleSettingFragment"
+            app:destination="@id/tenKeyPopupStyleSettingFragment" />
+        <action
+            android:id="@+id/action_navigation_setting_to_qwertyPopupStyleSettingFragment"
+            app:destination="@id/qwertyPopupStyleSettingFragment" />
+        <action
+            android:id="@+id/action_navigation_setting_to_flickKeyboardPopupStyleListFragment"
+            app:destination="@id/flickKeyboardPopupStyleListFragment" />
+        <action
+            android:id="@+id/action_navigation_setting_to_circularFlickSettingsFragment"
+            app:destination="@id/circularFlickSettingsFragment" />
+        <action
+            android:id="@+id/action_navigation_setting_to_hierarchicalFlickAngleMarginFragment"
+            app:destination="@id/hierarchicalFlickAngleMarginFragment" />
+        <action
+            android:id="@+id/action_navigation_setting_to_circularSlotActionSettingFragment"
+            app:destination="@id/circularSlotActionSettingFragment" />
+        <action
+            android:id="@+id/action_navigation_setting_to_flickKeyboardSizeSettingsFragment"
+            app:destination="@id/flickKeyboardSizeSettingsFragment" />
+        <action
+            android:id="@+id/action_navigation_setting_to_systemUserDictionaryBuilderFragment"
+            app:destination="@id/systemUserDictionaryBuilderFragment" />
+        <action
+            android:id="@+id/action_navigation_setting_to_externalDictionarySettingsFragment"
+            app:destination="@id/externalDictionarySettingsFragment" />
+        <action
+            android:id="@+id/action_navigation_setting_to_ngramRuleFragment"
+            app:destination="@id/ngramRuleFragment" />
+        <action
+            android:id="@+id/action_navigation_setting_to_gemmaPromptTemplateFragment"
+            app:destination="@id/gemmaPromptTemplateFragment" />
+        <action
+            android:id="@+id/action_navigation_setting_to_deleteKeyFlickTargetsFragment"
+            app:destination="@id/deleteKeyFlickTargetsFragment" />
+        <action
+            android:id="@+id/action_navigation_setting_to_cursorMoveTargetPairsFragment"
+            app:destination="@id/cursorMoveTargetPairsFragment" />
+        <action
+            android:id="@+id/action_navigation_setting_to_physicalKeyboardShortcutListFragment"
+            app:destination="@id/physicalKeyboardShortcutListFragment" />
+        <action
+            android:id="@+id/action_navigation_setting_to_sumireSpecialKeyEditorFragment"
+            app:destination="@id/sumireSpecialKeyEditorFragment" />
+    </fragment>
+
+    <fragment
+        android:id="@+id/settingMainFragment"
+        android:name="com.kazumaproject.markdownhelperkeyboard.setting_activity.ui.setting.SettingMainFragment"
+        android:label="@string/setting_route_legacy_settings_title"
+        tools:layout="@layout/fragment_setting_main" />
+
+    <fragment
+        android:id="@+id/commonPreferenceFragment"
+        android:name="com.kazumaproject.markdownhelperkeyboard.setting_activity.ui.setting.CommonPreferenceFragment"
+        android:label="@string/category_common" />
+
+    <fragment
+        android:id="@+id/localFontSettingsFragment"
+        android:name="com.kazumaproject.markdownhelperkeyboard.local_font.LocalFontSettingsFragment"
+        android:label="@string/local_font_title" />
+
+    <fragment
+        android:id="@+id/legacyCommonPreferenceFragment"
+        android:name="com.kazumaproject.markdownhelperkeyboard.setting_activity.ui.setting.LegacyCommonPreferenceFragment"
+        android:label="@string/category_common" />
+
+    <fragment
+        android:id="@+id/keyboardDisplayPreferenceFragment"
+        android:name="com.kazumaproject.markdownhelperkeyboard.setting_activity.ui.setting.KeyboardDisplayPreferenceFragment"
+        android:label="@string/setting_category_keyboard_display_title" />
+
+    <fragment
+        android:id="@+id/inputMethodPreferenceFragment"
+        android:name="com.kazumaproject.markdownhelperkeyboard.setting_activity.ui.setting.InputMethodPreferenceFragment"
+        android:label="@string/setting_category_input_method_title" />
+
+    <fragment
+        android:id="@+id/candidateConversionPreferenceFragment"
+        android:name="com.kazumaproject.markdownhelperkeyboard.setting_activity.ui.setting.CandidateConversionPreferenceFragment"
+        android:label="@string/setting_category_candidate_conversion_title" />
+
+    <fragment
+        android:id="@+id/conversionEnginePreferenceFragment"
+        android:name="com.kazumaproject.markdownhelperkeyboard.setting_activity.ui.setting.ConversionEnginePreferenceFragment"
+        android:label="@string/conversion_engine_category_title" />
+
+    <fragment
+        android:id="@+id/utilityCandidatePreferenceFragment"
+        android:name="com.kazumaproject.markdownhelperkeyboard.setting_activity.ui.setting.UtilityCandidatePreferenceFragment"
+        android:label="@string/utility_candidate_settings_title" />
+
+    <fragment
+        android:id="@+id/unitTargetSettingsFragment"
+        android:name="com.kazumaproject.markdownhelperkeyboard.setting_activity.ui.setting.UnitTargetSettingsFragment"
+        android:label="@string/utility_conversion_targets_title" />
+
+    <fragment
+        android:id="@+id/dateCandidateSettingsFragment"
+        android:name="com.kazumaproject.markdownhelperkeyboard.setting_activity.ui.setting.DateCandidateSettingsFragment"
+        android:label="@string/date_candidate_settings_title" />
+
+    <fragment
+        android:id="@+id/aiConversionPreferenceFragment"
+        android:name="com.kazumaproject.markdownhelperkeyboard.setting_activity.ui.setting.AiConversionPreferenceFragment"
+        android:label="@string/setting_category_ai_conversion_title" />
+
+    <fragment
+        android:id="@+id/operationFeedbackPreferenceFragment"
+        android:name="com.kazumaproject.markdownhelperkeyboard.setting_activity.ui.setting.OperationFeedbackPreferenceFragment"
+        android:label="@string/setting_category_operation_feedback_title" />
+
+    <fragment
+        android:id="@+id/clipboardShortcutPreferenceFragment"
+        android:name="com.kazumaproject.markdownhelperkeyboard.setting_activity.ui.setting.ClipboardShortcutPreferenceFragment"
+        android:label="@string/setting_category_clipboard_shortcut_title" />
+
+    <fragment
+        android:id="@+id/generalInfoPreferenceFragment"
+        android:name="com.kazumaproject.markdownhelperkeyboard.setting_activity.ui.setting.GeneralInfoPreferenceFragment"
+        android:label="@string/setting_category_general_info_title" />
+
+    <fragment
+        android:id="@+id/advancedPreferenceFragment"
+        android:name="com.kazumaproject.markdownhelperkeyboard.setting_activity.ui.setting.AdvancedPreferenceFragment"
+        android:label="@string/setting_category_advanced_title" />
+
+    <fragment
+        android:id="@+id/settingSearchFragment"
+        android:name="com.kazumaproject.markdownhelperkeyboard.setting_activity.ui.setting.SettingSearchFragment"
+        android:label="@string/setting_search_title"
+        tools:layout="@layout/fragment_setting_search" />
+
+    <fragment
+        android:id="@+id/frequentSettingsEditFragment"
+        android:name="com.kazumaproject.markdownhelperkeyboard.setting_activity.ui.setting.FrequentSettingsEditFragment"
+        android:label="@string/setting_frequent_edit_title"
+        tools:layout="@layout/fragment_setting_frequent_edit" />
+
+    <fragment
+        android:id="@+id/dictionaryPreferenceFragment"
+        android:name="com.kazumaproject.markdownhelperkeyboard.setting_activity.ui.setting.DictionaryPreferenceFragment"
+        android:label="@string/category_dictionary" />
+
+    <fragment
+        android:id="@+id/zenzPreferenceFragment"
+        android:name="com.kazumaproject.markdownhelperkeyboard.setting_activity.ui.setting.ZenzPreferenceFragment"
+        android:label="zenz" />
+
+    <fragment
+        android:id="@+id/gemmaPreferenceFragment"
+        android:name="com.kazumaproject.markdownhelperkeyboard.setting_activity.ui.setting.GemmaPreferenceFragment"
+        android:label="Gemma" />
+
+    <fragment
+        android:id="@+id/kanaPreferenceFragment"
+        android:name="com.kazumaproject.markdownhelperkeyboard.setting_activity.ui.setting.KanaPreferenceFragment"
+        android:label="@string/category_kana" />
+
+    <fragment
+        android:id="@+id/qwertyPreferenceFragment"
+        android:name="com.kazumaproject.markdownhelperkeyboard.setting_activity.ui.setting.QwertyPreferenceFragment"
+        android:label="@string/qwerty_common_category_title" />
+
+    <fragment
+        android:id="@+id/qwertyEnglishPreferenceFragment"
+        android:name="com.kazumaproject.markdownhelperkeyboard.setting_activity.ui.setting.QwertyEnglishPreferenceFragment"
+        android:label="@string/qwerty_english_category_title" />
+
+    <fragment
+        android:id="@+id/qwertyRomajiPreferenceFragment"
+        android:name="com.kazumaproject.markdownhelperkeyboard.setting_activity.ui.setting.QwertyRomajiPreferenceFragment"
+        android:label="@string/qwerty_romaji_category_title" />
+
+    <fragment
+        android:id="@+id/sumirePreferenceFragment"
+        android:name="com.kazumaproject.markdownhelperkeyboard.setting_activity.ui.setting.SumirePreferenceFragment"
+        android:label="@string/category_sumire_input_keyboard_title" />
+
+    <fragment
+        android:id="@+id/customKeyboardPreferenceFragment"
+        android:name="com.kazumaproject.markdownhelperkeyboard.setting_activity.ui.setting.CustomKeyboardPreferenceFragment"
+        android:label="@string/category_custom_keyboard_title" />
+
+    <fragment
+        android:id="@+id/tabletPreferenceFragment"
+        android:name="com.kazumaproject.markdownhelperkeyboard.setting_activity.ui.setting.TabletPreferenceFragment"
+        android:label="@string/tablet_preference_category_title" />
+
+    <fragment
+        android:id="@+id/hardwareKeyboardPreferenceFragment"
+        android:name="com.kazumaproject.markdownhelperkeyboard.setting_activity.ui.setting.HardwareKeyboardPreferenceFragment"
+        android:label="@string/hardware_keyboard_category_title" />
+
+    <fragment
+        android:id="@+id/openSourceFragment"
+        android:name="com.kazumaproject.markdownhelperkeyboard.setting_activity.ui.opensource.OpenSourceFragment"
+        android:label="@string/open_source_fragment_label"
+        tools:layout="@layout/fragment_open_source" />
+    <fragment
+        android:id="@+id/navigation_learn_dictionary"
+        android:name="com.kazumaproject.markdownhelperkeyboard.setting_activity.ui.dictionary_learn.DictionaryLearnFragment"
+        android:label="@string/learn_dictionary_fragment_title" />
+    <fragment
+        android:id="@+id/keyboardSettingFragment"
+        android:name="com.kazumaproject.markdownhelperkeyboard.setting_activity.ui.keyboard_size_setting.KeyboardSettingFragment"
+        android:label="@string/keyboard_size_setting_fragment_title"
+        tools:layout="@layout/fragment_keyboard_setting">
+        <action
+            android:id="@+id/action_keyboardSettingFragment_to_keyboardSizeDirectInputFragment"
+            app:destination="@id/keyboardSizeDirectInputFragment">
+            <argument
+                android:name="initialOrientation"
+                android:defaultValue="portrait" />
+        </action>
+    </fragment>
+    <fragment
+        android:id="@+id/keyboardSelectionFragment"
+        android:name="com.kazumaproject.markdownhelperkeyboard.setting_activity.ui.keyboard_selection.KeyboardSelectionFragment"
+        android:label="@string/keyboard_selection_fragment_title"
+        tools:layout="@layout/fragment_keyboard_selection">
+        <action
+            android:id="@+id/action_keyboardSelectionFragment_to_keyboardListFragment"
+            app:destination="@id/keyboardListFragment" />
+    </fragment>
+
+    <fragment
+        android:id="@+id/navigation_user_dictionary"
+        android:name="com.kazumaproject.markdownhelperkeyboard.setting_activity.ui.user_dictionary.UserDictionaryFragment"
+        android:label="@string/user_dictionary_title"
+        tools:layout="@layout/fragment_user_dictionary" />
+    <fragment
+        android:id="@+id/keyboardEditorFragment"
+        android:name="com.kazumaproject.markdownhelperkeyboard.custom_keyboard.ui.KeyboardEditorFragment"
+        android:label="キーボードの編集">
+        <argument
+            android:name="layoutId"
+            android:defaultValue="-1L"
+            app:argType="long" />
+        <action
+            android:id="@+id/action_keyboardEditorFragment_to_keyEditorFragment"
+            app:destination="@id/keyEditorFragment" />
+    </fragment>
+    <fragment
+        android:id="@+id/keyEditorFragment"
+        android:name="com.kazumaproject.markdownhelperkeyboard.custom_keyboard.ui.KeyEditorFragment"
+        android:label="@string/key_editor_fragment_label" />
+    <fragment
+        android:id="@+id/keyboardListFragment"
+        android:name="com.kazumaproject.markdownhelperkeyboard.custom_keyboard.ui.KeyboardListFragment"
+        android:label="@string/custom_layout_fragment_title">
+        <action
+            android:id="@+id/action_keyboardListFragment_to_keyboardEditorFragment"
+            app:destination="@id/keyboardEditorFragment" />
+    </fragment>
+    <fragment
+        android:id="@+id/userTemplateFragment"
+        android:name="com.kazumaproject.markdownhelperkeyboard.user_template.ui.UserTemplateFragment"
+        android:label="@string/user_template_fragment_title" />
+    <fragment
+        android:id="@+id/textMacroFragment"
+        android:name="com.kazumaproject.markdownhelperkeyboard.text_macro.ui.TextMacroFragment"
+        android:label="@string/text_macro_title" />
+    <fragment
+        android:id="@+id/textMacroEditorFragment"
+        android:name="com.kazumaproject.markdownhelperkeyboard.text_macro.ui.TextMacroEditorFragment"
+        android:label="@string/text_macro_editor_title"
+        tools:layout="@layout/fragment_text_macro_editor">
+        <argument
+            android:name="macroId"
+            android:defaultValue="0L"
+            app:argType="long" />
+    </fragment>
+    <fragment
+        android:id="@+id/clipboardHistoryFragment"
+        android:name="com.kazumaproject.markdownhelperkeyboard.clipboard_history.ui.ClipboardHistoryFragment"
+        android:label="@string/clipboard_fragment_title" />
+    <fragment
+        android:id="@+id/romajiMapFragment"
+        android:name="com.kazumaproject.markdownhelperkeyboard.custom_romaji.ui.RomajiMapFragment"
+        android:label="@string/romaji_conversion_map_fragment_title">
+        <action
+            android:id="@+id/action_romajiMapFragment_to_romajiMapDetailFragment"
+            app:destination="@id/romajiMapDetailFragment" />
+    </fragment>
+    <fragment
+        android:id="@+id/romajiMapDetailFragment"
+        android:name="com.kazumaproject.markdownhelperkeyboard.custom_romaji.ui.RomajiMapDetailFragment"
+        android:label="@string/romaji_map_fragment_title"
+        tools:layout="@layout/fragment_romaji_map_detail">
+        <argument
+            android:name="mapId"
+            app:argType="long" />
+    </fragment>
+    <fragment
+        android:id="@+id/ngWordFragment"
+        android:name="com.kazumaproject.markdownhelperkeyboard.ng_word.ui.NgWordFragment"
+        android:label="@string/ng_word_fragment_title" />
+    <fragment
+        android:id="@+id/keyCandidateLetterSizeFragment"
+        android:name="com.kazumaproject.markdownhelperkeyboard.setting_activity.ui.key_candidate_letter_size.KeyCandidateLetterSizeFragment"
+        android:label="@string/fragment_key_candidate_letter_size_title"
+        tools:layout="@layout/fragment_key_candidate_letter_size" />
+    <fragment
+        android:id="@+id/candidateViewHeightSettingFragment"
+        android:name="com.kazumaproject.markdownhelperkeyboard.setting_activity.ui.candidate_view_height_setting.CandidateViewHeightSettingFragment"
+        android:label="@string/candidate_view_height_setting_fragment_title"
+        tools:layout="@layout/fragment_candidate_view_height_setting" />
+    <fragment
+        android:id="@+id/candidateHeightDefaultsFragment"
+        android:name="com.kazumaproject.markdownhelperkeyboard.setting_activity.ui.candidate_view_height_setting.CandidateHeightDefaultsFragment"
+        android:label="@string/candidate_default_height_title"
+        tools:layout="@layout/fragment_candidate_height_defaults">
+        <argument
+            android:name="isLandscape"
+            android:defaultValue="false"
+            app:argType="boolean" />
+    </fragment>
+    <fragment
+        android:id="@+id/keyboardSizeLandscapeFragment"
+        android:name="com.kazumaproject.markdownhelperkeyboard.setting_activity.ui.keyboard_size_landscape_setting.KeyboardSizeLandscapeFragment"
+        android:label="@string/keyboard_size_landscape_title"
+        tools:layout="@layout/fragment_keyboardsize_landscape">
+        <action
+            android:id="@+id/action_keyboardSizeLandscapeFragment_to_keyboardSizeDirectInputFragment"
+            app:destination="@id/keyboardSizeDirectInputFragment">
+            <argument
+                android:name="initialOrientation"
+                android:defaultValue="landscape" />
+        </action>
+    </fragment>
+    <fragment
+        android:id="@+id/keyboardSizeDirectInputFragment"
+        android:name="com.kazumaproject.markdownhelperkeyboard.setting_activity.ui.keyboard_size_direct_input.KeyboardSizeDirectInputFragment"
+        android:label="@string/keyboard_size_direct_input_title"
+        tools:layout="@layout/fragment_keyboard_size_direct_input">
+        <argument
+            android:name="initialOrientation"
+            android:defaultValue="portrait"
+            app:argType="string" />
+    </fragment>
+    <fragment
+        android:id="@+id/candidateHeightLandscapeSettingFragment"
+        android:name="com.kazumaproject.markdownhelperkeyboard.setting_activity.ui.candidate_view_height_landscape_setting.CandidateHeightLandscapeSettingFragment"
+        android:label="@string/candidate_height_landscape_preference_title"
+        tools:layout="@layout/fragment_candidate_height_landscape_setting" />
+    <fragment
+        android:id="@+id/candidateTabOrderFragment"
+        android:name="com.kazumaproject.markdownhelperkeyboard.setting_activity.ui.candidate_tab_order.ui.CandidateTabOrderFragment"
+        android:label="@string/candidate_tab_order_preference_title" />
+    <fragment
+        android:id="@+id/candidateOrderOverrideFragment"
+        android:name="com.kazumaproject.markdownhelperkeyboard.candidate_order.ui.CandidateOrderOverrideFragment"
+        android:label="@string/candidate_order_override_fragment_title"
+        tools:layout="@layout/fragment_candidate_order_override" />
+    <fragment
+        android:id="@+id/customZeroQueryDictionaryFragment"
+        android:name="com.kazumaproject.markdownhelperkeyboard.zeroquery.custom.ui.CustomZeroQueryDictionaryFragment"
+        android:label="@string/custom_zero_query_dictionary_title"
+        tools:layout="@layout/fragment_custom_zero_query_dictionary">
+        <action
+            android:id="@+id/action_customZeroQueryDictionaryFragment_to_customZeroQueryGroupFragment"
+            app:destination="@id/customZeroQueryGroupFragment" />
+    </fragment>
+    <fragment
+        android:id="@+id/customZeroQueryGroupFragment"
+        android:name="com.kazumaproject.markdownhelperkeyboard.zeroquery.custom.ui.CustomZeroQueryGroupFragment"
+        android:label="@string/custom_zero_query_group_title"
+        tools:layout="@layout/fragment_custom_zero_query_group">
+        <argument
+            android:name="lookupKey"
+            app:argType="string" />
+    </fragment>
+    <fragment
+        android:id="@+id/enableKeyboardFragment"
+        android:name="com.kazumaproject.markdownhelperkeyboard.setting_activity.ui.enable_keyboard_setting.EnableKeyboardFragment"
+        android:label="@string/welcome_title"
+        tools:layout="@layout/fragment_enable_keyboard" />
+    <fragment
+        android:id="@+id/shortcutSettingFragment"
+        android:name="com.kazumaproject.markdownhelperkeyboard.short_cut.ui.ShortcutSettingFragment"
+        android:label="@string/shortcutsettingfragment" />
+    <fragment
+        android:id="@+id/shortcutToolbarSizeSettingFragment"
+        android:name="com.kazumaproject.markdownhelperkeyboard.setting_activity.ui.shortcut_toolbar_size.ShortcutToolbarSizeSettingFragment"
+        android:label="@string/shortcut_toolbar_size_title"
+        tools:layout="@layout/fragment_shortcut_toolbar_size_setting" />
+    <fragment
+        android:id="@+id/qwertyMarginSettingFragment"
+        android:name="com.kazumaproject.markdownhelperkeyboard.setting_activity.ui.qwerty_button_size.QwertyMarginSettingFragment"
+        android:label="@string/qwertymarginsettingfragment" />
+    <fragment
+        android:id="@+id/qwertyNumberKeyFlickSettingFragment"
+        android:name="com.kazumaproject.markdownhelperkeyboard.setting_activity.ui.qwerty_number_key_flick.QwertyNumberKeyFlickSettingFragment"
+        android:label="QWERTY 数字キーのフリック設定"
+        tools:layout="@layout/fragment_qwerty_number_key_flick_setting" />
+    <fragment
+        android:id="@+id/keyboardThemeFragment"
+        android:name="com.kazumaproject.markdownhelperkeyboard.setting_activity.ui.keyboard_theme.KeyboardThemeFragment"
+        android:label="@string/keyboardthemefragment" />
+    <fragment
+        android:id="@+id/keyboardSkinSelectionFragment"
+        android:name="com.kazumaproject.markdownhelperkeyboard.setting_activity.ui.keyboard_theme.KeyboardSkinSelectionFragment"
+        android:label="@string/keyboard_skin_choose" />
+    <fragment
+        android:id="@+id/tenKeyCandidateLetterSizeFragment"
+        android:name="com.kazumaproject.markdownhelperkeyboard.setting_activity.ui.tenkey_letter_size_setting.TenKeyCandidateLetterSizeFragment"
+        android:label="@string/tenkeycandidatelettersizefragment" />
+    <fragment
+        android:id="@+id/tenKeyPopupStyleSettingFragment"
+        android:name="com.kazumaproject.markdownhelperkeyboard.setting_activity.ui.popup_style.TenKeyPopupStyleSettingFragment"
+        android:label="@string/tenkey_popup_view_style_preference_title" />
+    <fragment
+        android:id="@+id/qwertyPopupStyleSettingFragment"
+        android:name="com.kazumaproject.markdownhelperkeyboard.setting_activity.ui.popup_style.QwertyPopupStyleSettingFragment"
+        android:label="@string/qwerty_popup_view_style_preference_title" />
+    <fragment
+        android:id="@+id/flickKeyboardPopupStyleListFragment"
+        android:name="com.kazumaproject.markdownhelperkeyboard.setting_activity.ui.popup_style.FlickKeyboardPopupStyleListFragment"
+        android:label="@string/flick_keyboard_popup_view_style_preference_title">
+        <action
+            android:id="@+id/action_flickKeyboardPopupStyleListFragment_to_flickKeyboardPopupStyleEditFragment"
+            app:destination="@id/flickKeyboardPopupStyleEditFragment" />
+    </fragment>
+    <fragment
+        android:id="@+id/flickKeyboardPopupStyleEditFragment"
+        android:name="com.kazumaproject.markdownhelperkeyboard.setting_activity.ui.popup_style.FlickKeyboardPopupStyleEditFragment"
+        android:label="Popup 表示編集">
+        <argument
+            android:name="target"
+            android:defaultValue="DIRECTIONAL"
+            app:argType="string" />
+    </fragment>
+    <fragment
+        android:id="@+id/circularFlickSettingsFragment"
+        android:name="com.kazumaproject.markdownhelperkeyboard.setting_activity.ui.sumire_custom_angle.CircularFlickSettingsFragment"
+        android:label="@string/circularflicksettingsfragment" />
+    <fragment
+        android:id="@+id/hierarchicalFlickAngleMarginFragment"
+        android:name="com.kazumaproject.markdownhelperkeyboard.setting_activity.ui.sumire_flick_angle.HierarchicalFlickAngleMarginFragment"
+        android:label="@string/hierarchical_flick_angle_margin_preference_title"
+        tools:layout="@layout/fragment_hierarchical_flick_angle_margin" />
+    <fragment
+        android:id="@+id/circularSlotActionSettingFragment"
+        android:name="com.kazumaproject.markdownhelperkeyboard.setting_activity.ui.circular_slot.CircularSlotActionSettingFragment"
+        android:label="Circular Flick SLOT4〜6 設定" />
+    <fragment
+        android:id="@+id/sumireSpecialKeyEditorFragment"
+        android:name="com.kazumaproject.markdownhelperkeyboard.sumire_special_key.ui.SumireSpecialKeyEditorFragment"
+        android:label="@string/sumire_special_key_editor_title"
+        tools:layout="@layout/fragment_sumire_special_key_editor">
+        <action
+            android:id="@+id/action_sumireSpecialKeyEditorFragment_to_sumireSpecialKeyActionEditorFragment"
+            app:destination="@id/sumireSpecialKeyActionEditorFragment" />
+    </fragment>
+    <fragment
+        android:id="@+id/sumireSpecialKeyActionEditorFragment"
+        android:name="com.kazumaproject.markdownhelperkeyboard.sumire_special_key.ui.SumireSpecialKeyActionEditorFragment"
+        android:label="@string/sumire_special_key_action_editor_title"
+        tools:layout="@layout/fragment_sumire_special_key_action_editor">
+        <argument
+            android:name="layoutType"
+            app:argType="string" />
+        <argument
+            android:name="inputMode"
+            app:argType="string" />
+        <argument
+            android:name="keyId"
+            app:argType="string" />
+    </fragment>
+    <fragment
+        android:id="@+id/flickKeyboardSizeSettingsFragment"
+        android:name="com.kazumaproject.markdownhelperkeyboard.setting_activity.ui.sumire_custom_key_setting.FlickKeyboardSizeSettingsFragment"
+        android:label="@string/flickKeyboardSizeSettingsFragment_title" />
+    <fragment
+        android:id="@+id/systemUserDictionaryBuilderFragment"
+        android:name="com.kazumaproject.markdownhelperkeyboard.system_user_dictionary.ui.SystemUserDictionaryBuilderFragment"
+        android:label="@string/system_user_dictionary_builder_title"
+        tools:layout="@layout/fragment_system_user_dictionary_builder" />
+    <fragment
+        android:id="@+id/externalDictionarySettingsFragment"
+        android:name="com.kazumaproject.markdownhelperkeyboard.setting_activity.ui.external_dictionary.ExternalDictionarySettingsFragment"
+        android:label="@string/external_dictionary_settings_title" />
+    <fragment
+        android:id="@+id/ngramRuleFragment"
+        android:name="com.kazumaproject.markdownhelperkeyboard.ngram_rule.ui.NgramRuleFragment"
+        android:label="@string/n_gram_rule_preference_title"
+        tools:layout="@layout/fragment_ngram_rule" />
+    <fragment
+        android:id="@+id/gemmaPromptTemplateFragment"
+        android:name="com.kazumaproject.markdownhelperkeyboard.gemma.ui.GemmaPromptTemplateFragment"
+        android:label="@string/gemma_prompt_template_fragment_title"
+        tools:layout="@layout/fragment_gemma_prompt_template" />
+    <fragment
+        android:id="@+id/deleteKeyFlickTargetsFragment"
+        android:name="com.kazumaproject.markdownhelperkeyboard.delete_key_flick.ui.DeleteKeyFlickTargetsFragment"
+        android:label="@string/delete_key_flick_targets_fragment_title"
+        tools:layout="@layout/fragment_delete_key_flick_targets" />
+    <fragment
+        android:id="@+id/cursorMoveTargetPairsFragment"
+        android:name="com.kazumaproject.markdownhelperkeyboard.cursor_move_targets.ui.CursorMoveTargetPairsFragment"
+        android:label="@string/cursor_move_target_pairs_fragment_title"
+        tools:layout="@layout/fragment_cursor_move_target_pairs" />
+    <fragment
+        android:id="@+id/physicalKeyboardShortcutListFragment"
+        android:name="com.kazumaproject.markdownhelperkeyboard.physical_keyboard.shortcut.ui.PhysicalKeyboardShortcutListFragment"
+        android:label="@string/physical_keyboard_shortcut_list_title">
+        <action
+            android:id="@+id/action_physicalKeyboardShortcutListFragment_to_physicalKeyboardShortcutEditFragment"
+            app:destination="@id/physicalKeyboardShortcutEditFragment" />
+    </fragment>
+    <fragment
+        android:id="@+id/physicalKeyboardShortcutEditFragment"
+        android:name="com.kazumaproject.markdownhelperkeyboard.physical_keyboard.shortcut.ui.PhysicalKeyboardShortcutEditFragment"
+        android:label="@string/physical_keyboard_shortcut_edit_title">
+        <argument
+            android:name="shortcutId"
+            android:defaultValue="0L"
+            app:argType="long" />
+    </fragment>
+
+    <fragment android:id="@+id/splitKeyboardPreferenceFragment"
+        android:name="com.kazumaproject.markdownhelperkeyboard.setting_activity.ui.setting.SplitKeyboardPreferenceFragment"
+        android:label="@string/split_keyboard_title" />
+</navigation>

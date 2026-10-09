@@ -1,0 +1,5182 @@
+package com.kazumaproject.markdownhelperkeyboard.setting_activity
+
+import android.content.Context
+import android.content.SharedPreferences
+import android.graphics.Color
+import androidx.core.graphics.toColorInt
+import androidx.preference.PreferenceManager
+import com.google.gson.Gson
+import com.google.gson.reflect.TypeToken
+import com.kazumaproject.core.domain.skin.KeyboardSkinId
+import com.kazumaproject.core.data.clicked_symbol.SymbolMode
+import com.kazumaproject.core.domain.flick.FlickThresholdShape
+import com.kazumaproject.core.domain.flick.TfbiDiagonalRecognitionMode
+import com.kazumaproject.core.data.popup.TfbiFlickStartPositionMode
+import com.kazumaproject.core.data.popup.TfbiPopupPresentationMode
+import com.kazumaproject.custom_keyboard.data.CircularFlickDirection
+import com.kazumaproject.custom_keyboard.data.KeyboardInputMode
+import com.kazumaproject.custom_keyboard.data.buildEvenCircularRanges
+import com.kazumaproject.domain.EmojiSkinToneSupport
+import com.kazumaproject.markdownhelperkeyboard.converter.engine.PredictionConfig
+import com.kazumaproject.markdownhelperkeyboard.converter.date.DateCandidateConfig
+import com.kazumaproject.markdownhelperkeyboard.converter.date.DateCandidateFormat
+import com.kazumaproject.markdownhelperkeyboard.converter.utility.AngleMode
+import com.kazumaproject.markdownhelperkeyboard.converter.utility.Precision
+import com.kazumaproject.markdownhelperkeyboard.converter.utility.RegionalUnitProfile
+import com.kazumaproject.markdownhelperkeyboard.converter.utility.UnitTargetSettingsJsonCodec
+import com.kazumaproject.markdownhelperkeyboard.converter.utility.UtilityCandidateConfig
+import com.kazumaproject.markdownhelperkeyboard.ime_service.image_effect.CinematicWaveSettings
+import com.kazumaproject.markdownhelperkeyboard.ime_service.image_effect.KeyboardTouchEffectQuality
+import com.kazumaproject.markdownhelperkeyboard.ime_service.image_effect.KeyboardTouchEffectType
+import com.kazumaproject.markdownhelperkeyboard.ime_service.image_effect.SprayPaintSettings
+import com.kazumaproject.markdownhelperkeyboard.ime_service.state.CandidateTab
+import com.kazumaproject.markdownhelperkeyboard.ime_service.state.KeyboardType
+import com.kazumaproject.markdownhelperkeyboard.gemma.handwriting.GemmaHandwritingLanguage
+import com.kazumaproject.markdownhelperkeyboard.gemma.handwriting.GemmaHandwritingSettings
+import com.kazumaproject.markdownhelperkeyboard.setting_activity.backup.PrefBackup
+import com.kazumaproject.markdownhelperkeyboard.setting_activity.backup.PrefEntry
+import com.kazumaproject.markdownhelperkeyboard.setting_activity.circular_slot.CircularSlotActionSetting
+import java.util.concurrent.CompletableFuture
+import java.util.concurrent.atomic.AtomicBoolean
+import com.kazumaproject.core.R as CoreR
+
+internal object CustomThemeColorPreferenceKeys {
+    const val CANDIDATE_TEXT_COLOR = "custom_theme_candidate_text_color"
+    const val CANDIDATE_ITEM_BG_COLOR = "custom_theme_candidate_item_bg_color"
+    const val CANDIDATE_ITEM_PRESSED_BG_COLOR = "custom_theme_candidate_item_pressed_bg_color"
+    const val CANDIDATE_EMPTY_POPUP_BG_COLOR = "custom_theme_candidate_empty_popup_bg_color"
+    const val CANDIDATE_EMPTY_POPUP_TEXT_COLOR = "custom_theme_candidate_empty_popup_text_color"
+    const val SHORTCUT_ICON_COLOR = "custom_theme_shortcut_icon_color"
+}
+
+object AppPreference {
+
+    const val PRESERVE_DICTIONARY_WORD_WHITESPACE_KEY =
+        "preserve_dictionary_word_whitespace_preference"
+
+    internal const val GOJUON_KEYBOARD_TYPE_MIGRATION_KEY =
+        "gojuon_keyboard_type_migrated_v1"
+
+    const val UTILITY_CALCULATION_ENABLED_KEY = "utility_calculation_enabled"
+    const val UTILITY_UNIT_CONVERSION_ENABLED_KEY = "utility_unit_conversion_enabled"
+    const val UTILITY_EXPRESSION_CANDIDATE_ENABLED_KEY = "utility_expression_candidate_enabled"
+    const val UTILITY_FORMULA_CANDIDATE_ENABLED_KEY = "utility_formula_candidate_enabled"
+    const val UTILITY_ANGLE_MODE_KEY = "utility_angle_mode"
+    const val UTILITY_CALCULATION_PRECISION_KEY = "utility_calculation_precision"
+    const val UTILITY_REGIONAL_PROFILE_KEY = "utility_regional_profile"
+    const val UTILITY_UNIT_TARGETS_JSON_KEY = "utility_unit_targets_json"
+    const val DATE_CANDIDATE_ORDER_KEY = "date_candidate_order"
+    const val DATE_CANDIDATE_ENABLED_FORMATS_KEY = "date_candidate_enabled_formats"
+    private const val UTILITY_DECIMAL_PRECISION_PREFIX = "decimal:"
+
+    const val DEFAULT_CUSTOM_THEME_CANDIDATE_ITEM_BG_COLOR = 0x00000000
+    const val DEFAULT_CUSTOM_THEME_CANDIDATE_ITEM_PRESSED_BG_COLOR = 0xFFF0F0F3.toInt()
+    const val SHORTCUT_TOOLBAR_HEIGHT_DEFAULT_DP = 36
+    const val SHORTCUT_TOOLBAR_HEIGHT_MIN_DP = 32
+    const val SHORTCUT_TOOLBAR_HEIGHT_MAX_DP = 72
+    const val SHORTCUT_TOOLBAR_ICON_SIZE_DEFAULT_DP = 28
+    const val SHORTCUT_TOOLBAR_ICON_SIZE_MIN_DP = 18
+    const val SHORTCUT_TOOLBAR_ICON_SIZE_MAX_DP = 56
+    const val PREDICTION_LOOKAHEAD_CHARACTER_COUNT_MIN =
+        PredictionConfig.MIN_LOOKAHEAD_CHARACTER_COUNT
+    const val PREDICTION_LOOKAHEAD_CHARACTER_COUNT_MAX =
+        PredictionConfig.MAX_LOOKAHEAD_CHARACTER_COUNT
+    const val PREDICTION_LOOKAHEAD_CHARACTER_COUNT_DEFAULT =
+        PredictionConfig.DEFAULT_LOOKAHEAD_CHARACTER_COUNT
+    const val GEMMA_HANDWRITING_AUTO_RECOGNITION_DELAY_KEY =
+        "gemma_handwriting_auto_recognition_delay_preference"
+    const val GEMMA_HANDWRITING_PROMPT_KEY =
+        "gemma_handwriting_prompt_preference"
+    const val GEMMA_HANDWRITING_RECOGNITION_LANGUAGE_KEY =
+        "gemma_handwriting_recognition_language_preference"
+    const val GEMMA_HANDWRITING_ADDITIONAL_INSTRUCTION_KEY =
+        "gemma_handwriting_additional_instruction_preference"
+    const val GEMMA_HANDWRITING_RESET_PROMPT_KEY =
+        "gemma_handwriting_reset_prompt_preference"
+    const val GEMMA_HANDWRITING_PEN_SIZE_KEY =
+        "gemma_handwriting_pen_size_preference"
+    const val GEMMA_HANDWRITING_PEN_COLOR_KEY =
+        "gemma_handwriting_pen_color_preference"
+    const val FLICK_SENSITIVITY_KEY = "flick_sensitivity_preference"
+    const val FLICK_THRESHOLD_SHAPE_KEY = "flick_threshold_shape_preference"
+    const val TFBI_DIAGONAL_RECOGNITION_MODE_KEY = "tfbi_diagonal_recognition_mode_preference"
+    const val FLICK_TFBI_POPUP_PRESENTATION_KEY = "flick_tfbi_popup_presentation_preference"
+    const val FLICK_TFBI_FLICK_START_POSITION_KEY =
+        "flick_tfbi_flick_start_position_preference"
+    const val FLICK_EDITOR_PREVIEW_KEY = "flick_editor_preview_preference"
+    const val TENKEY_KEYMAP_GUIDE_JAPANESE_KEY = "tenkey_keymap_guide"
+    const val TENKEY_KEYMAP_GUIDE_ENGLISH_KEY = "tenkey_keymap_guide_english"
+    const val TENKEY_KEYMAP_GUIDE_NUMBER_KEY = "tenkey_keymap_guide_number"
+    const val TENKEY_USE_THREE_STATE_KEY = "tenkey_use_three_state_keyboard_preference"
+    const val TENKEY_NUMBER_SYMBOL_KEY_GAP_KEY = "tenkey_number_symbol_key_gap_preference"
+    const val SUMIRE_KEYMAP_GUIDE_JAPANESE_KEY = "sumire_keymap_guide_japanese"
+    const val SUMIRE_KEYMAP_GUIDE_ENGLISH_KEY = "sumire_keymap_guide_english"
+    const val SUMIRE_KEYMAP_GUIDE_NUMBER_KEY = "sumire_keymap_guide_number"
+    const val STABILIZE_CANDIDATE_STRIP_HEIGHT_KEY = "stabilize_candidate_strip_height_preference"
+    const val CUSTOM_DIRECT_INPUT_REPLACE_COMPOSING_KEY =
+        "custom_direct_input_replace_composing_preference"
+    const val CUSTOM_KEYMAP_GUIDE_KEY = "flick_keymap_guide"
+    const val CUSTOM_KEYBOARD_INPUT_IN_EMPTY_AREAS_KEY =
+        "custom_keyboard_input_in_empty_areas_preference"
+    const val INDEPENDENT_MULTI_TOUCH_KEY = "independent_multi_touch_preference"
+    const val LONG_PRESS_TIMEOUT_KEY = "long_press_timeout_preference"
+    const val DELETE_LONG_PRESS_CONVERSION_BEHAVIOR_KEY =
+        "delete_long_press_conversion_behavior"
+    const val VIBRATION_KEY = "vibration_preference"
+    const val VIBRATION_TIMING_KEY = "vibration_timing"
+    const val KEY_SOUND_KEY = "key_sound_preference"
+    const val KEY_SOUND_VOLUME_PERCENT_KEY = "key_sound_volume_percent_preference"
+    const val ALLOW_FULLSCREEN_MODE_KEY = "allow_fullscreen_mode_preference"
+    const val INLINE_SUGGESTION_ENABLED_KEY = "inline_suggestion_enabled_preference"
+    internal const val CANDIDATE_HEIGHT_DEFAULTS_MIGRATION_VERSION_KEY =
+        "candidate_height_defaults_migration_version_preference"
+    private const val MIN_CANDIDATE_VISIBLE_HEIGHT_DP = 30
+    private const val MAX_CANDIDATE_VISIBLE_HEIGHT_DP = 300
+    private const val CURRENT_CANDIDATE_HEIGHT_DEFAULTS_MIGRATION_VERSION = 1
+
+    private val initializationLock = Any()
+    @Volatile private var initialization = CompletableFuture<Unit>()
+    private val initializationStartLock = Any()
+    private val initializationStarted = AtomicBoolean(false)
+    @Volatile private var initialized = false
+    @Volatile private var initializingThread: Thread? = null
+    private lateinit var loadedPreferences: SharedPreferences
+    private val preferences: SharedPreferences
+        get() {
+            if (!initialized && Thread.currentThread() !== initializingThread) {
+                check(initializationStarted.get()) { "AppPreference has not been initialized" }
+                initialization.join()
+            }
+            return loadedPreferences
+        }
+    private lateinit var appContext: Context
+    private var isTabletDevice: Boolean = false
+    private val gson = Gson()
+    private val unitTargetSettingsCodec = UnitTargetSettingsJsonCodec()
+    private const val LEGACY_SYMBOL_EMOJI_CANDIDATE_ENABLE_KEY =
+        "symbol_emoji_candidate_enable_preference"
+    private val circularSlotActionEditableSlots = setOf(
+        CircularFlickDirection.SLOT_4,
+        CircularFlickDirection.SLOT_5,
+        CircularFlickDirection.SLOT_6
+    )
+
+    private val CLIPBOARD_HISTORY_ENABLE = Pair("clipboard_history_preference", false)
+    private val TIME_SAME_PRONOUNCE_TYPING = Pair("time_same_pronounce_typing_preference", 1000)
+    private val FLICK_SENSITIVITY = Pair(FLICK_SENSITIVITY_KEY, 100)
+    private val FLICK_THRESHOLD_SHAPE = Pair(
+        FLICK_THRESHOLD_SHAPE_KEY,
+        FlickThresholdShape.Radial.preferenceValue
+    )
+    private val TFBI_DIAGONAL_RECOGNITION_MODE = Pair(
+        TFBI_DIAGONAL_RECOGNITION_MODE_KEY,
+        TfbiDiagonalRecognitionMode.LEGACY.preferenceValue
+    )
+    private val LONG_PRESS_TIMEOUT = Pair(LONG_PRESS_TIMEOUT_KEY, 300)
+    private val DELETE_LONG_PRESS_CONVERSION_BEHAVIOR =
+        Pair(DELETE_LONG_PRESS_CONVERSION_BEHAVIOR_KEY, "deferred")
+    private val VIBRATION_PREFERENCE = Pair(VIBRATION_KEY, true)
+    private val VIBRATION_TIMING_PREFERENCE = Pair(VIBRATION_TIMING_KEY, "both")
+    private val KEY_SOUND_PREFERENCE = Pair(KEY_SOUND_KEY, false)
+    private val KEY_SOUND_VOLUME_PERCENT_PREFERENCE =
+        Pair(KEY_SOUND_VOLUME_PERCENT_KEY, 0)
+    private val INLINE_SUGGESTION_ENABLED_PREFERENCE =
+        Pair(INLINE_SUGGESTION_ENABLED_KEY, true)
+    private val LEARN_DICTIONARY_PREFERENCE = Pair("learn_dictionary_preference", true)
+    private val INCOGNITO_MODE_DETECTION_PREFERENCE =
+        Pair("incognito_mode_detection_preference", true)
+    private val SHOW_LEARNED_CANDIDATES_IN_INCOGNITO_PREFERENCE =
+        Pair("show_learned_candidates_in_incognito_preference", true)
+    private val USER_DICTIONARY_PREFERENCE = Pair("user_dictionary_preference", true)
+    private val USER_DICTIONARY_PREFIX_PREFERENCE = Pair("user_dictionary_prefix_match_number", 2)
+    private val USER_TEMPLATE_PREFERENCE = Pair("user_template_preference", true)
+    private val TEXT_MACRO_CANDIDATE_PREFERENCE = Pair("text_macro_candidate_preference", true)
+    private val SYSTEM_NGRAM_DICTIONARY_ENABLE_PREFERENCE =
+        Pair("system_ngram_dictionary_enable_preference", true)
+    private val CUSTOM_NGRAM_DICTIONARY_ENABLE_PREFERENCE =
+        Pair("custom_ngram_dictionary_enable_preference", true)
+    private val SHOW_DICTIONARY_CANDIDATE_LABELS_PREFERENCE =
+        Pair("show_dictionary_candidate_labels_preference", false)
+    private val SUPPRESS_HENTAIGANA_CANDIDATES_PREFERENCE =
+        Pair("suppress_hentaigana_candidates_preference", false)
+    private val ZERO_QUERY_SUGGESTION_PREFERENCE =
+        Pair("zero_query_suggestion_preference", false)
+    private val NG_WORD_ENABLE_PREFERENCE = Pair("ng_word_enable_preference", true)
+    private val N_BEST_PREFERENCE = Pair("n_best_preference", 4)
+    private val CONVERSION_BEAM_WIDTH_PREFERENCE = Pair("conversion_beam_width_preference", 20)
+    private val INCREMENTAL_CONVERSION_SESSION_PREFERENCE =
+        Pair("incremental_conversion_session_preference", false)
+    private val JAPANESE_PREDICTION_ENABLE_PREFERENCE =
+        Pair("japanese_prediction_enable_preference", true)
+    private val ENGLISH_PREDICTION_ENABLE_PREFERENCE =
+        Pair("english_prediction_enable_preference", true)
+    private val SYSTEM_DICTIONARY_PREDICTION_ENABLE_PREFERENCE =
+        Pair("system_dictionary_prediction_enable_preference", true)
+    private val PREDICTION_MINIMUM_INPUT_LENGTH_PREFERENCE =
+        Pair("prediction_minimum_input_length_preference", 3)
+    private val SYSTEM_PREDICTION_CANDIDATE_LIMIT_PREFERENCE =
+        Pair("system_prediction_candidate_limit_preference", 4)
+    private val PREDICTION_LOOKAHEAD_CHARACTER_COUNT_PREFERENCE =
+        Pair("prediction_lookahead_preference", PREDICTION_LOOKAHEAD_CHARACTER_COUNT_DEFAULT)
+    private val PREDICTION_AGGRESSIVENESS_PREFERENCE =
+        Pair("prediction_aggressiveness_preference", "standard")
+    private val SYSTEM_USER_DICTIONARY_PREDICTION_ENABLE_PREFERENCE =
+        Pair("system_user_dictionary_prediction_enable_preference", true)
+    private val READING_CORRECTION_PREDICTION_ENABLE_PREFERENCE =
+        Pair("reading_correction_prediction_enable_preference", true)
+    private val PROVERB_PREDICTION_ENABLE_PREFERENCE =
+        Pair("proverb_prediction_enable_preference", true)
+    private val EXTERNAL_MOZC_PREDICTION_ENABLE_PREFERENCE =
+        Pair("external_mozc_prediction_enable_preference", true)
+    private val SYMBOL_EMOJI_PREDICTION_ENABLE_PREFERENCE =
+        Pair("symbol_emoji_prediction_enable_preference", true)
+    private val SYMBOL_CANDIDATE_ENABLE_PREFERENCE =
+        Pair("symbol_candidate_enable_preference", true)
+    private val EMOJI_CANDIDATE_ENABLE_PREFERENCE =
+        Pair("emoji_candidate_enable_preference", true)
+    private val EMOTICON_CANDIDATE_ENABLE_PREFERENCE =
+        Pair("emoticon_candidate_enable_preference", true)
+    private val CANDIDATE_ORDER_OVERRIDE_ENABLE =
+        Pair("candidate_order_override_enable_preference", false)
+    private val MOZCUT_PERSON_NAME = Pair("mozc_ut_person_name_preference", false)
+    private val MOZCUT_PLACES = Pair("mozc_ut_places_preference", false)
+    private val MOZCUT_WIKI = Pair("mozc_ut_wiki_preference", false)
+    private val MOZCUT_NEOLOGD = Pair("mozc_ut_neologd_preference", false)
+    private val MOZCUT_WEB = Pair("mozc_ut_web_preference", false)
+
+    private val SWITCH_QWERTY_PASSWORD = Pair("switch_qwerty_keyboard_password_preference", false)
+    private val LANDSCAPE_FORCE_QWERTY_PREFERENCE =
+        Pair("landscape_force_qwerty_preference", false)
+    private val LANDSCAPE_FORCE_QWERTY_ROMAJI_PREFERENCE =
+        Pair("landscape_force_qwerty_romaji_preference", false)
+
+    private val TENKEY_SWITCH_QWERTY_PREFERENCE =
+        Pair("tenkey_kana_english_qwerty_preference", false)
+
+    private val TENKEY_USE_THREE_STATE_KEYBOARD_PREFERENCE =
+        Pair(TENKEY_USE_THREE_STATE_KEY, true)
+    private val TENKEY_NUMBER_SYMBOL_KEY_GAP_PREFERENCE =
+        Pair(TENKEY_NUMBER_SYMBOL_KEY_GAP_KEY, 4)
+
+    private val TENKEY_SWITCH_NUMBER_TO_QWERTY_NUMBER_PREFERENCE =
+        Pair("tenkey_switch_number_to_qwerty_number_preference", false)
+
+    private val TENKEY_RESTORE_INPUT_MODE_ON_RESTART_PREFERENCE =
+        Pair("tenkey_restore_input_mode_on_restart_preference", false)
+    private val TENKEY_RESTORE_INPUT_MODE_ONLY_WITHIN_TIME_PREFERENCE =
+        Pair("tenkey_restore_input_mode_only_within_time_preference", false)
+    private val TENKEY_RESTORE_INPUT_MODE_TIMEOUT_MINUTES_PREFERENCE =
+        Pair("tenkey_restore_input_mode_timeout_minutes_preference", 5)
+    private val TENKEY_LAST_INPUT_MODE_PREFERENCE =
+        Pair("tenkey_last_input_mode_preference", "japanese")
+    private val TENKEY_LAST_INPUT_MODE_PRESENTATION_PREFERENCE =
+        Pair("tenkey_last_input_mode_presentation_preference", "native")
+    private val TENKEY_LAST_QWERTY_NUMBER_RETURN_TARGET_PREFERENCE =
+        Pair("tenkey_last_qwerty_number_return_target_preference", "japanese")
+    private val TENKEY_LAST_INPUT_MODE_SAVED_AT_EPOCH_MILLIS_PREFERENCE =
+        Pair("tenkey_last_input_mode_saved_at_epoch_millis_preference", 0L)
+
+    private val TABLET_TENKEY_SWITCH_QWERTY_PREFERENCE =
+        Pair("tablet_tenkey_kana_english_qwerty_preference", false)
+
+    private val TENKEY_KEYMAP_GUIDE_PREFERENCE =
+        Pair(TENKEY_KEYMAP_GUIDE_JAPANESE_KEY, false)
+    private val TENKEY_KEYMAP_GUIDE_ENGLISH_PREFERENCE =
+        Pair(TENKEY_KEYMAP_GUIDE_ENGLISH_KEY, false)
+    private val TENKEY_KEYMAP_GUIDE_NUMBER_PREFERENCE =
+        Pair(TENKEY_KEYMAP_GUIDE_NUMBER_KEY, false)
+
+    private val FLICK_KEYMAP_GUIDE_PREFERENCE =
+        Pair(CUSTOM_KEYMAP_GUIDE_KEY, false)
+    private val SUMIRE_KEYMAP_GUIDE_JAPANESE_PREFERENCE =
+        Pair(SUMIRE_KEYMAP_GUIDE_JAPANESE_KEY, false)
+    private val SUMIRE_KEYMAP_GUIDE_ENGLISH_PREFERENCE =
+        Pair(SUMIRE_KEYMAP_GUIDE_ENGLISH_KEY, false)
+    private val SUMIRE_KEYMAP_GUIDE_NUMBER_PREFERENCE =
+        Pair(SUMIRE_KEYMAP_GUIDE_NUMBER_KEY, false)
+    private const val SUMIRE_KEYMAP_GUIDE_MIGRATION_KEY =
+        "sumire_keymap_guide_modes_migrated"
+    private val FLICK_GUIDE_TEXT_SIZE_SP_PREFERENCE =
+        Pair("flick_guide_text_size_sp_preference", 9)
+    private val FLICK_GUIDE_MAX_CHARACTERS_PREFERENCE =
+        Pair("flick_guide_max_characters_preference", 1)
+    private val HIERARCHICAL_FLICK_MODE_SWITCH_ANGLE_MARGIN =
+        Pair("hierarchical_flick_mode_switch_angle_margin_preference", 20)
+
+    private val CUSTOM_KEYBOARD_TWO_WORDS_OUTPUTS =
+        Pair("custom_keyboard_two_words_preference", true)
+
+    private val QWERTY_SHOW_IME_SWITCH_BUTTON =
+        Pair("qwerty_show_switch_ime_button_preference", true)
+
+    private val QWERTY_SHOW_EMOJI_BUTTON =
+        Pair("qwerty_show_emoji_button_preference", false)
+
+    private val QWERTY_SHOW_CURSOR_BUTTONS = Pair("qwerty_show_cursor_buttons_preference", false)
+
+    private val QWERTY_SHOW_KEYMAP_SYMBOLS =
+        Pair("qwerty_show_keymap_symbols_romaji_preference", false)
+
+    private val QWERTY_SHOW_NUMBER_BUTTONS =
+        Pair("qwerty_show_number_keys_buttons_preference", false)
+
+    private val QWERTY_NUMBER_KEY_FLICK_UP_CHARS =
+        Pair("qwerty_number_key_flick_up_chars", "{}")
+
+    private val QWERTY_NUMBER_KEY_FLICK_DOWN_CHARS =
+        Pair("qwerty_number_key_flick_down_chars", "{}")
+
+    private val QWERTY_SHOW_SWITCH_ROMAJI_ENGLISH =
+        Pair("qwerty_show_switch_romaji_english_preference", true)
+
+    private val QWERTY_ENGLISH_DIRECT_INPUT_PREFERENCE =
+        Pair("qwerty_english_direct_input_preference", false)
+
+    private val QWERTY_GLIDE_INPUT_PREFERENCE =
+        Pair("qwerty_glide_input_preference", false)
+
+    private val QWERTY_GLIDE_COMMIT_PREVIOUS_CANDIDATE_ON_NEW_GLIDE_PREFERENCE =
+        Pair("qwerty_glide_commit_previous_candidate_on_new_glide_preference", false)
+
+    private val QWERTY_GLIDE_INSERT_SPACE_AFTER_COMMITTING_PREVIOUS_CANDIDATE_PREFERENCE =
+        Pair("qwerty_glide_insert_space_after_committing_previous_candidate_preference", false)
+
+    private val QWERTY_ENABLE_FLICK_UP_WINDOW = Pair("qwerty_enable_flick_up_preference", false)
+
+    private val QWERTY_ENABLE_FLICK_DOWN_WINDOW = Pair("qwerty_enable_flick_down_preference", false)
+
+    private val QWERTY_ZENKAKU_SPACE_PREFERENCE =
+        Pair("qwerty_romaji_zenkaku_space_preference", false)
+
+    private val QWERTY_ROMAJI_HANKAKU_NUMBER_PREFERENCE =
+        Pair("qwerty_romaji_hankaku_number_preference", false)
+
+    private val QWERTY_ROMAJI_HANKAKU_SYMBOL_PREFERENCE =
+        Pair("qwerty_romaji_hankaku_symbol_preference", false)
+
+    private val QWERTY_SHOW_POPUP_WINDOW = Pair("qwerty_show_popup_window_preference", true)
+
+    private val KEY_POPUP_USE_CUSTOM_COLOR =
+        Pair("key_popup_use_custom_color_preference", false)
+    private val KEY_POPUP_BACKGROUND_COLOR =
+        Pair("key_popup_background_color_preference", Color.WHITE)
+    private val KEY_POPUP_TEXT_COLOR =
+        Pair("key_popup_text_color_preference", Color.BLACK)
+
+    private val TENKEY_POPUP_SIZE_SCALE_PERCENT =
+        Pair("tenkey_popup_size_scale_percent_preference", 100)
+    private val TENKEY_POPUP_TEXT_SIZE_SP = Pair("tenkey_popup_text_size_sp_preference", 28.0f)
+
+    private val QWERTY_KEY_PREVIEW_POPUP_SIZE_SCALE_PERCENT =
+        Pair("qwerty_key_preview_popup_size_scale_percent_preference", 100)
+    private val QWERTY_KEY_PREVIEW_POPUP_TEXT_SIZE_SP =
+        Pair("qwerty_key_preview_popup_text_size_sp_preference", 28.0f)
+    private val QWERTY_VARIATION_POPUP_SIZE_SCALE_PERCENT =
+        Pair("qwerty_variation_popup_size_scale_percent_preference", 100)
+    private val QWERTY_VARIATION_POPUP_TEXT_SIZE_SP =
+        Pair("qwerty_variation_popup_text_size_sp_preference", 28.0f)
+
+    private val CANDIDATE_IN_PASSWORD = Pair("hide_candidate_password_preference", true)
+
+    private val CANDIDATE_IN_PASSWORD_COMPOSE = Pair("password_compose_preference", false)
+
+    private val TYPE_NULL_INPUT_BEHAVIOR = Pair("type_null_input_behavior_preference", "default")
+
+    private val QWERTY_SHOW_KUTOUTEN_BUTTONS =
+        Pair("qwerty_show_kutouten_buttons_preference", false)
+
+    private val KEYBOARD_HEIGHT = Pair("keyboard_height_preference", 220)
+    private val KEYBOARD_WIDTH = Pair("keyboard_width_preference", 100)
+    private val KEYBOARD_POSITION = Pair("keyboard_position_preference", true)
+    private val KEYBOARD_VERTICAL_MARGIN_BOTTOM =
+        Pair("keyboard_vertical_margin_bottom_preference", 0)
+    private val KEYBOARD_FLOATING_PREFERENCE = Pair("keyboard_floating_preference", false)
+    private val QWERTY_KEYBOARD_HEIGHT = Pair("qwerty_keyboard_height_preference", 220)
+    private val QWERTY_KEYBOARD_WIDTH = Pair("qwerty_keyboard_width_preference", 100)
+    private val QWERTY_KEYBOARD_VERTICAL_MARGIN_BOTTOM =
+        Pair("qwerty_keyboard_vertical_margin_bottom_preference", 0)
+    private val QWERTY_KEYBOARD_POSITION = Pair("qwerty_keyboard_position_preference", true)
+
+    private val KEYBOARD_HEIGHT_LANDSCAPE = Pair("keyboard_height_landscape_preference", 220)
+    private val KEYBOARD_WIDTH_LANDSCAPE = Pair("keyboard_width_landscape_preference", 100)
+    private val KEYBOARD_POSITION_LANDSCAPE = Pair("keyboard_position_landscape_preference", true)
+    private val KEYBOARD_VERTICAL_MARGIN_BOTTOM_LANDSCAPE =
+        Pair("keyboard_vertical_margin_bottom_landscape_preference", 0)
+    private val QWERTY_KEYBOARD_HEIGHT_LANDSCAPE =
+        Pair("qwerty_keyboard_height_landscape_preference", 220)
+    private val QWERTY_KEYBOARD_WIDTH_LANDSCAPE =
+        Pair("qwerty_keyboard_width_landscape_preference", 100)
+    private val QWERTY_KEYBOARD_VERTICAL_MARGIN_BOTTOM_LANDSCAPE =
+        Pair("qwerty_keyboard_vertical_margin_bottom_landscape_preference", 0)
+    private val QWERTY_KEYBOARD_POSITION_LANDSCAPE =
+        Pair("qwerty_keyboard_position_landscape_preference", true)
+
+    private val CANDIDATE_VIEW_HEIGHT_DP_LANDSCAPE =
+        Pair("candidate_view_height_dp_landscape_preference", 60)
+    private val CANDIDATE_VIEW_EMPTY_HEIGHT_DP_LANDSCAPE =
+        Pair("candidate_view_empty_height_dp_landscape_preference", 60)
+
+    private val FLICK_INPUT_ONLY = Pair("flick_input_only_preference", false)
+    private val FLICK_EDITOR_PREVIEW = Pair(FLICK_EDITOR_PREVIEW_KEY, false)
+    private val OMISSION_SEARCH = Pair("omission_search_preference", false)
+    private val UNDO_ENABLE = Pair("undo_enable_preference", false)
+    private val SPACE_HANKAKU_ENABLE = Pair("space_key_preference", false)
+    private val CUSTOM_DIRECT_MODE_SPACE_HANKAKU_ENABLE =
+        Pair("custom_direct_mode_space_hankaku_preference", true)
+    private val LIVE_CONVERSION_ENABLE = Pair("live_conversion_preference", false)
+    private val LIVE_CONVERSION_START_LENGTH = Pair("live_conversion_start_length_preference", 1)
+    const val LIVE_CONVERSION_CANDIDATE_YOMI_MODE_KEY = "live_conversion_candidate_yomi_mode_preference"
+    const val CANDIDATE_YOMI_MODE_WHOLE = "whole"
+    const val CANDIDATE_YOMI_MODE_RUBY = "ruby"
+    const val LIVE_CONVERSION_CANDIDATE_YOMI_SIZE_KEY = "live_conversion_candidate_yomi_size_preference"
+    const val DEFAULT_LIVE_CONVERSION_CANDIDATE_YOMI_SIZE = 14
+    const val MIN_LIVE_CONVERSION_CANDIDATE_YOMI_SIZE = 1
+    const val MAX_LIVE_CONVERSION_CANDIDATE_YOMI_SIZE = 24
+    private val LIVE_CONVERSION_CANDIDATE_YOMI =
+        Pair("live_conversion_candidate_yomi_preference", false)
+    private const val OLD_SUMIRE_PREFERENCE_KEY = "sumire_keyboard_input_type_preference"
+    private const val NEW_SUMIRE_STYLE_KEY = "sumire_keyboard_style_preference"
+    private const val NEW_SUMIRE_METHOD_KEY = "sumire_input_method_preference"
+    private val SUMIRE_INPUT_SELECTION_PREFERENCE =
+        Pair("sumire_keyboard_input_type_preference", "toggle-default")
+    private val SUMIRE_RESTORE_INPUT_MODE_ON_RESTART_PREFERENCE =
+        Pair("sumire_restore_input_mode_on_restart_preference", false)
+    private val SUMIRE_RESTORE_INPUT_MODE_ONLY_WITHIN_TIME_PREFERENCE =
+        Pair("sumire_restore_input_mode_only_within_time_preference", false)
+    private val SUMIRE_RESTORE_INPUT_MODE_TIMEOUT_MINUTES_PREFERENCE =
+        Pair("sumire_restore_input_mode_timeout_minutes_preference", 5)
+    private val SUMIRE_LAST_INPUT_MODE_PREFERENCE =
+        Pair("sumire_last_input_mode_preference", "japanese")
+    private val SUMIRE_LAST_INPUT_MODE_PRESENTATION_PREFERENCE =
+        Pair("sumire_last_input_mode_presentation_preference", "native")
+    private val SUMIRE_LAST_INPUT_MODE_SAVED_AT_EPOCH_MILLIS_PREFERENCE =
+        Pair("sumire_last_input_mode_saved_at_epoch_millis_preference", 0L)
+
+    private val DELETE_KEY_HIGH_LIGHT = Pair("henkan_delete_key_action_preference", true)
+    private val CUSTOM_KEYBOARD_SUGGESTION_PREFERENCE =
+        Pair("custom_keyboard_suggestion_preference", true)
+    private val CUSTOM_KEYBOARD_INPUT_IN_EMPTY_AREAS_PREFERENCE =
+        Pair(CUSTOM_KEYBOARD_INPUT_IN_EMPTY_AREAS_KEY, false)
+    private val REMEMBER_LAST_CUSTOM_KEYBOARD_PREFERENCE =
+        Pair("remember_last_custom_keyboard_preference", false)
+    private val LAST_USED_CUSTOM_KEYBOARD_STABLE_ID =
+        Pair("last_used_custom_keyboard_stable_id", "")
+    private val REMEMBER_CUSTOM_KEYBOARD_INPUT_MODE_PREFERENCE =
+        Pair("remember_custom_keyboard_input_mode_preference", false)
+    private const val CUSTOM_KEYBOARD_LAST_DIRECT_MODE_PREFIX =
+        "custom_keyboard_last_direct_mode_"
+    private const val CUSTOM_KEYBOARD_LAST_ROMAJI_MODE_PREFIX =
+        "custom_keyboard_last_romaji_mode_"
+
+    private val KEYBOARD_FLOATING_POSITION_X = Pair("keyboard_floating_position_x", -1)
+    private val KEYBOARD_FLOATING_POSITION_Y = Pair("keyboard_floating_position_y", -1)
+
+    private val defaultKeyboardOrderJson = gson.toJson(defaultKeyboardOrder(isTablet = false))
+    private val KEYBOARD_ORDER = Pair("keyboard_order_preference", defaultKeyboardOrderJson)
+    private val SETTING_HOME_FREQUENT_KEYS =
+        Pair("setting_home_frequent_keys_preference", "")
+    private val SETTING_USE_NEW_HOME_SCREEN =
+        Pair("setting_use_new_home_screen_preference", true)
+
+    private val defaultCandidateTabJson = gson.toJson(
+        listOf(
+            CandidateTab.PREDICTION,
+            CandidateTab.CONVERSION,
+            CandidateTab.EISUKANA,
+        )
+    )
+
+    private val CANDIDATE_TAB_ORDER_PREFERENCE =
+        Pair("candidate_tab_preference", defaultCandidateTabJson)
+
+    private val SYMBOL_MODE_PREFERENCE = Pair("symbol_mode_preference", "EMOJI")
+    private val DEFAULT_EMOJI_SKIN_TONE_PREFERENCE =
+        Pair("default_emoji_skin_tone_preference", EmojiSkinToneSupport.DEFAULT_SKIN_TONE)
+
+    private val CANDIDATE_COLUMN_PREFERENCE = Pair("candidate_column_preference", "1")
+    private val CANDIDATE_COLUMN_LANDSCAPE_PREFERENCE =
+        Pair("candidate_column_landscape_preference", "1")
+
+    private val CANDIDATE_TAB_PREFERENCE = Pair("candidate_tab_visibility_preference", false)
+
+    private val SHORTCUT_TOOLBAR_VISIBILITY_PREFERENCE =
+        Pair("shortcut_toolbar_visibility_preference", false)
+    private val SHORTCUT_TOOLBAR_INTEGRATED_IN_SUGGESTION_PREFERENCE =
+        Pair("shortcut_toolbar_integrated_in_suggestion_preference", false)
+    private val SHORTCUT_TOOLBAR_HEIGHT_DP_PREFERENCE =
+        Pair("shortcut_toolbar_height_dp_preference", SHORTCUT_TOOLBAR_HEIGHT_DEFAULT_DP)
+    private val SHORTCUT_TOOLBAR_ICON_SIZE_DP_PREFERENCE =
+        Pair("shortcut_toolbar_icon_size_dp_preference", SHORTCUT_TOOLBAR_ICON_SIZE_DEFAULT_DP)
+
+    private val APP_THEME_SEED_COLOR = Pair("app_theme_seed_color_preference", 0x00000000)
+
+    private val KEYBOARD_THEME_MODE =
+        Pair("keyboard_theme_mode_preference", "default") // default, light, dark, custom
+    private val CUSTOM_THEME_BG_COLOR = Pair("custom_theme_bg_color_preference", Color.WHITE)
+    private val CUSTOM_THEME_KEY_COLOR = Pair("custom_theme_key_color_preference", Color.LTGRAY)
+    private val CUSTOM_THEME_SPECIAL_KEY_COLOR =
+        Pair("custom_theme_special_key_color_preference", Color.GRAY)
+    private val CUSTOM_THEME_KEY_TEXT_COLOR =
+        Pair("custom_theme_key_text_color_preference", Color.BLACK)
+    private val CUSTOM_THEME_SPECIAL_KEY_TEXT_COLOR =
+        Pair("custom_theme_special_key_text_color_preference", Color.BLACK)
+    private val CUSTOM_THEME_CANDIDATE_TEXT_COLOR =
+        Pair(CustomThemeColorPreferenceKeys.CANDIDATE_TEXT_COLOR, Color.BLACK)
+    private val CUSTOM_THEME_CANDIDATE_ITEM_BG_COLOR =
+        Pair(
+            CustomThemeColorPreferenceKeys.CANDIDATE_ITEM_BG_COLOR,
+            DEFAULT_CUSTOM_THEME_CANDIDATE_ITEM_BG_COLOR
+        )
+    private val CUSTOM_THEME_CANDIDATE_ITEM_PRESSED_BG_COLOR =
+        Pair(
+            CustomThemeColorPreferenceKeys.CANDIDATE_ITEM_PRESSED_BG_COLOR,
+            DEFAULT_CUSTOM_THEME_CANDIDATE_ITEM_PRESSED_BG_COLOR
+        )
+    private val CUSTOM_THEME_CANDIDATE_EMPTY_POPUP_BG_COLOR =
+        Pair(CustomThemeColorPreferenceKeys.CANDIDATE_EMPTY_POPUP_BG_COLOR, Color.GRAY)
+    private val CUSTOM_THEME_CANDIDATE_EMPTY_POPUP_TEXT_COLOR =
+        Pair(CustomThemeColorPreferenceKeys.CANDIDATE_EMPTY_POPUP_TEXT_COLOR, Color.BLACK)
+    private val CUSTOM_THEME_SHORTCUT_ICON_COLOR =
+        Pair(CustomThemeColorPreferenceKeys.SHORTCUT_ICON_COLOR, Color.BLACK)
+
+    // New variables for Custom Border
+    private val CUSTOM_THEME_BORDER_ENABLE = Pair("theme_custom_border_enable", false)
+    private val CUSTOM_THEME_BORDER_COLOR = Pair("theme_custom_border_color", Color.BLACK)
+
+    private val DELETE_KEY_LEFT_FLICK_PREFERENCE = Pair("delete_key_flick_left_preference", true)
+    private val DELETE_KEY_UP_FLICK_PREFERENCE = Pair("delete_key_flick_up_preference", false)
+    private val DELETE_KEY_DOWN_FLICK_PREFERENCE = Pair("delete_key_flick_down_preference", false)
+    private val DEFAULT_CURSOR_MOVE_AFTER_COMMIT_TARGET_PAIRS = listOf(
+        "()",
+        "[]",
+        "{}",
+        "<>",
+        "「」",
+        "（）",
+        "［］",
+        "｛｝",
+        "＜＞",
+        "〔〕",
+        "〘〙",
+        "〚〛",
+        "〈〉",
+        "《》",
+        "«»",
+        "‹›",
+        "『』",
+        "【】"
+    )
+    private val CURSOR_MOVE_AFTER_COMMIT_TARGET_PAIRS_PREFERENCE = Pair(
+        "cursor_move_after_commit_target_pairs_preference",
+        gson.toJson(DEFAULT_CURSOR_MOVE_AFTER_COMMIT_TARGET_PAIRS)
+    )
+
+    private val KEY_LETTER_SIZE = Pair("key_letter_size_preference", 0.0f)
+    private val TENKEY_KEY_WIDTH_SCALE_PERCENT =
+        Pair("tenkey_key_width_scale_percent_preference", 100)
+    private val TENKEY_KEY_HEIGHT_SCALE_PERCENT =
+        Pair("tenkey_key_height_scale_percent_preference", 100)
+    private val FLICK_KEY_WIDTH_SCALE_PERCENT =
+        Pair("flick_key_width_scale_percent_preference", 160)
+    private val FLICK_KEY_HEIGHT_SCALE_PERCENT =
+        Pair("flick_key_height_scale_percent_preference", 160)
+    private val FLICK_KEY_ICON_SCALE_PERCENT = Pair("flick_key_icon_scale_percent_preference", 80)
+    private val FLICK_KEY_TEXT_SIZE_SP = Pair("flick_key_text_size_sp_preference", 16.0f)
+
+    private val FLICK_SPECIAL_KEY_TEXT_SIZE_SP =
+        Pair("flick_special_key_text_size_sp_preference", 12.0f)
+
+    private val FLICK_DIRECTIONAL_POPUP_SIZE_SCALE_PERCENT =
+        Pair("flick_directional_popup_size_scale_percent_preference", 100)
+    private val FLICK_DIRECTIONAL_POPUP_TEXT_SIZE_SP =
+        Pair("flick_directional_popup_text_size_sp_preference", 28.0f)
+    private val FLICK_CROSS_POPUP_SIZE_SCALE_PERCENT =
+        Pair("flick_cross_popup_size_scale_percent_preference", 100)
+    private val FLICK_CROSS_POPUP_TEXT_SIZE_SP =
+        Pair("flick_cross_popup_text_size_sp_preference", 18.0f)
+    private val FLICK_STANDARD_POPUP_SIZE_SCALE_PERCENT =
+        Pair("flick_standard_popup_size_scale_percent_preference", 100)
+    private val FLICK_STANDARD_POPUP_TEXT_SIZE_SP =
+        Pair("flick_standard_popup_text_size_sp_preference", 19.0f)
+    private val FLICK_TFBI_POPUP_SIZE_SCALE_PERCENT =
+        Pair("flick_tfbi_popup_size_scale_percent_preference", 100)
+    private val FLICK_TFBI_POPUP_TEXT_SIZE_SP =
+        Pair("flick_tfbi_popup_text_size_sp_preference", 20.0f)
+    private val FLICK_TFBI_POPUP_PRESENTATION =
+        Pair(FLICK_TFBI_POPUP_PRESENTATION_KEY, TfbiPopupPresentationMode.LEGACY_GRID.preferenceValue)
+    private val FLICK_TFBI_FLICK_START_POSITION =
+        Pair(
+            FLICK_TFBI_FLICK_START_POSITION_KEY,
+            TfbiFlickStartPositionMode.TOUCH_POINT.preferenceValue
+        )
+
+    private val CANDIDATE_LETTER_SIZE = Pair("candidate_letter_size_preference", 14.0f)
+
+    private val CANDIDATE_VIEW_HEIGHT_DP = Pair("candidate_view_height_dp_preference", 60)
+    private val CANDIDATE_VIEW_EMPTY_HEIGHT_DP =
+        Pair("candidate_view_empty_height_dp_preference", 60)
+    private val CANDIDATE_VIEW_HEIGHT_PORTRAIT_COLUMN_1_DP =
+        Pair("candidate_view_height_portrait_column_1_dp_preference", 60)
+    private val CANDIDATE_VIEW_HEIGHT_PORTRAIT_COLUMN_2_DP =
+        Pair("candidate_view_height_portrait_column_2_dp_preference", 80)
+    private val CANDIDATE_VIEW_HEIGHT_PORTRAIT_COLUMN_3_DP =
+        Pair("candidate_view_height_portrait_column_3_dp_preference", 100)
+    private val CANDIDATE_VIEW_HEIGHT_LANDSCAPE_COLUMN_1_DP =
+        Pair("candidate_view_height_landscape_column_1_dp_preference", 60)
+    private val CANDIDATE_VIEW_HEIGHT_LANDSCAPE_COLUMN_2_DP =
+        Pair("candidate_view_height_landscape_column_2_dp_preference", 80)
+    private val CANDIDATE_VIEW_HEIGHT_LANDSCAPE_COLUMN_3_DP =
+        Pair("candidate_view_height_landscape_column_3_dp_preference", 100)
+    private val CANDIDATE_DEFAULT_HEIGHT_PORTRAIT_COLUMN_1_DP =
+        Pair("candidate_default_height_portrait_column_1_dp_preference", 60)
+    private val CANDIDATE_DEFAULT_HEIGHT_PORTRAIT_COLUMN_2_DP =
+        Pair("candidate_default_height_portrait_column_2_dp_preference", 80)
+    private val CANDIDATE_DEFAULT_HEIGHT_PORTRAIT_COLUMN_3_DP =
+        Pair("candidate_default_height_portrait_column_3_dp_preference", 100)
+    private val CANDIDATE_DEFAULT_HEIGHT_LANDSCAPE_COLUMN_1_DP =
+        Pair("candidate_default_height_landscape_column_1_dp_preference", 60)
+    private val CANDIDATE_DEFAULT_HEIGHT_LANDSCAPE_COLUMN_2_DP =
+        Pair("candidate_default_height_landscape_column_2_dp_preference", 80)
+    private val CANDIDATE_DEFAULT_HEIGHT_LANDSCAPE_COLUMN_3_DP =
+        Pair("candidate_default_height_landscape_column_3_dp_preference", 100)
+    private val CANDIDATE_DEFAULT_EMPTY_HEIGHT_DP =
+        Pair(
+            "candidate_default_empty_height_dp_preference",
+            CANDIDATE_VIEW_EMPTY_HEIGHT_DP.second
+        )
+    private val CANDIDATE_DEFAULT_EMPTY_HEIGHT_DP_LANDSCAPE =
+        Pair(
+            "candidate_default_empty_height_dp_landscape_preference",
+            CANDIDATE_VIEW_EMPTY_HEIGHT_DP_LANDSCAPE.second
+        )
+    private val CANDIDATE_HEIGHT_PER_COLUMN_MIGRATED =
+        Pair("candidate_height_per_column_migrated_preference", false)
+
+    private val CLIP_BOARD_PREVIEW_PREFERENCE =
+        Pair("clipboard_preview_enable_preference", true)
+
+    private val CLIP_BOARD_PREVIEW_TAP_DELETE_PREFERENCE =
+        Pair("clipboard_preview_tap_delete_preference", false)
+
+    private val CLIPBOARD_DELETE_UNPINNED_AFTER_HOURS_PREFERENCE =
+        Pair("clipboard_delete_unpinned_after_hours_preference", false)
+
+    private val CLIPBOARD_UNPINNED_RETENTION_HOURS_PREFERENCE =
+        Pair("clipboard_unpinned_retention_hours_preference", 1)
+
+    private val ROUND_KEYBOARD_CORNER_PREFERENCE =
+        Pair("round_corner_keyboard_preference", false)
+
+    private val KEYBOARD_CORNER_RADIUS_DP_PREFERENCE =
+        Pair("keyboard_corner_radius_dp_preference", 32)
+
+    private val KEYBOARD_CORNER_TOP_LEFT_PREFERENCE =
+        Pair("keyboard_corner_top_left_preference", true)
+
+    private val KEYBOARD_CORNER_TOP_RIGHT_PREFERENCE =
+        Pair("keyboard_corner_top_right_preference", true)
+
+    private val KEYBOARD_CORNER_BOTTOM_LEFT_PREFERENCE =
+        Pair("keyboard_corner_bottom_left_preference", true)
+
+    private val KEYBOARD_CORNER_BOTTOM_RIGHT_PREFERENCE =
+        Pair("keyboard_corner_bottom_right_preference", true)
+
+    private val BUNSETSU_SEPARATION_PREFERENCE =
+        Pair("conversion_bunsetsu_separation_preference", false)
+
+    private val BUNSETSU_CURSOR_MOVE_PREFERENCE =
+        Pair("conversion_bunsetsu_cursor_move_preference", false)
+
+    private val RECONVERSION_PREFERENCE =
+        Pair("reconversion_preference", false)
+
+    private val CONVERSION_KEY_SWIPE_CURSOR_MOVE_PREFERENCE =
+        Pair("conversion_key_swipe_cursor_move_preference", false)
+
+    private val PHYSICAL_KEYBOARD_INPUT_MODE_PREFERENCE =
+        Pair("physical_keyboard_input_mode_preference", "romaji")
+
+    private val ROMAJI_MAP_DATA_VERSION = Pair("romaji_map_data_version", 0)
+
+    private val QWERTY_ROMAJI_SHIFT_CONVERSION_PREFERENCE =
+        Pair("qwerty_romaji_shift_conversion_preference", false)
+
+    private val TABLET_GOJUON_LAYOUT_PREFERENCE =
+        Pair("tablet_use_gojuon_layout_preference", true)
+
+    private val LAST_PASTED_CLIPBOARD_TEXT_PREFERENCE =
+        Pair("last_pasted_clipboard_text_preference", "")
+
+    private val TENKEY_SHOW_IME_SWITCH_BUTTON =
+        Pair("tenkey_show_switch_ime_button_preference", true)
+
+    private val ENABLE_ZENZ_PREFERENCE =
+        Pair("enable_ai_conversion_zenz_preference", false)
+
+    private val ENABLE_ZENZAI_PREFERENCE =
+        Pair("enable_ai_conversion_zenzai_preference", false)
+
+    private val ZENZ_PROFILE_PREFERENCE =
+        Pair("zenz_profile_string_preference", "")
+
+    private val ENABLE_ZENZ_CONVERSION_LONG_PRESS_PREFERENCE =
+        Pair("conversion_key_long_press_ai_conversion_preference", false)
+
+    private val ENABLE_ZENZ_RERANK_PREFERENCE =
+        Pair("enable_zenz_rerank_preference", false)
+
+    private val ZENZ_DEBOUNCE_TIME_PREFERENCE = Pair("zenz_debounce_time_preference", 300)
+
+    private val ZENZ_MAXIMUM_LETTER_SIZE_PREFERENCE =
+        Pair("zenz_maximum_letter_count_preference", 32)
+
+    private val ZENZ_MAXIMUM_CONTEXT_SIZE_PREFERENCE =
+        Pair("zenz_maximum_context_count_preference", 512)
+
+    private val ZENZ_MAXIMUM_THREAD_SIZE_PREFERENCE =
+        Pair("zenz_maximum_thread_count_preference", 4)
+
+    private val QWERTY_KEY_VERTICAL_MARGIN = Pair("qwerty_key_vertical_margin_preference", 5.0f)
+    private val QWERTY_KEY_HORIZONTAL_GAP = Pair("qwerty_key_horizontal_gap_preference", 2.0f)
+    private val QWERTY_KEY_INDENT_LARGE = Pair("qwerty_key_indent_large_preference", 23.0f)
+    private val QWERTY_KEY_INDENT_SMALL = Pair("qwerty_key_indent_small_preference", 9.0f)
+    private val QWERTY_KEY_SIDE_MARGIN = Pair("qwerty_key_side_margin_preference", 4.0f)
+    private val QWERTY_KEY_TEXT_SIZE = Pair("qwerty_key_text_size_preference", 18.0f)
+    private val QWERTY_SYMBOL_KEYMAP_TEXT_SIZE =
+        Pair("qwerty_symbol_keymap_text_size_preference", 9.0f)
+    private val QWERTY_SPECIAL_KEY_TEXT_SIZE = Pair("special_key_text_size_preference", 12.0f)
+    private val QWERTY_SPECIAL_KEY_ICON_SIZE =
+        Pair("qwerty_special_key_icon_size_preference", 18.0f)
+
+    private val LIQUID_GLASS_ENABLE = Pair("liquid_glass_preference", false)
+    private val LIQUID_GLASS_BLUR_RADIUS = Pair("liquid_glass_blur_preference", 220)
+    private val LIQUID_GLASS_KEY_ALPHA = Pair("liquid_glass_key_alpha_preference", 255)
+
+    private val CUSTOM_THEME_INPUT_COLOR_ENABLE = Pair("theme_custom_input_color_enable", false)
+    private val CUSTOM_THEME_PRE_EDIT_BG = Pair(
+        "theme_custom_pre_edit_bg_color",
+        "#440099CC".toColorInt()
+    )
+    private val CUSTOM_THEME_PRE_EDIT_TEXT = Pair("theme_custom_pre_edit_text_color", Color.WHITE)
+    private val CUSTOM_THEME_POST_EDIT_BG =
+        Pair("theme_custom_post_edit_bg_color", "#55FF8800".toColorInt())
+    private val CUSTOM_THEME_POST_EDIT_TEXT = Pair("theme_custom_post_edit_text_color", Color.WHITE)
+
+    private val SUMIRE_ENGLISH_QWERTY_PREFERENCE = Pair("sumire_english_qwerty_preference", false)
+
+    private val CONVERSION_CANDIDATES_ROMAJI_ENABLE_PREFERENCE =
+        Pair("conversion_candidates_romaji_enable_preference", false)
+
+    private val LEARN_FIRST_CANDIDATE_DICTIONARY_PREFERENCE =
+        Pair("learn_first_candidate_dictionary_preference", false)
+
+    private val LEARN_DICTIONARY_ALLOW_MIXED_SYMBOLS_NUMBERS_PREFERENCE =
+        Pair("learn_dictionary_allow_mixed_symbols_numbers_preference", true)
+
+    private val ENABLE_PREDICTION_SEARCH_LEARN_DICTIONARY_PREFERENCE =
+        Pair("enable_prediction_search_learn_dictionary_preference", false)
+
+    private val LEARN_PREDICTION_PREFERENCE = Pair("learn_prediction_preference", 4)
+    private val LEARN_PREDICTION_CANDIDATE_LIMIT_PREFERENCE =
+        Pair("learn_dictionary_prediction_candidate_limit_preference", 4)
+    private val USER_DICTIONARY_PREDICTION_CANDIDATE_LIMIT_PREFERENCE =
+        Pair("user_dictionary_prediction_candidate_limit_preference", 4)
+
+    private val PREF_UP_START = Pair("circular_flick_up_start", 225f)
+    private val PREF_UP_SWEEP = Pair("circular_flick_up_sweep", 90f)
+
+    private val PREF_RIGHT_START = Pair("circular_flick_right_start", 315f)
+    private val PREF_RIGHT_SWEEP = Pair("circular_flick_right_sweep", 90f)
+
+    private val PREF_DOWN_START = Pair("circular_flick_down_start", 45f)
+    private val PREF_DOWN_SWEEP = Pair("circular_flick_down_sweep", 90f)
+
+    private val PREF_LEFT_START = Pair("circular_flick_left_start", 135f)
+    private val PREF_LEFT_SWEEP = Pair("circular_flick_left_sweep", 90f)
+
+    private val CIRCULAR_FLICK_WINDOW_SCALE = Pair("circular_flick_window_scale", 1.0f)
+
+    private val CUSTOM_THEME_BORDER_WIDTH = Pair("theme_custom_border_width", 1)
+
+    private val PREF_FIVE_DIRECTIONS_ENABLE = Pair("circular_flick_five_directions_enable", false)
+    private val PREF_UP_RIGHT_START = Pair("circular_flick_up_right_start", 90f)
+    private val PREF_UP_RIGHT_SWEEP = Pair("circular_flick_up_right_sweep", 72f)
+    private val PREF_SLOT_5_START = Pair("circular_flick_slot_5_start", 150f)
+    private val PREF_SLOT_5_SWEEP = Pair("circular_flick_slot_5_sweep", 60f)
+    private val PREF_SLOT_6_START = Pair("circular_flick_slot_6_start", 167.14285f)
+    private val PREF_SLOT_6_SWEEP = Pair("circular_flick_slot_6_sweep", 51.42857f)
+    private val PREF_CIRCULAR_DIRECTION_COUNT = Pair("circular_flick_direction_count", 4)
+    private val CIRCULAR_SLOT_ACTION_SETTINGS =
+        Pair("circular_slot_action_settings", "[]")
+
+    private val QWERTY_SWITCH_NUMBER_KEY_WITHOUT_NUMBER_PREFERENCE =
+        Pair("qwerty_switch_number_key_without_number_preference", false)
+
+    private val KEYBOARD_MARGIN_START_DP = Pair("keyboard_margin_start_dp_preference", 0)
+    private val KEYBOARD_MARGIN_END_DP = Pair("keyboard_margin_end_dp_preference", 0)
+    private val QWERTY_KEYBOARD_MARGIN_START_DP =
+        Pair("qwerty_keyboard_margin_start_dp_preference", 0)
+    private val QWERTY_KEYBOARD_MARGIN_END_DP = Pair("qwerty_keyboard_margin_end_dp_preference", 0)
+
+    private val KEYBOARD_MARGIN_START_DP_LANDSCAPE =
+        Pair("keyboard_margin_start_dp_landscape_preference", 0)
+    private val KEYBOARD_MARGIN_END_DP_LANDSCAPE =
+        Pair("keyboard_margin_end_dp_landscape_preference", 0)
+    private val QWERTY_KEYBOARD_MARGIN_START_DP_LANDSCAPE =
+        Pair("qwerty_keyboard_margin_start_dp_landscape_preference", 0)
+    private val QWERTY_KEYBOARD_MARGIN_END_DP_LANDSCAPE =
+        Pair("qwerty_keyboard_margin_end_dp_landscape_preference", 0)
+
+    private val ZENZ_MODEL_URI_PREFERENCE = Pair("zenz_model_uri_preference", "")
+    private val ENABLE_GEMMA_TRANSLATION_PREFERENCE =
+        Pair("gemma_translation_enable_preference", false)
+    private val GEMMA_TRANSLATION_BACKEND_PREFERENCE =
+        Pair("gemma_translation_backend_preference", "cpu")
+    private val GEMMA_TRANSLATION_TARGET_LANGUAGE_PREFERENCE =
+        Pair("gemma_translation_target_language_preference", "en")
+    private val GEMMA_TRANSLATION_MODEL_PATH_PREFERENCE =
+        Pair("gemma_translation_model_path_preference", "")
+    private val GEMMA_HANDWRITING_AUTO_RECOGNITION_DELAY_PREFERENCE =
+        Pair(
+            GEMMA_HANDWRITING_AUTO_RECOGNITION_DELAY_KEY,
+            GemmaHandwritingSettings.DEFAULT_AUTO_RECOGNITION_DELAY_MS.toInt(),
+        )
+    private val GEMMA_HANDWRITING_RECOGNITION_LANGUAGE_PREFERENCE =
+        Pair(
+            GEMMA_HANDWRITING_RECOGNITION_LANGUAGE_KEY,
+            GemmaHandwritingLanguage.AUTO.preferenceValue,
+        )
+    private val GEMMA_HANDWRITING_ADDITIONAL_INSTRUCTION_PREFERENCE =
+        Pair(
+            GEMMA_HANDWRITING_ADDITIONAL_INSTRUCTION_KEY,
+            "",
+        )
+    private val GEMMA_HANDWRITING_PEN_SIZE_PREFERENCE =
+        Pair(
+            GEMMA_HANDWRITING_PEN_SIZE_KEY,
+            GemmaHandwritingSettings.DEFAULT_PEN_SIZE_DP,
+        )
+    private val GEMMA_HANDWRITING_PEN_COLOR_PREFERENCE =
+        Pair(
+            GEMMA_HANDWRITING_PEN_COLOR_KEY,
+            GemmaHandwritingSettings.AUTOMATIC_PEN_COLOR,
+        )
+    private val KEYBOARD_BACKGROUND_IMAGE_URI_PREFERENCE =
+        Pair("keyboard_background_image_uri_preference", "")
+    private val KEYBOARD_BACKGROUND_IMAGE_DISPLAY_MODE_PREFERENCE =
+        Pair("keyboard_background_image_display_mode_preference", "fit")
+    private val KEYBOARD_BACKGROUND_VIDEO_URI_PREFERENCE =
+        Pair("keyboard_background_video_uri_preference", "")
+    private val KEYBOARD_BACKGROUND_VIDEO_QUALITY_PREFERENCE =
+        Pair("keyboard_background_video_quality_preference", "high")
+    private val SUMINAGASHI_INK_EFFECT_ENABLE =
+        Pair("suminagashi_ink_effect_preference", false)
+    private val KEYBOARD_TOUCH_EFFECT_TYPE =
+        Pair("keyboard_touch_effect_type_preference", KeyboardTouchEffectType.NONE)
+    private val KEYBOARD_TOUCH_EFFECT_QUALITY =
+        Pair("keyboard_touch_effect_quality_preference", KeyboardTouchEffectQuality.HIGH)
+    private val SUMINAGASHI_INK_COLOR_MODE =
+        Pair("suminagashi_ink_color_mode_preference", "random")
+    private val SUMINAGASHI_INK_COLOR =
+        Pair("suminagashi_ink_color_preference", Color.rgb(17, 17, 17))
+    private val KEYBOARD_TOUCH_EFFECT_COLOR_MODE =
+        Pair("keyboard_touch_effect_color_mode_preference", "random")
+    private val KEYBOARD_TOUCH_EFFECT_COLOR =
+        Pair("keyboard_touch_effect_color_preference", Color.rgb(17, 17, 17))
+    private val KEYBOARD_TOUCH_EFFECT_PALETTE =
+        Pair(
+            "keyboard_touch_effect_palette_preference",
+            SprayPaintSettings.PALETTE_PAINT_SPLASH
+        )
+    private val KEYBOARD_TOUCH_EFFECT_LIQUID_INK_DENSITY =
+        Pair("keyboard_touch_effect_liquid_ink_density_preference", 100)
+    private val KEYBOARD_TOUCH_EFFECT_AURORA_INK_DENSITY =
+        Pair("keyboard_touch_effect_aurora_ink_density_preference", 100)
+    private val KEYBOARD_TOUCH_EFFECT_CINEMATIC_WAVE_COLOR_MODE =
+        Pair(
+            "keyboard_touch_effect_cinematic_wave_color_mode_preference",
+            CinematicWaveSettings.COLOR_MODE_CINEMATIC_RANDOM
+        )
+    private val KEYBOARD_TOUCH_EFFECT_CINEMATIC_WAVE_PRIMARY_COLOR =
+        Pair(
+            "keyboard_touch_effect_cinematic_wave_primary_color_preference",
+            CinematicWaveSettings.DEFAULT_PRIMARY_COLOR
+        )
+    private val KEYBOARD_TOUCH_EFFECT_CINEMATIC_WAVE_SECONDARY_COLOR =
+        Pair(
+            "keyboard_touch_effect_cinematic_wave_secondary_color_preference",
+            CinematicWaveSettings.DEFAULT_SECONDARY_COLOR
+        )
+    private val KEYBOARD_TOUCH_EFFECT_CINEMATIC_WAVE_SECONDARY_COLOR_AUTO =
+        Pair("keyboard_touch_effect_cinematic_wave_secondary_color_auto_preference", true)
+    private val KEYBOARD_TOUCH_EFFECT_CINEMATIC_WAVE_TYPE =
+        Pair(
+            "keyboard_touch_effect_cinematic_wave_type_preference",
+            CinematicWaveSettings.WAVE_TYPE_AURORA_MEMBRANE
+        )
+    private val KEYBOARD_TOUCH_EFFECT_CINEMATIC_WAVE_OPACITY =
+        Pair("keyboard_touch_effect_cinematic_wave_opacity_percent_preference", 46)
+    private val KEYBOARD_TOUCH_EFFECT_CINEMATIC_WAVE_INTENSITY =
+        Pair("keyboard_touch_effect_cinematic_wave_intensity_percent_preference", 100)
+    private val KEYBOARD_TOUCH_EFFECT_CINEMATIC_WAVE_MOTION =
+        Pair(
+            "keyboard_touch_effect_cinematic_wave_motion_preference",
+            CinematicWaveSettings.MOTION_ELEGANT
+        )
+    private val KEYBOARD_TOUCH_EFFECT_CINEMATIC_WAVE_TOUCH_RESPONSE =
+        Pair(
+            "keyboard_touch_effect_cinematic_wave_touch_response_preference",
+            CinematicWaveSettings.TOUCH_RESPONSE_NORMAL
+        )
+    private val KEYBOARD_TOUCH_EFFECT_CINEMATIC_WAVE_QUALITY =
+        Pair(
+            "keyboard_touch_effect_cinematic_wave_quality_preference",
+            CinematicWaveSettings.QUALITY_BALANCED
+        )
+
+    private val SAVE_LAST_USED_KEYBOARD = Pair("save_last_used_keyboard", false)
+    private val SAVE_LAST_USED_KEYBOARD_POSITION = Pair("save_last_used_keyboard_int", 0)
+
+    private val ENABLE_ZENZ_RIGHT_CONTEXT_PREFERENCE =
+        Pair("enable_zenz_right_context_preference", false)
+
+    private val TYPO_CORRECTION_JA_FLICK =
+        Pair("enable_typo_correction_japanese_flick_keyboard_preference", false)
+
+    private val TYPO_CORRECTION_EN_QWERTY =
+        Pair("enable_typo_correction_qwerty_english_keyboard_preference", false)
+
+    private val CUSTOM_ROMAJI_ZENKAKU_CONVERSION_ENABLE_PREFERENCE =
+        Pair("custom_romaji_zenkaku_conversion_enable_preference", true)
+
+    private val OMISSION_SEARCH_OFFSET_SCORE_PREFERENCE =
+        Pair("omission_search_preference_offset_score_preference", 1900)
+
+    private val TYPO_CORRECTION_JA_FLICK_OFFSET_SCORE_PREFERENCE =
+        Pair("enable_typo_correction_japanese_flick_keyboard_offset_score_preference", 3000)
+
+    fun startInitialization(context: Context) {
+        synchronized(initializationStartLock) {
+            if (initialization.isCompletedExceptionally) {
+                initialization = CompletableFuture()
+                initializationStarted.set(false)
+            }
+            if (!initializationStarted.compareAndSet(false, true)) return
+            Thread({
+                try {
+                    init(context)
+                } catch (_: Throwable) {
+                    // init completed its future exceptionally; the loading UI owns retry.
+                }
+            }, "AppPreferenceInit").start()
+        }
+    }
+
+    suspend fun awaitInitializationSuspending() = kotlinx.coroutines.suspendCancellableCoroutine<Unit> { continuation ->
+        // A cancelled screen must not remain retained by a slow initialization future.
+        val waiting = java.util.concurrent.atomic.AtomicReference(continuation)
+        continuation.invokeOnCancellation { waiting.set(null) }
+        initialization.whenComplete { _, error ->
+            waiting.getAndSet(null)?.resumeWith(
+                if (error == null) Result.success(Unit) else Result.failure(error),
+            )
+        }
+    }
+
+    fun awaitInitialization() {
+        initialization.join()
+    }
+
+    fun init(context: Context) {
+        synchronized(initializationLock) {
+            initializationStarted.set(true)
+            initializingThread = Thread.currentThread()
+            try {
+                appContext = context.applicationContext
+                // This startup filesystem maintenance used to run in Application.onCreate on main.
+                appContext.codeCacheDir.setReadOnly()
+                isTabletDevice = context.resources.getBoolean(CoreR.bool.isTablet)
+                loadedPreferences = PreferenceManager.getDefaultSharedPreferences(context)
+                migrateCandidateHeightDefaultsIfNeeded()
+                removeUnsafeLegacyGemmaHandwritingPrompt()
+                migratePredictionLookaheadPreferenceIfNeeded()
+                migrateSymbolEmojiCandidatePreferenceIfNeeded()
+                migrateSumireKeymapGuideModesIfNeeded()
+                migrateGojuonKeyboardTypeIfNeeded(context)
+                migrateSumirePreferenceIfNeeded()
+                initialized = true
+                initialization.complete(Unit)
+            } catch (failure: Throwable) {
+                initialization.completeExceptionally(failure)
+                throw failure
+            } finally {
+                initializingThread = null
+            }
+        }
+    }
+
+    fun migrateGojuonKeyboardTypeIfNeeded(context: Context = appContext) {
+        isTabletDevice = context.resources.getBoolean(CoreR.bool.isTablet)
+        if (!isTabletDevice) {
+            if (preferences.contains(GOJUON_KEYBOARD_TYPE_MIGRATION_KEY)) {
+                preferences.edit { it.remove(GOJUON_KEYBOARD_TYPE_MIGRATION_KEY) }
+            }
+            return
+        }
+        if (preferences.getBoolean(GOJUON_KEYBOARD_TYPE_MIGRATION_KEY, false)) return
+
+        val legacyDefault = defaultKeyboardOrder(isTablet = false)
+        val legacyOrder = if (preferences.contains(KEYBOARD_ORDER.first)) {
+            parseKeyboardOrder(
+                preferences.getString(KEYBOARD_ORDER.first, defaultKeyboardOrderJson),
+                fallback = legacyDefault,
+                preserveEmpty = true,
+            )
+        } else {
+            legacyDefault
+        }
+        val result = GojuonKeyboardTypeMigration.resolve(
+            legacyGojuonEnabled = preferences.getBoolean(
+                TABLET_GOJUON_LAYOUT_PREFERENCE.first,
+                TABLET_GOJUON_LAYOUT_PREFERENCE.second,
+            ),
+            keyboardOrder = legacyOrder,
+            selectedPosition = preferences.getInt(
+                SAVE_LAST_USED_KEYBOARD_POSITION.first,
+                SAVE_LAST_USED_KEYBOARD_POSITION.second,
+            ),
+        )
+        preferences.edit {
+            it.putString(KEYBOARD_ORDER.first, gson.toJson(result.keyboardOrder))
+            it.putInt(SAVE_LAST_USED_KEYBOARD_POSITION.first, result.selectedPosition)
+            it.putBoolean(GOJUON_KEYBOARD_TYPE_MIGRATION_KEY, true)
+            it.remove(TABLET_GOJUON_LAYOUT_PREFERENCE.first)
+        }
+    }
+
+    private fun defaultKeyboardOrder(isTablet: Boolean = isTabletDevice): List<KeyboardType> {
+        return listOf(
+            if (isTablet) KeyboardType.GOJUON else KeyboardType.TENKEY,
+            KeyboardType.QWERTY,
+        )
+    }
+
+    private fun parseKeyboardOrder(
+        json: String?,
+        fallback: List<KeyboardType> = defaultKeyboardOrder(),
+        preserveEmpty: Boolean = false,
+    ): List<KeyboardType> {
+        val type = object : TypeToken<List<KeyboardType?>>() {}.type
+        return runCatching {
+            val parsed = gson.fromJson<List<KeyboardType?>>(json, type)
+                .orEmpty()
+                .filterNotNull()
+            if (preserveEmpty) parsed else parsed.ifEmpty { fallback }
+        }.getOrElse { fallback }
+    }
+
+    fun migrateSymbolEmojiCandidatePreferenceIfNeeded() {
+        if (!preferences.contains(LEGACY_SYMBOL_EMOJI_CANDIDATE_ENABLE_KEY)) return
+        val legacyValue = preferences.getBoolean(
+            LEGACY_SYMBOL_EMOJI_CANDIDATE_ENABLE_KEY,
+            true,
+        )
+        preferences.edit {
+            if (!preferences.contains(SYMBOL_CANDIDATE_ENABLE_PREFERENCE.first)) {
+                it.putBoolean(SYMBOL_CANDIDATE_ENABLE_PREFERENCE.first, legacyValue)
+            }
+            if (!preferences.contains(EMOJI_CANDIDATE_ENABLE_PREFERENCE.first)) {
+                it.putBoolean(EMOJI_CANDIDATE_ENABLE_PREFERENCE.first, legacyValue)
+            }
+            if (!preferences.contains(EMOTICON_CANDIDATE_ENABLE_PREFERENCE.first)) {
+                it.putBoolean(EMOTICON_CANDIDATE_ENABLE_PREFERENCE.first, legacyValue)
+            }
+            it.remove(LEGACY_SYMBOL_EMOJI_CANDIDATE_ENABLE_KEY)
+        }
+    }
+
+    private fun migrateSumireKeymapGuideModesIfNeeded() {
+        if (preferences.getBoolean(SUMIRE_KEYMAP_GUIDE_MIGRATION_KEY, false)) return
+        val legacyGuideEnabled = preferences.getBoolean(
+            FLICK_KEYMAP_GUIDE_PREFERENCE.first,
+            FLICK_KEYMAP_GUIDE_PREFERENCE.second
+        )
+        preferences.edit {
+            if (!preferences.contains(SUMIRE_KEYMAP_GUIDE_JAPANESE_PREFERENCE.first)) {
+                it.putBoolean(
+                    SUMIRE_KEYMAP_GUIDE_JAPANESE_PREFERENCE.first,
+                    legacyGuideEnabled
+                )
+            }
+            it.putBoolean(SUMIRE_KEYMAP_GUIDE_MIGRATION_KEY, true)
+        }
+    }
+
+    private fun removeUnsafeLegacyGemmaHandwritingPrompt() {
+        if (!preferences.contains(GEMMA_HANDWRITING_PROMPT_KEY)) return
+        preferences.edit {
+            it.remove(GEMMA_HANDWRITING_PROMPT_KEY)
+        }
+    }
+
+    private inline fun SharedPreferences.edit(operation: (SharedPreferences.Editor) -> Unit) {
+        val editor = edit()
+        operation(editor)
+        editor.apply()
+    }
+
+    private fun normalizeCursorMoveTargetPair(value: String): String? {
+        val trimmed = value.trim()
+        return if (trimmed.length == 2) trimmed else null
+    }
+
+    private fun normalizeQwertyNumberKeyFlickChars(map: Map<String, String?>): Map<String, String> {
+        val allowedKeys = setOf("1", "2", "3", "4", "5", "6", "7", "8", "9", "0")
+        return map.mapNotNull { (key, value) ->
+            val normalizedValue = value?.trim().orEmpty()
+            if (key in allowedKeys && normalizedValue.isNotEmpty()) {
+                key to normalizedValue.take(1)
+            } else {
+                null
+            }
+        }.toMap()
+    }
+
+    private fun readQwertyNumberKeyFlickChars(preferenceKey: String): Map<String, String> {
+        val raw = preferences.getString(preferenceKey, "{}") ?: "{}"
+        val parsed = runCatching {
+            gson.fromJson<Map<String, String?>>(
+                raw,
+                object : TypeToken<Map<String, String?>>() {}.type
+            )
+        }.getOrNull()
+        return normalizeQwertyNumberKeyFlickChars(parsed ?: emptyMap())
+    }
+
+    private fun readIntPreference(key: String, defaultValue: Int): Int {
+        return runCatching {
+            preferences.getInt(key, defaultValue)
+        }.getOrDefault(defaultValue)
+    }
+
+    fun resolveShortcutToolbarIconSizeDp(
+        toolbarHeightDp: Int = shortcut_toolbar_height_dp_preference,
+        iconSizeDp: Int = shortcut_toolbar_icon_size_dp_preference
+    ): Int {
+        val resolvedToolbarHeightDp = toolbarHeightDp.coerceIn(
+            SHORTCUT_TOOLBAR_HEIGHT_MIN_DP,
+            SHORTCUT_TOOLBAR_HEIGHT_MAX_DP
+        )
+        val resolvedIconSizeDp = iconSizeDp.coerceIn(
+            SHORTCUT_TOOLBAR_ICON_SIZE_MIN_DP,
+            SHORTCUT_TOOLBAR_ICON_SIZE_MAX_DP
+        )
+        val maxIconSizeForHeightDp = (resolvedToolbarHeightDp - 8)
+            .coerceAtLeast(SHORTCUT_TOOLBAR_ICON_SIZE_MIN_DP)
+        return resolvedIconSizeDp
+            .coerceAtMost(maxIconSizeForHeightDp)
+            .coerceIn(
+                SHORTCUT_TOOLBAR_ICON_SIZE_MIN_DP,
+                SHORTCUT_TOOLBAR_ICON_SIZE_MAX_DP
+            )
+    }
+
+    private fun normalizeCandidateColumn(column: String): String =
+        if (column in setOf("1", "2", "3")) column else "1"
+
+    private fun candidateHeightPreferenceFor(
+        isLandscape: Boolean,
+        column: String
+    ): Pair<String, Int> {
+        return when (normalizeCandidateColumn(column)) {
+            "2" -> if (isLandscape) {
+                CANDIDATE_VIEW_HEIGHT_LANDSCAPE_COLUMN_2_DP
+            } else {
+                CANDIDATE_VIEW_HEIGHT_PORTRAIT_COLUMN_2_DP
+            }
+
+            "3" -> if (isLandscape) {
+                CANDIDATE_VIEW_HEIGHT_LANDSCAPE_COLUMN_3_DP
+            } else {
+                CANDIDATE_VIEW_HEIGHT_PORTRAIT_COLUMN_3_DP
+            }
+
+            else -> if (isLandscape) {
+                CANDIDATE_VIEW_HEIGHT_LANDSCAPE_COLUMN_1_DP
+            } else {
+                CANDIDATE_VIEW_HEIGHT_PORTRAIT_COLUMN_1_DP
+            }
+        }
+    }
+
+    private fun candidateDefaultHeightPreferenceFor(
+        isLandscape: Boolean,
+        column: String
+    ): Pair<String, Int> {
+        return when (normalizeCandidateColumn(column)) {
+            "2" -> if (isLandscape) {
+                CANDIDATE_DEFAULT_HEIGHT_LANDSCAPE_COLUMN_2_DP
+            } else {
+                CANDIDATE_DEFAULT_HEIGHT_PORTRAIT_COLUMN_2_DP
+            }
+
+            "3" -> if (isLandscape) {
+                CANDIDATE_DEFAULT_HEIGHT_LANDSCAPE_COLUMN_3_DP
+            } else {
+                CANDIDATE_DEFAULT_HEIGHT_PORTRAIT_COLUMN_3_DP
+            }
+
+            else -> if (isLandscape) {
+                CANDIDATE_DEFAULT_HEIGHT_LANDSCAPE_COLUMN_1_DP
+            } else {
+                CANDIDATE_DEFAULT_HEIGHT_PORTRAIT_COLUMN_1_DP
+            }
+        }
+    }
+
+    private fun candidateEmptyHeightPreferenceFor(isLandscape: Boolean): Pair<String, Int> =
+        if (isLandscape) {
+            CANDIDATE_VIEW_EMPTY_HEIGHT_DP_LANDSCAPE
+        } else {
+            CANDIDATE_VIEW_EMPTY_HEIGHT_DP
+        }
+
+    private fun candidateDefaultEmptyHeightPreferenceFor(isLandscape: Boolean): Pair<String, Int> =
+        if (isLandscape) {
+            CANDIDATE_DEFAULT_EMPTY_HEIGHT_DP_LANDSCAPE
+        } else {
+            CANDIDATE_DEFAULT_EMPTY_HEIGHT_DP
+        }
+
+    var clipboard_history_enable: Boolean?
+        get() = preferences.getBoolean(
+            CLIPBOARD_HISTORY_ENABLE.first, CLIPBOARD_HISTORY_ENABLE.second
+        )
+        set(value) = preferences.edit {
+            it.putBoolean(CLIPBOARD_HISTORY_ENABLE.first, value ?: false)
+        }
+
+    var custom_keyboard_two_words_output: Boolean?
+        get() = preferences.getBoolean(
+            CUSTOM_KEYBOARD_TWO_WORDS_OUTPUTS.first, CUSTOM_KEYBOARD_TWO_WORDS_OUTPUTS.second
+        )
+        set(value) = preferences.edit {
+            it.putBoolean(CUSTOM_KEYBOARD_TWO_WORDS_OUTPUTS.first, value ?: false)
+        }
+
+    var tenkey_qwerty_switch_number_layout: Boolean?
+        get() = preferences.getBoolean(
+            TENKEY_SWITCH_QWERTY_PREFERENCE.first, TENKEY_SWITCH_QWERTY_PREFERENCE.second
+        )
+        set(value) = preferences.edit {
+            it.putBoolean(TENKEY_SWITCH_QWERTY_PREFERENCE.first, value ?: false)
+        }
+
+    var tenkey_use_three_state_keyboard_preference: Boolean
+        get() = preferences.getBoolean(
+            TENKEY_USE_THREE_STATE_KEYBOARD_PREFERENCE.first,
+            TENKEY_USE_THREE_STATE_KEYBOARD_PREFERENCE.second
+        )
+        set(value) = preferences.edit {
+            it.putBoolean(TENKEY_USE_THREE_STATE_KEYBOARD_PREFERENCE.first, value)
+        }
+
+    var tenkey_number_symbol_key_gap_preference: Int
+        get() = preferences.getInt(
+            TENKEY_NUMBER_SYMBOL_KEY_GAP_PREFERENCE.first,
+            TENKEY_NUMBER_SYMBOL_KEY_GAP_PREFERENCE.second,
+        ).coerceIn(0, 16)
+        set(value) = preferences.edit {
+            it.putInt(TENKEY_NUMBER_SYMBOL_KEY_GAP_PREFERENCE.first, value.coerceIn(0, 16))
+        }
+
+    var tenkey_switch_number_to_qwerty_number_preference: Boolean
+        get() = preferences.getBoolean(
+            TENKEY_SWITCH_NUMBER_TO_QWERTY_NUMBER_PREFERENCE.first,
+            TENKEY_SWITCH_NUMBER_TO_QWERTY_NUMBER_PREFERENCE.second
+        )
+        set(value) = preferences.edit {
+            it.putBoolean(TENKEY_SWITCH_NUMBER_TO_QWERTY_NUMBER_PREFERENCE.first, value)
+        }
+
+    var tenkey_restore_input_mode_on_restart_preference: Boolean
+        get() = preferences.getBoolean(
+            TENKEY_RESTORE_INPUT_MODE_ON_RESTART_PREFERENCE.first,
+            TENKEY_RESTORE_INPUT_MODE_ON_RESTART_PREFERENCE.second
+        )
+        set(value) = preferences.edit {
+            it.putBoolean(TENKEY_RESTORE_INPUT_MODE_ON_RESTART_PREFERENCE.first, value)
+        }
+
+    var tenkey_restore_input_mode_only_within_time_preference: Boolean
+        get() = preferences.getBoolean(
+            TENKEY_RESTORE_INPUT_MODE_ONLY_WITHIN_TIME_PREFERENCE.first,
+            TENKEY_RESTORE_INPUT_MODE_ONLY_WITHIN_TIME_PREFERENCE.second
+        )
+        set(value) = preferences.edit {
+            it.putBoolean(TENKEY_RESTORE_INPUT_MODE_ONLY_WITHIN_TIME_PREFERENCE.first, value)
+        }
+
+    var tenkey_restore_input_mode_timeout_minutes_preference: Int
+        get() = preferences.getInt(
+            TENKEY_RESTORE_INPUT_MODE_TIMEOUT_MINUTES_PREFERENCE.first,
+            TENKEY_RESTORE_INPUT_MODE_TIMEOUT_MINUTES_PREFERENCE.second
+        )
+        set(value) = preferences.edit {
+            it.putInt(TENKEY_RESTORE_INPUT_MODE_TIMEOUT_MINUTES_PREFERENCE.first, value)
+        }
+
+    // Publish a complete restart snapshot together, including the timeout timestamp.
+    // Keep apply() semantics: readers and listeners see the new state immediately.
+    internal fun saveTenkeyRestartInputMode(
+        mode: String,
+        presentation: String,
+        numberReturnTarget: String,
+        savedAtEpochMillis: Long,
+    ) = preferences.edit {
+        it.putString(TENKEY_LAST_INPUT_MODE_PREFERENCE.first, mode)
+        it.putString(TENKEY_LAST_INPUT_MODE_PRESENTATION_PREFERENCE.first, presentation)
+        it.putString(TENKEY_LAST_QWERTY_NUMBER_RETURN_TARGET_PREFERENCE.first, numberReturnTarget)
+        it.putLong(TENKEY_LAST_INPUT_MODE_SAVED_AT_EPOCH_MILLIS_PREFERENCE.first, savedAtEpochMillis)
+    }
+
+    internal fun saveSumireRestartInputMode(
+        mode: String,
+        presentation: String,
+        savedAtEpochMillis: Long,
+    ) = preferences.edit {
+        it.putString(SUMIRE_LAST_INPUT_MODE_PREFERENCE.first, mode)
+        it.putString(SUMIRE_LAST_INPUT_MODE_PRESENTATION_PREFERENCE.first, presentation)
+        it.putLong(SUMIRE_LAST_INPUT_MODE_SAVED_AT_EPOCH_MILLIS_PREFERENCE.first, savedAtEpochMillis)
+    }
+
+    var tenkey_last_input_mode_preference: String
+        get() = preferences.getString(
+            TENKEY_LAST_INPUT_MODE_PREFERENCE.first,
+            TENKEY_LAST_INPUT_MODE_PREFERENCE.second
+        ) ?: TENKEY_LAST_INPUT_MODE_PREFERENCE.second
+        set(value) = preferences.edit {
+            it.putString(TENKEY_LAST_INPUT_MODE_PREFERENCE.first, value)
+        }
+
+    var tenkey_last_input_mode_presentation_preference: String
+        get() = preferences.getString(
+            TENKEY_LAST_INPUT_MODE_PRESENTATION_PREFERENCE.first,
+            TENKEY_LAST_INPUT_MODE_PRESENTATION_PREFERENCE.second
+        ) ?: TENKEY_LAST_INPUT_MODE_PRESENTATION_PREFERENCE.second
+        set(value) = preferences.edit {
+            it.putString(TENKEY_LAST_INPUT_MODE_PRESENTATION_PREFERENCE.first, value)
+        }
+
+    var tenkey_last_qwerty_number_return_target_preference: String
+        get() = preferences.getString(
+            TENKEY_LAST_QWERTY_NUMBER_RETURN_TARGET_PREFERENCE.first,
+            TENKEY_LAST_QWERTY_NUMBER_RETURN_TARGET_PREFERENCE.second
+        ) ?: TENKEY_LAST_QWERTY_NUMBER_RETURN_TARGET_PREFERENCE.second
+        set(value) = preferences.edit {
+            it.putString(TENKEY_LAST_QWERTY_NUMBER_RETURN_TARGET_PREFERENCE.first, value)
+        }
+
+    var tenkey_last_input_mode_saved_at_epoch_millis_preference: Long
+        get() = preferences.getLong(
+            TENKEY_LAST_INPUT_MODE_SAVED_AT_EPOCH_MILLIS_PREFERENCE.first,
+            TENKEY_LAST_INPUT_MODE_SAVED_AT_EPOCH_MILLIS_PREFERENCE.second
+        )
+        set(value) = preferences.edit {
+            it.putLong(TENKEY_LAST_INPUT_MODE_SAVED_AT_EPOCH_MILLIS_PREFERENCE.first, value)
+        }
+
+    var tablet_tenkey_qwerty_switch_english_layout: Boolean
+        get() = preferences.getBoolean(
+            TABLET_TENKEY_SWITCH_QWERTY_PREFERENCE.first,
+            TABLET_TENKEY_SWITCH_QWERTY_PREFERENCE.second
+        )
+        set(value) = preferences.edit {
+            it.putBoolean(TABLET_TENKEY_SWITCH_QWERTY_PREFERENCE.first, value)
+        }
+
+    var tenkey_keymap_guide_layout: Boolean?
+        get() = preferences.getBoolean(
+            TENKEY_KEYMAP_GUIDE_PREFERENCE.first, TENKEY_KEYMAP_GUIDE_PREFERENCE.second
+        )
+        set(value) = preferences.edit {
+            it.putBoolean(TENKEY_KEYMAP_GUIDE_PREFERENCE.first, value ?: false)
+        }
+
+    var tenkey_keymap_guide_english: Boolean
+        get() = preferences.getBoolean(
+            TENKEY_KEYMAP_GUIDE_ENGLISH_PREFERENCE.first,
+            TENKEY_KEYMAP_GUIDE_ENGLISH_PREFERENCE.second
+        )
+        set(value) = preferences.edit {
+            it.putBoolean(TENKEY_KEYMAP_GUIDE_ENGLISH_PREFERENCE.first, value)
+        }
+
+    var tenkey_keymap_guide_number: Boolean
+        get() = preferences.getBoolean(
+            TENKEY_KEYMAP_GUIDE_NUMBER_PREFERENCE.first,
+            TENKEY_KEYMAP_GUIDE_NUMBER_PREFERENCE.second
+        )
+        set(value) = preferences.edit {
+            it.putBoolean(TENKEY_KEYMAP_GUIDE_NUMBER_PREFERENCE.first, value)
+        }
+
+    var flick_keymap_guide_layout: Boolean?
+        get() = preferences.getBoolean(
+            FLICK_KEYMAP_GUIDE_PREFERENCE.first, FLICK_KEYMAP_GUIDE_PREFERENCE.second
+        )
+        set(value) = preferences.edit {
+            it.putBoolean(FLICK_KEYMAP_GUIDE_PREFERENCE.first, value ?: false)
+        }
+
+    var sumire_keymap_guide_japanese: Boolean
+        get() = preferences.getBoolean(
+            SUMIRE_KEYMAP_GUIDE_JAPANESE_PREFERENCE.first,
+            SUMIRE_KEYMAP_GUIDE_JAPANESE_PREFERENCE.second
+        )
+        set(value) = preferences.edit {
+            it.putBoolean(SUMIRE_KEYMAP_GUIDE_JAPANESE_PREFERENCE.first, value)
+        }
+
+    var sumire_keymap_guide_english: Boolean
+        get() = preferences.getBoolean(
+            SUMIRE_KEYMAP_GUIDE_ENGLISH_PREFERENCE.first,
+            SUMIRE_KEYMAP_GUIDE_ENGLISH_PREFERENCE.second
+        )
+        set(value) = preferences.edit {
+            it.putBoolean(SUMIRE_KEYMAP_GUIDE_ENGLISH_PREFERENCE.first, value)
+        }
+
+    var sumire_keymap_guide_number: Boolean
+        get() = preferences.getBoolean(
+            SUMIRE_KEYMAP_GUIDE_NUMBER_PREFERENCE.first,
+            SUMIRE_KEYMAP_GUIDE_NUMBER_PREFERENCE.second
+        )
+        set(value) = preferences.edit {
+            it.putBoolean(SUMIRE_KEYMAP_GUIDE_NUMBER_PREFERENCE.first, value)
+        }
+
+    var flick_guide_text_size_sp_preference: Int?
+        get() = preferences.getInt(
+            FLICK_GUIDE_TEXT_SIZE_SP_PREFERENCE.first,
+            FLICK_GUIDE_TEXT_SIZE_SP_PREFERENCE.second
+        )
+        set(value) = preferences.edit {
+            it.putInt(
+                FLICK_GUIDE_TEXT_SIZE_SP_PREFERENCE.first,
+                value ?: FLICK_GUIDE_TEXT_SIZE_SP_PREFERENCE.second
+            )
+        }
+
+    var flick_guide_max_characters_preference: Int?
+        get() = preferences.getInt(
+            FLICK_GUIDE_MAX_CHARACTERS_PREFERENCE.first,
+            FLICK_GUIDE_MAX_CHARACTERS_PREFERENCE.second
+        )
+        set(value) = preferences.edit {
+            it.putInt(
+                FLICK_GUIDE_MAX_CHARACTERS_PREFERENCE.first,
+                value ?: FLICK_GUIDE_MAX_CHARACTERS_PREFERENCE.second
+            )
+        }
+
+    var qwerty_show_ime_button: Boolean?
+        get() = preferences.getBoolean(
+            QWERTY_SHOW_IME_SWITCH_BUTTON.first, QWERTY_SHOW_IME_SWITCH_BUTTON.second
+        )
+        set(value) = preferences.edit {
+            it.putBoolean(QWERTY_SHOW_IME_SWITCH_BUTTON.first, value ?: true)
+        }
+
+    var qwerty_show_emoji_button: Boolean?
+        get() = preferences.getBoolean(
+            QWERTY_SHOW_EMOJI_BUTTON.first, QWERTY_SHOW_EMOJI_BUTTON.second
+        )
+        set(value) = preferences.edit {
+            it.putBoolean(QWERTY_SHOW_EMOJI_BUTTON.first, value ?: false)
+        }
+
+    var qwerty_show_cursor_buttons: Boolean?
+        get() = preferences.getBoolean(
+            QWERTY_SHOW_CURSOR_BUTTONS.first, QWERTY_SHOW_CURSOR_BUTTONS.second
+        )
+        set(value) = preferences.edit {
+            it.putBoolean(QWERTY_SHOW_CURSOR_BUTTONS.first, value ?: false)
+        }
+
+    var qwerty_show_keymap_symbols: Boolean?
+        get() = preferences.getBoolean(
+            QWERTY_SHOW_KEYMAP_SYMBOLS.first, QWERTY_SHOW_KEYMAP_SYMBOLS.second
+        )
+        set(value) = preferences.edit {
+            it.putBoolean(QWERTY_SHOW_KEYMAP_SYMBOLS.first, value ?: false)
+        }
+
+    var qwerty_show_number_buttons: Boolean?
+        get() = preferences.getBoolean(
+            QWERTY_SHOW_NUMBER_BUTTONS.first, QWERTY_SHOW_NUMBER_BUTTONS.second
+        )
+        set(value) = preferences.edit {
+            it.putBoolean(QWERTY_SHOW_NUMBER_BUTTONS.first, value ?: false)
+        }
+
+    fun getQwertyNumberKeyFlickUpChars(): Map<String, String> =
+        readQwertyNumberKeyFlickChars(QWERTY_NUMBER_KEY_FLICK_UP_CHARS.first)
+
+    fun saveQwertyNumberKeyFlickUpChars(map: Map<String, String>) = preferences.edit {
+        it.putString(
+            QWERTY_NUMBER_KEY_FLICK_UP_CHARS.first,
+            gson.toJson(normalizeQwertyNumberKeyFlickChars(map))
+        )
+    }
+
+    fun getQwertyNumberKeyFlickDownChars(): Map<String, String> =
+        readQwertyNumberKeyFlickChars(QWERTY_NUMBER_KEY_FLICK_DOWN_CHARS.first)
+
+    fun saveQwertyNumberKeyFlickDownChars(map: Map<String, String>) = preferences.edit {
+        it.putString(
+            QWERTY_NUMBER_KEY_FLICK_DOWN_CHARS.first,
+            gson.toJson(normalizeQwertyNumberKeyFlickChars(map))
+        )
+    }
+
+    var qwerty_show_switch_romaji_english_button: Boolean?
+        get() = preferences.getBoolean(
+            QWERTY_SHOW_SWITCH_ROMAJI_ENGLISH.first, QWERTY_SHOW_SWITCH_ROMAJI_ENGLISH.second
+        )
+        set(value) = preferences.edit {
+            it.putBoolean(QWERTY_SHOW_SWITCH_ROMAJI_ENGLISH.first, value ?: true)
+        }
+
+    var qwerty_english_direct_input_preference: Boolean
+        get() = preferences.getBoolean(
+            QWERTY_ENGLISH_DIRECT_INPUT_PREFERENCE.first,
+            QWERTY_ENGLISH_DIRECT_INPUT_PREFERENCE.second
+        )
+        set(value) = preferences.edit {
+            it.putBoolean(QWERTY_ENGLISH_DIRECT_INPUT_PREFERENCE.first, value)
+        }
+
+    var qwerty_glide_input_preference: Boolean
+        get() = preferences.getBoolean(
+            QWERTY_GLIDE_INPUT_PREFERENCE.first,
+            QWERTY_GLIDE_INPUT_PREFERENCE.second
+        )
+        set(value) = preferences.edit {
+            it.putBoolean(QWERTY_GLIDE_INPUT_PREFERENCE.first, value)
+        }
+
+    var qwerty_glide_commit_previous_candidate_on_new_glide_preference: Boolean
+        get() = preferences.getBoolean(
+            QWERTY_GLIDE_COMMIT_PREVIOUS_CANDIDATE_ON_NEW_GLIDE_PREFERENCE.first,
+            QWERTY_GLIDE_COMMIT_PREVIOUS_CANDIDATE_ON_NEW_GLIDE_PREFERENCE.second
+        )
+        set(value) = preferences.edit {
+            it.putBoolean(
+                QWERTY_GLIDE_COMMIT_PREVIOUS_CANDIDATE_ON_NEW_GLIDE_PREFERENCE.first,
+                value
+            )
+        }
+
+    var qwerty_glide_insert_space_after_committing_previous_candidate_preference: Boolean
+        get() = preferences.getBoolean(
+            QWERTY_GLIDE_INSERT_SPACE_AFTER_COMMITTING_PREVIOUS_CANDIDATE_PREFERENCE.first,
+            QWERTY_GLIDE_INSERT_SPACE_AFTER_COMMITTING_PREVIOUS_CANDIDATE_PREFERENCE.second
+        )
+        set(value) = preferences.edit {
+            it.putBoolean(
+                QWERTY_GLIDE_INSERT_SPACE_AFTER_COMMITTING_PREVIOUS_CANDIDATE_PREFERENCE.first,
+                value
+            )
+        }
+
+    var switch_qwerty_password: Boolean?
+        get() = preferences.getBoolean(
+            SWITCH_QWERTY_PASSWORD.first, SWITCH_QWERTY_PASSWORD.second
+        )
+        set(value) = preferences.edit {
+            it.putBoolean(SWITCH_QWERTY_PASSWORD.first, value ?: false)
+        }
+
+    var landscape_force_qwerty_preference: Boolean
+        get() = preferences.getBoolean(
+            LANDSCAPE_FORCE_QWERTY_PREFERENCE.first,
+            LANDSCAPE_FORCE_QWERTY_PREFERENCE.second
+        )
+        set(value) = preferences.edit {
+            it.putBoolean(LANDSCAPE_FORCE_QWERTY_PREFERENCE.first, value)
+        }
+
+    fun isFullscreenModeAllowed(defaultValue: Boolean): Boolean =
+        preferences.getBoolean(ALLOW_FULLSCREEN_MODE_KEY, defaultValue)
+
+    var inline_suggestion_enabled_preference: Boolean
+        get() = preferences.getBoolean(
+            INLINE_SUGGESTION_ENABLED_PREFERENCE.first,
+            INLINE_SUGGESTION_ENABLED_PREFERENCE.second,
+        )
+        set(value) = preferences.edit {
+            it.putBoolean(INLINE_SUGGESTION_ENABLED_PREFERENCE.first, value)
+        }
+
+    var landscape_force_qwerty_romaji_preference: Boolean
+        get() = preferences.getBoolean(
+            LANDSCAPE_FORCE_QWERTY_ROMAJI_PREFERENCE.first,
+            LANDSCAPE_FORCE_QWERTY_ROMAJI_PREFERENCE.second
+        )
+        set(value) = preferences.edit {
+            it.putBoolean(LANDSCAPE_FORCE_QWERTY_ROMAJI_PREFERENCE.first, value)
+        }
+
+    var qwerty_enable_flick_up_preference: Boolean?
+        get() = preferences.getBoolean(
+            QWERTY_ENABLE_FLICK_UP_WINDOW.first, QWERTY_ENABLE_FLICK_UP_WINDOW.second
+        )
+        set(value) = preferences.edit {
+            it.putBoolean(QWERTY_ENABLE_FLICK_UP_WINDOW.first, value ?: false)
+        }
+
+    var qwerty_enable_flick_down_preference: Boolean?
+        get() = preferences.getBoolean(
+            QWERTY_ENABLE_FLICK_DOWN_WINDOW.first, QWERTY_ENABLE_FLICK_DOWN_WINDOW.second
+        )
+        set(value) = preferences.edit {
+            it.putBoolean(QWERTY_ENABLE_FLICK_DOWN_WINDOW.first, value ?: false)
+        }
+
+    var qwerty_enable_zenkaku_space_preference: Boolean?
+        get() = preferences.getBoolean(
+            QWERTY_ZENKAKU_SPACE_PREFERENCE.first, QWERTY_ZENKAKU_SPACE_PREFERENCE.second
+        )
+        set(value) = preferences.edit {
+            it.putBoolean(QWERTY_ZENKAKU_SPACE_PREFERENCE.first, value ?: false)
+        }
+
+    var qwerty_romaji_hankaku_number_preference: Boolean?
+        get() = preferences.getBoolean(
+            QWERTY_ROMAJI_HANKAKU_NUMBER_PREFERENCE.first,
+            QWERTY_ROMAJI_HANKAKU_NUMBER_PREFERENCE.second
+        )
+        set(value) = preferences.edit {
+            it.putBoolean(QWERTY_ROMAJI_HANKAKU_NUMBER_PREFERENCE.first, value ?: false)
+        }
+
+    var qwerty_romaji_hankaku_symbol_preference: Boolean?
+        get() = preferences.getBoolean(
+            QWERTY_ROMAJI_HANKAKU_SYMBOL_PREFERENCE.first,
+            QWERTY_ROMAJI_HANKAKU_SYMBOL_PREFERENCE.second
+        )
+        set(value) = preferences.edit {
+            it.putBoolean(QWERTY_ROMAJI_HANKAKU_SYMBOL_PREFERENCE.first, value ?: false)
+        }
+
+    var qwerty_show_popup_window: Boolean?
+        get() = preferences.getBoolean(
+            QWERTY_SHOW_POPUP_WINDOW.first, QWERTY_SHOW_POPUP_WINDOW.second
+        )
+        set(value) = preferences.edit {
+            it.putBoolean(QWERTY_SHOW_POPUP_WINDOW.first, value ?: true)
+        }
+
+    var key_popup_use_custom_color: Boolean
+        get() = preferences.getBoolean(
+            KEY_POPUP_USE_CUSTOM_COLOR.first,
+            KEY_POPUP_USE_CUSTOM_COLOR.second
+        )
+        set(value) = preferences.edit {
+            it.putBoolean(KEY_POPUP_USE_CUSTOM_COLOR.first, value)
+        }
+
+    var key_popup_background_color: Int
+        get() = readIntPreference(
+            KEY_POPUP_BACKGROUND_COLOR.first,
+            KEY_POPUP_BACKGROUND_COLOR.second
+        )
+        set(value) = preferences.edit {
+            it.putInt(KEY_POPUP_BACKGROUND_COLOR.first, value)
+        }
+
+    var key_popup_text_color: Int
+        get() = readIntPreference(KEY_POPUP_TEXT_COLOR.first, KEY_POPUP_TEXT_COLOR.second)
+        set(value) = preferences.edit {
+            it.putInt(KEY_POPUP_TEXT_COLOR.first, value)
+        }
+
+    var show_candidates_password: Boolean?
+        get() = preferences.getBoolean(
+            CANDIDATE_IN_PASSWORD.first, CANDIDATE_IN_PASSWORD.second
+        )
+        set(value) = preferences.edit {
+            it.putBoolean(CANDIDATE_IN_PASSWORD.first, value ?: true)
+        }
+
+    var show_candidates_password_compose: Boolean?
+        get() = preferences.getBoolean(
+            CANDIDATE_IN_PASSWORD_COMPOSE.first, CANDIDATE_IN_PASSWORD_COMPOSE.second
+        )
+        set(value) = preferences.edit {
+            it.putBoolean(CANDIDATE_IN_PASSWORD_COMPOSE.first, value ?: false)
+        }
+
+    var type_null_input_behavior_preference: String?
+        get() = preferences.getString(
+            TYPE_NULL_INPUT_BEHAVIOR.first,
+            TYPE_NULL_INPUT_BEHAVIOR.second
+        )
+        set(value) = preferences.edit {
+            it.putString(TYPE_NULL_INPUT_BEHAVIOR.first, value ?: TYPE_NULL_INPUT_BEHAVIOR.second)
+        }
+
+    var qwerty_show_kutouten_buttons: Boolean?
+        get() = preferences.getBoolean(
+            QWERTY_SHOW_KUTOUTEN_BUTTONS.first, QWERTY_SHOW_KUTOUTEN_BUTTONS.second
+        )
+        set(value) = preferences.edit {
+            it.putBoolean(QWERTY_SHOW_KUTOUTEN_BUTTONS.first, value ?: false)
+        }
+
+    var keyboard_order: List<KeyboardType>
+        get() {
+            val fallback = defaultKeyboardOrder()
+            if (!preferences.contains(KEYBOARD_ORDER.first)) return fallback
+            val json = preferences.getString(KEYBOARD_ORDER.first, gson.toJson(fallback))
+            return parseKeyboardOrder(json, fallback, preserveEmpty = true)
+        }
+        set(value) = preferences.edit {
+            val json = gson.toJson(value)
+            it.putString(KEYBOARD_ORDER.first, json)
+        }
+
+    var setting_home_frequent_keys: List<String>
+        get() {
+            val json = preferences.getString(
+                SETTING_HOME_FREQUENT_KEYS.first,
+                SETTING_HOME_FREQUENT_KEYS.second
+            )
+            if (json.isNullOrBlank()) return emptyList()
+            val type = object : TypeToken<List<String>>() {}.type
+            return runCatching {
+                gson.fromJson<List<String>>(json, type)
+                    .orEmpty()
+                    .filter { it.isNotBlank() }
+                    .distinct()
+            }.getOrDefault(emptyList())
+        }
+        set(value) = preferences.edit {
+            it.putString(
+                SETTING_HOME_FREQUENT_KEYS.first,
+                gson.toJson(value.filter { key -> key.isNotBlank() }.distinct())
+            )
+        }
+
+    val has_setting_home_frequent_keys: Boolean
+        get() = preferences.contains(SETTING_HOME_FREQUENT_KEYS.first)
+
+    var setting_use_new_home_screen_preference: Boolean
+        get() = preferences.getBoolean(
+            SETTING_USE_NEW_HOME_SCREEN.first,
+            SETTING_USE_NEW_HOME_SCREEN.second
+        )
+        set(value) = preferences.edit {
+            it.putBoolean(SETTING_USE_NEW_HOME_SCREEN.first, value)
+        }
+
+    var candidate_tab_order: List<CandidateTab>
+        get() {
+            val json = preferences.getString(
+                CANDIDATE_TAB_ORDER_PREFERENCE.first,
+                CANDIDATE_TAB_ORDER_PREFERENCE.second
+            )
+            val type = object : TypeToken<List<CandidateTab>>() {}.type
+            return gson.fromJson(json, type)
+        }
+        set(value) = preferences.edit {
+            val json = gson.toJson(value)
+            it.putString(CANDIDATE_TAB_ORDER_PREFERENCE.first, json)
+        }
+
+    var symbol_mode_preference: SymbolMode
+        get() {
+            val modeString = preferences.getString(
+                SYMBOL_MODE_PREFERENCE.first, SYMBOL_MODE_PREFERENCE.second
+            )
+            return try {
+                // 保存されている文字列からEnumを復元
+                SymbolMode.valueOf(modeString ?: SYMBOL_MODE_PREFERENCE.second)
+            } catch (e: IllegalArgumentException) {
+                // 不正な値が保存されていた場合はデフォルト値を返す
+                SymbolMode.valueOf(SYMBOL_MODE_PREFERENCE.second)
+            }
+        }
+        set(value) = preferences.edit {
+            // Enumを文字列として保存
+            it.putString(SYMBOL_MODE_PREFERENCE.first, value.name)
+        }
+
+    var default_emoji_skin_tone_preference: String
+        get() {
+            val skinTone = preferences.getString(
+                DEFAULT_EMOJI_SKIN_TONE_PREFERENCE.first,
+                DEFAULT_EMOJI_SKIN_TONE_PREFERENCE.second
+            ) ?: DEFAULT_EMOJI_SKIN_TONE_PREFERENCE.second
+            return if (EmojiSkinToneSupport.isSupportedSkinToneValue(skinTone)) {
+                skinTone
+            } else {
+                DEFAULT_EMOJI_SKIN_TONE_PREFERENCE.second
+            }
+        }
+        set(value) = preferences.edit {
+            val skinTone = if (EmojiSkinToneSupport.isSupportedSkinToneValue(value)) {
+                value
+            } else {
+                DEFAULT_EMOJI_SKIN_TONE_PREFERENCE.second
+            }
+            it.putString(DEFAULT_EMOJI_SKIN_TONE_PREFERENCE.first, skinTone)
+        }
+
+    var vibration_preference: Boolean?
+        get() = preferences.getBoolean(VIBRATION_PREFERENCE.first, VIBRATION_PREFERENCE.second)
+        set(value) = preferences.edit {
+            it.putBoolean(VIBRATION_PREFERENCE.first, value ?: true)
+        }
+
+    var ng_word_preference: Boolean?
+        get() = preferences.getBoolean(
+            NG_WORD_ENABLE_PREFERENCE.first, NG_WORD_ENABLE_PREFERENCE.second
+        )
+        set(value) = preferences.edit {
+            it.putBoolean(NG_WORD_ENABLE_PREFERENCE.first, value ?: true)
+        }
+
+    var vibration_timing_preference: String?
+        get() = preferences.getString(
+            VIBRATION_TIMING_PREFERENCE.first, VIBRATION_TIMING_PREFERENCE.second
+        )
+        set(value) = preferences.edit {
+            it.putString(VIBRATION_TIMING_PREFERENCE.first, value ?: "both")
+        }
+
+    var key_sound_preference: Boolean?
+        get() = preferences.getBoolean(KEY_SOUND_PREFERENCE.first, KEY_SOUND_PREFERENCE.second)
+        set(value) = preferences.edit {
+            it.putBoolean(KEY_SOUND_PREFERENCE.first, value ?: false)
+        }
+
+    var key_sound_volume_percent_preference: Int?
+        get() = preferences.getInt(
+            KEY_SOUND_VOLUME_PERCENT_PREFERENCE.first,
+            KEY_SOUND_VOLUME_PERCENT_PREFERENCE.second
+        )
+        set(value) = preferences.edit {
+            it.putInt(KEY_SOUND_VOLUME_PERCENT_PREFERENCE.first, value ?: 0)
+        }
+
+    var flick_sensitivity_preference: Int?
+        get() = preferences.getInt(
+            FLICK_SENSITIVITY.first, FLICK_SENSITIVITY.second
+        )
+        set(value) = preferences.edit {
+            it.putInt(FLICK_SENSITIVITY.first, value ?: 100)
+        }
+
+    var flick_threshold_shape_preference: String
+        get() = preferences.getString(
+            FLICK_THRESHOLD_SHAPE.first,
+            FLICK_THRESHOLD_SHAPE.second
+        ) ?: FLICK_THRESHOLD_SHAPE.second
+        set(value) = preferences.edit {
+            it.putString(
+                FLICK_THRESHOLD_SHAPE.first,
+                FlickThresholdShape.fromPreferenceValue(value).preferenceValue
+            )
+        }
+
+    var tfbi_diagonal_recognition_mode_preference: TfbiDiagonalRecognitionMode
+        get() = TfbiDiagonalRecognitionMode.fromPreferenceValue(
+            preferences.getString(
+                TFBI_DIAGONAL_RECOGNITION_MODE.first,
+                TFBI_DIAGONAL_RECOGNITION_MODE.second
+            )
+        )
+        set(value) = preferences.edit {
+            it.putString(TFBI_DIAGONAL_RECOGNITION_MODE.first, value.preferenceValue)
+        }
+
+    var hierarchical_flick_mode_switch_angle_margin_preference: Int
+        get() = preferences.getInt(
+            HIERARCHICAL_FLICK_MODE_SWITCH_ANGLE_MARGIN.first,
+            HIERARCHICAL_FLICK_MODE_SWITCH_ANGLE_MARGIN.second
+        ).coerceIn(0, 34)
+        set(value) = preferences.edit {
+            it.putInt(
+                HIERARCHICAL_FLICK_MODE_SWITCH_ANGLE_MARGIN.first,
+                value.coerceIn(0, 34)
+            )
+        }
+
+    var independent_multi_touch_preference: Boolean
+        get() = preferences.getBoolean(INDEPENDENT_MULTI_TOUCH_KEY, false)
+        set(value) = preferences.edit { it.putBoolean(INDEPENDENT_MULTI_TOUCH_KEY, value) }
+
+    var long_press_timeout_preference: Int?
+        get() = preferences.getInt(
+            LONG_PRESS_TIMEOUT.first, LONG_PRESS_TIMEOUT.second
+        )
+        set(value) = preferences.edit {
+            it.putInt(LONG_PRESS_TIMEOUT.first, value ?: 300)
+        }
+
+    var delete_long_press_conversion_behavior: String
+        get() = preferences.getString(
+            DELETE_LONG_PRESS_CONVERSION_BEHAVIOR.first,
+            DELETE_LONG_PRESS_CONVERSION_BEHAVIOR.second,
+        ) ?: DELETE_LONG_PRESS_CONVERSION_BEHAVIOR.second
+        set(value) = preferences.edit {
+            it.putString(DELETE_LONG_PRESS_CONVERSION_BEHAVIOR.first, value)
+        }
+
+    var n_best_preference: Int?
+        get() = preferences.getInt(
+            N_BEST_PREFERENCE.first, N_BEST_PREFERENCE.second
+        )
+        set(value) = preferences.edit {
+            it.putInt(N_BEST_PREFERENCE.first, value ?: 4)
+        }
+
+    var conversion_beam_width_preference: Int
+        get() = preferences.getInt(
+            CONVERSION_BEAM_WIDTH_PREFERENCE.first,
+            CONVERSION_BEAM_WIDTH_PREFERENCE.second,
+        ).coerceIn(1, 100)
+        set(value) = preferences.edit {
+            it.putInt(CONVERSION_BEAM_WIDTH_PREFERENCE.first, value.coerceIn(1, 100))
+        }
+
+    var incremental_conversion_session_preference: Boolean
+        get() = preferences.getBoolean(
+            INCREMENTAL_CONVERSION_SESSION_PREFERENCE.first,
+            INCREMENTAL_CONVERSION_SESSION_PREFERENCE.second,
+        )
+        set(value) = preferences.edit {
+            it.putBoolean(INCREMENTAL_CONVERSION_SESSION_PREFERENCE.first, value)
+        }
+
+    var date_candidate_config: DateCandidateConfig
+        get() {
+            val formatsByValue = DateCandidateFormat.entries.associateBy { it.preferenceValue }
+            val order = preferences.getString(DATE_CANDIDATE_ORDER_KEY, null)
+                ?.split(',')?.mapNotNull(formatsByValue::get).orEmpty()
+            val enabledValues = preferences.getStringSet(DATE_CANDIDATE_ENABLED_FORMATS_KEY, null)
+            val enabledFormats = enabledValues?.mapNotNull(formatsByValue::get)?.toSet()
+                ?: DateCandidateFormat.entries.toSet()
+            val config = DateCandidateConfig(order = order, enabledFormats = enabledFormats)
+            return config.copy(order = config.normalizedOrder)
+        }
+        set(value) = preferences.edit { editor ->
+            editor.putString(
+                DATE_CANDIDATE_ORDER_KEY,
+                value.normalizedOrder.joinToString(",") { it.preferenceValue },
+            )
+            editor.putStringSet(
+                DATE_CANDIDATE_ENABLED_FORMATS_KEY,
+                value.enabledFormats.mapTo(mutableSetOf()) { it.preferenceValue },
+            )
+        }
+
+    var utility_candidate_config: UtilityCandidateConfig
+        get() {
+            val calculationPrecision = preferences.getString(
+                UTILITY_CALCULATION_PRECISION_KEY,
+                "auto",
+            ).toUtilityPrecision()
+            return UtilityCandidateConfig(
+                calculationEnabled = preferences.getBoolean(
+                    UTILITY_CALCULATION_ENABLED_KEY,
+                    true,
+                ),
+                unitConversionEnabled = preferences.getBoolean(
+                    UTILITY_UNIT_CONVERSION_ENABLED_KEY,
+                    true,
+                ),
+                includeExpressionCandidate = preferences.getBoolean(
+                    UTILITY_EXPRESSION_CANDIDATE_ENABLED_KEY,
+                    true,
+                ),
+                formulaCandidateEnabled = preferences.getBoolean(
+                    UTILITY_FORMULA_CANDIDATE_ENABLED_KEY,
+                    true,
+                ),
+                angleMode = preferences.getString(UTILITY_ANGLE_MODE_KEY, "degrees")
+                    .toAngleMode(),
+                calculationPrecision = calculationPrecision,
+                regionalUnitProfile = preferences.getString(
+                    UTILITY_REGIONAL_PROFILE_KEY,
+                    "japan",
+                ).toRegionalUnitProfile(),
+                unitTargets = unitTargetSettingsCodec.decodeOrDefault(
+                    preferences.getString(UTILITY_UNIT_TARGETS_JSON_KEY, null),
+                ),
+            )
+        }
+        set(value) = preferences.edit { editor ->
+            editor.putBoolean(UTILITY_CALCULATION_ENABLED_KEY, value.calculationEnabled)
+            editor.putBoolean(UTILITY_UNIT_CONVERSION_ENABLED_KEY, value.unitConversionEnabled)
+            editor.putBoolean(
+                UTILITY_EXPRESSION_CANDIDATE_ENABLED_KEY,
+                value.includeExpressionCandidate,
+            )
+            editor.putBoolean(
+                UTILITY_FORMULA_CANDIDATE_ENABLED_KEY,
+                value.formulaCandidateEnabled,
+            )
+            editor.putString(
+                UTILITY_ANGLE_MODE_KEY,
+                if (value.angleMode == AngleMode.DEGREES) "degrees" else "radians",
+            )
+            editor.putString(
+                UTILITY_CALCULATION_PRECISION_KEY,
+                value.calculationPrecision.toPreferenceValue(),
+            )
+            editor.putString(
+                UTILITY_REGIONAL_PROFILE_KEY,
+                when (value.regionalUnitProfile) {
+                    RegionalUnitProfile.JAPAN -> "japan"
+                    RegionalUnitProfile.UNITED_STATES -> "united_states"
+                    RegionalUnitProfile.UNITED_KINGDOM -> "united_kingdom"
+                },
+            )
+            editor.putString(
+                UTILITY_UNIT_TARGETS_JSON_KEY,
+                unitTargetSettingsCodec.encode(value.unitTargets),
+            )
+        }
+
+    fun resetUtilityCandidateConfig() {
+        preferences.edit { editor ->
+            editor.remove(UTILITY_CALCULATION_ENABLED_KEY)
+            editor.remove(UTILITY_UNIT_CONVERSION_ENABLED_KEY)
+            editor.remove(UTILITY_EXPRESSION_CANDIDATE_ENABLED_KEY)
+            editor.remove(UTILITY_FORMULA_CANDIDATE_ENABLED_KEY)
+            editor.remove(UTILITY_ANGLE_MODE_KEY)
+            editor.remove(UTILITY_CALCULATION_PRECISION_KEY)
+            editor.remove(UTILITY_REGIONAL_PROFILE_KEY)
+            editor.remove(UTILITY_UNIT_TARGETS_JSON_KEY)
+        }
+    }
+
+    private fun String?.toAngleMode(): AngleMode = when (this) {
+        "radians" -> AngleMode.RADIANS
+        else -> AngleMode.DEGREES
+    }
+
+    private fun String?.toRegionalUnitProfile(): RegionalUnitProfile = when (this) {
+        "united_states" -> RegionalUnitProfile.UNITED_STATES
+        "united_kingdom" -> RegionalUnitProfile.UNITED_KINGDOM
+        else -> RegionalUnitProfile.JAPAN
+    }
+
+    private fun String?.toUtilityPrecision(): Precision = when (this) {
+        "auto", null -> Precision.Auto
+        "integer" -> Precision.DecimalPlaces(0)
+        else -> if (startsWith(UTILITY_DECIMAL_PRECISION_PREFIX)) {
+            removePrefix(UTILITY_DECIMAL_PRECISION_PREFIX).toIntOrNull()
+                ?.takeIf {
+                    it in Precision.MIN_DECIMAL_PLACES..Precision.MAX_DECIMAL_PLACES
+                }
+                ?.let(Precision::DecimalPlaces)
+                ?: Precision.Auto
+        } else {
+            toIntOrNull()
+                ?.takeIf { it in Precision.MIN_DIGITS..Precision.MAX_DIGITS }
+                ?.let(Precision::SignificantDigits)
+                ?: Precision.Auto
+        }
+    }
+
+    @Suppress("DEPRECATION")
+    private fun Precision.toPreferenceValue(): String = when (this) {
+        Precision.Auto -> "auto"
+        Precision.Integer -> "${UTILITY_DECIMAL_PRECISION_PREFIX}0"
+        is Precision.DecimalPlaces -> "$UTILITY_DECIMAL_PRECISION_PREFIX$places"
+        is Precision.SignificantDigits -> digits.toString()
+    }
+
+    var japanese_prediction_enable_preference: Boolean
+        get() = preferences.getBoolean(
+            JAPANESE_PREDICTION_ENABLE_PREFERENCE.first,
+            JAPANESE_PREDICTION_ENABLE_PREFERENCE.second,
+        )
+        set(value) = preferences.edit {
+            it.putBoolean(JAPANESE_PREDICTION_ENABLE_PREFERENCE.first, value)
+        }
+
+    var english_prediction_enable_preference: Boolean
+        get() = preferences.getBoolean(
+            ENGLISH_PREDICTION_ENABLE_PREFERENCE.first,
+            ENGLISH_PREDICTION_ENABLE_PREFERENCE.second,
+        )
+        set(value) = preferences.edit {
+            it.putBoolean(ENGLISH_PREDICTION_ENABLE_PREFERENCE.first, value)
+        }
+
+    var system_dictionary_prediction_enable_preference: Boolean
+        get() = preferences.getBoolean(
+            SYSTEM_DICTIONARY_PREDICTION_ENABLE_PREFERENCE.first,
+            SYSTEM_DICTIONARY_PREDICTION_ENABLE_PREFERENCE.second,
+        )
+        set(value) = preferences.edit {
+            it.putBoolean(SYSTEM_DICTIONARY_PREDICTION_ENABLE_PREFERENCE.first, value)
+        }
+
+    var prediction_minimum_input_length_preference: Int
+        get() = preferences.getInt(
+            PREDICTION_MINIMUM_INPUT_LENGTH_PREFERENCE.first,
+            PREDICTION_MINIMUM_INPUT_LENGTH_PREFERENCE.second,
+        ).coerceIn(3, 8)
+        set(value) = preferences.edit {
+            it.putInt(PREDICTION_MINIMUM_INPUT_LENGTH_PREFERENCE.first, value.coerceIn(3, 8))
+        }
+
+    var system_prediction_candidate_limit_preference: Int
+        get() = preferences.getInt(
+            SYSTEM_PREDICTION_CANDIDATE_LIMIT_PREFERENCE.first,
+            SYSTEM_PREDICTION_CANDIDATE_LIMIT_PREFERENCE.second,
+        ).coerceIn(1, 16)
+        set(value) = preferences.edit {
+            it.putInt(SYSTEM_PREDICTION_CANDIDATE_LIMIT_PREFERENCE.first, value.coerceIn(1, 16))
+        }
+
+    var prediction_lookahead_character_count_preference: Int
+        get() = when (
+            val storedValue = preferences.all[PREDICTION_LOOKAHEAD_CHARACTER_COUNT_PREFERENCE.first]
+        ) {
+            is Number -> storedValue.toInt()
+            is String -> legacyPredictionLookaheadCharacterCount(storedValue)
+            else -> PREDICTION_LOOKAHEAD_CHARACTER_COUNT_PREFERENCE.second
+        }.coerceIn(
+            PREDICTION_LOOKAHEAD_CHARACTER_COUNT_MIN,
+            PREDICTION_LOOKAHEAD_CHARACTER_COUNT_MAX,
+        )
+        set(value) = preferences.edit {
+            it.putInt(
+                PREDICTION_LOOKAHEAD_CHARACTER_COUNT_PREFERENCE.first,
+                value.coerceIn(
+                    PREDICTION_LOOKAHEAD_CHARACTER_COUNT_MIN,
+                    PREDICTION_LOOKAHEAD_CHARACTER_COUNT_MAX,
+                ),
+            )
+        }
+
+    fun migratePredictionLookaheadPreferenceIfNeeded() {
+        val key = PREDICTION_LOOKAHEAD_CHARACTER_COUNT_PREFERENCE.first
+        val storedValue = preferences.all[key] ?: return
+        val normalizedValue = when (storedValue) {
+            is Number -> storedValue.toInt()
+            is String -> legacyPredictionLookaheadCharacterCount(storedValue)
+            else -> PREDICTION_LOOKAHEAD_CHARACTER_COUNT_PREFERENCE.second
+        }.coerceIn(
+            PREDICTION_LOOKAHEAD_CHARACTER_COUNT_MIN,
+            PREDICTION_LOOKAHEAD_CHARACTER_COUNT_MAX,
+        )
+        if (storedValue !is Int || storedValue != normalizedValue) {
+            preferences.edit { it.putInt(key, normalizedValue) }
+        }
+    }
+
+    private fun legacyPredictionLookaheadCharacterCount(value: String): Int =
+        when (value) {
+            "short" -> 1
+            "standard" -> PREDICTION_LOOKAHEAD_CHARACTER_COUNT_DEFAULT
+            "long" -> PREDICTION_LOOKAHEAD_CHARACTER_COUNT_MAX
+            else -> value.toIntOrNull() ?: PREDICTION_LOOKAHEAD_CHARACTER_COUNT_DEFAULT
+        }
+
+    var prediction_aggressiveness_preference: String
+        get() = preferences.getString(
+            PREDICTION_AGGRESSIVENESS_PREFERENCE.first,
+            PREDICTION_AGGRESSIVENESS_PREFERENCE.second,
+        ) ?: PREDICTION_AGGRESSIVENESS_PREFERENCE.second
+        set(value) = preferences.edit {
+            it.putString(PREDICTION_AGGRESSIVENESS_PREFERENCE.first, value)
+        }
+
+    var system_user_dictionary_prediction_enable_preference: Boolean
+        get() = preferences.getBoolean(
+            SYSTEM_USER_DICTIONARY_PREDICTION_ENABLE_PREFERENCE.first,
+            SYSTEM_USER_DICTIONARY_PREDICTION_ENABLE_PREFERENCE.second,
+        )
+        set(value) = preferences.edit {
+            it.putBoolean(SYSTEM_USER_DICTIONARY_PREDICTION_ENABLE_PREFERENCE.first, value)
+        }
+
+    var reading_correction_prediction_enable_preference: Boolean
+        get() = preferences.getBoolean(
+            READING_CORRECTION_PREDICTION_ENABLE_PREFERENCE.first,
+            READING_CORRECTION_PREDICTION_ENABLE_PREFERENCE.second,
+        )
+        set(value) = preferences.edit {
+            it.putBoolean(READING_CORRECTION_PREDICTION_ENABLE_PREFERENCE.first, value)
+        }
+
+    var proverb_prediction_enable_preference: Boolean
+        get() = preferences.getBoolean(
+            PROVERB_PREDICTION_ENABLE_PREFERENCE.first,
+            PROVERB_PREDICTION_ENABLE_PREFERENCE.second,
+        )
+        set(value) = preferences.edit {
+            it.putBoolean(PROVERB_PREDICTION_ENABLE_PREFERENCE.first, value)
+        }
+
+    var external_mozc_prediction_enable_preference: Boolean
+        get() = preferences.getBoolean(
+            EXTERNAL_MOZC_PREDICTION_ENABLE_PREFERENCE.first,
+            EXTERNAL_MOZC_PREDICTION_ENABLE_PREFERENCE.second,
+        )
+        set(value) = preferences.edit {
+            it.putBoolean(EXTERNAL_MOZC_PREDICTION_ENABLE_PREFERENCE.first, value)
+        }
+
+    var symbol_emoji_prediction_enable_preference: Boolean
+        get() = preferences.getBoolean(
+            SYMBOL_EMOJI_PREDICTION_ENABLE_PREFERENCE.first,
+            SYMBOL_EMOJI_PREDICTION_ENABLE_PREFERENCE.second,
+        )
+        set(value) = preferences.edit {
+            it.putBoolean(SYMBOL_EMOJI_PREDICTION_ENABLE_PREFERENCE.first, value)
+        }
+
+    var symbol_candidate_enable_preference: Boolean
+        get() = preferences.getBoolean(
+            SYMBOL_CANDIDATE_ENABLE_PREFERENCE.first,
+            SYMBOL_CANDIDATE_ENABLE_PREFERENCE.second,
+        )
+        set(value) = preferences.edit {
+            it.putBoolean(SYMBOL_CANDIDATE_ENABLE_PREFERENCE.first, value)
+        }
+
+    var emoji_candidate_enable_preference: Boolean
+        get() = preferences.getBoolean(
+            EMOJI_CANDIDATE_ENABLE_PREFERENCE.first,
+            EMOJI_CANDIDATE_ENABLE_PREFERENCE.second,
+        )
+        set(value) = preferences.edit {
+            it.putBoolean(EMOJI_CANDIDATE_ENABLE_PREFERENCE.first, value)
+        }
+
+    var emoticon_candidate_enable_preference: Boolean
+        get() = preferences.getBoolean(
+            EMOTICON_CANDIDATE_ENABLE_PREFERENCE.first,
+            EMOTICON_CANDIDATE_ENABLE_PREFERENCE.second,
+        )
+        set(value) = preferences.edit {
+            it.putBoolean(EMOTICON_CANDIDATE_ENABLE_PREFERENCE.first, value)
+        }
+
+    var candidate_order_override_enable_preference: Boolean?
+        get() = preferences.getBoolean(
+            CANDIDATE_ORDER_OVERRIDE_ENABLE.first,
+            CANDIDATE_ORDER_OVERRIDE_ENABLE.second
+        )
+        set(value) = preferences.edit {
+            it.putBoolean(CANDIDATE_ORDER_OVERRIDE_ENABLE.first, value ?: false)
+        }
+
+    var learn_dictionary_preference: Boolean?
+        get() = preferences.getBoolean(
+            LEARN_DICTIONARY_PREFERENCE.first, LEARN_DICTIONARY_PREFERENCE.second
+        )
+        set(value) = preferences.edit {
+            it.putBoolean(LEARN_DICTIONARY_PREFERENCE.first, value ?: true)
+        }
+
+    var incognito_mode_detection_preference: Boolean
+        get() = preferences.getBoolean(
+            INCOGNITO_MODE_DETECTION_PREFERENCE.first,
+            INCOGNITO_MODE_DETECTION_PREFERENCE.second
+        )
+        set(value) = preferences.edit {
+            it.putBoolean(INCOGNITO_MODE_DETECTION_PREFERENCE.first, value)
+        }
+
+    var show_learned_candidates_in_incognito_preference: Boolean
+        get() = preferences.getBoolean(
+            SHOW_LEARNED_CANDIDATES_IN_INCOGNITO_PREFERENCE.first,
+            SHOW_LEARNED_CANDIDATES_IN_INCOGNITO_PREFERENCE.second
+        )
+        set(value) = preferences.edit {
+            it.putBoolean(SHOW_LEARNED_CANDIDATES_IN_INCOGNITO_PREFERENCE.first, value)
+        }
+
+    var user_dictionary_preference: Boolean?
+        get() = preferences.getBoolean(
+            USER_DICTIONARY_PREFERENCE.first, USER_DICTIONARY_PREFERENCE.second
+        )
+        set(value) = preferences.edit {
+            it.putBoolean(USER_DICTIONARY_PREFERENCE.first, value ?: true)
+        }
+
+    var user_dictionary_prefix_match_number_preference: Int?
+        get() = preferences.getInt(
+            USER_DICTIONARY_PREFIX_PREFERENCE.first, USER_DICTIONARY_PREFIX_PREFERENCE.second
+        )
+        set(value) = preferences.edit {
+            it.putInt(USER_DICTIONARY_PREFIX_PREFERENCE.first, value ?: 2)
+        }
+
+    var user_dictionary_prediction_candidate_limit_preference: Int
+        get() = preferences.getInt(
+            USER_DICTIONARY_PREDICTION_CANDIDATE_LIMIT_PREFERENCE.first,
+            USER_DICTIONARY_PREDICTION_CANDIDATE_LIMIT_PREFERENCE.second,
+        ).coerceIn(1, 8)
+        set(value) = preferences.edit {
+            it.putInt(
+                USER_DICTIONARY_PREDICTION_CANDIDATE_LIMIT_PREFERENCE.first,
+                value.coerceIn(1, 8),
+            )
+        }
+
+    var user_template_preference: Boolean?
+        get() = preferences.getBoolean(
+            USER_TEMPLATE_PREFERENCE.first, USER_TEMPLATE_PREFERENCE.second
+        )
+        set(value) = preferences.edit {
+            it.putBoolean(USER_TEMPLATE_PREFERENCE.first, value ?: true)
+        }
+
+    var text_macro_candidate_preference: Boolean
+        get() = preferences.getBoolean(
+            TEXT_MACRO_CANDIDATE_PREFERENCE.first,
+            TEXT_MACRO_CANDIDATE_PREFERENCE.second,
+        )
+        set(value) = preferences.edit {
+            it.putBoolean(TEXT_MACRO_CANDIDATE_PREFERENCE.first, value)
+        }
+
+    var system_ngram_dictionary_enable_preference: Boolean
+        get() = preferences.getBoolean(
+            SYSTEM_NGRAM_DICTIONARY_ENABLE_PREFERENCE.first,
+            SYSTEM_NGRAM_DICTIONARY_ENABLE_PREFERENCE.second,
+        )
+        set(value) = preferences.edit {
+            it.putBoolean(SYSTEM_NGRAM_DICTIONARY_ENABLE_PREFERENCE.first, value)
+        }
+
+    var custom_ngram_dictionary_enable_preference: Boolean
+        get() = preferences.getBoolean(
+            CUSTOM_NGRAM_DICTIONARY_ENABLE_PREFERENCE.first,
+            CUSTOM_NGRAM_DICTIONARY_ENABLE_PREFERENCE.second,
+        )
+        set(value) = preferences.edit {
+            it.putBoolean(CUSTOM_NGRAM_DICTIONARY_ENABLE_PREFERENCE.first, value)
+        }
+
+    var preserve_dictionary_word_whitespace_preference: Boolean
+        get() = preferences.getBoolean(PRESERVE_DICTIONARY_WORD_WHITESPACE_KEY, false)
+        set(value) = preferences.edit {
+            it.putBoolean(PRESERVE_DICTIONARY_WORD_WHITESPACE_KEY, value)
+        }
+
+    var show_dictionary_candidate_labels_preference: Boolean
+        get() = preferences.getBoolean(
+            SHOW_DICTIONARY_CANDIDATE_LABELS_PREFERENCE.first,
+            SHOW_DICTIONARY_CANDIDATE_LABELS_PREFERENCE.second,
+        )
+        set(value) = preferences.edit {
+            it.putBoolean(SHOW_DICTIONARY_CANDIDATE_LABELS_PREFERENCE.first, value)
+        }
+
+    var suppress_hentaigana_candidates_preference: Boolean
+        get() = preferences.getBoolean(
+            SUPPRESS_HENTAIGANA_CANDIDATES_PREFERENCE.first,
+            SUPPRESS_HENTAIGANA_CANDIDATES_PREFERENCE.second,
+        )
+        set(value) = preferences.edit {
+            it.putBoolean(SUPPRESS_HENTAIGANA_CANDIDATES_PREFERENCE.first, value)
+        }
+
+    var zero_query_suggestion_preference: Boolean
+        get() = preferences.getBoolean(
+            ZERO_QUERY_SUGGESTION_PREFERENCE.first,
+            ZERO_QUERY_SUGGESTION_PREFERENCE.second
+        )
+        set(value) = preferences.edit {
+            it.putBoolean(ZERO_QUERY_SUGGESTION_PREFERENCE.first, value)
+        }
+
+    var time_same_pronounce_typing_preference: Int?
+        get() = preferences.getInt(
+            TIME_SAME_PRONOUNCE_TYPING.first, TIME_SAME_PRONOUNCE_TYPING.second
+        )
+        set(value) = preferences.edit {
+            it.putInt(TIME_SAME_PRONOUNCE_TYPING.first, value ?: 1000)
+        }
+
+    var mozc_ut_person_names_preference: Boolean?
+        get() = preferences.getBoolean(MOZCUT_PERSON_NAME.first, MOZCUT_PERSON_NAME.second)
+        set(value) = preferences.edit {
+            it.putBoolean(MOZCUT_PERSON_NAME.first, value ?: false)
+        }
+
+    var mozc_ut_places_preference: Boolean?
+        get() = preferences.getBoolean(MOZCUT_PLACES.first, MOZCUT_PLACES.second)
+        set(value) = preferences.edit {
+            it.putBoolean(MOZCUT_PLACES.first, value ?: false)
+        }
+
+    var mozc_ut_wiki_preference: Boolean?
+        get() = preferences.getBoolean(MOZCUT_WIKI.first, MOZCUT_WIKI.second)
+        set(value) = preferences.edit {
+            it.putBoolean(MOZCUT_WIKI.first, value ?: false)
+        }
+
+    var mozc_ut_neologd_preference: Boolean?
+        get() = preferences.getBoolean(MOZCUT_NEOLOGD.first, MOZCUT_NEOLOGD.second)
+        set(value) = preferences.edit {
+            it.putBoolean(MOZCUT_NEOLOGD.first, value ?: false)
+        }
+
+    var mozc_ut_web_preference: Boolean?
+        get() = preferences.getBoolean(MOZCUT_WEB.first, MOZCUT_WEB.second)
+        set(value) = preferences.edit {
+            it.putBoolean(MOZCUT_WEB.first, value ?: false)
+        }
+
+    var keyboard_height: Int?
+        get() = preferences.getInt(
+            KEYBOARD_HEIGHT.first, KEYBOARD_HEIGHT.second
+        )
+        set(value) = preferences.edit {
+            it.putInt(KEYBOARD_HEIGHT.first, value ?: 280)
+        }
+
+    var keyboard_width: Int?
+        get() = preferences.getInt(
+            KEYBOARD_WIDTH.first, KEYBOARD_WIDTH.second
+        )
+        set(value) = preferences.edit {
+            it.putInt(KEYBOARD_WIDTH.first, value ?: 100)
+        }
+
+    var qwerty_keyboard_height: Int?
+        get() = preferences.getInt(
+            QWERTY_KEYBOARD_HEIGHT.first, QWERTY_KEYBOARD_HEIGHT.second
+        )
+        set(value) = preferences.edit {
+            it.putInt(QWERTY_KEYBOARD_HEIGHT.first, value ?: 220)
+        }
+
+    var qwerty_keyboard_width: Int?
+        get() = preferences.getInt(
+            QWERTY_KEYBOARD_WIDTH.first, QWERTY_KEYBOARD_WIDTH.second
+        )
+        set(value) = preferences.edit {
+            it.putInt(QWERTY_KEYBOARD_WIDTH.first, value ?: 100)
+        }
+
+    var qwerty_keyboard_vertical_margin_bottom: Int?
+        get() = preferences.getInt(
+            QWERTY_KEYBOARD_VERTICAL_MARGIN_BOTTOM.first,
+            QWERTY_KEYBOARD_VERTICAL_MARGIN_BOTTOM.second
+        )
+        set(value) = preferences.edit {
+            it.putInt(QWERTY_KEYBOARD_VERTICAL_MARGIN_BOTTOM.first, value ?: 0)
+        }
+
+    var keyboard_position: Boolean?
+        get() = preferences.getBoolean(KEYBOARD_POSITION.first, KEYBOARD_POSITION.second)
+        set(value) = preferences.edit {
+            it.putBoolean(KEYBOARD_POSITION.first, value ?: true)
+        }
+
+    var qwerty_keyboard_position: Boolean?
+        get() = preferences.getBoolean(
+            QWERTY_KEYBOARD_POSITION.first,
+            QWERTY_KEYBOARD_POSITION.second
+        )
+        set(value) = preferences.edit {
+            it.putBoolean(QWERTY_KEYBOARD_POSITION.first, value ?: true)
+        }
+
+    var keyboard_vertical_margin_bottom: Int?
+        get() = preferences.getInt(
+            KEYBOARD_VERTICAL_MARGIN_BOTTOM.first, KEYBOARD_VERTICAL_MARGIN_BOTTOM.second
+        )
+        set(value) = preferences.edit {
+            it.putInt(KEYBOARD_VERTICAL_MARGIN_BOTTOM.first, value ?: 0)
+        }
+
+    var keyboard_height_landscape: Int?
+        get() = preferences.getInt(
+            KEYBOARD_HEIGHT_LANDSCAPE.first, KEYBOARD_HEIGHT_LANDSCAPE.second
+        )
+        set(value) = preferences.edit {
+            it.putInt(KEYBOARD_HEIGHT_LANDSCAPE.first, value ?: 220)
+        }
+
+    var keyboard_width_landscape: Int?
+        get() = preferences.getInt(
+            KEYBOARD_WIDTH_LANDSCAPE.first, KEYBOARD_WIDTH_LANDSCAPE.second
+        )
+        set(value) = preferences.edit {
+            it.putInt(KEYBOARD_WIDTH_LANDSCAPE.first, value ?: 100)
+        }
+
+    var keyboard_position_landscape: Boolean?
+        get() = preferences.getBoolean(
+            KEYBOARD_POSITION_LANDSCAPE.first, KEYBOARD_POSITION_LANDSCAPE.second
+        )
+        set(value) = preferences.edit {
+            it.putBoolean(KEYBOARD_POSITION_LANDSCAPE.first, value ?: true)
+        }
+
+    var keyboard_vertical_margin_bottom_landscape: Int?
+        get() = preferences.getInt(
+            KEYBOARD_VERTICAL_MARGIN_BOTTOM_LANDSCAPE.first,
+            KEYBOARD_VERTICAL_MARGIN_BOTTOM_LANDSCAPE.second
+        )
+        set(value) = preferences.edit {
+            it.putInt(KEYBOARD_VERTICAL_MARGIN_BOTTOM_LANDSCAPE.first, value ?: 0)
+        }
+
+    var qwerty_keyboard_height_landscape: Int?
+        get() = preferences.getInt(
+            QWERTY_KEYBOARD_HEIGHT_LANDSCAPE.first, QWERTY_KEYBOARD_HEIGHT_LANDSCAPE.second
+        )
+        set(value) = preferences.edit {
+            it.putInt(QWERTY_KEYBOARD_HEIGHT_LANDSCAPE.first, value ?: 220)
+        }
+
+    var qwerty_keyboard_width_landscape: Int?
+        get() = preferences.getInt(
+            QWERTY_KEYBOARD_WIDTH_LANDSCAPE.first, QWERTY_KEYBOARD_WIDTH_LANDSCAPE.second
+        )
+        set(value) = preferences.edit {
+            it.putInt(QWERTY_KEYBOARD_WIDTH_LANDSCAPE.first, value ?: 100)
+        }
+
+    var qwerty_keyboard_vertical_margin_bottom_landscape: Int?
+        get() = preferences.getInt(
+            QWERTY_KEYBOARD_VERTICAL_MARGIN_BOTTOM_LANDSCAPE.first,
+            QWERTY_KEYBOARD_VERTICAL_MARGIN_BOTTOM_LANDSCAPE.second
+        )
+        set(value) = preferences.edit {
+            it.putInt(QWERTY_KEYBOARD_VERTICAL_MARGIN_BOTTOM_LANDSCAPE.first, value ?: 0)
+        }
+
+    var qwerty_keyboard_position_landscape: Boolean?
+        get() = preferences.getBoolean(
+            QWERTY_KEYBOARD_POSITION_LANDSCAPE.first,
+            QWERTY_KEYBOARD_POSITION_LANDSCAPE.second
+        )
+        set(value) = preferences.edit {
+            it.putBoolean(QWERTY_KEYBOARD_POSITION_LANDSCAPE.first, value ?: true)
+        }
+
+    var candidate_view_height_dp_landscape: Int?
+        get() = preferences.getInt(
+            CANDIDATE_VIEW_HEIGHT_DP_LANDSCAPE.first, CANDIDATE_VIEW_HEIGHT_DP_LANDSCAPE.second
+        )
+        set(value) = preferences.edit {
+            it.putInt(
+                CANDIDATE_VIEW_HEIGHT_DP_LANDSCAPE.first,
+                value ?: CANDIDATE_VIEW_HEIGHT_DP_LANDSCAPE.second
+            )
+        }
+
+    var candidate_view_empty_height_dp_landscape: Int?
+        get() = preferences.getInt(
+            CANDIDATE_VIEW_EMPTY_HEIGHT_DP_LANDSCAPE.first,
+            CANDIDATE_VIEW_EMPTY_HEIGHT_DP_LANDSCAPE.second
+        )
+        set(value) = preferences.edit {
+            it.putInt(
+                CANDIDATE_VIEW_EMPTY_HEIGHT_DP_LANDSCAPE.first,
+                value ?: CANDIDATE_VIEW_EMPTY_HEIGHT_DP_LANDSCAPE.second
+            )
+        }
+
+    var flick_input_only_preference: Boolean?
+        get() = preferences.getBoolean(FLICK_INPUT_ONLY.first, FLICK_INPUT_ONLY.second)
+        set(value) = preferences.edit {
+            it.putBoolean(FLICK_INPUT_ONLY.first, value ?: false)
+        }
+
+    var flick_editor_preview_preference: Boolean
+        get() = preferences.getBoolean(
+            FLICK_EDITOR_PREVIEW.first,
+            FLICK_EDITOR_PREVIEW.second
+        )
+        set(value) = preferences.edit {
+            it.putBoolean(FLICK_EDITOR_PREVIEW.first, value)
+        }
+
+    var flick_editor_preview_delay_ms: Int
+        get() = FlickPreviewDelaySettings.normalize(
+            preferences.getInt(FlickPreviewDelaySettings.KEY, 0)
+        )
+        set(value) = preferences.edit {
+            it.putInt(FlickPreviewDelaySettings.KEY, FlickPreviewDelaySettings.normalize(value))
+        }
+
+    var undo_enable_preference: Boolean?
+        get() = preferences.getBoolean(UNDO_ENABLE.first, UNDO_ENABLE.second)
+        set(value) = preferences.edit {
+            it.putBoolean(UNDO_ENABLE.first, value ?: false)
+        }
+
+    var omission_search_preference: Boolean?
+        get() = preferences.getBoolean(OMISSION_SEARCH.first, OMISSION_SEARCH.second)
+        set(value) = preferences.edit {
+            it.putBoolean(OMISSION_SEARCH.first, value ?: false)
+        }
+
+    var tenkey_space_flick_preference: Boolean
+        get() = preferences.getBoolean("tenkey_space_flick_preference", true)
+        set(value) = preferences.edit {
+            it.putBoolean("tenkey_space_flick_preference", value)
+        }
+
+    var qwerty_english_space_flick_preference: Boolean
+        get() = preferences.getBoolean("qwerty_english_space_flick_preference", false)
+        set(value) = preferences.edit {
+            it.putBoolean("qwerty_english_space_flick_preference", value)
+        }
+
+    var qwerty_romaji_space_flick_preference: Boolean
+        get() = preferences.getBoolean("qwerty_romaji_space_flick_preference", false)
+        set(value) = preferences.edit {
+            it.putBoolean("qwerty_romaji_space_flick_preference", value)
+        }
+
+    var space_hankaku_preference: Boolean?
+        get() = preferences.getBoolean(SPACE_HANKAKU_ENABLE.first, SPACE_HANKAKU_ENABLE.second)
+        set(value) = preferences.edit {
+            it.putBoolean(SPACE_HANKAKU_ENABLE.first, value ?: false)
+        }
+
+    var custom_direct_mode_space_hankaku_preference: Boolean?
+        get() = preferences.getBoolean(
+            CUSTOM_DIRECT_MODE_SPACE_HANKAKU_ENABLE.first,
+            CUSTOM_DIRECT_MODE_SPACE_HANKAKU_ENABLE.second
+        )
+        set(value) = preferences.edit {
+            it.putBoolean(
+                CUSTOM_DIRECT_MODE_SPACE_HANKAKU_ENABLE.first,
+                value ?: CUSTOM_DIRECT_MODE_SPACE_HANKAKU_ENABLE.second
+            )
+        }
+
+    var live_conversion_preference: Boolean?
+        get() = preferences.getBoolean(LIVE_CONVERSION_ENABLE.first, LIVE_CONVERSION_ENABLE.second)
+        set(value) = preferences.edit {
+            it.putBoolean(LIVE_CONVERSION_ENABLE.first, value ?: false)
+        }
+
+    var live_conversion_start_length_preference: Int?
+        get() = preferences.getInt(
+            LIVE_CONVERSION_START_LENGTH.first,
+            LIVE_CONVERSION_START_LENGTH.second
+        )
+        set(value) = preferences.edit {
+            it.putInt(
+                LIVE_CONVERSION_START_LENGTH.first,
+                value ?: LIVE_CONVERSION_START_LENGTH.second
+            )
+        }
+
+    var live_conversion_candidate_yomi_preference: Boolean?
+        get() = preferences.getBoolean(
+            LIVE_CONVERSION_CANDIDATE_YOMI.first,
+            LIVE_CONVERSION_CANDIDATE_YOMI.second
+        )
+        set(value) = preferences.edit {
+            it.putBoolean(
+                LIVE_CONVERSION_CANDIDATE_YOMI.first,
+                value ?: LIVE_CONVERSION_CANDIDATE_YOMI.second
+            )
+        }
+
+    var live_conversion_candidate_yomi_mode: String
+        get() = preferences.getString(
+            LIVE_CONVERSION_CANDIDATE_YOMI_MODE_KEY, CANDIDATE_YOMI_MODE_WHOLE
+        ).let { if (it == CANDIDATE_YOMI_MODE_RUBY) it else CANDIDATE_YOMI_MODE_WHOLE }
+        set(value) = preferences.edit {
+            it.putString(LIVE_CONVERSION_CANDIDATE_YOMI_MODE_KEY,
+                if (value == CANDIDATE_YOMI_MODE_RUBY) value else CANDIDATE_YOMI_MODE_WHOLE)
+        }
+
+    var live_conversion_candidate_yomi_size: Int
+        get() = preferences.getInt(
+            LIVE_CONVERSION_CANDIDATE_YOMI_SIZE_KEY, DEFAULT_LIVE_CONVERSION_CANDIDATE_YOMI_SIZE
+        ).coerceIn(MIN_LIVE_CONVERSION_CANDIDATE_YOMI_SIZE, MAX_LIVE_CONVERSION_CANDIDATE_YOMI_SIZE)
+        set(value) = preferences.edit {
+            it.putInt(LIVE_CONVERSION_CANDIDATE_YOMI_SIZE_KEY,
+                value.coerceIn(MIN_LIVE_CONVERSION_CANDIDATE_YOMI_SIZE, MAX_LIVE_CONVERSION_CANDIDATE_YOMI_SIZE))
+        }
+
+    var delete_key_high_light_preference: Boolean?
+        get() = preferences.getBoolean(DELETE_KEY_HIGH_LIGHT.first, DELETE_KEY_HIGH_LIGHT.second)
+        set(value) = preferences.edit {
+            it.putBoolean(DELETE_KEY_HIGH_LIGHT.first, value ?: true)
+        }
+
+    var custom_keyboard_suggestion_preference: Boolean?
+        get() = preferences.getBoolean(
+            CUSTOM_KEYBOARD_SUGGESTION_PREFERENCE.first,
+            CUSTOM_KEYBOARD_SUGGESTION_PREFERENCE.second
+        )
+        set(value) = preferences.edit {
+            it.putBoolean(CUSTOM_KEYBOARD_SUGGESTION_PREFERENCE.first, value ?: true)
+        }
+
+    var custom_direct_input_replace_composing_preference: Boolean
+        get() = preferences.getBoolean(CUSTOM_DIRECT_INPUT_REPLACE_COMPOSING_KEY, false)
+        set(value) = preferences.edit {
+            it.putBoolean(CUSTOM_DIRECT_INPUT_REPLACE_COMPOSING_KEY, value)
+        }
+
+    var custom_keyboard_input_in_empty_areas_preference: Boolean
+        get() = preferences.getBoolean(
+            CUSTOM_KEYBOARD_INPUT_IN_EMPTY_AREAS_PREFERENCE.first,
+            CUSTOM_KEYBOARD_INPUT_IN_EMPTY_AREAS_PREFERENCE.second
+        )
+        set(value) = preferences.edit {
+            it.putBoolean(CUSTOM_KEYBOARD_INPUT_IN_EMPTY_AREAS_PREFERENCE.first, value)
+        }
+
+    var remember_last_custom_keyboard_preference: Boolean?
+        get() = preferences.getBoolean(
+            REMEMBER_LAST_CUSTOM_KEYBOARD_PREFERENCE.first,
+            REMEMBER_LAST_CUSTOM_KEYBOARD_PREFERENCE.second
+        )
+        set(value) = preferences.edit {
+            it.putBoolean(REMEMBER_LAST_CUSTOM_KEYBOARD_PREFERENCE.first, value ?: false)
+        }
+
+    var remember_custom_keyboard_input_mode_preference: Boolean?
+        get() = preferences.getBoolean(
+            REMEMBER_CUSTOM_KEYBOARD_INPUT_MODE_PREFERENCE.first,
+            REMEMBER_CUSTOM_KEYBOARD_INPUT_MODE_PREFERENCE.second
+        )
+        set(value) = preferences.edit {
+            it.putBoolean(REMEMBER_CUSTOM_KEYBOARD_INPUT_MODE_PREFERENCE.first, value ?: false)
+        }
+
+    var last_used_custom_keyboard_stable_id: String?
+        get() = preferences.getString(
+            LAST_USED_CUSTOM_KEYBOARD_STABLE_ID.first,
+            LAST_USED_CUSTOM_KEYBOARD_STABLE_ID.second
+        )
+        set(value) = preferences.edit {
+            it.putString(LAST_USED_CUSTOM_KEYBOARD_STABLE_ID.first, value.orEmpty())
+        }
+
+    fun saveCustomKeyboardLastDirectMode(key: String, value: Boolean) = preferences.edit {
+        it.putBoolean("$CUSTOM_KEYBOARD_LAST_DIRECT_MODE_PREFIX$key", value)
+    }
+
+    fun getCustomKeyboardLastDirectMode(key: String): Boolean? {
+        val preferenceKey = "$CUSTOM_KEYBOARD_LAST_DIRECT_MODE_PREFIX$key"
+        return if (preferences.contains(preferenceKey)) {
+            preferences.getBoolean(preferenceKey, false)
+        } else {
+            null
+        }
+    }
+
+    fun saveCustomKeyboardLastRomajiMode(key: String, value: Boolean) = preferences.edit {
+        it.putBoolean("$CUSTOM_KEYBOARD_LAST_ROMAJI_MODE_PREFIX$key", value)
+    }
+
+    fun getCustomKeyboardLastRomajiMode(key: String): Boolean? {
+        val preferenceKey = "$CUSTOM_KEYBOARD_LAST_ROMAJI_MODE_PREFIX$key"
+        return if (preferences.contains(preferenceKey)) {
+            preferences.getBoolean(preferenceKey, false)
+        } else {
+            null
+        }
+    }
+
+    var sumire_input_selection_preference: String?
+        get() = preferences.getString(
+            SUMIRE_INPUT_SELECTION_PREFERENCE.first, SUMIRE_INPUT_SELECTION_PREFERENCE.second
+        )
+        set(value) = preferences.edit {
+            it.putString(SUMIRE_INPUT_SELECTION_PREFERENCE.first, value ?: "toggle-default")
+        }
+
+    var sumire_keyboard_style: String
+        get() = preferences.getString(NEW_SUMIRE_STYLE_KEY, "default") ?: "default"
+        set(value) = preferences.edit {
+            it.putString(NEW_SUMIRE_STYLE_KEY, value)
+        }
+
+    var sumire_input_method: String
+        get() = preferences.getString(NEW_SUMIRE_METHOD_KEY, "toggle") ?: "toggle"
+        set(value) = preferences.edit {
+            it.putString(NEW_SUMIRE_METHOD_KEY, value)
+        }
+
+    var is_floating_mode: Boolean?
+        get() = preferences.getBoolean(
+            KEYBOARD_FLOATING_PREFERENCE.first, KEYBOARD_FLOATING_PREFERENCE.second
+        )
+        set(value) = preferences.edit {
+            it.putBoolean(KEYBOARD_FLOATING_PREFERENCE.first, value ?: false)
+        }
+
+    var keyboard_floating_position_x: Int
+        get() = preferences.getInt(
+            KEYBOARD_FLOATING_POSITION_X.first, KEYBOARD_FLOATING_POSITION_X.second
+        )
+        set(value) = preferences.edit {
+            it.putInt(KEYBOARD_FLOATING_POSITION_X.first, value)
+        }
+
+    var keyboard_floating_position_y: Int
+        get() = preferences.getInt(
+            KEYBOARD_FLOATING_POSITION_Y.first, KEYBOARD_FLOATING_POSITION_Y.second
+        )
+        set(value) = preferences.edit {
+            it.putInt(KEYBOARD_FLOATING_POSITION_Y.first, value)
+        }
+
+    var candidate_view_height_dp: Int?
+        get() = preferences.getInt(
+            CANDIDATE_VIEW_HEIGHT_DP.first, CANDIDATE_VIEW_HEIGHT_DP.second
+        )
+        set(value) = preferences.edit {
+            it.putInt(CANDIDATE_VIEW_HEIGHT_DP.first, value ?: CANDIDATE_VIEW_HEIGHT_DP.second)
+        }
+
+    var candidate_view_empty_height_dp: Int?
+        get() = preferences.getInt(
+            CANDIDATE_VIEW_EMPTY_HEIGHT_DP.first, CANDIDATE_VIEW_EMPTY_HEIGHT_DP.second
+        )
+        set(value) = preferences.edit {
+            it.putInt(
+                CANDIDATE_VIEW_EMPTY_HEIGHT_DP.first,
+                value ?: CANDIDATE_VIEW_EMPTY_HEIGHT_DP.second
+            )
+        }
+
+    var candidate_column_preference: String
+        get() = preferences.getString(
+            CANDIDATE_COLUMN_PREFERENCE.first, CANDIDATE_COLUMN_PREFERENCE.second
+        ) ?: "1"
+        set(value) = preferences.edit {
+            it.putString(CANDIDATE_COLUMN_PREFERENCE.first, value)
+        }
+
+    var candidate_column_landscape_preference: String
+        get() = preferences.getString(
+            CANDIDATE_COLUMN_LANDSCAPE_PREFERENCE.first,
+            CANDIDATE_COLUMN_LANDSCAPE_PREFERENCE.second
+        ) ?: "1"
+        set(value) = preferences.edit {
+            it.putString(CANDIDATE_COLUMN_LANDSCAPE_PREFERENCE.first, value)
+        }
+
+    internal fun migrateCandidateHeightDefaultsIfNeeded() {
+        if (preferences.getInt(
+                CANDIDATE_HEIGHT_DEFAULTS_MIGRATION_VERSION_KEY,
+                0
+            ) >= CURRENT_CANDIDATE_HEIGHT_DEFAULTS_MIGRATION_VERSION
+        ) {
+            return
+        }
+
+        preferences.edit { editor ->
+            listOf(false, true).forEach { isLandscape ->
+                listOf("1", "2", "3").forEach { column ->
+                    val heightPreference = candidateHeightPreferenceFor(isLandscape, column)
+                    editor.putInt(heightPreference.first, heightPreference.second)
+
+                    val defaultPreference = candidateDefaultHeightPreferenceFor(isLandscape, column)
+                    editor.putInt(defaultPreference.first, defaultPreference.second)
+                }
+
+                val activeColumn = getCandidateColumn(isLandscape)
+                val activeHeight = candidateHeightPreferenceFor(isLandscape, activeColumn).second
+                editor.putInt(
+                    if (isLandscape) {
+                        CANDIDATE_VIEW_HEIGHT_DP_LANDSCAPE.first
+                    } else {
+                        CANDIDATE_VIEW_HEIGHT_DP.first
+                    },
+                    activeHeight
+                )
+
+                val emptyPreference = candidateEmptyHeightPreferenceFor(isLandscape)
+                editor.putInt(emptyPreference.first, emptyPreference.second)
+
+                val defaultEmptyPreference = candidateDefaultEmptyHeightPreferenceFor(isLandscape)
+                editor.putInt(defaultEmptyPreference.first, defaultEmptyPreference.second)
+            }
+
+            // The per-column values have been initialized above, so the older lazy migration
+            // must not copy the active value over them later.
+            editor.putBoolean(CANDIDATE_HEIGHT_PER_COLUMN_MIGRATED.first, true)
+            editor.putInt(
+                CANDIDATE_HEIGHT_DEFAULTS_MIGRATION_VERSION_KEY,
+                CURRENT_CANDIDATE_HEIGHT_DEFAULTS_MIGRATION_VERSION
+            )
+        }
+    }
+
+    fun migrateCandidateHeightPerColumnPreferencesIfNeeded() {
+        if (preferences.getBoolean(
+                CANDIDATE_HEIGHT_PER_COLUMN_MIGRATED.first,
+                CANDIDATE_HEIGHT_PER_COLUMN_MIGRATED.second
+            )
+        ) {
+            return
+        }
+
+        val portraitColumn = normalizeCandidateColumn(candidate_column_preference)
+        val landscapeColumn = normalizeCandidateColumn(candidate_column_landscape_preference)
+        val portraitHeight = candidateHeightForPerColumnMigration(false, portraitColumn)
+        val landscapeHeight = candidateHeightForPerColumnMigration(true, landscapeColumn)
+
+        preferences.edit { editor ->
+            candidateHeightPreferenceFor(isLandscape = false, column = "1").let { editor.putInt(it.first, it.second) }
+            candidateHeightPreferenceFor(isLandscape = false, column = "2").let { editor.putInt(it.first, it.second) }
+            candidateHeightPreferenceFor(isLandscape = false, column = "3").let { editor.putInt(it.first, it.second) }
+            candidateHeightPreferenceFor(isLandscape = true, column = "1").let { editor.putInt(it.first, it.second) }
+            candidateHeightPreferenceFor(isLandscape = true, column = "2").let { editor.putInt(it.first, it.second) }
+            candidateHeightPreferenceFor(isLandscape = true, column = "3").let { editor.putInt(it.first, it.second) }
+            editor.putInt(candidateHeightPreferenceFor(false, portraitColumn).first, portraitHeight)
+            editor.putInt(candidateHeightPreferenceFor(true, landscapeColumn).first, landscapeHeight)
+            editor.putInt(CANDIDATE_VIEW_HEIGHT_DP.first, portraitHeight)
+            editor.putInt(CANDIDATE_VIEW_HEIGHT_DP_LANDSCAPE.first, landscapeHeight)
+            editor.putBoolean(CANDIDATE_HEIGHT_PER_COLUMN_MIGRATED.first, true)
+        }
+    }
+
+    private fun candidateHeightForPerColumnMigration(
+        isLandscape: Boolean,
+        column: String
+    ): Int {
+        val activePreference = if (isLandscape) {
+            CANDIDATE_VIEW_HEIGHT_DP_LANDSCAPE
+        } else {
+            CANDIDATE_VIEW_HEIGHT_DP
+        }
+        val heightDp = if (preferences.contains(activePreference.first)) {
+            readIntPreference(activePreference.first, activePreference.second)
+        } else {
+            candidateHeightPreferenceFor(isLandscape, column).second
+        }
+        return heightDp.coerceIn(MIN_CANDIDATE_VISIBLE_HEIGHT_DP, MAX_CANDIDATE_VISIBLE_HEIGHT_DP)
+    }
+
+    fun getCandidateVisibleHeightDp(
+        isLandscape: Boolean,
+        column: String
+    ): Int {
+        migrateCandidateHeightPerColumnPreferencesIfNeeded()
+        val preference = candidateHeightPreferenceFor(isLandscape, normalizeCandidateColumn(column))
+        return readIntPreference(preference.first, preference.second)
+            .coerceIn(MIN_CANDIDATE_VISIBLE_HEIGHT_DP, MAX_CANDIDATE_VISIBLE_HEIGHT_DP)
+    }
+
+    fun setCandidateVisibleHeightDp(
+        isLandscape: Boolean,
+        column: String,
+        heightDp: Int
+    ) {
+        migrateCandidateHeightPerColumnPreferencesIfNeeded()
+        val normalizedColumn = normalizeCandidateColumn(column)
+        val clampedHeight = heightDp.coerceIn(
+            MIN_CANDIDATE_VISIBLE_HEIGHT_DP,
+            MAX_CANDIDATE_VISIBLE_HEIGHT_DP
+        )
+        val preference = candidateHeightPreferenceFor(isLandscape, normalizedColumn)
+        preferences.edit { editor ->
+            editor.putInt(preference.first, clampedHeight)
+            if (normalizeCandidateColumn(getCandidateColumn(isLandscape)) == normalizedColumn) {
+                editor.putInt(
+                    if (isLandscape) {
+                        CANDIDATE_VIEW_HEIGHT_DP_LANDSCAPE.first
+                    } else {
+                        CANDIDATE_VIEW_HEIGHT_DP.first
+                    },
+                    clampedHeight
+                )
+            }
+        }
+    }
+
+    fun getCandidateDefaultVisibleHeightDp(
+        isLandscape: Boolean,
+        column: String
+    ): Int {
+        val preference = candidateDefaultHeightPreferenceFor(
+            isLandscape,
+            normalizeCandidateColumn(column)
+        )
+        return readIntPreference(preference.first, preference.second)
+            .coerceIn(MIN_CANDIDATE_VISIBLE_HEIGHT_DP, MAX_CANDIDATE_VISIBLE_HEIGHT_DP)
+    }
+
+    fun setCandidateDefaultVisibleHeightDp(
+        isLandscape: Boolean,
+        column: String,
+        heightDp: Int
+    ) {
+        val preference = candidateDefaultHeightPreferenceFor(
+            isLandscape,
+            normalizeCandidateColumn(column)
+        )
+        preferences.edit { editor ->
+            editor.putInt(
+                preference.first,
+                heightDp.coerceIn(
+                    MIN_CANDIDATE_VISIBLE_HEIGHT_DP,
+                    MAX_CANDIDATE_VISIBLE_HEIGHT_DP
+                )
+            )
+        }
+    }
+
+    fun getCandidateDefaultEmptyHeightDp(isLandscape: Boolean): Int {
+        val preference = candidateDefaultEmptyHeightPreferenceFor(isLandscape)
+        return readIntPreference(preference.first, preference.second)
+            .coerceIn(MIN_CANDIDATE_VISIBLE_HEIGHT_DP, MAX_CANDIDATE_VISIBLE_HEIGHT_DP)
+    }
+
+    fun setCandidateDefaultEmptyHeightDp(isLandscape: Boolean, heightDp: Int) {
+        val preference = candidateDefaultEmptyHeightPreferenceFor(isLandscape)
+        preferences.edit { editor ->
+            editor.putInt(
+                preference.first,
+                heightDp.coerceIn(
+                    MIN_CANDIDATE_VISIBLE_HEIGHT_DP,
+                    MAX_CANDIDATE_VISIBLE_HEIGHT_DP
+                )
+            )
+        }
+    }
+
+    fun resetCandidateHeightSettingsToUserDefaults(isLandscape: Boolean) {
+        migrateCandidateHeightPerColumnPreferencesIfNeeded()
+        val activeColumn = getCandidateColumn(isLandscape)
+        val emptyHeight = getCandidateDefaultEmptyHeightDp(isLandscape)
+        val emptyPreference = candidateEmptyHeightPreferenceFor(isLandscape)
+        preferences.edit { editor ->
+            listOf("1", "2", "3").forEach { column ->
+                val heightDp = getCandidateDefaultVisibleHeightDp(isLandscape, column)
+                editor.putInt(candidateHeightPreferenceFor(isLandscape, column).first, heightDp)
+                if (column == activeColumn) {
+                    editor.putInt(
+                        if (isLandscape) {
+                            CANDIDATE_VIEW_HEIGHT_DP_LANDSCAPE.first
+                        } else {
+                            CANDIDATE_VIEW_HEIGHT_DP.first
+                        },
+                        heightDp
+                    )
+                }
+            }
+            editor.putInt(emptyPreference.first, emptyHeight)
+        }
+    }
+
+    fun resetCandidateHeightDefaultsToFactoryDefaults(isLandscape: Boolean) {
+        val emptyPreference = candidateDefaultEmptyHeightPreferenceFor(isLandscape)
+        preferences.edit { editor ->
+            listOf("1", "2", "3").forEach { column ->
+                val preference = candidateDefaultHeightPreferenceFor(isLandscape, column)
+                editor.putInt(preference.first, preference.second)
+            }
+            editor.putInt(emptyPreference.first, emptyPreference.second)
+        }
+    }
+
+    fun copyCandidateHeightSettingsToUserDefaults(isLandscape: Boolean) {
+        migrateCandidateHeightPerColumnPreferencesIfNeeded()
+        val emptyPreference = candidateEmptyHeightPreferenceFor(isLandscape)
+        val emptyHeight = readIntPreference(emptyPreference.first, emptyPreference.second)
+            .coerceIn(MIN_CANDIDATE_VISIBLE_HEIGHT_DP, MAX_CANDIDATE_VISIBLE_HEIGHT_DP)
+        val defaultEmptyPreference = candidateDefaultEmptyHeightPreferenceFor(isLandscape)
+        preferences.edit { editor ->
+            listOf("1", "2", "3").forEach { column ->
+                val heightDp = getCandidateVisibleHeightDp(isLandscape, column)
+                editor.putInt(
+                    candidateDefaultHeightPreferenceFor(isLandscape, column).first,
+                    heightDp
+                )
+            }
+            editor.putInt(defaultEmptyPreference.first, emptyHeight)
+        }
+    }
+
+    fun getCandidateColumn(isLandscape: Boolean): String =
+        normalizeCandidateColumn(
+            if (isLandscape) {
+                candidate_column_landscape_preference
+            } else {
+                candidate_column_preference
+            }
+        )
+
+    fun setCandidateColumnAndSyncHeight(
+        isLandscape: Boolean,
+        column: String
+    ) {
+        migrateCandidateHeightPerColumnPreferencesIfNeeded()
+        val normalizedColumn = normalizeCandidateColumn(column)
+        val heightDp = getCandidateVisibleHeightDp(isLandscape, normalizedColumn)
+        preferences.edit { editor ->
+            editor.putString(
+                if (isLandscape) {
+                    CANDIDATE_COLUMN_LANDSCAPE_PREFERENCE.first
+                } else {
+                    CANDIDATE_COLUMN_PREFERENCE.first
+                },
+                normalizedColumn
+            )
+            editor.putInt(
+                if (isLandscape) {
+                    CANDIDATE_VIEW_HEIGHT_DP_LANDSCAPE.first
+                } else {
+                    CANDIDATE_VIEW_HEIGHT_DP.first
+                },
+                heightDp
+            )
+        }
+    }
+
+    fun syncActiveCandidateVisibleHeightToImePreference(isLandscape: Boolean) {
+        migrateCandidateHeightPerColumnPreferencesIfNeeded()
+        val column = getCandidateColumn(isLandscape)
+        val heightDp = getCandidateVisibleHeightDp(isLandscape, column)
+        preferences.edit { editor ->
+            editor.putInt(
+                if (isLandscape) {
+                    CANDIDATE_VIEW_HEIGHT_DP_LANDSCAPE.first
+                } else {
+                    CANDIDATE_VIEW_HEIGHT_DP.first
+                },
+                heightDp
+            )
+        }
+    }
+
+    var candidate_tab_preference: Boolean
+        get() = preferences.getBoolean(
+            CANDIDATE_TAB_PREFERENCE.first, CANDIDATE_TAB_PREFERENCE.second
+        )
+        set(value) = preferences.edit {
+            it.putBoolean(CANDIDATE_TAB_PREFERENCE.first, value)
+        }
+
+    var shortcut_toolbar_visibility_preference: Boolean
+        get() = preferences.getBoolean(
+            SHORTCUT_TOOLBAR_VISIBILITY_PREFERENCE.first,
+            SHORTCUT_TOOLBAR_VISIBILITY_PREFERENCE.second
+        )
+        set(value) = preferences.edit {
+            it.putBoolean(SHORTCUT_TOOLBAR_VISIBILITY_PREFERENCE.first, value)
+        }
+
+    var shortcut_toolbar_integrated_in_suggestion_preference: Boolean
+        get() = preferences.getBoolean(
+            SHORTCUT_TOOLBAR_INTEGRATED_IN_SUGGESTION_PREFERENCE.first,
+            SHORTCUT_TOOLBAR_INTEGRATED_IN_SUGGESTION_PREFERENCE.second
+        )
+        set(value) = preferences.edit {
+            it.putBoolean(SHORTCUT_TOOLBAR_INTEGRATED_IN_SUGGESTION_PREFERENCE.first, value)
+        }
+
+    var stabilize_candidate_strip_height_preference: Boolean
+        get() = preferences.getBoolean(STABILIZE_CANDIDATE_STRIP_HEIGHT_KEY, false)
+        set(value) = preferences.edit {
+            it.putBoolean(STABILIZE_CANDIDATE_STRIP_HEIGHT_KEY, value)
+        }
+
+    var shortcut_toolbar_height_dp_preference: Int
+        get() = preferences.getInt(
+            SHORTCUT_TOOLBAR_HEIGHT_DP_PREFERENCE.first,
+            SHORTCUT_TOOLBAR_HEIGHT_DP_PREFERENCE.second
+        ).coerceIn(
+            SHORTCUT_TOOLBAR_HEIGHT_MIN_DP,
+            SHORTCUT_TOOLBAR_HEIGHT_MAX_DP
+        )
+        set(value) = preferences.edit {
+            it.putInt(
+                SHORTCUT_TOOLBAR_HEIGHT_DP_PREFERENCE.first,
+                value.coerceIn(
+                    SHORTCUT_TOOLBAR_HEIGHT_MIN_DP,
+                    SHORTCUT_TOOLBAR_HEIGHT_MAX_DP
+                )
+            )
+        }
+
+    var shortcut_toolbar_icon_size_dp_preference: Int
+        get() = preferences.getInt(
+            SHORTCUT_TOOLBAR_ICON_SIZE_DP_PREFERENCE.first,
+            SHORTCUT_TOOLBAR_ICON_SIZE_DP_PREFERENCE.second
+        ).coerceIn(
+            SHORTCUT_TOOLBAR_ICON_SIZE_MIN_DP,
+            SHORTCUT_TOOLBAR_ICON_SIZE_MAX_DP
+        )
+        set(value) = preferences.edit {
+            it.putInt(
+                SHORTCUT_TOOLBAR_ICON_SIZE_DP_PREFERENCE.first,
+                value.coerceIn(
+                    SHORTCUT_TOOLBAR_ICON_SIZE_MIN_DP,
+                    SHORTCUT_TOOLBAR_ICON_SIZE_MAX_DP
+                )
+            )
+        }
+
+    var seedColor: Int
+        get() = preferences.getInt(
+            APP_THEME_SEED_COLOR.first, APP_THEME_SEED_COLOR.second
+        )
+        set(value) = preferences.edit {
+            it.putInt(APP_THEME_SEED_COLOR.first, value)
+        }
+
+    var keyboardSkin: KeyboardSkinId
+        get() = KeyboardSkinId.fromPreference(
+            preferences.getString(KeyboardSkinId.PREFERENCE_KEY, null)
+        )
+        set(value) = preferences.edit {
+            it.putString(KeyboardSkinId.PREFERENCE_KEY, value.preferenceValue)
+        }
+
+    var theme_mode: String
+        get() = preferences.getString(KEYBOARD_THEME_MODE.first, KEYBOARD_THEME_MODE.second)
+            ?: "default"
+        set(value) = preferences.edit {
+            it.putString(KEYBOARD_THEME_MODE.first, value)
+        }
+
+    var custom_theme_bg_color: Int
+        get() = readIntPreference(CUSTOM_THEME_BG_COLOR.first, CUSTOM_THEME_BG_COLOR.second)
+        set(value) = preferences.edit {
+            it.putInt(CUSTOM_THEME_BG_COLOR.first, value)
+        }
+
+    var custom_theme_key_color: Int
+        get() = readIntPreference(CUSTOM_THEME_KEY_COLOR.first, CUSTOM_THEME_KEY_COLOR.second)
+        set(value) = preferences.edit {
+            it.putInt(CUSTOM_THEME_KEY_COLOR.first, value)
+        }
+
+    var custom_theme_special_key_color: Int
+        get() = readIntPreference(
+            CUSTOM_THEME_SPECIAL_KEY_COLOR.first,
+            CUSTOM_THEME_SPECIAL_KEY_COLOR.second
+        )
+        set(value) = preferences.edit {
+            it.putInt(CUSTOM_THEME_SPECIAL_KEY_COLOR.first, value)
+        }
+
+    var custom_theme_key_text_color: Int
+        get() = readIntPreference(
+            CUSTOM_THEME_KEY_TEXT_COLOR.first,
+            CUSTOM_THEME_KEY_TEXT_COLOR.second
+        )
+        set(value) = preferences.edit {
+            it.putInt(CUSTOM_THEME_KEY_TEXT_COLOR.first, value)
+        }
+
+    var custom_theme_special_key_text_color: Int
+        get() = readIntPreference(
+            CUSTOM_THEME_SPECIAL_KEY_TEXT_COLOR.first,
+            CUSTOM_THEME_SPECIAL_KEY_TEXT_COLOR.second
+        )
+        set(value) = preferences.edit {
+            it.putInt(CUSTOM_THEME_SPECIAL_KEY_TEXT_COLOR.first, value)
+        }
+
+    var custom_theme_candidate_text_color: Int
+        get() = getCustomThemeCandidateTextColor(custom_theme_key_text_color)
+        set(value) = preferences.edit {
+            it.putInt(CUSTOM_THEME_CANDIDATE_TEXT_COLOR.first, value)
+        }
+
+    fun getCustomThemeCandidateTextColor(defaultColor: Int): Int {
+        return readIntPreference(CUSTOM_THEME_CANDIDATE_TEXT_COLOR.first, defaultColor)
+    }
+
+    var custom_theme_candidate_item_bg_color: Int
+        get() = getCustomThemeCandidateItemBgColor(CUSTOM_THEME_CANDIDATE_ITEM_BG_COLOR.second)
+        set(value) = preferences.edit {
+            it.putInt(CUSTOM_THEME_CANDIDATE_ITEM_BG_COLOR.first, value)
+        }
+
+    fun getCustomThemeCandidateItemBgColor(defaultColor: Int): Int {
+        return readIntPreference(CUSTOM_THEME_CANDIDATE_ITEM_BG_COLOR.first, defaultColor)
+    }
+
+    var custom_theme_candidate_item_pressed_bg_color: Int
+        get() = getCustomThemeCandidateItemPressedBgColor(
+            CUSTOM_THEME_CANDIDATE_ITEM_PRESSED_BG_COLOR.second
+        )
+        set(value) = preferences.edit {
+            it.putInt(CUSTOM_THEME_CANDIDATE_ITEM_PRESSED_BG_COLOR.first, value)
+        }
+
+    fun getCustomThemeCandidateItemPressedBgColor(defaultColor: Int): Int {
+        return readIntPreference(CUSTOM_THEME_CANDIDATE_ITEM_PRESSED_BG_COLOR.first, defaultColor)
+    }
+
+    var custom_theme_candidate_empty_popup_bg_color: Int
+        get() = getCustomThemeCandidateEmptyPopupBgColor(custom_theme_special_key_color)
+        set(value) = preferences.edit {
+            it.putInt(CUSTOM_THEME_CANDIDATE_EMPTY_POPUP_BG_COLOR.first, value)
+        }
+
+    fun getCustomThemeCandidateEmptyPopupBgColor(defaultColor: Int): Int {
+        return readIntPreference(CUSTOM_THEME_CANDIDATE_EMPTY_POPUP_BG_COLOR.first, defaultColor)
+    }
+
+    var custom_theme_candidate_empty_popup_text_color: Int
+        get() = getCustomThemeCandidateEmptyPopupTextColor(custom_theme_special_key_text_color)
+        set(value) = preferences.edit {
+            it.putInt(CUSTOM_THEME_CANDIDATE_EMPTY_POPUP_TEXT_COLOR.first, value)
+        }
+
+    fun getCustomThemeCandidateEmptyPopupTextColor(defaultColor: Int): Int {
+        return readIntPreference(CUSTOM_THEME_CANDIDATE_EMPTY_POPUP_TEXT_COLOR.first, defaultColor)
+    }
+
+    var custom_theme_shortcut_icon_color: Int
+        get() = getCustomThemeShortcutIconColor(custom_theme_special_key_text_color)
+        set(value) = preferences.edit {
+            it.putInt(CUSTOM_THEME_SHORTCUT_ICON_COLOR.first, value)
+        }
+
+    fun getCustomThemeShortcutIconColor(defaultColor: Int): Int {
+        return readIntPreference(CUSTOM_THEME_SHORTCUT_ICON_COLOR.first, defaultColor)
+    }
+
+    var delete_key_left_flick_preference: Boolean
+        get() = preferences.getBoolean(
+            DELETE_KEY_LEFT_FLICK_PREFERENCE.first,
+            DELETE_KEY_LEFT_FLICK_PREFERENCE.second
+        )
+        set(value) = preferences.edit {
+            it.putBoolean(DELETE_KEY_LEFT_FLICK_PREFERENCE.first, value)
+        }
+
+    var delete_key_up_flick_preference: Boolean
+        get() = preferences.getBoolean(
+            DELETE_KEY_UP_FLICK_PREFERENCE.first,
+            DELETE_KEY_UP_FLICK_PREFERENCE.second
+        )
+        set(value) = preferences.edit {
+            it.putBoolean(DELETE_KEY_UP_FLICK_PREFERENCE.first, value)
+        }
+
+    var delete_key_down_flick_preference: Boolean
+        get() = preferences.getBoolean(
+            DELETE_KEY_DOWN_FLICK_PREFERENCE.first,
+            DELETE_KEY_DOWN_FLICK_PREFERENCE.second
+        )
+        set(value) = preferences.edit {
+            it.putBoolean(DELETE_KEY_DOWN_FLICK_PREFERENCE.first, value)
+        }
+
+    var cursor_move_after_commit_target_pairs_preference: List<String>
+        get() {
+            val raw = preferences.getString(
+                CURSOR_MOVE_AFTER_COMMIT_TARGET_PAIRS_PREFERENCE.first,
+                CURSOR_MOVE_AFTER_COMMIT_TARGET_PAIRS_PREFERENCE.second
+            ) ?: CURSOR_MOVE_AFTER_COMMIT_TARGET_PAIRS_PREFERENCE.second
+
+            val parsed = runCatching {
+                gson.fromJson<List<String>>(
+                    raw,
+                    object : TypeToken<List<String>>() {}.type
+                )
+            }.getOrNull()
+
+            return parsed?.mapNotNull(::normalizeCursorMoveTargetPair)?.distinct()
+                ?: DEFAULT_CURSOR_MOVE_AFTER_COMMIT_TARGET_PAIRS
+        }
+        set(value) = preferences.edit {
+            val normalized = value.mapNotNull(::normalizeCursorMoveTargetPair).distinct()
+            it.putString(
+                CURSOR_MOVE_AFTER_COMMIT_TARGET_PAIRS_PREFERENCE.first,
+                gson.toJson(normalized)
+            )
+        }
+
+    fun defaultCursorMoveAfterCommitTargetPairs(): List<String> =
+        DEFAULT_CURSOR_MOVE_AFTER_COMMIT_TARGET_PAIRS
+
+    var key_letter_size: Float?
+        get() = preferences.getFloat(KEY_LETTER_SIZE.first, KEY_LETTER_SIZE.second)
+        set(value) = preferences.edit {
+            it.putFloat(KEY_LETTER_SIZE.first, value ?: KEY_LETTER_SIZE.second)
+        }
+
+    var candidate_letter_size: Float?
+        get() = preferences.getFloat(CANDIDATE_LETTER_SIZE.first, CANDIDATE_LETTER_SIZE.second)
+        set(value) = preferences.edit {
+            it.putFloat(CANDIDATE_LETTER_SIZE.first, value ?: CANDIDATE_LETTER_SIZE.second)
+        }
+
+    var tenkey_key_width_scale_percent: Int?
+        get() = preferences.getInt(
+            TENKEY_KEY_WIDTH_SCALE_PERCENT.first,
+            TENKEY_KEY_WIDTH_SCALE_PERCENT.second
+        )
+        set(value) = preferences.edit {
+            it.putInt(
+                TENKEY_KEY_WIDTH_SCALE_PERCENT.first,
+                value ?: TENKEY_KEY_WIDTH_SCALE_PERCENT.second
+            )
+        }
+
+    var tenkey_key_height_scale_percent: Int?
+        get() = preferences.getInt(
+            TENKEY_KEY_HEIGHT_SCALE_PERCENT.first,
+            TENKEY_KEY_HEIGHT_SCALE_PERCENT.second
+        )
+        set(value) = preferences.edit {
+            it.putInt(
+                TENKEY_KEY_HEIGHT_SCALE_PERCENT.first,
+                value ?: TENKEY_KEY_HEIGHT_SCALE_PERCENT.second
+            )
+        }
+
+    var flick_key_width_scale_percent: Int?
+        get() = preferences.getInt(
+            FLICK_KEY_WIDTH_SCALE_PERCENT.first,
+            FLICK_KEY_WIDTH_SCALE_PERCENT.second
+        )
+        set(value) = preferences.edit {
+            it.putInt(
+                FLICK_KEY_WIDTH_SCALE_PERCENT.first,
+                value ?: FLICK_KEY_WIDTH_SCALE_PERCENT.second
+            )
+        }
+
+    var flick_key_height_scale_percent: Int?
+        get() = preferences.getInt(
+            FLICK_KEY_HEIGHT_SCALE_PERCENT.first,
+            FLICK_KEY_HEIGHT_SCALE_PERCENT.second
+        )
+        set(value) = preferences.edit {
+            it.putInt(
+                FLICK_KEY_HEIGHT_SCALE_PERCENT.first,
+                value ?: FLICK_KEY_HEIGHT_SCALE_PERCENT.second
+            )
+        }
+
+    var flick_key_icon_scale_percent: Int?
+        get() = preferences.getInt(
+            FLICK_KEY_ICON_SCALE_PERCENT.first,
+            FLICK_KEY_ICON_SCALE_PERCENT.second
+        )
+        set(value) = preferences.edit {
+            it.putInt(
+                FLICK_KEY_ICON_SCALE_PERCENT.first,
+                value ?: FLICK_KEY_ICON_SCALE_PERCENT.second
+            )
+        }
+
+    var flick_key_text_size_sp: Float?
+        get() = preferences.getFloat(
+            FLICK_KEY_TEXT_SIZE_SP.first,
+            FLICK_KEY_TEXT_SIZE_SP.second
+        )
+        set(value) = preferences.edit {
+            it.putFloat(
+                FLICK_KEY_TEXT_SIZE_SP.first,
+                value ?: FLICK_KEY_TEXT_SIZE_SP.second
+            )
+        }
+
+    var flick_special_key_text_size_sp: Float?
+        get() = preferences.getFloat(
+            FLICK_SPECIAL_KEY_TEXT_SIZE_SP.first,
+            FLICK_SPECIAL_KEY_TEXT_SIZE_SP.second
+        )
+        set(value) = preferences.edit {
+            it.putFloat(
+                FLICK_SPECIAL_KEY_TEXT_SIZE_SP.first,
+                value ?: FLICK_SPECIAL_KEY_TEXT_SIZE_SP.second
+            )
+        }
+
+    var tenkey_popup_size_scale_percent: Int?
+        get() = preferences.getInt(
+            TENKEY_POPUP_SIZE_SCALE_PERCENT.first,
+            TENKEY_POPUP_SIZE_SCALE_PERCENT.second
+        )
+        set(value) = preferences.edit {
+            it.putInt(
+                TENKEY_POPUP_SIZE_SCALE_PERCENT.first,
+                value ?: TENKEY_POPUP_SIZE_SCALE_PERCENT.second
+            )
+        }
+
+    var tenkey_popup_text_size_sp: Float?
+        get() = preferences.getFloat(
+            TENKEY_POPUP_TEXT_SIZE_SP.first,
+            TENKEY_POPUP_TEXT_SIZE_SP.second
+        )
+        set(value) = preferences.edit {
+            it.putFloat(TENKEY_POPUP_TEXT_SIZE_SP.first, value ?: TENKEY_POPUP_TEXT_SIZE_SP.second)
+        }
+
+    var qwerty_key_preview_popup_size_scale_percent: Int?
+        get() = preferences.getInt(
+            QWERTY_KEY_PREVIEW_POPUP_SIZE_SCALE_PERCENT.first,
+            QWERTY_KEY_PREVIEW_POPUP_SIZE_SCALE_PERCENT.second
+        )
+        set(value) = preferences.edit {
+            it.putInt(
+                QWERTY_KEY_PREVIEW_POPUP_SIZE_SCALE_PERCENT.first,
+                value ?: QWERTY_KEY_PREVIEW_POPUP_SIZE_SCALE_PERCENT.second
+            )
+        }
+
+    var qwerty_key_preview_popup_text_size_sp: Float?
+        get() = preferences.getFloat(
+            QWERTY_KEY_PREVIEW_POPUP_TEXT_SIZE_SP.first,
+            QWERTY_KEY_PREVIEW_POPUP_TEXT_SIZE_SP.second
+        )
+        set(value) = preferences.edit {
+            it.putFloat(
+                QWERTY_KEY_PREVIEW_POPUP_TEXT_SIZE_SP.first,
+                value ?: QWERTY_KEY_PREVIEW_POPUP_TEXT_SIZE_SP.second
+            )
+        }
+
+    var qwerty_variation_popup_size_scale_percent: Int?
+        get() = preferences.getInt(
+            QWERTY_VARIATION_POPUP_SIZE_SCALE_PERCENT.first,
+            QWERTY_VARIATION_POPUP_SIZE_SCALE_PERCENT.second
+        )
+        set(value) = preferences.edit {
+            it.putInt(
+                QWERTY_VARIATION_POPUP_SIZE_SCALE_PERCENT.first,
+                value ?: QWERTY_VARIATION_POPUP_SIZE_SCALE_PERCENT.second
+            )
+        }
+
+    var qwerty_variation_popup_text_size_sp: Float?
+        get() = preferences.getFloat(
+            QWERTY_VARIATION_POPUP_TEXT_SIZE_SP.first,
+            QWERTY_VARIATION_POPUP_TEXT_SIZE_SP.second
+        )
+        set(value) = preferences.edit {
+            it.putFloat(
+                QWERTY_VARIATION_POPUP_TEXT_SIZE_SP.first,
+                value ?: QWERTY_VARIATION_POPUP_TEXT_SIZE_SP.second
+            )
+        }
+
+    var flick_directional_popup_size_scale_percent: Int?
+        get() = preferences.getInt(
+            FLICK_DIRECTIONAL_POPUP_SIZE_SCALE_PERCENT.first,
+            FLICK_DIRECTIONAL_POPUP_SIZE_SCALE_PERCENT.second
+        )
+        set(value) = preferences.edit {
+            it.putInt(
+                FLICK_DIRECTIONAL_POPUP_SIZE_SCALE_PERCENT.first,
+                value ?: FLICK_DIRECTIONAL_POPUP_SIZE_SCALE_PERCENT.second
+            )
+        }
+
+    var flick_directional_popup_text_size_sp: Float?
+        get() = preferences.getFloat(
+            FLICK_DIRECTIONAL_POPUP_TEXT_SIZE_SP.first,
+            FLICK_DIRECTIONAL_POPUP_TEXT_SIZE_SP.second
+        )
+        set(value) = preferences.edit {
+            it.putFloat(
+                FLICK_DIRECTIONAL_POPUP_TEXT_SIZE_SP.first,
+                value ?: FLICK_DIRECTIONAL_POPUP_TEXT_SIZE_SP.second
+            )
+        }
+
+    var flick_cross_popup_size_scale_percent: Int?
+        get() = preferences.getInt(
+            FLICK_CROSS_POPUP_SIZE_SCALE_PERCENT.first,
+            FLICK_CROSS_POPUP_SIZE_SCALE_PERCENT.second
+        )
+        set(value) = preferences.edit {
+            it.putInt(
+                FLICK_CROSS_POPUP_SIZE_SCALE_PERCENT.first,
+                value ?: FLICK_CROSS_POPUP_SIZE_SCALE_PERCENT.second
+            )
+        }
+
+    var flick_cross_popup_text_size_sp: Float?
+        get() = preferences.getFloat(
+            FLICK_CROSS_POPUP_TEXT_SIZE_SP.first,
+            FLICK_CROSS_POPUP_TEXT_SIZE_SP.second
+        )
+        set(value) = preferences.edit {
+            it.putFloat(
+                FLICK_CROSS_POPUP_TEXT_SIZE_SP.first,
+                value ?: FLICK_CROSS_POPUP_TEXT_SIZE_SP.second
+            )
+        }
+
+    var flick_standard_popup_size_scale_percent: Int?
+        get() = preferences.getInt(
+            FLICK_STANDARD_POPUP_SIZE_SCALE_PERCENT.first,
+            FLICK_STANDARD_POPUP_SIZE_SCALE_PERCENT.second
+        )
+        set(value) = preferences.edit {
+            it.putInt(
+                FLICK_STANDARD_POPUP_SIZE_SCALE_PERCENT.first,
+                value ?: FLICK_STANDARD_POPUP_SIZE_SCALE_PERCENT.second
+            )
+        }
+
+    var flick_standard_popup_text_size_sp: Float?
+        get() = preferences.getFloat(
+            FLICK_STANDARD_POPUP_TEXT_SIZE_SP.first,
+            FLICK_STANDARD_POPUP_TEXT_SIZE_SP.second
+        )
+        set(value) = preferences.edit {
+            it.putFloat(
+                FLICK_STANDARD_POPUP_TEXT_SIZE_SP.first,
+                value ?: FLICK_STANDARD_POPUP_TEXT_SIZE_SP.second
+            )
+        }
+
+    var flick_tfbi_popup_size_scale_percent: Int?
+        get() = preferences.getInt(
+            FLICK_TFBI_POPUP_SIZE_SCALE_PERCENT.first,
+            FLICK_TFBI_POPUP_SIZE_SCALE_PERCENT.second
+        )
+        set(value) = preferences.edit {
+            it.putInt(
+                FLICK_TFBI_POPUP_SIZE_SCALE_PERCENT.first,
+                value ?: FLICK_TFBI_POPUP_SIZE_SCALE_PERCENT.second
+            )
+        }
+
+    var flick_tfbi_popup_text_size_sp: Float?
+        get() = preferences.getFloat(
+            FLICK_TFBI_POPUP_TEXT_SIZE_SP.first,
+            FLICK_TFBI_POPUP_TEXT_SIZE_SP.second
+        )
+        set(value) = preferences.edit {
+            it.putFloat(
+                FLICK_TFBI_POPUP_TEXT_SIZE_SP.first,
+                value ?: FLICK_TFBI_POPUP_TEXT_SIZE_SP.second
+            )
+        }
+
+    var flick_tfbi_popup_presentation: TfbiPopupPresentationMode
+        get() = TfbiPopupPresentationMode.fromPreference(
+            preferences.getString(
+                FLICK_TFBI_POPUP_PRESENTATION.first,
+                FLICK_TFBI_POPUP_PRESENTATION.second
+            )
+        )
+        set(value) = preferences.edit {
+            it.putString(FLICK_TFBI_POPUP_PRESENTATION.first, value.preferenceValue)
+        }
+
+    var flick_tfbi_flick_start_position: TfbiFlickStartPositionMode
+        get() = TfbiFlickStartPositionMode.fromPreference(
+            preferences.getString(
+                FLICK_TFBI_FLICK_START_POSITION.first,
+                FLICK_TFBI_FLICK_START_POSITION.second
+            )
+        )
+        set(value) = preferences.edit {
+            it.putString(FLICK_TFBI_FLICK_START_POSITION.first, value.preferenceValue)
+        }
+
+    var clipboard_preview_preference: Boolean
+        get() = preferences.getBoolean(
+            CLIP_BOARD_PREVIEW_PREFERENCE.first,
+            CLIP_BOARD_PREVIEW_PREFERENCE.second
+        )
+        set(value) = preferences.edit {
+            it.putBoolean(CLIP_BOARD_PREVIEW_PREFERENCE.first, value)
+        }
+
+    var clipboard_preview_tap_delete_preference: Boolean
+        get() = preferences.getBoolean(
+            CLIP_BOARD_PREVIEW_TAP_DELETE_PREFERENCE.first,
+            CLIP_BOARD_PREVIEW_TAP_DELETE_PREFERENCE.second
+        )
+        set(value) = preferences.edit {
+            it.putBoolean(CLIP_BOARD_PREVIEW_TAP_DELETE_PREFERENCE.first, value)
+        }
+
+    var clipboard_delete_unpinned_after_hours_preference: Boolean
+        get() = preferences.getBoolean(
+            CLIPBOARD_DELETE_UNPINNED_AFTER_HOURS_PREFERENCE.first,
+            CLIPBOARD_DELETE_UNPINNED_AFTER_HOURS_PREFERENCE.second
+        )
+        set(value) = preferences.edit {
+            it.putBoolean(CLIPBOARD_DELETE_UNPINNED_AFTER_HOURS_PREFERENCE.first, value)
+        }
+
+    var clipboard_unpinned_retention_hours_preference: Int
+        get() = preferences.getInt(
+            CLIPBOARD_UNPINNED_RETENTION_HOURS_PREFERENCE.first,
+            CLIPBOARD_UNPINNED_RETENTION_HOURS_PREFERENCE.second
+        )
+        set(value) = preferences.edit {
+            it.putInt(CLIPBOARD_UNPINNED_RETENTION_HOURS_PREFERENCE.first, value.coerceIn(1, 72))
+        }
+
+    var keyboard_corner_round_preference: Boolean
+        get() = preferences.getBoolean(
+            ROUND_KEYBOARD_CORNER_PREFERENCE.first,
+            ROUND_KEYBOARD_CORNER_PREFERENCE.second
+        )
+        set(value) = preferences.edit {
+            it.putBoolean(ROUND_KEYBOARD_CORNER_PREFERENCE.first, value)
+        }
+
+    var keyboard_corner_radius_dp_preference: Int
+        get() = preferences.getInt(
+            KEYBOARD_CORNER_RADIUS_DP_PREFERENCE.first,
+            KEYBOARD_CORNER_RADIUS_DP_PREFERENCE.second
+        )
+        set(value) = preferences.edit {
+            it.putInt(
+                KEYBOARD_CORNER_RADIUS_DP_PREFERENCE.first,
+                value.coerceIn(0, 64)
+            )
+        }
+
+    var keyboard_corner_top_left_preference: Boolean
+        get() = preferences.getBoolean(
+            KEYBOARD_CORNER_TOP_LEFT_PREFERENCE.first,
+            KEYBOARD_CORNER_TOP_LEFT_PREFERENCE.second
+        )
+        set(value) = preferences.edit {
+            it.putBoolean(KEYBOARD_CORNER_TOP_LEFT_PREFERENCE.first, value)
+        }
+
+    var keyboard_corner_top_right_preference: Boolean
+        get() = preferences.getBoolean(
+            KEYBOARD_CORNER_TOP_RIGHT_PREFERENCE.first,
+            KEYBOARD_CORNER_TOP_RIGHT_PREFERENCE.second
+        )
+        set(value) = preferences.edit {
+            it.putBoolean(KEYBOARD_CORNER_TOP_RIGHT_PREFERENCE.first, value)
+        }
+
+    var keyboard_corner_bottom_left_preference: Boolean
+        get() = preferences.getBoolean(
+            KEYBOARD_CORNER_BOTTOM_LEFT_PREFERENCE.first,
+            KEYBOARD_CORNER_BOTTOM_LEFT_PREFERENCE.second
+        )
+        set(value) = preferences.edit {
+            it.putBoolean(KEYBOARD_CORNER_BOTTOM_LEFT_PREFERENCE.first, value)
+        }
+
+    var keyboard_corner_bottom_right_preference: Boolean
+        get() = preferences.getBoolean(
+            KEYBOARD_CORNER_BOTTOM_RIGHT_PREFERENCE.first,
+            KEYBOARD_CORNER_BOTTOM_RIGHT_PREFERENCE.second
+        )
+        set(value) = preferences.edit {
+            it.putBoolean(KEYBOARD_CORNER_BOTTOM_RIGHT_PREFERENCE.first, value)
+        }
+
+    var bunsetsu_separation_preference: Boolean
+        get() = preferences.getBoolean(
+            BUNSETSU_SEPARATION_PREFERENCE.first,
+            BUNSETSU_SEPARATION_PREFERENCE.second
+        )
+        set(value) = preferences.edit {
+            it.putBoolean(BUNSETSU_SEPARATION_PREFERENCE.first, value)
+        }
+
+    var bunsetsu_cursor_move_preference: Boolean
+        get() = preferences.getBoolean(
+            BUNSETSU_CURSOR_MOVE_PREFERENCE.first,
+            BUNSETSU_CURSOR_MOVE_PREFERENCE.second
+        )
+        set(value) = preferences.edit {
+            it.putBoolean(BUNSETSU_CURSOR_MOVE_PREFERENCE.first, value)
+        }
+
+    var reconversion_preference: Boolean
+        get() = preferences.getBoolean(
+            RECONVERSION_PREFERENCE.first,
+            RECONVERSION_PREFERENCE.second
+        )
+        set(value) = preferences.edit {
+            it.putBoolean(RECONVERSION_PREFERENCE.first, value)
+        }
+
+    var conversion_key_swipe_cursor_move_preference: Boolean
+        get() = preferences.getBoolean(
+            CONVERSION_KEY_SWIPE_CURSOR_MOVE_PREFERENCE.first,
+            CONVERSION_KEY_SWIPE_CURSOR_MOVE_PREFERENCE.second
+        )
+        set(value) = preferences.edit {
+            it.putBoolean(CONVERSION_KEY_SWIPE_CURSOR_MOVE_PREFERENCE.first, value)
+        }
+
+    var physical_keyboard_input_mode_preference: String
+        get() = preferences.getString(
+            PHYSICAL_KEYBOARD_INPUT_MODE_PREFERENCE.first,
+            PHYSICAL_KEYBOARD_INPUT_MODE_PREFERENCE.second
+        ) ?: PHYSICAL_KEYBOARD_INPUT_MODE_PREFERENCE.second
+        set(value) = preferences.edit {
+            it.putString(PHYSICAL_KEYBOARD_INPUT_MODE_PREFERENCE.first, value)
+        }
+
+    var romaji_map_data_version: Int
+        get() = preferences.getInt(ROMAJI_MAP_DATA_VERSION.first, ROMAJI_MAP_DATA_VERSION.second)
+        set(value) = preferences.edit {
+            it.putInt(ROMAJI_MAP_DATA_VERSION.first, value)
+        }
+
+    var qwerty_romaji_shift_conversion_preference: Boolean
+        get() = preferences.getBoolean(
+            QWERTY_ROMAJI_SHIFT_CONVERSION_PREFERENCE.first,
+            QWERTY_ROMAJI_SHIFT_CONVERSION_PREFERENCE.second
+        )
+        set(value) = preferences.edit {
+            it.putBoolean(QWERTY_ROMAJI_SHIFT_CONVERSION_PREFERENCE.first, value)
+        }
+
+    var last_pasted_clipboard_text_preference: String
+        get() = preferences.getString(
+            LAST_PASTED_CLIPBOARD_TEXT_PREFERENCE.first,
+            LAST_PASTED_CLIPBOARD_TEXT_PREFERENCE.second
+        ) ?: ""
+        set(value) = preferences.edit {
+            it.putString(LAST_PASTED_CLIPBOARD_TEXT_PREFERENCE.first, value)
+        }
+
+    var tenkey_show_language_button_preference: Boolean
+        get() = preferences.getBoolean(
+            TENKEY_SHOW_IME_SWITCH_BUTTON.first,
+            TENKEY_SHOW_IME_SWITCH_BUTTON.second
+        )
+        set(value) = preferences.edit {
+            it.putBoolean(TENKEY_SHOW_IME_SWITCH_BUTTON.first, value)
+        }
+
+    var enable_zenz_preference: Boolean
+        get() = preferences.getBoolean(
+            ENABLE_ZENZ_PREFERENCE.first,
+            ENABLE_ZENZ_PREFERENCE.second
+        )
+        set(value) = preferences.edit {
+            it.putBoolean(ENABLE_ZENZ_PREFERENCE.first, value)
+        }
+
+    var enable_zenzai_preference: Boolean
+        get() = preferences.getBoolean(
+            ENABLE_ZENZAI_PREFERENCE.first,
+            ENABLE_ZENZAI_PREFERENCE.second
+        )
+        set(value) = preferences.edit {
+            it.putBoolean(ENABLE_ZENZAI_PREFERENCE.first, value)
+        }
+
+    var zenz_profile_preference: String
+        get() = preferences.getString(
+            ZENZ_PROFILE_PREFERENCE.first,
+            ZENZ_PROFILE_PREFERENCE.second
+        ) ?: ""
+        set(value) = preferences.edit {
+            it.putString(ZENZ_PROFILE_PREFERENCE.first, value)
+        }
+
+    var enable_zenz_long_press_preference: Boolean
+        get() = preferences.getBoolean(
+            ENABLE_ZENZ_CONVERSION_LONG_PRESS_PREFERENCE.first,
+            ENABLE_ZENZ_CONVERSION_LONG_PRESS_PREFERENCE.second
+        )
+        set(value) = preferences.edit {
+            it.putBoolean(ENABLE_ZENZ_CONVERSION_LONG_PRESS_PREFERENCE.first, value)
+        }
+
+    var enable_zenz_rerank_preference: Boolean
+        get() = preferences.getBoolean(
+            ENABLE_ZENZ_RERANK_PREFERENCE.first,
+            ENABLE_ZENZ_RERANK_PREFERENCE.second
+        )
+        set(value) = preferences.edit {
+            it.putBoolean(ENABLE_ZENZ_RERANK_PREFERENCE.first, value)
+        }
+
+    var zenz_debounce_time_preference: Int?
+        get() = preferences.getInt(
+            ZENZ_DEBOUNCE_TIME_PREFERENCE.first, ZENZ_DEBOUNCE_TIME_PREFERENCE.second
+        )
+        set(value) = preferences.edit {
+            it.putInt(ZENZ_DEBOUNCE_TIME_PREFERENCE.first, value ?: 300)
+        }
+
+    var zenz_maximum_letter_size_preference: Int?
+        get() = preferences.getInt(
+            ZENZ_MAXIMUM_LETTER_SIZE_PREFERENCE.first, ZENZ_MAXIMUM_LETTER_SIZE_PREFERENCE.second
+        )
+        set(value) = preferences.edit {
+            it.putInt(ZENZ_MAXIMUM_LETTER_SIZE_PREFERENCE.first, value ?: 32)
+        }
+
+    var zenz_maximum_context_size_preference: Int?
+        get() = preferences.getInt(
+            ZENZ_MAXIMUM_CONTEXT_SIZE_PREFERENCE.first, ZENZ_MAXIMUM_CONTEXT_SIZE_PREFERENCE.second
+        )
+        set(value) = preferences.edit {
+            it.putInt(ZENZ_MAXIMUM_CONTEXT_SIZE_PREFERENCE.first, value ?: 512)
+        }
+
+    var zenz_maximum_thread_size_preference: Int?
+        get() = preferences.getInt(
+            ZENZ_MAXIMUM_THREAD_SIZE_PREFERENCE.first, ZENZ_MAXIMUM_THREAD_SIZE_PREFERENCE.second
+        )
+        set(value) = preferences.edit {
+            it.putInt(ZENZ_MAXIMUM_THREAD_SIZE_PREFERENCE.first, value ?: 4)
+        }
+
+    var qwerty_key_vertical_margin: Float?
+        get() = preferences.getFloat(
+            QWERTY_KEY_VERTICAL_MARGIN.first,
+            QWERTY_KEY_VERTICAL_MARGIN.second
+        )
+        set(value) = preferences.edit {
+            it.putFloat(
+                QWERTY_KEY_VERTICAL_MARGIN.first,
+                value ?: 5.0f
+            )
+        }
+
+    var qwerty_key_horizontal_gap: Float?
+        get() = preferences.getFloat(
+            QWERTY_KEY_HORIZONTAL_GAP.first,
+            QWERTY_KEY_HORIZONTAL_GAP.second
+        )
+        set(value) = preferences.edit {
+            it.putFloat(
+                QWERTY_KEY_HORIZONTAL_GAP.first,
+                value ?: 2.0f
+            )
+        }
+
+    var qwerty_key_indent_large: Float?
+        get() = preferences.getFloat(QWERTY_KEY_INDENT_LARGE.first, QWERTY_KEY_INDENT_LARGE.second)
+        set(value) = preferences.edit { it.putFloat(QWERTY_KEY_INDENT_LARGE.first, value ?: 23.0f) }
+
+    var qwerty_key_indent_small: Float?
+        get() = preferences.getFloat(QWERTY_KEY_INDENT_SMALL.first, QWERTY_KEY_INDENT_SMALL.second)
+        set(value) = preferences.edit { it.putFloat(QWERTY_KEY_INDENT_SMALL.first, value ?: 9.0f) }
+
+    var qwerty_key_side_margin: Float?
+        get() = preferences.getFloat(QWERTY_KEY_SIDE_MARGIN.first, QWERTY_KEY_SIDE_MARGIN.second)
+        set(value) = preferences.edit { it.putFloat(QWERTY_KEY_SIDE_MARGIN.first, value ?: 4.0f) }
+
+    var qwerty_key_text_size: Float?
+        get() = preferences.getFloat(QWERTY_KEY_TEXT_SIZE.first, QWERTY_KEY_TEXT_SIZE.second)
+        set(value) = preferences.edit { it.putFloat(QWERTY_KEY_TEXT_SIZE.first, value ?: 18.0f) }
+
+    var qwerty_symbol_keymap_text_size: Float?
+        get() = preferences.getFloat(
+            QWERTY_SYMBOL_KEYMAP_TEXT_SIZE.first,
+            QWERTY_SYMBOL_KEYMAP_TEXT_SIZE.second
+        ).coerceIn(4.0f, 24.0f)
+        set(value) = preferences.edit {
+            it.putFloat(
+                QWERTY_SYMBOL_KEYMAP_TEXT_SIZE.first,
+                (value ?: QWERTY_SYMBOL_KEYMAP_TEXT_SIZE.second).coerceIn(4.0f, 24.0f)
+            )
+        }
+
+    var qwerty_special_key_text_size: Float?
+        get() = preferences.getFloat(
+            QWERTY_SPECIAL_KEY_TEXT_SIZE.first,
+            QWERTY_SPECIAL_KEY_TEXT_SIZE.second
+        )
+        set(value) = preferences.edit {
+            it.putFloat(
+                QWERTY_SPECIAL_KEY_TEXT_SIZE.first,
+                value ?: 12.0f
+            )
+        }
+
+    var qwerty_special_key_icon_size: Float?
+        get() = preferences.getFloat(
+            QWERTY_SPECIAL_KEY_ICON_SIZE.first,
+            QWERTY_SPECIAL_KEY_ICON_SIZE.second
+        )
+        set(value) = preferences.edit {
+            it.putFloat(
+                QWERTY_SPECIAL_KEY_ICON_SIZE.first,
+                value ?: 24.0f
+            )
+        }
+
+    var liquid_glass_preference: Boolean
+        get() = preferences.getBoolean(
+            LIQUID_GLASS_ENABLE.first,
+            LIQUID_GLASS_ENABLE.second
+        )
+        set(value) = preferences.edit {
+            it.putBoolean(LIQUID_GLASS_ENABLE.first, value)
+        }
+
+    var liquid_glass_blur_radius: Int
+        get() = preferences.getInt(
+            LIQUID_GLASS_BLUR_RADIUS.first,
+            LIQUID_GLASS_BLUR_RADIUS.second
+        )
+        set(value) = preferences.edit {
+            it.putInt(LIQUID_GLASS_BLUR_RADIUS.first, value)
+        }
+
+    var custom_theme_border_enable: Boolean
+        get() = preferences.getBoolean(
+            CUSTOM_THEME_BORDER_ENABLE.first,
+            CUSTOM_THEME_BORDER_ENABLE.second
+        )
+        set(value) = preferences.edit {
+            it.putBoolean(CUSTOM_THEME_BORDER_ENABLE.first, value)
+        }
+
+    var custom_theme_border_color: Int
+        get() = preferences.getInt(
+            CUSTOM_THEME_BORDER_COLOR.first,
+            CUSTOM_THEME_BORDER_COLOR.second
+        )
+        set(value) = preferences.edit {
+            it.putInt(CUSTOM_THEME_BORDER_COLOR.first, value)
+        }
+
+    var liquid_glass_key_alpha: Int
+        get() = preferences.getInt(
+            LIQUID_GLASS_KEY_ALPHA.first,
+            LIQUID_GLASS_KEY_ALPHA.second
+        )
+        set(value) = preferences.edit {
+            it.putInt(LIQUID_GLASS_KEY_ALPHA.first, value)
+        }
+
+    var custom_theme_input_color_enable: Boolean
+        get() = preferences.getBoolean(
+            CUSTOM_THEME_INPUT_COLOR_ENABLE.first,
+            CUSTOM_THEME_INPUT_COLOR_ENABLE.second
+        )
+        set(value) = preferences.edit {
+            it.putBoolean(CUSTOM_THEME_INPUT_COLOR_ENABLE.first, value)
+        }
+
+    var custom_theme_pre_edit_bg_color: Int
+        get() = preferences.getInt(CUSTOM_THEME_PRE_EDIT_BG.first, CUSTOM_THEME_PRE_EDIT_BG.second)
+        set(value) = preferences.edit { it.putInt(CUSTOM_THEME_PRE_EDIT_BG.first, value) }
+
+    var custom_theme_pre_edit_text_color: Int
+        get() = preferences.getInt(
+            CUSTOM_THEME_PRE_EDIT_TEXT.first,
+            CUSTOM_THEME_PRE_EDIT_TEXT.second
+        )
+        set(value) = preferences.edit { it.putInt(CUSTOM_THEME_PRE_EDIT_TEXT.first, value) }
+
+    var custom_theme_post_edit_bg_color: Int
+        get() = preferences.getInt(
+            CUSTOM_THEME_POST_EDIT_BG.first,
+            CUSTOM_THEME_POST_EDIT_BG.second
+        )
+        set(value) = preferences.edit { it.putInt(CUSTOM_THEME_POST_EDIT_BG.first, value) }
+
+    var custom_theme_post_edit_text_color: Int
+        get() = preferences.getInt(
+            CUSTOM_THEME_POST_EDIT_TEXT.first,
+            CUSTOM_THEME_POST_EDIT_TEXT.second
+        )
+        set(value) = preferences.edit { it.putInt(CUSTOM_THEME_POST_EDIT_TEXT.first, value) }
+
+    var sumire_english_qwerty_preference: Boolean
+        get() = preferences.getBoolean(
+            SUMIRE_ENGLISH_QWERTY_PREFERENCE.first,
+            SUMIRE_ENGLISH_QWERTY_PREFERENCE.second
+        )
+        set(value) = preferences.edit {
+            it.putBoolean(SUMIRE_ENGLISH_QWERTY_PREFERENCE.first, value)
+        }
+
+    var sumire_restore_input_mode_on_restart_preference: Boolean
+        get() = preferences.getBoolean(
+            SUMIRE_RESTORE_INPUT_MODE_ON_RESTART_PREFERENCE.first,
+            SUMIRE_RESTORE_INPUT_MODE_ON_RESTART_PREFERENCE.second
+        )
+        set(value) = preferences.edit {
+            it.putBoolean(SUMIRE_RESTORE_INPUT_MODE_ON_RESTART_PREFERENCE.first, value)
+        }
+
+    var sumire_restore_input_mode_only_within_time_preference: Boolean
+        get() = preferences.getBoolean(
+            SUMIRE_RESTORE_INPUT_MODE_ONLY_WITHIN_TIME_PREFERENCE.first,
+            SUMIRE_RESTORE_INPUT_MODE_ONLY_WITHIN_TIME_PREFERENCE.second
+        )
+        set(value) = preferences.edit {
+            it.putBoolean(SUMIRE_RESTORE_INPUT_MODE_ONLY_WITHIN_TIME_PREFERENCE.first, value)
+        }
+
+    var sumire_restore_input_mode_timeout_minutes_preference: Int
+        get() = preferences.getInt(
+            SUMIRE_RESTORE_INPUT_MODE_TIMEOUT_MINUTES_PREFERENCE.first,
+            SUMIRE_RESTORE_INPUT_MODE_TIMEOUT_MINUTES_PREFERENCE.second
+        )
+        set(value) = preferences.edit {
+            it.putInt(SUMIRE_RESTORE_INPUT_MODE_TIMEOUT_MINUTES_PREFERENCE.first, value)
+        }
+
+    var sumire_last_input_mode_preference: String
+        get() = preferences.getString(
+            SUMIRE_LAST_INPUT_MODE_PREFERENCE.first,
+            SUMIRE_LAST_INPUT_MODE_PREFERENCE.second
+        ) ?: SUMIRE_LAST_INPUT_MODE_PREFERENCE.second
+        set(value) = preferences.edit {
+            it.putString(SUMIRE_LAST_INPUT_MODE_PREFERENCE.first, value)
+        }
+
+    var sumire_last_input_mode_presentation_preference: String
+        get() = preferences.getString(
+            SUMIRE_LAST_INPUT_MODE_PRESENTATION_PREFERENCE.first,
+            SUMIRE_LAST_INPUT_MODE_PRESENTATION_PREFERENCE.second
+        ) ?: SUMIRE_LAST_INPUT_MODE_PRESENTATION_PREFERENCE.second
+        set(value) = preferences.edit {
+            it.putString(SUMIRE_LAST_INPUT_MODE_PRESENTATION_PREFERENCE.first, value)
+        }
+
+    var sumire_last_input_mode_saved_at_epoch_millis_preference: Long
+        get() = preferences.getLong(
+            SUMIRE_LAST_INPUT_MODE_SAVED_AT_EPOCH_MILLIS_PREFERENCE.first,
+            SUMIRE_LAST_INPUT_MODE_SAVED_AT_EPOCH_MILLIS_PREFERENCE.second
+        )
+        set(value) = preferences.edit {
+            it.putLong(SUMIRE_LAST_INPUT_MODE_SAVED_AT_EPOCH_MILLIS_PREFERENCE.first, value)
+        }
+
+    var conversion_candidates_romaji_enable_preference: Boolean
+        get() = preferences.getBoolean(
+            CONVERSION_CANDIDATES_ROMAJI_ENABLE_PREFERENCE.first,
+            CONVERSION_CANDIDATES_ROMAJI_ENABLE_PREFERENCE.second
+        )
+        set(value) = preferences.edit {
+            it.putBoolean(CONVERSION_CANDIDATES_ROMAJI_ENABLE_PREFERENCE.first, value)
+        }
+
+    var learn_first_candidate_dictionary_preference: Boolean
+        get() = preferences.getBoolean(
+            LEARN_FIRST_CANDIDATE_DICTIONARY_PREFERENCE.first,
+            LEARN_FIRST_CANDIDATE_DICTIONARY_PREFERENCE.second
+        )
+        set(value) = preferences.edit {
+            it.putBoolean(LEARN_FIRST_CANDIDATE_DICTIONARY_PREFERENCE.first, value)
+        }
+
+    var learn_dictionary_allow_mixed_symbols_numbers_preference: Boolean
+        get() = preferences.getBoolean(
+            LEARN_DICTIONARY_ALLOW_MIXED_SYMBOLS_NUMBERS_PREFERENCE.first,
+            LEARN_DICTIONARY_ALLOW_MIXED_SYMBOLS_NUMBERS_PREFERENCE.second
+        )
+        set(value) = preferences.edit {
+            it.putBoolean(LEARN_DICTIONARY_ALLOW_MIXED_SYMBOLS_NUMBERS_PREFERENCE.first, value)
+        }
+
+    var enable_prediction_search_learn_dictionary_preference: Boolean
+        get() = preferences.getBoolean(
+            ENABLE_PREDICTION_SEARCH_LEARN_DICTIONARY_PREFERENCE.first,
+            ENABLE_PREDICTION_SEARCH_LEARN_DICTIONARY_PREFERENCE.second
+        )
+        set(value) = preferences.edit {
+            it.putBoolean(ENABLE_PREDICTION_SEARCH_LEARN_DICTIONARY_PREFERENCE.first, value)
+        }
+
+    var learn_prediction_preference: Int
+        get() = preferences.getInt(
+            LEARN_PREDICTION_PREFERENCE.first,
+            LEARN_PREDICTION_PREFERENCE.second
+        )
+        set(value) = preferences.edit { it.putInt(LEARN_PREDICTION_PREFERENCE.first, value) }
+
+    var learn_dictionary_prediction_candidate_limit_preference: Int
+        get() = preferences.getInt(
+            LEARN_PREDICTION_CANDIDATE_LIMIT_PREFERENCE.first,
+            LEARN_PREDICTION_CANDIDATE_LIMIT_PREFERENCE.second,
+        ).coerceIn(1, 8)
+        set(value) = preferences.edit {
+            it.putInt(
+                LEARN_PREDICTION_CANDIDATE_LIMIT_PREFERENCE.first,
+                value.coerceIn(1, 8),
+            )
+        }
+
+    var circular_flickWindow_scale: Float
+        get() = preferences.getFloat(
+            CIRCULAR_FLICK_WINDOW_SCALE.first,
+            CIRCULAR_FLICK_WINDOW_SCALE.second
+        )
+        set(value) = preferences.edit { it.putFloat(CIRCULAR_FLICK_WINDOW_SCALE.first, value) }
+
+    var custom_theme_border_width: Int
+        get() = preferences.getInt(
+            CUSTOM_THEME_BORDER_WIDTH.first,
+            CUSTOM_THEME_BORDER_WIDTH.second
+        )
+        set(value) = preferences.edit {
+            it.putInt(CUSTOM_THEME_BORDER_WIDTH.first, value)
+        }
+
+    var circularFlick5DirectionsEnable: Boolean
+        get() = preferences.getBoolean(
+            PREF_FIVE_DIRECTIONS_ENABLE.first,
+            PREF_FIVE_DIRECTIONS_ENABLE.second
+        )
+        set(value) = preferences.edit { it.putBoolean(PREF_FIVE_DIRECTIONS_ENABLE.first, value) }
+
+    var circularFlickDirectionCount: Int
+        get() {
+            val hasNewPreference = preferences.contains(PREF_CIRCULAR_DIRECTION_COUNT.first)
+            val raw = if (hasNewPreference) {
+                preferences.getInt(
+                    PREF_CIRCULAR_DIRECTION_COUNT.first,
+                    PREF_CIRCULAR_DIRECTION_COUNT.second
+                )
+            } else if (circularFlick5DirectionsEnable) {
+                5
+            } else {
+                PREF_CIRCULAR_DIRECTION_COUNT.second
+            }
+            return raw.coerceIn(4, 7)
+        }
+        set(value) = preferences.edit {
+            it.putInt(PREF_CIRCULAR_DIRECTION_COUNT.first, value.coerceIn(4, 7))
+        }
+
+    var circularFlickUpStart: Float
+        get() = preferences.getFloat(PREF_UP_START.first, PREF_UP_START.second)
+        set(value) = preferences.edit { it.putFloat(PREF_UP_START.first, value) }
+
+    var circularFlickUpSweep: Float
+        get() = preferences.getFloat(PREF_UP_SWEEP.first, PREF_UP_SWEEP.second)
+        set(value) = preferences.edit { it.putFloat(PREF_UP_SWEEP.first, value) }
+
+    var circularFlickRightStart: Float
+        get() = preferences.getFloat(PREF_RIGHT_START.first, PREF_RIGHT_START.second)
+        set(value) = preferences.edit { it.putFloat(PREF_RIGHT_START.first, value) }
+
+    var circularFlickRightSweep: Float
+        get() = preferences.getFloat(PREF_RIGHT_SWEEP.first, PREF_RIGHT_SWEEP.second)
+        set(value) = preferences.edit { it.putFloat(PREF_RIGHT_SWEEP.first, value) }
+
+    var circularFlickDownStart: Float
+        get() = preferences.getFloat(PREF_DOWN_START.first, PREF_DOWN_START.second)
+        set(value) = preferences.edit { it.putFloat(PREF_DOWN_START.first, value) }
+
+    var circularFlickDownSweep: Float
+        get() = preferences.getFloat(PREF_DOWN_SWEEP.first, PREF_DOWN_SWEEP.second)
+        set(value) = preferences.edit { it.putFloat(PREF_DOWN_SWEEP.first, value) }
+
+    var circularFlickLeftStart: Float
+        get() = preferences.getFloat(PREF_LEFT_START.first, PREF_LEFT_START.second)
+        set(value) = preferences.edit { it.putFloat(PREF_LEFT_START.first, value) }
+
+    var circularFlickLeftSweep: Float
+        get() = preferences.getFloat(PREF_LEFT_SWEEP.first, PREF_LEFT_SWEEP.second)
+        set(value) = preferences.edit { it.putFloat(PREF_LEFT_SWEEP.first, value) }
+
+    var circularFlickUpRightStart: Float
+        get() = preferences.getFloat(PREF_UP_RIGHT_START.first, PREF_UP_RIGHT_START.second)
+        set(value) = preferences.edit { it.putFloat(PREF_UP_RIGHT_START.first, value) }
+
+    var circularFlickUpRightSweep: Float
+        get() = preferences.getFloat(PREF_UP_RIGHT_SWEEP.first, PREF_UP_RIGHT_SWEEP.second)
+        set(value) = preferences.edit { it.putFloat(PREF_UP_RIGHT_SWEEP.first, value) }
+
+    var circularFlickSlot5Start: Float
+        get() = preferences.getFloat(PREF_SLOT_5_START.first, PREF_SLOT_5_START.second)
+        set(value) = preferences.edit { it.putFloat(PREF_SLOT_5_START.first, value) }
+
+    var circularFlickSlot5Sweep: Float
+        get() = preferences.getFloat(PREF_SLOT_5_SWEEP.first, PREF_SLOT_5_SWEEP.second)
+        set(value) = preferences.edit { it.putFloat(PREF_SLOT_5_SWEEP.first, value) }
+
+    var circularFlickSlot6Start: Float
+        get() = preferences.getFloat(PREF_SLOT_6_START.first, PREF_SLOT_6_START.second)
+        set(value) = preferences.edit { it.putFloat(PREF_SLOT_6_START.first, value) }
+
+    var circularFlickSlot6Sweep: Float
+        get() = preferences.getFloat(PREF_SLOT_6_SWEEP.first, PREF_SLOT_6_SWEEP.second)
+        set(value) = preferences.edit { it.putFloat(PREF_SLOT_6_SWEEP.first, value) }
+
+    var qwerty_switch_number_key_without_number_preference: Boolean
+        get() = preferences.getBoolean(
+            QWERTY_SWITCH_NUMBER_KEY_WITHOUT_NUMBER_PREFERENCE.first,
+            QWERTY_SWITCH_NUMBER_KEY_WITHOUT_NUMBER_PREFERENCE.second
+        )
+        set(value) = preferences.edit {
+            it.putBoolean(
+                QWERTY_SWITCH_NUMBER_KEY_WITHOUT_NUMBER_PREFERENCE.first,
+                value
+            )
+        }
+
+    var keyboard_margin_start_dp: Int?
+        get() = preferences.getInt(KEYBOARD_MARGIN_START_DP.first, KEYBOARD_MARGIN_START_DP.second)
+        set(value) = preferences.edit { it.putInt(KEYBOARD_MARGIN_START_DP.first, value ?: 0) }
+
+    var keyboard_margin_end_dp: Int?
+        get() = preferences.getInt(KEYBOARD_MARGIN_END_DP.first, KEYBOARD_MARGIN_END_DP.second)
+        set(value) = preferences.edit { it.putInt(KEYBOARD_MARGIN_END_DP.first, value ?: 0) }
+
+    var qwerty_keyboard_margin_start_dp: Int?
+        get() = preferences.getInt(
+            QWERTY_KEYBOARD_MARGIN_START_DP.first,
+            QWERTY_KEYBOARD_MARGIN_START_DP.second
+        )
+        set(value) = preferences.edit {
+            it.putInt(
+                QWERTY_KEYBOARD_MARGIN_START_DP.first,
+                value ?: 0
+            )
+        }
+
+    var qwerty_keyboard_margin_end_dp: Int?
+        get() = preferences.getInt(
+            QWERTY_KEYBOARD_MARGIN_END_DP.first,
+            QWERTY_KEYBOARD_MARGIN_END_DP.second
+        )
+        set(value) = preferences.edit { it.putInt(QWERTY_KEYBOARD_MARGIN_END_DP.first, value ?: 0) }
+
+    var keyboard_margin_start_dp_landscape: Int?
+        get() = preferences.getInt(
+            KEYBOARD_MARGIN_START_DP_LANDSCAPE.first,
+            KEYBOARD_MARGIN_START_DP_LANDSCAPE.second
+        )
+        set(value) = preferences.edit {
+            it.putInt(
+                KEYBOARD_MARGIN_START_DP_LANDSCAPE.first,
+                value ?: 0
+            )
+        }
+
+    var keyboard_margin_end_dp_landscape: Int?
+        get() = preferences.getInt(
+            KEYBOARD_MARGIN_END_DP_LANDSCAPE.first,
+            KEYBOARD_MARGIN_END_DP_LANDSCAPE.second
+        )
+        set(value) = preferences.edit {
+            it.putInt(
+                KEYBOARD_MARGIN_END_DP_LANDSCAPE.first,
+                value ?: 0
+            )
+        }
+
+    var qwerty_keyboard_margin_start_dp_landscape: Int?
+        get() = preferences.getInt(
+            QWERTY_KEYBOARD_MARGIN_START_DP_LANDSCAPE.first,
+            QWERTY_KEYBOARD_MARGIN_START_DP_LANDSCAPE.second
+        )
+        set(value) = preferences.edit {
+            it.putInt(
+                QWERTY_KEYBOARD_MARGIN_START_DP_LANDSCAPE.first,
+                value ?: 0
+            )
+        }
+
+    var qwerty_keyboard_margin_end_dp_landscape: Int?
+        get() = preferences.getInt(
+            QWERTY_KEYBOARD_MARGIN_END_DP_LANDSCAPE.first,
+            QWERTY_KEYBOARD_MARGIN_END_DP_LANDSCAPE.second
+        )
+        set(value) = preferences.edit {
+            it.putInt(
+                QWERTY_KEYBOARD_MARGIN_END_DP_LANDSCAPE.first,
+                value ?: 0
+            )
+        }
+
+    var zenz_model_uri_preference: String
+        get() = preferences.getString(
+            ZENZ_MODEL_URI_PREFERENCE.first,
+            ZENZ_MODEL_URI_PREFERENCE.second
+        ) ?: ""
+        set(value) = preferences.edit {
+            it.putString(ZENZ_MODEL_URI_PREFERENCE.first, value)
+        }
+
+    var enable_gemma_translation_preference: Boolean
+        get() = preferences.getBoolean(
+            ENABLE_GEMMA_TRANSLATION_PREFERENCE.first,
+            ENABLE_GEMMA_TRANSLATION_PREFERENCE.second
+        )
+        set(value) = preferences.edit {
+            it.putBoolean(ENABLE_GEMMA_TRANSLATION_PREFERENCE.first, value)
+        }
+
+    var gemma_translation_model_path_preference: String
+        get() = preferences.getString(
+            GEMMA_TRANSLATION_MODEL_PATH_PREFERENCE.first,
+            GEMMA_TRANSLATION_MODEL_PATH_PREFERENCE.second
+        ) ?: ""
+        set(value) = preferences.edit {
+            it.putString(GEMMA_TRANSLATION_MODEL_PATH_PREFERENCE.first, value)
+        }
+
+    var gemma_translation_backend_preference: String
+        get() = preferences.getString(
+            GEMMA_TRANSLATION_BACKEND_PREFERENCE.first,
+            GEMMA_TRANSLATION_BACKEND_PREFERENCE.second
+        ) ?: GEMMA_TRANSLATION_BACKEND_PREFERENCE.second
+        set(value) = preferences.edit {
+            it.putString(GEMMA_TRANSLATION_BACKEND_PREFERENCE.first, value)
+        }
+
+    var gemma_translation_target_language_preference: String
+        get() = preferences.getString(
+            GEMMA_TRANSLATION_TARGET_LANGUAGE_PREFERENCE.first,
+            GEMMA_TRANSLATION_TARGET_LANGUAGE_PREFERENCE.second
+        ) ?: GEMMA_TRANSLATION_TARGET_LANGUAGE_PREFERENCE.second
+        set(value) = preferences.edit {
+            it.putString(GEMMA_TRANSLATION_TARGET_LANGUAGE_PREFERENCE.first, value)
+        }
+
+    var gemma_handwriting_auto_recognition_delay_preference: Int
+        get() = preferences.getInt(
+            GEMMA_HANDWRITING_AUTO_RECOGNITION_DELAY_PREFERENCE.first,
+            GEMMA_HANDWRITING_AUTO_RECOGNITION_DELAY_PREFERENCE.second,
+        ).coerceIn(
+            GemmaHandwritingSettings.MIN_AUTO_RECOGNITION_DELAY_MS,
+            GemmaHandwritingSettings.MAX_AUTO_RECOGNITION_DELAY_MS,
+        )
+        set(value) = preferences.edit {
+            it.putInt(
+                GEMMA_HANDWRITING_AUTO_RECOGNITION_DELAY_PREFERENCE.first,
+                value.coerceIn(
+                    GemmaHandwritingSettings.MIN_AUTO_RECOGNITION_DELAY_MS,
+                    GemmaHandwritingSettings.MAX_AUTO_RECOGNITION_DELAY_MS,
+                ),
+            )
+        }
+
+    var gemma_handwriting_recognition_language_preference: String
+        get() = preferences.getString(
+            GEMMA_HANDWRITING_RECOGNITION_LANGUAGE_PREFERENCE.first,
+            GEMMA_HANDWRITING_RECOGNITION_LANGUAGE_PREFERENCE.second,
+        )
+            ?.let(GemmaHandwritingLanguage::fromPreference)
+            ?.preferenceValue
+            ?: GEMMA_HANDWRITING_RECOGNITION_LANGUAGE_PREFERENCE.second
+        set(value) = preferences.edit {
+            it.putString(
+                GEMMA_HANDWRITING_RECOGNITION_LANGUAGE_PREFERENCE.first,
+                GemmaHandwritingLanguage.fromPreference(value).preferenceValue,
+            )
+        }
+
+    var gemma_handwriting_additional_instruction_preference: String
+        get() = preferences.getString(
+            GEMMA_HANDWRITING_ADDITIONAL_INSTRUCTION_PREFERENCE.first,
+            GEMMA_HANDWRITING_ADDITIONAL_INSTRUCTION_PREFERENCE.second,
+        )
+            .orEmpty()
+            .trim()
+            .take(GemmaHandwritingSettings.MAX_ADDITIONAL_INSTRUCTION_LENGTH)
+        set(value) = preferences.edit {
+            val normalized = value
+                .trim()
+                .take(GemmaHandwritingSettings.MAX_ADDITIONAL_INSTRUCTION_LENGTH)
+            if (normalized.isEmpty()) {
+                it.remove(GEMMA_HANDWRITING_ADDITIONAL_INSTRUCTION_PREFERENCE.first)
+            } else {
+                it.putString(
+                    GEMMA_HANDWRITING_ADDITIONAL_INSTRUCTION_PREFERENCE.first,
+                    normalized,
+                )
+            }
+        }
+
+    fun resetGemmaHandwritingPromptToDefault() {
+        preferences.edit {
+            it.remove(GEMMA_HANDWRITING_PROMPT_KEY)
+            it.remove(GEMMA_HANDWRITING_ADDITIONAL_INSTRUCTION_PREFERENCE.first)
+        }
+    }
+
+    var gemma_handwriting_pen_size_preference: Int
+        get() = preferences.getInt(
+            GEMMA_HANDWRITING_PEN_SIZE_PREFERENCE.first,
+            GEMMA_HANDWRITING_PEN_SIZE_PREFERENCE.second,
+        ).coerceIn(
+            GemmaHandwritingSettings.MIN_PEN_SIZE_DP,
+            GemmaHandwritingSettings.MAX_PEN_SIZE_DP,
+        )
+        set(value) = preferences.edit {
+            it.putInt(
+                GEMMA_HANDWRITING_PEN_SIZE_PREFERENCE.first,
+                value.coerceIn(
+                    GemmaHandwritingSettings.MIN_PEN_SIZE_DP,
+                    GemmaHandwritingSettings.MAX_PEN_SIZE_DP,
+                ),
+            )
+        }
+
+    var gemma_handwriting_pen_color_preference: Int
+        get() = GemmaHandwritingSettings.normalizePenColor(
+            preferences.getInt(
+                GEMMA_HANDWRITING_PEN_COLOR_PREFERENCE.first,
+                GEMMA_HANDWRITING_PEN_COLOR_PREFERENCE.second,
+            ),
+        )
+        set(value) = preferences.edit {
+            it.putInt(
+                GEMMA_HANDWRITING_PEN_COLOR_PREFERENCE.first,
+                GemmaHandwritingSettings.normalizePenColor(value),
+            )
+        }
+
+    var keyboard_background_image_uri: String
+        get() = preferences.getString(
+            KEYBOARD_BACKGROUND_IMAGE_URI_PREFERENCE.first,
+            KEYBOARD_BACKGROUND_IMAGE_URI_PREFERENCE.second
+        ) ?: ""
+        set(value) = preferences.edit {
+            it.putString(KEYBOARD_BACKGROUND_IMAGE_URI_PREFERENCE.first, value)
+        }
+
+    var keyboard_background_image_display_mode: String
+        get() = preferences.getString(
+            KEYBOARD_BACKGROUND_IMAGE_DISPLAY_MODE_PREFERENCE.first,
+            KEYBOARD_BACKGROUND_IMAGE_DISPLAY_MODE_PREFERENCE.second
+        ) ?: "fit"
+        set(value) = preferences.edit {
+            it.putString(KEYBOARD_BACKGROUND_IMAGE_DISPLAY_MODE_PREFERENCE.first, value)
+        }
+
+    var keyboard_background_video_uri: String
+        get() = preferences.getString(
+            KEYBOARD_BACKGROUND_VIDEO_URI_PREFERENCE.first,
+            KEYBOARD_BACKGROUND_VIDEO_URI_PREFERENCE.second
+        ) ?: ""
+        set(value) = preferences.edit {
+            it.putString(KEYBOARD_BACKGROUND_VIDEO_URI_PREFERENCE.first, value)
+        }
+
+    var keyboard_background_video_quality: String
+        get() = preferences.getString(
+            KEYBOARD_BACKGROUND_VIDEO_QUALITY_PREFERENCE.first,
+            KEYBOARD_BACKGROUND_VIDEO_QUALITY_PREFERENCE.second
+        ) ?: "high"
+        set(value) = preferences.edit {
+            it.putString(KEYBOARD_BACKGROUND_VIDEO_QUALITY_PREFERENCE.first, value)
+        }
+
+    var suminagashi_ink_effect_preference: Boolean
+        get() = preferences.getBoolean(
+            SUMINAGASHI_INK_EFFECT_ENABLE.first,
+            SUMINAGASHI_INK_EFFECT_ENABLE.second
+        )
+        set(value) = preferences.edit {
+            it.putBoolean(SUMINAGASHI_INK_EFFECT_ENABLE.first, value)
+        }
+
+    var keyboard_touch_effect_type_preference: String
+        get() {
+            if (!preferences.contains(KEYBOARD_TOUCH_EFFECT_TYPE.first)) {
+                return if (suminagashi_ink_effect_preference) {
+                    KeyboardTouchEffectType.LIQUID_INK
+                } else {
+                    KeyboardTouchEffectType.NONE
+                }
+            }
+            val value = preferences.getString(
+                KEYBOARD_TOUCH_EFFECT_TYPE.first,
+                KEYBOARD_TOUCH_EFFECT_TYPE.second
+            )
+            return KeyboardTouchEffectType.normalize(value)
+        }
+        set(value) = preferences.edit {
+            val normalized = KeyboardTouchEffectType.normalize(value)
+            it.putString(KEYBOARD_TOUCH_EFFECT_TYPE.first, normalized)
+            it.putBoolean(
+                SUMINAGASHI_INK_EFFECT_ENABLE.first,
+                normalized == KeyboardTouchEffectType.LIQUID_INK
+            )
+        }
+
+    var keyboard_touch_effect_quality_preference: String
+        get() {
+            val value = preferences.getString(
+                KEYBOARD_TOUCH_EFFECT_QUALITY.first,
+                KEYBOARD_TOUCH_EFFECT_QUALITY.second
+            )
+            return KeyboardTouchEffectQuality.normalize(value)
+        }
+        set(value) = preferences.edit {
+            it.putString(
+                KEYBOARD_TOUCH_EFFECT_QUALITY.first,
+                KeyboardTouchEffectQuality.normalize(value)
+            )
+        }
+
+    var suminagashi_ink_color_mode_preference: String
+        get() {
+            val value = preferences.getString(
+                SUMINAGASHI_INK_COLOR_MODE.first,
+                SUMINAGASHI_INK_COLOR_MODE.second
+            ) ?: SUMINAGASHI_INK_COLOR_MODE.second
+            return if (value == "fixed") "fixed" else "random"
+        }
+        set(value) = preferences.edit {
+            it.putString(
+                SUMINAGASHI_INK_COLOR_MODE.first,
+                if (value == "fixed") "fixed" else "random"
+            )
+        }
+
+    var suminagashi_ink_color_preference: Int
+        get() = preferences.getInt(
+            SUMINAGASHI_INK_COLOR.first,
+            SUMINAGASHI_INK_COLOR.second
+        )
+        set(value) = preferences.edit {
+            it.putInt(SUMINAGASHI_INK_COLOR.first, value)
+        }
+
+    var keyboard_touch_effect_color_mode_preference: String
+        get() {
+            val value = preferences.getString(KEYBOARD_TOUCH_EFFECT_COLOR_MODE.first, null)
+            if (value != null) return normalizeTouchEffectColorMode(value)
+            return suminagashi_ink_color_mode_preference
+        }
+        set(value) = preferences.edit {
+            it.putString(
+                KEYBOARD_TOUCH_EFFECT_COLOR_MODE.first,
+                normalizeTouchEffectColorMode(value)
+            )
+        }
+
+    var keyboard_touch_effect_color_preference: Int
+        get() {
+            if (preferences.contains(KEYBOARD_TOUCH_EFFECT_COLOR.first)) {
+                return preferences.getInt(
+                    KEYBOARD_TOUCH_EFFECT_COLOR.first,
+                    KEYBOARD_TOUCH_EFFECT_COLOR.second
+                )
+            }
+            return suminagashi_ink_color_preference
+        }
+        set(value) = preferences.edit {
+            it.putInt(KEYBOARD_TOUCH_EFFECT_COLOR.first, value)
+        }
+
+    var keyboard_touch_effect_palette_preference: String
+        get() {
+            val value = preferences.getString(
+                KEYBOARD_TOUCH_EFFECT_PALETTE.first,
+                KEYBOARD_TOUCH_EFFECT_PALETTE.second
+            )
+            return normalizeTouchEffectPalette(value)
+        }
+        set(value) = preferences.edit {
+            it.putString(
+                KEYBOARD_TOUCH_EFFECT_PALETTE.first,
+                normalizeTouchEffectPalette(value)
+            )
+        }
+
+    var keyboard_touch_effect_liquid_ink_density_preference: Int
+        get() = preferences.getInt(
+            KEYBOARD_TOUCH_EFFECT_LIQUID_INK_DENSITY.first,
+            KEYBOARD_TOUCH_EFFECT_LIQUID_INK_DENSITY.second
+        ).coerceIn(50, 300)
+        set(value) = preferences.edit {
+            it.putInt(
+                KEYBOARD_TOUCH_EFFECT_LIQUID_INK_DENSITY.first,
+                value.coerceIn(50, 300)
+            )
+        }
+
+    var keyboard_touch_effect_aurora_ink_density_preference: Int
+        get() = preferences.getInt(
+            KEYBOARD_TOUCH_EFFECT_AURORA_INK_DENSITY.first,
+            KEYBOARD_TOUCH_EFFECT_AURORA_INK_DENSITY.second
+        ).coerceIn(50, 300)
+        set(value) = preferences.edit {
+            it.putInt(
+                KEYBOARD_TOUCH_EFFECT_AURORA_INK_DENSITY.first,
+                value.coerceIn(50, 300)
+            )
+        }
+
+    var keyboard_touch_effect_cinematic_wave_color_mode_preference: String
+        get() {
+            val value = preferences.getString(
+                KEYBOARD_TOUCH_EFFECT_CINEMATIC_WAVE_COLOR_MODE.first,
+                KEYBOARD_TOUCH_EFFECT_CINEMATIC_WAVE_COLOR_MODE.second
+            )
+            return CinematicWaveSettings.normalizeColorMode(value)
+        }
+        set(value) = preferences.edit {
+            it.putString(
+                KEYBOARD_TOUCH_EFFECT_CINEMATIC_WAVE_COLOR_MODE.first,
+                CinematicWaveSettings.normalizeColorMode(value)
+            )
+        }
+
+    var keyboard_touch_effect_cinematic_wave_primary_color_preference: Int
+        get() = preferences.getInt(
+            KEYBOARD_TOUCH_EFFECT_CINEMATIC_WAVE_PRIMARY_COLOR.first,
+            KEYBOARD_TOUCH_EFFECT_CINEMATIC_WAVE_PRIMARY_COLOR.second
+        )
+        set(value) = preferences.edit {
+            it.putInt(
+                KEYBOARD_TOUCH_EFFECT_CINEMATIC_WAVE_PRIMARY_COLOR.first,
+                CinematicWaveSettings.withoutTransparentAlpha(value)
+            )
+        }
+
+    var keyboard_touch_effect_cinematic_wave_secondary_color_preference: Int
+        get() = preferences.getInt(
+            KEYBOARD_TOUCH_EFFECT_CINEMATIC_WAVE_SECONDARY_COLOR.first,
+            KEYBOARD_TOUCH_EFFECT_CINEMATIC_WAVE_SECONDARY_COLOR.second
+        )
+        set(value) = preferences.edit {
+            it.putInt(
+                KEYBOARD_TOUCH_EFFECT_CINEMATIC_WAVE_SECONDARY_COLOR.first,
+                CinematicWaveSettings.withoutTransparentAlpha(value)
+            )
+        }
+
+    var keyboard_touch_effect_cinematic_wave_secondary_color_auto_preference: Boolean
+        get() = preferences.getBoolean(
+            KEYBOARD_TOUCH_EFFECT_CINEMATIC_WAVE_SECONDARY_COLOR_AUTO.first,
+            KEYBOARD_TOUCH_EFFECT_CINEMATIC_WAVE_SECONDARY_COLOR_AUTO.second
+        )
+        set(value) = preferences.edit {
+            it.putBoolean(KEYBOARD_TOUCH_EFFECT_CINEMATIC_WAVE_SECONDARY_COLOR_AUTO.first, value)
+        }
+
+    var keyboard_touch_effect_cinematic_wave_type_preference: String
+        get() {
+            val value = preferences.getString(
+                KEYBOARD_TOUCH_EFFECT_CINEMATIC_WAVE_TYPE.first,
+                KEYBOARD_TOUCH_EFFECT_CINEMATIC_WAVE_TYPE.second
+            )
+            return CinematicWaveSettings.normalizeWaveType(value)
+        }
+        set(value) = preferences.edit {
+            it.putString(
+                KEYBOARD_TOUCH_EFFECT_CINEMATIC_WAVE_TYPE.first,
+                CinematicWaveSettings.normalizeWaveType(value)
+            )
+        }
+
+    var keyboard_touch_effect_cinematic_wave_opacity_percent_preference: Int
+        get() = preferences.getInt(
+            KEYBOARD_TOUCH_EFFECT_CINEMATIC_WAVE_OPACITY.first,
+            KEYBOARD_TOUCH_EFFECT_CINEMATIC_WAVE_OPACITY.second
+        ).coerceIn(18, 68)
+        set(value) = preferences.edit {
+            it.putInt(KEYBOARD_TOUCH_EFFECT_CINEMATIC_WAVE_OPACITY.first, value.coerceIn(18, 68))
+        }
+
+    var keyboard_touch_effect_cinematic_wave_intensity_percent_preference: Int
+        get() = preferences.getInt(
+            KEYBOARD_TOUCH_EFFECT_CINEMATIC_WAVE_INTENSITY.first,
+            KEYBOARD_TOUCH_EFFECT_CINEMATIC_WAVE_INTENSITY.second
+        ).coerceIn(35, 180)
+        set(value) = preferences.edit {
+            it.putInt(
+                KEYBOARD_TOUCH_EFFECT_CINEMATIC_WAVE_INTENSITY.first,
+                value.coerceIn(35, 180)
+            )
+        }
+
+    var keyboard_touch_effect_cinematic_wave_motion_preference: String
+        get() {
+            val value = preferences.getString(
+                KEYBOARD_TOUCH_EFFECT_CINEMATIC_WAVE_MOTION.first,
+                KEYBOARD_TOUCH_EFFECT_CINEMATIC_WAVE_MOTION.second
+            )
+            return CinematicWaveSettings.normalizeMotion(value)
+        }
+        set(value) = preferences.edit {
+            it.putString(
+                KEYBOARD_TOUCH_EFFECT_CINEMATIC_WAVE_MOTION.first,
+                CinematicWaveSettings.normalizeMotion(value)
+            )
+        }
+
+    var keyboard_touch_effect_cinematic_wave_touch_response_preference: String
+        get() {
+            val value = preferences.getString(
+                KEYBOARD_TOUCH_EFFECT_CINEMATIC_WAVE_TOUCH_RESPONSE.first,
+                KEYBOARD_TOUCH_EFFECT_CINEMATIC_WAVE_TOUCH_RESPONSE.second
+            )
+            return CinematicWaveSettings.normalizeTouchResponse(value)
+        }
+        set(value) = preferences.edit {
+            it.putString(
+                KEYBOARD_TOUCH_EFFECT_CINEMATIC_WAVE_TOUCH_RESPONSE.first,
+                CinematicWaveSettings.normalizeTouchResponse(value)
+            )
+        }
+
+    var keyboard_touch_effect_cinematic_wave_quality_preference: String
+        get() {
+            val value = preferences.getString(
+                KEYBOARD_TOUCH_EFFECT_CINEMATIC_WAVE_QUALITY.first,
+                KEYBOARD_TOUCH_EFFECT_CINEMATIC_WAVE_QUALITY.second
+            )
+            return CinematicWaveSettings.normalizeQuality(value)
+        }
+        set(value) = preferences.edit {
+            it.putString(
+                KEYBOARD_TOUCH_EFFECT_CINEMATIC_WAVE_QUALITY.first,
+                CinematicWaveSettings.normalizeQuality(value)
+            )
+        }
+
+    private fun normalizeTouchEffectColorMode(value: String?): String {
+        return when (value) {
+            "fixed" -> "fixed"
+            "palette" -> "palette"
+            "theme" -> "theme"
+            else -> "random"
+        }
+    }
+
+    private fun normalizeTouchEffectPalette(value: String?): String {
+        return SprayPaintSettings.normalizePalette(value)
+    }
+
+    var save_last_used_keyboard_enable_preference: Boolean
+        get() = preferences.getBoolean(
+            SAVE_LAST_USED_KEYBOARD.first,
+            SAVE_LAST_USED_KEYBOARD.second
+        )
+        set(value) = preferences.edit {
+            it.putBoolean(SAVE_LAST_USED_KEYBOARD.first, value)
+        }
+
+    var save_last_used_keyboard_position_preference: Int
+        get() = preferences.getInt(
+            SAVE_LAST_USED_KEYBOARD_POSITION.first,
+            SAVE_LAST_USED_KEYBOARD_POSITION.second
+        )
+        set(value) = preferences.edit {
+            it.putInt(SAVE_LAST_USED_KEYBOARD_POSITION.first, value)
+        }
+
+    var enable_zenz_right_context_preference: Boolean
+        get() = preferences.getBoolean(
+            ENABLE_ZENZ_RIGHT_CONTEXT_PREFERENCE.first,
+            ENABLE_ZENZ_RIGHT_CONTEXT_PREFERENCE.second
+        )
+        set(value) = preferences.edit {
+            it.putBoolean(ENABLE_ZENZ_RIGHT_CONTEXT_PREFERENCE.first, value)
+        }
+
+    var enable_typo_correction_japanese_flick_keyboard_preference: Boolean
+        get() = preferences.getBoolean(
+            TYPO_CORRECTION_JA_FLICK.first,
+            TYPO_CORRECTION_JA_FLICK.second
+        )
+        set(value) = preferences.edit {
+            it.putBoolean(TYPO_CORRECTION_JA_FLICK.first, value)
+        }
+
+    var enable_typo_correction_qwerty_english_keyboard_preference: Boolean
+        get() = preferences.getBoolean(
+            TYPO_CORRECTION_EN_QWERTY.first,
+            TYPO_CORRECTION_EN_QWERTY.second
+        )
+        set(value) = preferences.edit {
+            it.putBoolean(TYPO_CORRECTION_EN_QWERTY.first, value)
+        }
+
+    var custom_romaji_zenkaku_conversion_enable_preference: Boolean
+        get() = preferences.getBoolean(
+            CUSTOM_ROMAJI_ZENKAKU_CONVERSION_ENABLE_PREFERENCE.first,
+            CUSTOM_ROMAJI_ZENKAKU_CONVERSION_ENABLE_PREFERENCE.second
+        )
+        set(value) = preferences.edit {
+            it.putBoolean(
+                CUSTOM_ROMAJI_ZENKAKU_CONVERSION_ENABLE_PREFERENCE.first,
+                value
+            )
+        }
+
+    var omission_search_offset_score_preference: Int
+        get() = preferences.getInt(
+            OMISSION_SEARCH_OFFSET_SCORE_PREFERENCE.first,
+            OMISSION_SEARCH_OFFSET_SCORE_PREFERENCE.second
+        )
+        set(value) = preferences.edit {
+            it.putInt(OMISSION_SEARCH_OFFSET_SCORE_PREFERENCE.first, value)
+        }
+
+    var enable_typo_correction_japanese_flick_keyboard_offset_score_preference: Int
+        get() = preferences.getInt(
+            TYPO_CORRECTION_JA_FLICK_OFFSET_SCORE_PREFERENCE.first,
+            TYPO_CORRECTION_JA_FLICK_OFFSET_SCORE_PREFERENCE.second
+        )
+        set(value) = preferences.edit {
+            it.putInt(TYPO_CORRECTION_JA_FLICK_OFFSET_SCORE_PREFERENCE.first, value)
+        }
+
+    /**
+     * キーボード側で使用するためのマップ取得メソッド
+     * 戻り値: Map<FlickDirection, Pair<StartAngle, SweepAngle>>
+     */
+    fun getCircularFlickSlotRanges(): Map<CircularFlickDirection, Pair<Float, Float>> {
+        val count = circularFlickDirectionCount
+        val defaults = getDefaultCircularFlickSlotRanges(count)
+
+        val baseMap = mutableMapOf(
+            CircularFlickDirection.SLOT_0 to getCircularFlickRange(
+                CircularFlickDirection.SLOT_0,
+                defaults.getValue(CircularFlickDirection.SLOT_0)
+            ),
+            CircularFlickDirection.SLOT_1 to getCircularFlickRange(
+                CircularFlickDirection.SLOT_1,
+                defaults.getValue(CircularFlickDirection.SLOT_1)
+            ),
+            CircularFlickDirection.SLOT_2 to getCircularFlickRange(
+                CircularFlickDirection.SLOT_2,
+                defaults.getValue(CircularFlickDirection.SLOT_2)
+            ),
+            CircularFlickDirection.SLOT_3 to getCircularFlickRange(
+                CircularFlickDirection.SLOT_3,
+                defaults.getValue(CircularFlickDirection.SLOT_3)
+            )
+        )
+
+        if (count >= 5) {
+            baseMap[CircularFlickDirection.SLOT_4] = getCircularFlickRange(
+                CircularFlickDirection.SLOT_4,
+                defaults.getValue(CircularFlickDirection.SLOT_4)
+            )
+        }
+
+        if (count >= 6) {
+            baseMap[CircularFlickDirection.SLOT_5] = getCircularFlickRange(
+                CircularFlickDirection.SLOT_5,
+                defaults.getValue(CircularFlickDirection.SLOT_5)
+            )
+        }
+
+        if (count >= 7) {
+            baseMap[CircularFlickDirection.SLOT_6] = getCircularFlickRange(
+                CircularFlickDirection.SLOT_6,
+                defaults.getValue(CircularFlickDirection.SLOT_6)
+            )
+        }
+
+        return baseMap
+    }
+
+    private fun getDefaultCircularFlickSlotRanges(
+        count: Int
+    ): Map<CircularFlickDirection, Pair<Float, Float>> {
+        return when (count.coerceIn(4, 7)) {
+            4 -> mapOf(
+                CircularFlickDirection.SLOT_0 to (225f to 90f),
+                CircularFlickDirection.SLOT_1 to (315f to 90f),
+                CircularFlickDirection.SLOT_2 to (45f to 90f),
+                CircularFlickDirection.SLOT_3 to (135f to 90f)
+            )
+
+            5 -> mapOf(
+                CircularFlickDirection.SLOT_0 to (234f to 72f),
+                CircularFlickDirection.SLOT_1 to (306f to 72f),
+                CircularFlickDirection.SLOT_2 to (18f to 72f),
+                CircularFlickDirection.SLOT_3 to (90f to 72f),
+                CircularFlickDirection.SLOT_4 to (162f to 72f)
+            )
+
+            else -> buildEvenCircularRanges(count)
+        }
+    }
+
+    private fun getCircularFlickRange(
+        direction: CircularFlickDirection,
+        defaultRange: Pair<Float, Float>
+    ): Pair<Float, Float> {
+        val (startPreference, sweepPreference) = when (direction) {
+            CircularFlickDirection.SLOT_0 -> PREF_UP_START to PREF_UP_SWEEP
+            CircularFlickDirection.SLOT_1 -> PREF_RIGHT_START to PREF_RIGHT_SWEEP
+            CircularFlickDirection.SLOT_2 -> PREF_DOWN_START to PREF_DOWN_SWEEP
+            CircularFlickDirection.SLOT_3 -> PREF_LEFT_START to PREF_LEFT_SWEEP
+            CircularFlickDirection.SLOT_4 -> PREF_UP_RIGHT_START to PREF_UP_RIGHT_SWEEP
+            CircularFlickDirection.SLOT_5 -> PREF_SLOT_5_START to PREF_SLOT_5_SWEEP
+            CircularFlickDirection.SLOT_6 -> PREF_SLOT_6_START to PREF_SLOT_6_SWEEP
+            CircularFlickDirection.TAP -> return defaultRange
+        }
+
+        return preferences.getFloat(startPreference.first, defaultRange.first) to
+                preferences.getFloat(sweepPreference.first, defaultRange.second)
+    }
+
+    fun getCircularFlickRanges(): Map<CircularFlickDirection, Pair<Float, Float>> {
+        return getCircularFlickSlotRanges()
+    }
+
+    fun getCircularSlotActionSettings(): List<CircularSlotActionSetting> {
+        val raw = preferences.getString(
+            CIRCULAR_SLOT_ACTION_SETTINGS.first,
+            CIRCULAR_SLOT_ACTION_SETTINGS.second
+        ) ?: CIRCULAR_SLOT_ACTION_SETTINGS.second
+
+        return runCatching {
+            gson.fromJson<List<CircularSlotActionSetting>>(
+                raw,
+                object : TypeToken<List<CircularSlotActionSetting>>() {}.type
+            )
+        }.getOrNull()
+            ?.filter { it.slot in circularSlotActionEditableSlots }
+            ?: emptyList()
+    }
+
+    fun saveCircularSlotActionSettings(settings: List<CircularSlotActionSetting>) {
+        preferences.edit {
+            it.putString(
+                CIRCULAR_SLOT_ACTION_SETTINGS.first,
+                gson.toJson(settings.filter { setting ->
+                    setting.slot in circularSlotActionEditableSlots &&
+                            setting.keyIdentifier.isNotBlank()
+                })
+            )
+        }
+    }
+
+    fun getCircularSlotActionSetting(
+        mode: KeyboardInputMode,
+        keyIdentifier: String,
+        slot: CircularFlickDirection
+    ): CircularSlotActionSetting? {
+        return getCircularSlotActionSettings().firstOrNull {
+            it.mode == mode && it.keyIdentifier == keyIdentifier && it.slot == slot
+        }
+    }
+
+    fun upsertCircularSlotActionSetting(setting: CircularSlotActionSetting) {
+        if (setting.slot !in circularSlotActionEditableSlots || setting.keyIdentifier.isBlank()) return
+        val nextSettings = getCircularSlotActionSettings()
+            .filterNot {
+                it.mode == setting.mode &&
+                        it.keyIdentifier == setting.keyIdentifier &&
+                        it.slot == setting.slot
+            }
+            .plus(setting)
+        saveCircularSlotActionSettings(nextSettings)
+    }
+
+    fun deleteCircularSlotActionSetting(
+        mode: KeyboardInputMode,
+        keyIdentifier: String,
+        slot: CircularFlickDirection
+    ) {
+        saveCircularSlotActionSettings(
+            getCircularSlotActionSettings().filterNot {
+                it.mode == mode && it.keyIdentifier == keyIdentifier && it.slot == slot
+            }
+        )
+    }
+
+    /**
+     * SharedPreferences 全体を JSON として書き出す（将来キーが増えても自動対応）
+     */
+    fun exportAllToJson(): String {
+        val all = preferences.all // Map<String, *>
+        val entries = all.entries.map { (k, v) ->
+            when (v) {
+                null -> PrefEntry(k, "null", null)
+                is Boolean -> PrefEntry(k, "boolean", v)
+                is Int -> PrefEntry(k, "int", v)
+                is Long -> PrefEntry(k, "long", v)
+                is Float -> PrefEntry(k, "float", v)
+                is String -> PrefEntry(k, "string", v)
+                is Set<*> -> {
+                    val list = v.filterIsInstance<String>()
+                    PrefEntry(k, "string_set", list)
+                }
+
+                else -> {
+                    // 想定外は string に落とす（壊さないため）
+                    PrefEntry(k, "string", v.toString())
+                }
+            }
+        }
+
+        return gson.toJson(PrefBackup(entries = entries))
+    }
+
+    /**
+     * JSON を読み込んで SharedPreferences に反映
+     * @param replaceAll true の場合は一旦 clear() してから復元（バックアップ復元向け）
+     */
+    fun importAllFromJson(json: String, replaceAll: Boolean = true) {
+        val backup = try {
+            gson.fromJson(json, PrefBackup::class.java)
+        } catch (e: Exception) {
+            throw IllegalArgumentException("Invalid backup json", e)
+        }
+
+        preferences.edit { editor ->
+            if (replaceAll) editor.clear()
+
+            backup.entries.forEach { e ->
+                when (e.type) {
+                    "null" -> editor.remove(e.key)
+                    "boolean" -> editor.putBoolean(e.key, (e.value as Boolean))
+                    "int" -> editor.putInt(e.key, (e.value as Number).toInt())
+                    "long" -> editor.putLong(e.key, (e.value as Number).toLong())
+                    "float" -> editor.putFloat(e.key, (e.value as Number).toFloat())
+                    "string" -> editor.putString(e.key, e.value as String)
+                    "string_set" -> {
+                        val list = (e.value as List<*>).filterIsInstance<String>()
+                        editor.putStringSet(e.key, list.toSet())
+                    }
+
+                    else -> {
+                        // unknown type は無視（将来バージョン差分で落ちないように）
+                    }
+                }
+            }
+        }
+        migrateSumireKeymapGuideModesIfNeeded()
+        migrateGojuonKeyboardTypeIfNeeded()
+    }
+
+    fun migrateSumirePreferenceIfNeeded() {
+        // 古いキーが存在する場合のみ移行処理を実行
+        if (preferences.contains(OLD_SUMIRE_PREFERENCE_KEY)) {
+            val oldValue = preferences.getString(OLD_SUMIRE_PREFERENCE_KEY, "toggle-default")
+
+            val (newStyle, newMethod) = when (oldValue) {
+                "toggle-default" -> "default" to "toggle"
+                "flick-default" -> "default" to "flick"
+                "flick-circle" -> "circle" to "toggle"
+                "flick-circle-flick" -> "circle" to "flick"
+                "second-flick" -> "second-flick" to "toggle"
+                "second-flick-flick" -> "second-flick" to "flick"
+                "flick-sumire" -> "sumire" to "flick"
+                else -> "default" to "toggle"
+            }
+
+            preferences.edit {
+                // 新しいキーで値を保存
+                it.putString(NEW_SUMIRE_STYLE_KEY, newStyle)
+                it.putString(NEW_SUMIRE_METHOD_KEY, newMethod)
+                // 移行が完了したので古いキーを削除
+                it.remove(OLD_SUMIRE_PREFERENCE_KEY)
+            }
+        }
+    }
+}

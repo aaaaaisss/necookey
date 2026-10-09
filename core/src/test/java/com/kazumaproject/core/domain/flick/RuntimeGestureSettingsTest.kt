@@ -1,0 +1,81 @@
+package com.kazumaproject.core.domain.flick
+
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertSame
+import org.junit.Test
+
+class RuntimeGestureSettingsTest {
+    @Test fun independentInputDefaultsOffAndPublishesWithoutResettingOtherSettings() {
+        val source = MutableRuntimeGestureSettingsSource(RuntimeGestureSettings(flickSensitivity = 75))
+        assertEquals(false, source.snapshot().independentMultiTouchEnabled)
+        val enabled = source.update(independentMultiTouchEnabled = true)
+        assertEquals(true, enabled.independentMultiTouchEnabled)
+        assertEquals(75, enabled.flickSensitivity)
+        assertEquals(1L, enabled.revision)
+        assertSame(enabled, source.update(independentMultiTouchEnabled = true))
+        source.update(longPressTimeoutMillis = 800)
+        assertEquals(true, source.snapshot().independentMultiTouchEnabled)
+        assertEquals(false, source.update(independentMultiTouchEnabled = false).independentMultiTouchEnabled)
+    }
+
+
+    @Test
+    fun updatePublishesOneNormalizedAtomicSnapshotAndRevision() {
+        val source = MutableRuntimeGestureSettingsSource()
+        val initial = source.snapshot()
+
+        assertSame(initial, source.update())
+
+        val updated = source.update(
+            flickSensitivity = -20,
+            longPressTimeoutMillis = 9_000L
+        )
+
+        assertEquals(1, updated.flickSensitivity)
+        assertEquals(2_000L, updated.longPressTimeoutMillis)
+        assertEquals(initial.revision + 1L, updated.revision)
+        assertSame(updated, source.snapshot())
+    }
+
+    @Test
+    fun delegatingSourceSwitchesWithoutChangingConsumerReference() {
+        val fallback = MutableRuntimeGestureSettingsSource()
+        val shared = MutableRuntimeGestureSettingsSource(
+            RuntimeGestureSettings(flickSensitivity = 25, longPressTimeoutMillis = 450L)
+        )
+        val source = DelegatingRuntimeGestureSettingsSource(fallback)
+
+        source.bind(shared)
+        assertEquals(25, source.snapshot().flickSensitivity)
+
+        shared.update(flickSensitivity = 175)
+        assertEquals(175, source.snapshot().flickSensitivity)
+
+        source.bind(null)
+        assertEquals(100, source.snapshot().flickSensitivity)
+    }
+
+    @Test
+    fun thresholdShapeUpdatesAtomicallyAndAdvancesRevision() {
+        val source = MutableRuntimeGestureSettingsSource()
+
+        val updated = source.update(
+            flickThresholdShape = FlickThresholdShape.Rectangular
+        )
+
+        assertEquals(FlickThresholdShape.Rectangular, updated.flickThresholdShape)
+        assertEquals(1L, updated.revision)
+        assertEquals(FlickThresholdShape.Rectangular, source.snapshot().flickThresholdShape)
+    }
+
+    @Test
+    fun diagonalModeDefaultsToLegacyAndUpdatesAtomically() {
+        val source = MutableRuntimeGestureSettingsSource()
+        assertEquals(TfbiDiagonalRecognitionMode.LEGACY, source.snapshot().tfbiDiagonalRecognitionMode)
+
+        val updated = source.update(tfbiDiagonalRecognitionMode = TfbiDiagonalRecognitionMode.STABLE)
+        assertEquals(TfbiDiagonalRecognitionMode.STABLE, updated.tfbiDiagonalRecognitionMode)
+        assertEquals(1L, updated.revision)
+        assertSame(updated, source.update())
+    }
+}

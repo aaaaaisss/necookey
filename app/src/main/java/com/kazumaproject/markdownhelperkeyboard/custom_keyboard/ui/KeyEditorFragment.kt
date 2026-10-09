@@ -1,0 +1,2136 @@
+package com.kazumaproject.markdownhelperkeyboard.custom_keyboard.ui
+
+import android.Manifest
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import android.graphics.Matrix
+import android.media.ExifInterface
+import android.net.Uri
+import android.content.pm.PackageManager
+import android.os.Bundle
+import android.view.Menu
+import android.view.MenuInflater
+import android.view.MenuItem
+import android.view.View
+import android.widget.ArrayAdapter
+import android.widget.AdapterView
+import android.widget.ImageView
+import android.widget.TextView
+import android.widget.Toast
+import androidx.appcompat.app.AlertDialog
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.appcompat.app.AppCompatActivity
+import androidx.core.content.ContextCompat
+import androidx.core.view.MenuHost
+import androidx.core.view.MenuProvider
+import androidx.core.view.isVisible
+import androidx.core.widget.doAfterTextChanged
+import androidx.fragment.app.Fragment
+import androidx.hilt.navigation.fragment.hiltNavGraphViewModels
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.lifecycleScope
+import androidx.navigation.fragment.findNavController
+import androidx.recyclerview.widget.LinearLayoutManager
+import com.kazumaproject.custom_keyboard.data.CircularFlickDirection
+import com.kazumaproject.custom_keyboard.data.DoubleTapBinding
+import com.kazumaproject.custom_keyboard.data.FlickAction
+import com.kazumaproject.custom_keyboard.data.FlickDirection
+import com.kazumaproject.custom_keyboard.data.KeyAction
+import com.kazumaproject.custom_keyboard.data.KeyActionMapper
+import com.kazumaproject.custom_keyboard.data.KeyData
+import com.kazumaproject.custom_keyboard.data.KeyIconBuiltInDrawable
+import com.kazumaproject.custom_keyboard.data.KeyIconRef
+import com.kazumaproject.custom_keyboard.data.KeyIconResolver
+import com.kazumaproject.custom_keyboard.data.KeyIconType
+import com.kazumaproject.custom_keyboard.data.KeyItem
+import com.kazumaproject.custom_keyboard.data.KeyTextInputBehavior
+import com.kazumaproject.custom_keyboard.data.KeyType
+import com.kazumaproject.custom_keyboard.data.SpecialKeyColorStyle
+import com.kazumaproject.custom_keyboard.data.automaticDoubleTapPolicy
+import com.kazumaproject.custom_keyboard.data.compatibleColumnSpan
+import com.kazumaproject.custom_keyboard.data.compatibleRowSpan
+import com.kazumaproject.custom_keyboard.data.toCircularFlickMap
+import com.kazumaproject.custom_keyboard.data.toCellSpanCeilFromGridUnits
+import com.kazumaproject.custom_keyboard.data.usesFlexiblePlacement
+import com.kazumaproject.custom_keyboard.view.TfbiFlickDirection
+import com.kazumaproject.markdownhelperkeyboard.R
+import com.kazumaproject.markdownhelperkeyboard.custom_keyboard.data.CircularFlickSlotActionMapper
+import com.kazumaproject.markdownhelperkeyboard.custom_keyboard.data.CustomKeyboardLayout
+import com.kazumaproject.markdownhelperkeyboard.custom_keyboard.data.FlickDirectionMapper
+import com.kazumaproject.markdownhelperkeyboard.custom_keyboard.data.TwoStepMappingItem
+import com.kazumaproject.markdownhelperkeyboard.custom_keyboard.ui.adapter.CircularFlickMappingAdapter
+import com.kazumaproject.markdownhelperkeyboard.custom_keyboard.ui.adapter.CircularFlickMappingItem
+import com.kazumaproject.markdownhelperkeyboard.custom_keyboard.ui.adapter.DisplayActionUi
+import com.kazumaproject.markdownhelperkeyboard.custom_keyboard.ui.adapter.FlickLongPressMappingItem
+import com.kazumaproject.markdownhelperkeyboard.custom_keyboard.ui.adapter.FlickMappingItem
+import com.kazumaproject.markdownhelperkeyboard.custom_keyboard.ui.adapter.SpecialFlickMappingItem
+import com.kazumaproject.markdownhelperkeyboard.databinding.FragmentKeyEditorBinding
+import com.kazumaproject.markdownhelperkeyboard.repository.KeyboardRepository
+import com.kazumaproject.markdownhelperkeyboard.setting_activity.AppPreference
+import dagger.hilt.android.AndroidEntryPoint
+import kotlinx.coroutines.flow.filterNotNull
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
+import timber.log.Timber
+import java.io.File
+import java.util.UUID
+import javax.inject.Inject
+import kotlin.math.max
+
+private enum class OutputEditMode {
+    NORMAL,
+    TOGGLE,
+    LONG_PRESS
+}
+
+private data class CustomKeyboardTargetOption(
+    val label: String,
+    val stableId: String,
+    val isValid: Boolean
+)
+
+@AndroidEntryPoint
+class KeyEditorFragment : Fragment(R.layout.fragment_key_editor) {
+
+    @Inject
+    lateinit var keyboardRepository: KeyboardRepository
+
+    @Inject
+    lateinit var appPreference: AppPreference
+
+    private val viewModel: KeyboardEditorViewModel by hiltNavGraphViewModels(R.id.mobile_navigation)
+
+    private var _binding: FragmentKeyEditorBinding? = null
+    private val binding get() = _binding!!
+
+    private var currentKeyData: KeyData? = null
+
+    private var currentFlickItems = mutableListOf<FlickMappingItem>()
+    private var currentToggleFlickItems = mutableListOf<FlickMappingItem>()
+    private var currentLongPressFlickItems = mutableListOf<FlickMappingItem>()
+    private var currentTwoStepItems = mutableListOf<TwoStepMappingItem>()
+    private var currentTwoStepLongPressItems = mutableListOf<TwoStepMappingItem>()
+    private var currentFlickLongPressItems = mutableListOf<FlickLongPressMappingItem>()
+    private var currentFlickLongPressHoldItems = mutableListOf<FlickLongPressMappingItem>()
+    private var currentSpecialFlickItems = mutableListOf<SpecialFlickMappingItem>()
+    private var currentCircularFlickMaps = mutableListOf<MutableList<CircularFlickMappingItem>>()
+    private var currentCircularMapIndex = 0
+    private var outputEditMode: OutputEditMode = OutputEditMode.NORMAL
+    private var selectedTextInputBehavior = KeyTextInputBehavior.NORMAL
+    private var isUpdatingCharEditText = false
+
+    // 現在選択中のセルモード
+    private var currentCellMode: CellMode? = null
+
+    private lateinit var keyActionOptions: List<SpecialKeyActionOption>
+    private lateinit var specialFlickActionOptions: List<SpecialKeyActionOption>
+    private lateinit var customKeyboardTargetAdapter: ArrayAdapter<String>
+    private lateinit var doubleTapTargetAdapter: ArrayAdapter<String>
+    private lateinit var circularFlickAdapter: CircularFlickMappingAdapter
+    private lateinit var circularMapAdapter: ArrayAdapter<String>
+
+    // NEW: UI-friendly display actions (avoids depending on unknown internal display type)
+    private lateinit var displayActions: List<DisplayActionUi>
+    private lateinit var specialFlickDisplayActions: List<DisplayActionUi>
+    private var customKeyboardTargets: List<CustomKeyboardLayout> = emptyList()
+    private var customKeyboardTargetOptions: List<CustomKeyboardTargetOption> = emptyList()
+    private var selectedTargetCustomKeyboardStableId: String? = null
+    private var selectedDoubleTapTargetStableId: String? = null
+    private var selectedIconRef: KeyIconRef? = null
+    private var originalIconRef: KeyIconRef? = null
+    private val pendingUserIconPaths = mutableSetOf<String>()
+    private var didSaveKey = false
+
+    private var currentColSpan: Int = 1
+    private var currentRowSpan: Int = 1
+    private var maxColSpan: Int = 1
+    private var maxRowSpan: Int = 1
+    private var isFlexibleSizeEditing: Boolean = false
+    private var currentColumnSpanUnits: Int = 2
+    private var currentRowSpanUnits: Int = 2
+    private var maxColumnSpanUnits: Int = 2
+    private var maxRowSpanUnits: Int = 2
+
+    // NEW: allowed directions for special-flick category (5 directions)
+    private val allowedSpecialFlickDirections: List<FlickDirection> = listOf(
+        FlickDirection.TAP,
+        FlickDirection.UP,
+        FlickDirection.DOWN,
+        FlickDirection.UP_LEFT,
+        FlickDirection.UP_RIGHT
+    )
+
+    private val flickLongPressDirections: List<TfbiFlickDirection> = listOf(
+        TfbiFlickDirection.TAP,
+        TfbiFlickDirection.UP_LEFT,
+        TfbiFlickDirection.UP,
+        TfbiFlickDirection.UP_RIGHT,
+        TfbiFlickDirection.LEFT,
+        TfbiFlickDirection.RIGHT,
+        TfbiFlickDirection.DOWN_LEFT,
+        TfbiFlickDirection.DOWN,
+        TfbiFlickDirection.DOWN_RIGHT
+    )
+
+    override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
+        super.onViewCreated(view, savedInstanceState)
+        _binding = FragmentKeyEditorBinding.bind(view)
+
+        binding.buttonDone.isEnabled = false
+        setupToolbarAndMenu()
+        setupGridEditor()
+        setupUIListeners()
+        setupInitialState()
+    }
+
+    private fun setupGridEditor() {
+        // Convert KeyActionMapper display actions into stable UI list
+        val raw = KeyActionMapper.getDisplayActions(requireContext())
+        displayActions = raw.map { DisplayActionUi(it.displayName, it.action, it.iconResId) }
+        specialFlickDisplayActions = displayActions
+
+        keyActionOptions = groupedSpecialKeyActionOptions(displayActions) {
+            getString(it.titleResId)
+        }
+        specialFlickActionOptions = listOf(SpecialKeyActionOption("")) + keyActionOptions
+        binding.keyActionSpinner.setAdapter(
+            SpecialKeyActionDropdownAdapter(requireContext(), keyActionOptions)
+        )
+
+        binding.doubleTapActionSpinner.setAdapter(
+            SpecialKeyActionDropdownAdapter(
+                requireContext(),
+                listOf(SpecialKeyActionOption(getString(R.string.double_tap_disabled))) + keyActionOptions
+            )
+        )
+        binding.doubleTapActionSpinner.setText(
+            getString(R.string.double_tap_disabled),
+            false
+        )
+
+        // 特殊フリック用アクションスピナー（セル選択後に表示）
+        binding.specialFlickMappingsRecyclerView.setAdapter(
+            SpecialKeyActionDropdownAdapter(requireContext(), specialFlickActionOptions)
+        )
+
+        customKeyboardTargetAdapter = ArrayAdapter(
+            requireContext(),
+            android.R.layout.simple_spinner_dropdown_item,
+            mutableListOf<String>()
+        )
+        binding.customKeyboardTargetSpinner.setAdapter(customKeyboardTargetAdapter)
+        doubleTapTargetAdapter = ArrayAdapter(
+            requireContext(),
+            android.R.layout.simple_spinner_dropdown_item,
+            mutableListOf<String>()
+        )
+        binding.doubleTapTargetSpinner.setAdapter(doubleTapTargetAdapter)
+
+        circularFlickAdapter = CircularFlickMappingAdapter { updated ->
+            val currentMap = currentCircularFlickMaps.getOrNull(currentCircularMapIndex)
+                ?: return@CircularFlickMappingAdapter
+            val idx = currentMap.indexOfFirst { it.direction == updated.direction }
+            if (idx != -1) {
+                currentMap[idx] = updated
+                updateDoneButtonState()
+            }
+        }
+        binding.circularFlickMappingsRecyclerView.apply {
+            layoutManager = LinearLayoutManager(requireContext())
+            adapter = circularFlickAdapter
+        }
+        circularMapAdapter = ArrayAdapter(
+            requireContext(),
+            android.R.layout.simple_spinner_dropdown_item,
+            mutableListOf<String>()
+        )
+        binding.spinnerCircularMap.adapter = circularMapAdapter
+
+        // グリッドのセル選択コールバック
+        binding.flickGridEditorView.onCellSelected = { mode ->
+            currentCellMode = mode
+            showEditorForMode(mode)
+        }
+
+        // 文字入力欄の変更コールバック
+        binding.textCharEdittext.doAfterTextChanged { editable ->
+            if (isUpdatingCharEditText) return@doAfterTextChanged
+            val mode = currentCellMode ?: return@doAfterTextChanged
+            val text = editable?.toString() ?: ""
+            when (mode) {
+                is CellMode.Petal -> {
+                    val items = currentPetalItems()
+                    val idx = items.indexOfFirst { it.direction == mode.direction }
+                    if (idx != -1) items[idx] = items[idx].copy(output = text)
+                    binding.flickGridEditorView.updateCellLabel(mode, text)
+                    updateDoneButtonState()
+                }
+                is CellMode.TwoStepFirst -> {
+                    val items = currentTwoStepItemsForOutputMode()
+                    updateTwoStepOutput(items, mode.first, mode.first, text)
+                    binding.flickGridEditorView.refreshTwoStepLabels(items.toList())
+                    updateDoneButtonState()
+                }
+                is CellMode.TwoStepSecond -> {
+                    val items = currentTwoStepItemsForOutputMode()
+                    updateTwoStepOutput(items, mode.first, mode.second, text)
+                    binding.flickGridEditorView.refreshTwoStepLabels(items.toList())
+                    updateDoneButtonState()
+                }
+                is CellMode.FlickLongPress -> {
+                    val items = currentFlickLongPressItemsForOutputMode()
+                    updateFlickLongPressOutput(items, mode.direction, text)
+                    binding.flickGridEditorView.updateCellLabel(mode, text)
+                    updateDoneButtonState()
+                }
+                else -> Unit
+            }
+        }
+
+        // 特殊フリック用アクション選択コールバック
+        binding.specialFlickMappingsRecyclerView.setOnItemClickListener { _, _, idx, _ ->
+            val mode = currentCellMode as? CellMode.SpecialFlick ?: return@setOnItemClickListener
+            val item = currentSpecialFlickItems.firstOrNull { it.direction == mode.direction }
+            val selectedAction = specialFlickActionOptions.getOrNull(idx)?.action?.let {
+                resolveSpecialFlickSelectedAction(
+                    selectedAction = it.action,
+                    currentAction = item?.action,
+                    selectedTargetStableId = selectedTargetCustomKeyboardStableId,
+                    validTargetStableIds = validTargetStableIds()
+                )
+            }
+            val itemIdx = currentSpecialFlickItems.indexOfFirst { it.direction == mode.direction }
+            if (itemIdx != -1) {
+                currentSpecialFlickItems[itemIdx] = currentSpecialFlickItems[itemIdx].copy(action = selectedAction)
+                val displayAction = selectedAction?.let { act -> displayActionForAction(act) }
+                binding.flickGridEditorView.updateCellIcon(
+                    mode,
+                    displayAction?.iconResId,
+                    displayAction?.displayName ?: "",
+                    selectedAction
+                )
+                if (mode.direction == FlickDirection.TAP) {
+                    refreshIconPreview()
+                }
+                updateCustomKeyboardTargetVisibility()
+                updateDoneButtonState()
+            }
+        }
+    }
+
+    private fun setupUIListeners() {
+        binding.buttonDone.setOnClickListener { onDone() }
+
+        binding.keyTypeChipGroup.setOnCheckedStateChangeListener { _, checkedIds ->
+            if (checkedIds.isEmpty()) return@setOnCheckedStateChangeListener
+            val selectedChipId = checkedIds.first()
+            val isSpecialKey = selectedChipId == R.id.chip_special
+
+            // Special key: show category selector (single/flick)
+            binding.textSpecialCategoryTitle.isVisible = isSpecialKey
+            binding.specialCategoryChipGroup.isVisible = isSpecialKey
+            updateSpecialKeyColorStyleVisibility(isSpecialKey)
+
+            // Normal UI blocks
+            binding.textInputStyleTitle.isVisible = !isSpecialKey
+            binding.inputStyleChipGroup.isVisible = !isSpecialKey
+            binding.textOutputModeTitle.isVisible = !isSpecialKey
+            binding.outputModeChipGroup.isVisible = !isSpecialKey
+
+            if (isSpecialKey) {
+                // Default category = single if none selected yet
+                if (binding.specialCategoryChipGroup.checkedChipId == View.NO_ID) {
+                    binding.specialCategoryChipGroup.check(R.id.chip_special_single)
+                }
+
+                // hide normal editors
+                binding.keyLabelLayout.isVisible = false
+                binding.flickGridEditorView.isVisible = false
+                binding.textSelectedDirection.isVisible = false
+                binding.textCharInputLayout.isVisible = false
+
+                // show the right special editor
+                handleSpecialCategoryUi()
+            } else {
+                // hide special editors
+                binding.keyActionLayout.isVisible = false
+                binding.customKeyboardTargetLayout.isVisible = false
+                binding.specialFlickEditorGroup.isVisible = false
+                updateSpecialKeyColorStyleVisibility(false)
+
+                // normal key: input style controls which editor is visible
+                handleInputStyleUi()
+            }
+
+            updateDoubleTapControlsVisibility()
+            updateDoneButtonState()
+        }
+
+        // NEW: category change for special key
+        binding.specialCategoryChipGroup.setOnCheckedStateChangeListener { _, checkedIds ->
+            if (checkedIds.isEmpty()) return@setOnCheckedStateChangeListener
+            handleSpecialCategoryUi()
+            updateDoneButtonState()
+        }
+
+        binding.inputStyleChipGroup.setOnCheckedStateChangeListener { _, checkedIds ->
+            if (checkedIds.isEmpty()) return@setOnCheckedStateChangeListener
+            val isPetal = checkedIds.first() == R.id.chip_petal_flick
+            binding.chipToggleOutput.isEnabled = isPetal
+            if (!isPetal && outputEditMode == OutputEditMode.TOGGLE) {
+                binding.outputModeChipGroup.check(R.id.chip_normal_output)
+            }
+            handleInputStyleUi()
+            updateDoneButtonState()
+        }
+
+        binding.spinnerCircularMap.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
+            override fun onItemSelected(parent: AdapterView<*>?, view: View?, position: Int, id: Long) {
+                if (position == currentCircularMapIndex) return
+                currentCircularMapIndex = position
+                refreshCircularEditor()
+            }
+
+            override fun onNothingSelected(parent: AdapterView<*>?) = Unit
+        }
+
+        binding.btnCircularMapAdd.setOnClickListener {
+            currentCircularFlickMaps.add(createDefaultCircularItems())
+            currentCircularMapIndex = currentCircularFlickMaps.lastIndex
+            refreshCircularMapSelector()
+            refreshCircularEditor()
+            updateDoneButtonState()
+        }
+
+        binding.btnCircularMapDuplicate.setOnClickListener {
+            val source = currentCircularFlickMaps.getOrNull(currentCircularMapIndex)
+                ?: createDefaultCircularItems()
+            currentCircularFlickMaps.add(source.map { it.copy(id = java.util.UUID.randomUUID().toString()) }.toMutableList())
+            currentCircularMapIndex = currentCircularFlickMaps.lastIndex
+            refreshCircularMapSelector()
+            refreshCircularEditor()
+            updateDoneButtonState()
+        }
+
+        binding.btnCircularMapDelete.setOnClickListener {
+            if (currentCircularFlickMaps.size <= 1) return@setOnClickListener
+            currentCircularFlickMaps.removeAt(currentCircularMapIndex)
+            currentCircularMapIndex = currentCircularMapIndex.coerceAtMost(currentCircularFlickMaps.lastIndex)
+            refreshCircularMapSelector()
+            refreshCircularEditor()
+            updateDoneButtonState()
+        }
+
+        binding.outputModeChipGroup.setOnCheckedStateChangeListener { _, checkedIds ->
+            if (checkedIds.isEmpty()) return@setOnCheckedStateChangeListener
+            outputEditMode = when (checkedIds.first()) {
+                R.id.chip_toggle_output -> OutputEditMode.TOGGLE
+                R.id.chip_long_press_output -> OutputEditMode.LONG_PRESS
+                else -> OutputEditMode.NORMAL
+            }
+            when (outputEditMode) {
+                OutputEditMode.NORMAL -> selectedTextInputBehavior = KeyTextInputBehavior.NORMAL
+                OutputEditMode.TOGGLE -> selectedTextInputBehavior = KeyTextInputBehavior.TOGGLE
+                OutputEditMode.LONG_PRESS -> Unit
+            }
+            handleInputStyleUi()
+            updateDoneButtonState()
+        }
+
+        binding.keyLabelEdittext.doAfterTextChanged { text ->
+            updateDoneButtonState()
+            // ペタルフリックの中央セルラベルをリアルタイム更新
+            if (binding.inputStyleChipGroup.checkedChipId == R.id.chip_petal_flick && outputEditMode == OutputEditMode.NORMAL) {
+                val label = text?.toString() ?: ""
+                val tapOutput = currentFlickItems.firstOrNull { it.direction == FlickDirection.TAP }?.output ?: ""
+                binding.flickGridEditorView.updateCellLabel(
+                    CellMode.Petal(FlickDirection.TAP),
+                    label.ifEmpty { tapOutput }
+                )
+            }
+        }
+
+        binding.keyActionSpinner.doAfterTextChanged {
+            updateCustomKeyboardTargetVisibility()
+            refreshIconPreview()
+            updateDoneButtonState()
+        }
+        binding.keyActionSpinner.setOnItemClickListener { _, _, position, _ ->
+            if (
+                keyActionOptions.getOrNull(position)?.action?.action == KeyAction.ShiftKey &&
+                selectedDoubleTapDisplayAction() == null
+            ) {
+                displayActionForAction(KeyAction.CapLockKey)?.let { capLock ->
+                    binding.doubleTapActionSpinner.setText(capLock.displayName, false)
+                    updateDoubleTapControlsVisibility()
+                }
+            }
+        }
+
+        binding.doubleTapActionSpinner.doAfterTextChanged {
+            updateDoubleTapControlsVisibility()
+            updateDoneButtonState()
+        }
+
+        binding.customKeyboardTargetSpinner.setOnItemClickListener { _, _, position, _ ->
+            val option = customKeyboardTargetOptions.getOrNull(position)
+            selectedTargetCustomKeyboardStableId = option
+                ?.takeIf { it.isValid }
+                ?.stableId
+            val mode = currentCellMode as? CellMode.SpecialFlick
+            val stableId = selectedTargetCustomKeyboardStableId
+            if (
+                binding.keyTypeChipGroup.checkedChipId == R.id.chip_special &&
+                binding.specialCategoryChipGroup.checkedChipId == R.id.chip_special_flick &&
+                mode != null &&
+                stableId != null
+            ) {
+                currentSpecialFlickItems = currentSpecialFlickItems
+                    .withMoveToCustomKeyboardTargetForDirection(
+                        direction = mode.direction,
+                        stableId = stableId,
+                        validTargetStableIds = validTargetStableIds()
+                    )
+                    .toMutableList()
+                updateDoneButtonState()
+            }
+            updateDoneButtonState()
+        }
+
+        binding.doubleTapTargetSpinner.setOnItemClickListener { _, _, position, _ ->
+            selectedDoubleTapTargetStableId = customKeyboardTargetOptions
+                .getOrNull(position)
+                ?.takeIf { it.isValid }
+                ?.stableId
+            updateDoneButtonState()
+        }
+
+        binding.buttonChooseBuiltinIcon.setOnClickListener {
+            showBuiltInIconPicker()
+        }
+        binding.buttonChooseImageIcon.setOnClickListener {
+            pickImageIcon.launch("image/*")
+        }
+        binding.buttonClearIconOverride.setOnClickListener {
+            replaceSelectedIcon(null)
+        }
+
+        binding.btnColPlus.setOnClickListener {
+            if (isFlexibleSizeEditing) {
+                if (currentColumnSpanUnits < maxColumnSpanUnits) {
+                    currentColumnSpanUnits++
+                    updateSizeDisplay()
+                }
+            } else if (currentColSpan < maxColSpan) {
+                currentColSpan++
+                updateSizeDisplay()
+            }
+        }
+        binding.btnColMinus.setOnClickListener {
+            if (isFlexibleSizeEditing) {
+                if (currentColumnSpanUnits > 1) {
+                    currentColumnSpanUnits--
+                    updateSizeDisplay()
+                }
+            } else if (currentColSpan > 1) {
+                currentColSpan--
+                updateSizeDisplay()
+            }
+        }
+        binding.btnRowPlus.setOnClickListener {
+            if (isFlexibleSizeEditing) {
+                if (currentRowSpanUnits < maxRowSpanUnits) {
+                    currentRowSpanUnits++
+                    updateSizeDisplay()
+                }
+            } else if (currentRowSpan < maxRowSpan) {
+                currentRowSpan++
+                updateSizeDisplay()
+            }
+        }
+        binding.btnRowMinus.setOnClickListener {
+            if (isFlexibleSizeEditing) {
+                if (currentRowSpanUnits > 1) {
+                    currentRowSpanUnits--
+                    updateSizeDisplay()
+                }
+            } else if (currentRowSpan > 1) {
+                currentRowSpan--
+                updateSizeDisplay()
+            }
+        }
+    }
+
+    private fun handleSpecialCategoryUi() {
+        val isFlick = binding.specialCategoryChipGroup.checkedChipId == R.id.chip_special_flick
+
+        binding.keyLabelLayout.isVisible = false
+        binding.keyActionLayout.isVisible = !isFlick
+        binding.customKeyboardTargetLayout.isVisible = false
+        binding.flickGridEditorView.isVisible = isFlick
+        binding.specialFlickEditorGroup.isVisible = false
+        binding.textSelectedDirection.isVisible = false
+        binding.textCharInputLayout.isVisible = false
+        currentCellMode = null
+        updateIconOverrideVisibility()
+
+        if (isFlick) {
+            if (currentSpecialFlickItems.isEmpty()) {
+                currentSpecialFlickItems = allowedSpecialFlickDirections
+                    .map { dir -> SpecialFlickMappingItem(direction = dir, action = null) }
+                    .toMutableList()
+            }
+            binding.flickGridEditorView.setSpecialFlickContent(
+                currentSpecialFlickItems.toList(),
+                specialFlickDisplayActions
+            )
+            refreshIconPreview()
+            binding.flickGridEditorView.selectInitialCell()
+        } else {
+            updateCustomKeyboardTargetVisibility()
+        }
+    }
+
+    private fun handleInputStyleUi() {
+        val selectedStyle = binding.inputStyleChipGroup.checkedChipId
+        val isTwoStep = selectedStyle == R.id.chip_two_step_flick
+        val isCircular = selectedStyle == R.id.chip_circular_flick
+        val isFlickLongPress = selectedStyle == R.id.chip_flick_long_press
+        binding.chipToggleOutput.isEnabled = selectedStyle == R.id.chip_petal_flick
+
+        if (binding.outputModeChipGroup.checkedChipId == View.NO_ID) {
+            binding.outputModeChipGroup.check(R.id.chip_normal_output)
+        }
+
+        binding.keyLabelLayout.isVisible = true
+        binding.customKeyboardTargetLayout.isVisible = false
+        binding.flickGridEditorView.isVisible = true
+        binding.circularFlickEditorGroup.isVisible = false
+        binding.textSelectedDirection.isVisible = false
+        binding.textCharInputLayout.isVisible = false
+        binding.specialFlickEditorGroup.isVisible = false
+        updateIconOverrideVisibility()
+        currentCellMode = null
+
+        if (isCircular) {
+            binding.flickGridEditorView.isVisible = false
+            binding.textSelectedDirection.isVisible = false
+            binding.textCharInputLayout.isVisible = false
+            binding.circularFlickEditorGroup.isVisible = true
+            if (currentCircularFlickMaps.isEmpty()) {
+                currentCircularFlickMaps.add(createDefaultCircularItems())
+            }
+            refreshCircularMapSelector()
+            refreshCircularEditor()
+        } else if (isFlickLongPress) {
+            if (currentFlickLongPressItems.isEmpty()) {
+                currentFlickLongPressItems = createDefaultFlickLongPressItems(
+                    initialFlickLongPressNormalOutputs()
+                )
+            }
+            if (currentFlickLongPressHoldItems.isEmpty()) {
+                currentFlickLongPressHoldItems = createDefaultFlickLongPressItems()
+            }
+            binding.flickGridEditorView.setFlickLongPressContent(
+                currentFlickLongPressItemsForOutputMode().toList()
+            )
+        } else if (!isTwoStep) {
+            if (currentFlickItems.isEmpty()) {
+                currentFlickItems = FlickDirectionMapper.allowedDirections.map { direction ->
+                    FlickMappingItem(direction = direction, output = "")
+                }.toMutableList()
+            }
+            if (currentLongPressFlickItems.isEmpty()) {
+                currentLongPressFlickItems = FlickDirectionMapper.allowedDirections.map { direction ->
+                    FlickMappingItem(direction = direction, output = "")
+                }.toMutableList()
+            }
+            if (currentToggleFlickItems.isEmpty()) {
+                currentToggleFlickItems = FlickDirectionMapper.allowedDirections.map { direction ->
+                    FlickMappingItem(direction = direction, output = "")
+                }.toMutableList()
+            }
+            val keyLabel = binding.keyLabelEdittext.text.toString()
+            val centerLabel = if (outputEditMode == OutputEditMode.NORMAL) keyLabel else ""
+            binding.flickGridEditorView.setPetalContent(
+                currentPetalItems().toList(),
+                displayActions,
+                centerLabel
+            )
+        } else {
+            if (currentTwoStepItems.isEmpty()) {
+                currentTwoStepItems = createDefaultTwoStepItems()
+            }
+            if (currentTwoStepLongPressItems.isEmpty()) {
+                currentTwoStepLongPressItems = createDefaultTwoStepItems()
+            }
+            binding.flickGridEditorView.setTwoStepContent(
+                currentTwoStepItemsForOutputMode().toList(),
+                displayActions
+            )
+        }
+
+        if (!isCircular) {
+            binding.flickGridEditorView.selectInitialCell()
+        }
+    }
+
+    private fun createDefaultCircularItems(
+        source: Map<CircularFlickDirection, FlickAction> = emptyMap()
+    ): MutableList<CircularFlickMappingItem> {
+        val directions = listOf(CircularFlickDirection.TAP) +
+            CircularFlickDirection.slots(appPreference.circularFlickDirectionCount)
+        return directions.map { direction ->
+            val (actionType, output) = CircularFlickSlotActionMapper.fromFlickAction(
+                direction = direction,
+                action = source[direction]
+            )
+            CircularFlickMappingItem(
+                direction = direction,
+                actionType = actionType,
+                output = output
+            )
+        }.toMutableList()
+    }
+
+    private fun refreshCircularMapSelector() {
+        circularMapAdapter.clear()
+        circularMapAdapter.addAll(currentCircularFlickMaps.indices.map { "Map ${it + 1}" })
+        circularMapAdapter.notifyDataSetChanged()
+        if (currentCircularFlickMaps.isNotEmpty()) {
+            binding.spinnerCircularMap.setSelection(currentCircularMapIndex, false)
+        }
+        binding.btnCircularMapDelete.isEnabled = currentCircularFlickMaps.size > 1
+    }
+
+    private fun refreshCircularEditor() {
+        val currentItems = currentCircularFlickMaps
+            .getOrNull(currentCircularMapIndex)
+            ?: createDefaultCircularItems().also { currentCircularFlickMaps.add(it) }
+
+        val visibleDirections = (listOf(CircularFlickDirection.TAP) +
+            CircularFlickDirection.slots(appPreference.circularFlickDirectionCount)).toSet()
+        val normalizedItems = currentItems
+            .filter { visibleDirections.contains(it.direction) }
+        circularFlickAdapter.submitList(normalizedItems)
+    }
+
+    /**
+     * セル選択時に入力欄を表示し、現在の値をセットする
+     */
+    private fun showEditorForMode(mode: CellMode) {
+        val directionLabel = when (mode) {
+            is CellMode.Petal -> FlickDirectionMapper.toDisplayName(mode.direction, requireContext())
+            is CellMode.SpecialFlick -> FlickDirectionMapper.toDisplayName(mode.direction, requireContext())
+            is CellMode.TwoStepFirst -> FlickDirectionMapper.toDisplayName(mode.first, requireContext())
+            is CellMode.TwoStepSecond -> "${FlickDirectionMapper.toDisplayName(mode.first, requireContext())} → ${
+                FlickDirectionMapper.toDisplayName(mode.second, requireContext())
+            }"
+            is CellMode.FlickLongPress -> tfbiToDisplayName(mode.direction)
+        }
+
+        binding.textSelectedDirection.text = if (isLongPressOutputMode() && mode !is CellMode.SpecialFlick) {
+            "長押し: $directionLabel"
+        } else {
+            getString(R.string.direction_action_label, directionLabel)
+        }
+        binding.textSelectedDirection.isVisible = true
+
+        when (mode) {
+            is CellMode.Petal -> {
+                val value = currentPetalItems().firstOrNull { it.direction == mode.direction }?.output ?: ""
+                binding.textCharInputLayout.hint = if (isLongPressOutputMode()) {
+                    "長押し時の出力"
+                } else if (outputEditMode == OutputEditMode.TOGGLE) {
+                    "トグル時の1文字"
+                } else {
+                    getString(R.string.two_step_output_label)
+                }
+                binding.textCharInputLayout.isVisible = true
+                binding.specialFlickEditorGroup.isVisible = false
+                setCharEditorValue(value)
+            }
+            is CellMode.TwoStepFirst -> {
+                val value = currentTwoStepItemsForOutputMode().firstOrNull {
+                    it.first == mode.first && it.second == mode.first
+                }?.output ?: ""
+                binding.textCharInputLayout.hint = if (isLongPressOutputMode()) {
+                    "長押し時の出力"
+                } else {
+                    getString(R.string.two_step_output_label)
+                }
+                binding.textCharInputLayout.isVisible = true
+                binding.specialFlickEditorGroup.isVisible = false
+                setCharEditorValue(value)
+            }
+            is CellMode.TwoStepSecond -> {
+                val value = currentTwoStepItemsForOutputMode().firstOrNull {
+                    it.first == mode.first && it.second == mode.second
+                }?.output ?: ""
+                binding.textCharInputLayout.hint = if (isLongPressOutputMode()) {
+                    "長押し時の出力"
+                } else {
+                    getString(R.string.two_step_output_label)
+                }
+                binding.textCharInputLayout.isVisible = true
+                binding.specialFlickEditorGroup.isVisible = false
+                setCharEditorValue(value)
+            }
+            is CellMode.FlickLongPress -> {
+                val value = currentFlickLongPressItemsForOutputMode()
+                    .firstOrNull { it.direction == mode.direction }
+                    ?.output
+                    .orEmpty()
+                binding.textCharInputLayout.hint = if (isLongPressOutputMode()) {
+                    "フリック後に長押しした時の出力"
+                } else {
+                    getString(R.string.two_step_output_label)
+                }
+                binding.textCharInputLayout.isVisible = true
+                binding.specialFlickEditorGroup.isVisible = false
+                setCharEditorValue(value)
+            }
+            is CellMode.SpecialFlick -> {
+                val currentAction = currentSpecialFlickItems
+                    .firstOrNull { it.direction == mode.direction }?.action
+                val currentName = currentAction?.let { act ->
+                    specialFlickDisplayActions.displayActionFor(act)?.displayName
+                }.orEmpty()
+                binding.textCharInputLayout.isVisible = false
+                binding.specialFlickEditorGroup.isVisible = true
+                binding.specialFlickMappingsRecyclerView.setText(currentName, false)
+                updateCustomKeyboardTargetVisibility()
+            }
+        }
+    }
+
+    private fun isLongPressOutputMode(): Boolean =
+        outputEditMode == OutputEditMode.LONG_PRESS &&
+                binding.outputModeChipGroup.checkedChipId == R.id.chip_long_press_output
+
+    private fun currentPetalItems(): MutableList<FlickMappingItem> =
+        when (outputEditMode) {
+            OutputEditMode.NORMAL -> currentFlickItems
+            OutputEditMode.TOGGLE -> currentToggleFlickItems
+            OutputEditMode.LONG_PRESS -> currentLongPressFlickItems
+        }
+
+    private fun currentTwoStepItemsForOutputMode(): MutableList<TwoStepMappingItem> =
+        if (isLongPressOutputMode()) currentTwoStepLongPressItems else currentTwoStepItems
+
+    private fun currentFlickLongPressItemsForOutputMode(): MutableList<FlickLongPressMappingItem> =
+        if (isLongPressOutputMode()) currentFlickLongPressHoldItems else currentFlickLongPressItems
+
+    private fun updateTwoStepOutput(
+        items: MutableList<TwoStepMappingItem>,
+        first: TfbiFlickDirection,
+        second: TfbiFlickDirection,
+        output: String
+    ) {
+        val idx = items.indexOfFirst { it.first == first && it.second == second }
+        if (idx != -1) {
+            items[idx] = items[idx].copy(output = output)
+        }
+    }
+
+    private fun updateFlickLongPressOutput(
+        items: MutableList<FlickLongPressMappingItem>,
+        direction: TfbiFlickDirection,
+        output: String
+    ) {
+        val idx = items.indexOfFirst { it.direction == direction }
+        if (idx != -1) {
+            items[idx] = items[idx].copy(output = output)
+        }
+    }
+
+    private fun setCharEditorValue(value: String) {
+        val editText = binding.textCharEdittext
+        if (editText.text.toString() == value) return
+
+        isUpdatingCharEditText = true
+        editText.setText(value)
+        editText.setSelection(value.length)
+        isUpdatingCharEditText = false
+    }
+
+    private fun textOutputFromAction(action: KeyAction?): String {
+        return when (action) {
+            is KeyAction.Text -> action.text
+            is KeyAction.InputText -> action.text
+            else -> ""
+        }
+    }
+
+    private fun tfbiToDisplayName(dir: TfbiFlickDirection): String =
+        FlickDirectionMapper.toDisplayName(dir, requireContext())
+
+    private fun updateSizeDisplay() {
+        if (isFlexibleSizeEditing) {
+            binding.textColSpan.text = formatGridUnitsAsCells(currentColumnSpanUnits)
+            binding.textRowSpan.text = formatGridUnitsAsCells(currentRowSpanUnits)
+
+            binding.btnColPlus.isEnabled = currentColumnSpanUnits < maxColumnSpanUnits
+            binding.btnColMinus.isEnabled = currentColumnSpanUnits > 1
+            binding.btnRowPlus.isEnabled = currentRowSpanUnits < maxRowSpanUnits
+            binding.btnRowMinus.isEnabled = currentRowSpanUnits > 1
+            return
+        }
+
+        binding.textColSpan.text = currentColSpan.toString()
+        binding.textRowSpan.text = currentRowSpan.toString()
+
+        binding.btnColPlus.isEnabled = currentColSpan < maxColSpan
+        binding.btnColMinus.isEnabled = currentColSpan > 1
+        binding.btnRowPlus.isEnabled = currentRowSpan < maxRowSpan
+        binding.btnRowMinus.isEnabled = currentRowSpan > 1
+    }
+
+    private fun formatGridUnitsAsCells(units: Int): String =
+        if (units % 2 == 0) {
+            (units / 2).toString()
+        } else {
+            "${units / 2}.5"
+        }
+
+    private fun setupToolbarAndMenu() {
+        (activity as? AppCompatActivity)?.supportActionBar?.apply {
+            title = getString(R.string.edit_key)
+            setDisplayHomeAsUpEnabled(true)
+        }
+
+        val menuHost: MenuHost = requireActivity()
+        menuHost.addMenuProvider(object : MenuProvider {
+            override fun onCreateMenu(menu: Menu, menuInflater: MenuInflater) {
+            }
+
+            override fun onMenuItemSelected(menuItem: MenuItem): Boolean {
+                return when (menuItem.itemId) {
+                    android.R.id.home -> {
+                        findNavController().popBackStack()
+                        true
+                    }
+
+                    else -> false
+                }
+            }
+        }, viewLifecycleOwner, Lifecycle.State.RESUMED)
+    }
+
+    private fun displayActionForAction(action: KeyAction): DisplayActionUi? {
+        return displayActions.displayActionFor(action)
+    }
+
+    private fun selectedSingleDisplayAction(): DisplayActionUi? {
+        val selectedText = binding.keyActionSpinner.text.toString()
+        return displayActions.firstOrNull { it.displayName == selectedText }
+    }
+
+    private fun selectedDoubleTapDisplayAction(): DisplayActionUi? {
+        val selectedText = binding.doubleTapActionSpinner.text.toString()
+        return displayActions.firstOrNull { it.displayName == selectedText }
+    }
+
+    private fun isMoveToCustomKeyboardSelected(): Boolean {
+        return selectedSingleDisplayAction()?.action is KeyAction.MoveToCustomKeyboard
+    }
+
+    private fun validTargetStableIds(): Set<String> =
+        customKeyboardTargets.map { it.stableId }.toSet()
+
+    private fun buildTargetOptions(
+        targets: List<CustomKeyboardLayout>,
+        deletedStableId: String? = null
+    ): List<CustomKeyboardTargetOption> {
+        val totalByName = targets.groupingBy { it.name }.eachCount()
+        val seenByName = mutableMapOf<String, Int>()
+        val validOptions = targets.map { layout ->
+            val seenCount = (seenByName[layout.name] ?: 0) + 1
+            seenByName[layout.name] = seenCount
+            val label = if ((totalByName[layout.name] ?: 0) > 1) {
+                "${layout.name} ($seenCount)"
+            } else {
+                layout.name
+            }
+            CustomKeyboardTargetOption(
+                label = label,
+                stableId = layout.stableId,
+                isValid = true
+            )
+        }
+
+        val deletedOption = deletedStableId
+            ?.takeIf { it.isNotBlank() && validOptions.none { option -> option.stableId == it } }
+            ?.let {
+                CustomKeyboardTargetOption(
+                    label = getString(R.string.deleted_custom_keyboard_target),
+                    stableId = it,
+                    isValid = false
+                )
+            }
+
+        return if (deletedOption != null) validOptions + deletedOption else validOptions
+    }
+
+    private suspend fun loadCustomKeyboardTargets() {
+        customKeyboardTargets = keyboardRepository.getLayoutsNotFlowEnsuringStableIds()
+        refreshCustomKeyboardTargetOptions()
+    }
+
+    private fun refreshCustomKeyboardTargetOptions(deletedStableId: String? = null) {
+        customKeyboardTargetOptions = buildTargetOptions(customKeyboardTargets, deletedStableId)
+        customKeyboardTargetAdapter.clear()
+        customKeyboardTargetAdapter.addAll(customKeyboardTargetOptions.map { it.label })
+        customKeyboardTargetAdapter.notifyDataSetChanged()
+        doubleTapTargetAdapter.clear()
+        doubleTapTargetAdapter.addAll(customKeyboardTargetOptions.map { it.label })
+        doubleTapTargetAdapter.notifyDataSetChanged()
+    }
+
+    private fun selectTargetCustomKeyboard(stableId: String?) {
+        val id = stableId.orEmpty()
+        if (id.isBlank()) {
+            selectedTargetCustomKeyboardStableId = null
+            binding.customKeyboardTargetSpinner.setText("", false)
+            return
+        }
+
+        var option = customKeyboardTargetOptions.firstOrNull { it.stableId == id }
+        if (option == null) {
+            refreshCustomKeyboardTargetOptions(deletedStableId = id)
+            option = customKeyboardTargetOptions.firstOrNull { it.stableId == id }
+        }
+
+        selectedTargetCustomKeyboardStableId = option
+            ?.takeIf { it.isValid }
+            ?.stableId
+        binding.customKeyboardTargetSpinner.setText(option?.label.orEmpty(), false)
+    }
+
+    private fun selectDoubleTapTargetCustomKeyboard(stableId: String?) {
+        val id = stableId.orEmpty()
+        if (id.isBlank()) {
+            selectedDoubleTapTargetStableId = null
+            binding.doubleTapTargetSpinner.setText("", false)
+            return
+        }
+
+        var option = customKeyboardTargetOptions.firstOrNull { it.stableId == id }
+        if (option == null) {
+            refreshCustomKeyboardTargetOptions(deletedStableId = id)
+            option = customKeyboardTargetOptions.firstOrNull { it.stableId == id }
+        }
+
+        selectedDoubleTapTargetStableId = option
+            ?.takeIf { it.isValid }
+            ?.stableId
+        binding.doubleTapTargetSpinner.setText(option?.label.orEmpty(), false)
+    }
+
+    private fun updateDoubleTapControlsVisibility() {
+        val supportsDoubleTap =
+            binding.keyTypeChipGroup.checkedChipId == R.id.chip_special
+        binding.doubleTapActionLayout.isVisible = supportsDoubleTap
+        val selected = selectedDoubleTapDisplayAction()
+        val isMoveToCustomKeyboard = selected?.action is KeyAction.MoveToCustomKeyboard
+        binding.doubleTapTargetLayout.isVisible = supportsDoubleTap && isMoveToCustomKeyboard
+        if (isMoveToCustomKeyboard && selectedDoubleTapTargetStableId.isNullOrBlank()) {
+            customKeyboardTargetOptions.firstOrNull { it.isValid }?.let {
+                selectedDoubleTapTargetStableId = it.stableId
+                binding.doubleTapTargetSpinner.setText(it.label, false)
+            }
+        }
+    }
+
+    private fun updateCustomKeyboardTargetVisibility() {
+        val isSpecialSingleMoveTo =
+            binding.keyTypeChipGroup.checkedChipId == R.id.chip_special &&
+                    binding.specialCategoryChipGroup.checkedChipId == R.id.chip_special_single &&
+                    isMoveToCustomKeyboardSelected()
+        val specialFlickMode = currentCellMode as? CellMode.SpecialFlick
+        val specialFlickAction = specialFlickMode
+            ?.let { mode ->
+                currentSpecialFlickItems.firstOrNull { it.direction == mode.direction }?.action
+            } as? KeyAction.MoveToCustomKeyboard
+        val isSpecialFlickMoveTo =
+            binding.keyTypeChipGroup.checkedChipId == R.id.chip_special &&
+                    binding.specialCategoryChipGroup.checkedChipId == R.id.chip_special_flick &&
+                    specialFlickAction != null
+        val shouldShow = isSpecialSingleMoveTo || isSpecialFlickMoveTo
+
+        binding.customKeyboardTargetLayout.isVisible = shouldShow
+        if (!shouldShow) {
+            return
+        }
+
+        if (isSpecialFlickMoveTo && specialFlickMode != null && specialFlickAction != null) {
+            if (specialFlickAction.stableId.isBlank()) {
+                val firstValid = customKeyboardTargetOptions.firstOrNull { it.isValid }
+                if (firstValid == null) {
+                    selectTargetCustomKeyboard(null)
+                    return
+                }
+
+                currentSpecialFlickItems = currentSpecialFlickItems
+                    .withActionForDirection(
+                        specialFlickMode.direction,
+                        KeyAction.MoveToCustomKeyboard(firstValid.stableId)
+                    )
+                    .toMutableList()
+                selectedTargetCustomKeyboardStableId = firstValid.stableId
+                binding.customKeyboardTargetSpinner.setText(firstValid.label, false)
+                return
+            }
+
+            selectTargetCustomKeyboard(specialFlickAction.stableId)
+            return
+        }
+
+        if (isSpecialSingleMoveTo && selectedTargetCustomKeyboardStableId.isNullOrBlank()) {
+            val firstValid = customKeyboardTargetOptions.firstOrNull { it.isValid }
+            if (firstValid != null && binding.customKeyboardTargetSpinner.text.isNullOrEmpty()) {
+                selectedTargetCustomKeyboardStableId = firstValid.stableId
+                binding.customKeyboardTargetSpinner.setText(firstValid.label, false)
+            }
+        }
+    }
+
+    private fun updateDoneButtonState() {
+        if (outputEditMode != OutputEditMode.TOGGLE) {
+            binding.textCharInputLayout.error = null
+        }
+        val isEnabled = when (binding.keyTypeChipGroup.checkedChipId) {
+            R.id.chip_special -> {
+                val isFlick =
+                    binding.specialCategoryChipGroup.checkedChipId == R.id.chip_special_flick
+                if (!isFlick) {
+                    if (isMoveToCustomKeyboardSelected()) {
+                        selectedTargetCustomKeyboardStableId
+                            ?.takeIf { stableId ->
+                                customKeyboardTargets.any { it.stableId == stableId }
+                            }
+                            ?.isNotBlank() == true
+                    } else {
+                        binding.keyActionSpinner.text.isNotEmpty()
+                    }
+                } else {
+                    // Special flick: TAP must be selected
+                    val tapAction = currentSpecialFlickItems
+                        .firstOrNull { it.direction == FlickDirection.TAP }
+                        ?.action
+                    tapAction != null &&
+                            currentSpecialFlickItems.hasOnlyValidMoveToCustomKeyboardTargets(
+                                validTargetStableIds()
+                            )
+                }
+            }
+
+            R.id.chip_normal -> {
+                val isTwoStep =
+                    binding.inputStyleChipGroup.checkedChipId == R.id.chip_two_step_flick
+                val isFlickLongPress =
+                    binding.inputStyleChipGroup.checkedChipId == R.id.chip_flick_long_press
+                if (isTwoStep) {
+                    // TwoStep: base (TAP->TAP) must be filled
+                    val base = currentTwoStepItems
+                        .firstOrNull { it.first == TfbiFlickDirection.TAP && it.second == TfbiFlickDirection.TAP }
+                        ?.output
+                    !base.isNullOrEmpty()
+                } else if (isFlickLongPress) {
+                    val tapOutput = currentFlickLongPressItems
+                        .firstOrNull { it.direction == TfbiFlickDirection.TAP }
+                        ?.output
+                    val hasAnyOutput =
+                        currentFlickLongPressItems.any { it.output.isNotEmpty() } ||
+                                currentFlickLongPressHoldItems.any { it.output.isNotEmpty() }
+                    !tapOutput.isNullOrEmpty() ||
+                            (binding.keyLabelEdittext.text.toString().isNotEmpty() && hasAnyOutput)
+                } else {
+                    // Petal: label must be filled
+                    val hasToggleCenter = currentToggleFlickItems.any {
+                        it.direction == FlickDirection.TAP && it.output.isNotEmpty()
+                    }
+                    val toggleOutputsAreValid = selectedTextInputBehavior != KeyTextInputBehavior.TOGGLE ||
+                        (hasToggleCenter &&
+                            currentToggleFlickItems.all {
+                                it.output.isEmpty() || it.output.length == 1
+                            })
+                    binding.textCharInputLayout.error = if (toggleOutputsAreValid) {
+                        null
+                    } else if (!hasToggleCenter &&
+                        selectedTextInputBehavior == KeyTextInputBehavior.TOGGLE
+                    ) {
+                        "中央のトグル出力を設定してください"
+                    } else {
+                        "トグル出力は1文字で設定してください"
+                    }
+                    binding.keyLabelEdittext.text.toString().isNotEmpty() && toggleOutputsAreValid
+                }
+            }
+
+            else -> false
+        }
+        val doubleTapAction = selectedDoubleTapDisplayAction()
+            ?.action
+            ?.takeIf { binding.keyTypeChipGroup.checkedChipId == R.id.chip_special }
+        val isDoubleTapValid = if (doubleTapAction is KeyAction.MoveToCustomKeyboard) {
+            selectedDoubleTapTargetStableId
+                ?.let { target -> customKeyboardTargets.any { it.stableId == target } }
+                ?: false
+        } else {
+            true
+        }
+        binding.buttonDone.isEnabled = isEnabled && isDoubleTapValid
+    }
+
+    private fun setupInitialState() {
+        viewLifecycleOwner.lifecycleScope.launch {
+            loadCustomKeyboardTargets()
+            val state = viewModel.uiState.filterNotNull().first()
+
+            // Resolve the editing target by both KeyboardLayoutItem.id and the
+            // legacy KeyData.keyId. selectedKeyIdentifier carries item.id for
+            // flexible layouts (so half-cell keys and editor-created keys
+            // resolve correctly even when keyData.keyId is null/blank).
+            val selectedId = state.selectedKeyIdentifier
+            val selectedKeyItem = selectedId?.let { id ->
+                state.layout.items
+                    .filterIsInstance<KeyItem>()
+                    .firstOrNull { it.id == id || it.keyData.keyId == id }
+            }
+            currentKeyData = if (selectedId == null) {
+                null
+            } else {
+                selectedKeyItem?.keyData
+                    ?: state.layout.keys.firstOrNull { it.keyId == selectedId }
+            }
+
+            if (currentKeyData == null) {
+                findNavController().popBackStack()
+                return@launch
+            }
+
+            val key = currentKeyData!!
+            selectedIconRef = key.icon?.takeIf { it.isOverride() }
+            originalIconRef = selectedIconRef
+            key.doubleTapBinding
+                ?.takeIf { key.isSpecialKey }
+                ?.let { doubleTap ->
+                val doubleTapAction = doubleTap.action
+                displayActionForAction(doubleTapAction)?.let { display ->
+                    binding.doubleTapActionSpinner.setText(display.displayName, false)
+                }
+                if (doubleTapAction is KeyAction.MoveToCustomKeyboard) {
+                    selectDoubleTapTargetCustomKeyboard(doubleTapAction.stableId)
+                }
+            }
+            updateDoubleTapControlsVisibility()
+
+            isFlexibleSizeEditing = state.layout.usesFlexiblePlacement() && selectedKeyItem != null
+            if (isFlexibleSizeEditing) {
+                val placement = selectedKeyItem!!.placement
+                currentColumnSpanUnits = placement.columnSpanUnits.coerceAtLeast(1)
+                currentRowSpanUnits = placement.rowSpanUnits.coerceAtLeast(1)
+                maxColumnSpanUnits =
+                    (state.layout.columnUnitCount - placement.columnUnits).coerceAtLeast(1)
+                maxRowSpanUnits =
+                    (state.layout.rowUnitCount - placement.rowUnits).coerceAtLeast(1)
+                currentColSpan = placement.compatibleColumnSpan()
+                currentRowSpan = placement.compatibleRowSpan()
+                maxColSpan = maxColumnSpanUnits.toCellSpanCeilFromGridUnits()
+                maxRowSpan = maxRowSpanUnits.toCellSpanCeilFromGridUnits()
+            } else {
+                currentColSpan = key.colSpan
+                currentRowSpan = key.rowSpan
+                maxColSpan = state.layout.columnCount - key.column
+                maxRowSpan = state.layout.rowCount - key.row
+            }
+            updateSizeDisplay()
+
+            // Key type: special / normal
+            if (key.isSpecialKey) {
+                binding.keyTypeChipGroup.check(R.id.chip_special)
+                setSelectedSpecialKeyColorStyle(key.specialKeyColorStyle)
+                updateSpecialKeyColorStyleVisibility(true)
+
+                // Decide category: SINGLE or FLICK
+                val flickMap = state.layout.flickKeyMaps[key.keyId]?.firstOrNull() ?: emptyMap()
+                val isSpecialFlick = (key.keyType == KeyType.CROSS_FLICK) ||
+                        flickMap.values.any { it is FlickAction.Action }
+
+                // show category UI
+                binding.textSpecialCategoryTitle.isVisible = true
+                binding.specialCategoryChipGroup.isVisible = true
+                binding.textOutputModeTitle.isVisible = false
+                binding.outputModeChipGroup.isVisible = false
+
+                if (isSpecialFlick) {
+                    binding.specialCategoryChipGroup.check(R.id.chip_special_flick)
+
+                    currentSpecialFlickItems = allowedSpecialFlickDirections.map { dir ->
+                        val saved = flickMap[dir] as? FlickAction.Action
+                        SpecialFlickMappingItem(direction = dir, action = saved?.action)
+                    }.toMutableList()
+
+                    handleSpecialCategoryUi()
+                } else {
+                    binding.specialCategoryChipGroup.check(R.id.chip_special_single)
+                    handleSpecialCategoryUi()
+
+                    key.action?.let { currentAction ->
+                        val displayAction = displayActionForAction(currentAction)
+                        if (displayAction != null) {
+                            binding.keyActionSpinner.setText(displayAction.displayName, false)
+                        }
+                        if (currentAction is KeyAction.MoveToCustomKeyboard) {
+                            selectTargetCustomKeyboard(currentAction.stableId)
+                        }
+                        updateCustomKeyboardTargetVisibility()
+                    }
+                }
+
+                // hide normal editors for special
+                binding.keyLabelLayout.isVisible = false
+                binding.flickGridEditorView.isVisible =
+                    (binding.specialCategoryChipGroup.checkedChipId == R.id.chip_special_flick)
+            } else {
+                binding.keyTypeChipGroup.check(R.id.chip_normal)
+                setSelectedSpecialKeyColorStyle(SpecialKeyColorStyle.SPECIAL)
+                updateSpecialKeyColorStyleVisibility(false)
+
+                // hide special UI
+                binding.textSpecialCategoryTitle.isVisible = false
+                binding.specialCategoryChipGroup.isVisible = false
+                binding.keyActionLayout.isVisible = false
+                binding.textOutputModeTitle.isVisible = true
+                binding.outputModeChipGroup.isVisible = true
+                binding.outputModeChipGroup.check(R.id.chip_normal_output)
+                outputEditMode = OutputEditMode.NORMAL
+
+                // Input style: petal or two-step
+                if (key.keyType == KeyType.TWO_STEP_FLICK) {
+                    binding.inputStyleChipGroup.check(R.id.chip_two_step_flick)
+                } else if (key.keyType == KeyType.FLICK_LONG_PRESS) {
+                    binding.inputStyleChipGroup.check(R.id.chip_flick_long_press)
+                } else if (key.keyType == KeyType.CIRCULAR_FLICK) {
+                    binding.inputStyleChipGroup.check(R.id.chip_circular_flick)
+                } else {
+                    binding.inputStyleChipGroup.check(R.id.chip_petal_flick)
+                }
+
+                // Restore editors
+                if (key.keyType == KeyType.TWO_STEP_FLICK) {
+                    binding.keyLabelEdittext.setText(key.label)
+
+                    // Restore from layout.twoStepFlickKeyMaps
+                    val map = state.layout.twoStepFlickKeyMaps[key.keyId] ?: emptyMap()
+                    currentTwoStepItems = createDefaultTwoStepItems()
+                    applyTwoStepOutputs(currentTwoStepItems, map)
+
+                    val longPressMap = state.layout.twoStepLongPressKeyMaps[key.keyId] ?: emptyMap()
+                    currentTwoStepLongPressItems = createDefaultTwoStepItems()
+                    applyTwoStepOutputs(currentTwoStepLongPressItems, longPressMap)
+
+                    // グリッドはhandleInputStyleUi()で更新
+                } else if (key.keyType == KeyType.FLICK_LONG_PRESS) {
+                    binding.keyLabelEdittext.setText(key.label)
+
+                    val map = state.layout.twoStepFlickKeyMaps[key.keyId] ?: emptyMap()
+                    val mapWithTapFallback = extractFlickLongPressOutputs(map).toMutableMap()
+                    if (mapWithTapFallback[TfbiFlickDirection.TAP].orEmpty().isEmpty()) {
+                        textOutputFromAction(key.action)
+                            .takeIf { it.isNotEmpty() }
+                            ?.let { mapWithTapFallback[TfbiFlickDirection.TAP] = it }
+                    }
+                    currentFlickLongPressItems = createDefaultFlickLongPressItems(mapWithTapFallback)
+
+                    val longPressMap = state.layout.twoStepLongPressKeyMaps[key.keyId] ?: emptyMap()
+                    currentFlickLongPressHoldItems = createDefaultFlickLongPressItems(
+                        extractFlickLongPressOutputs(longPressMap)
+                    )
+                } else if (key.keyType == KeyType.CIRCULAR_FLICK) {
+                    binding.keyLabelEdittext.setText(key.label)
+                    val circularMaps = state.layout.circularFlickKeyMaps[key.keyId]
+                        ?: state.layout.flickKeyMaps[key.keyId]?.map { it.toCircularFlickMap() }
+                        ?: listOf(emptyMap())
+                    currentCircularFlickMaps = circularMaps
+                        .map { createDefaultCircularItems(it) }
+                        .toMutableList()
+                    currentCircularMapIndex = 0
+                } else {
+                    binding.keyLabelEdittext.setText(key.label)
+
+                    val flickMap = state.layout.flickKeyMaps[key.keyId]?.firstOrNull() ?: emptyMap()
+                    val restoredItems = FlickDirectionMapper.allowedDirections.map { direction ->
+                        val savedAction = flickMap[direction]
+                        val output = if (savedAction is FlickAction.Input) {
+                            savedAction.char
+                        } else if (direction == FlickDirection.TAP) {
+                            textOutputFromAction(key.action)
+                        } else {
+                            ""
+                        }
+                        FlickMappingItem(direction = direction, output = output)
+                    }.toMutableList()
+                    val emptyItems = FlickDirectionMapper.allowedDirections.map { direction ->
+                        FlickMappingItem(direction = direction, output = "")
+                    }.toMutableList()
+                    if (key.textInputBehavior == KeyTextInputBehavior.TOGGLE) {
+                        currentToggleFlickItems = restoredItems
+                        currentFlickItems = emptyItems
+                        outputEditMode = OutputEditMode.TOGGLE
+                        selectedTextInputBehavior = KeyTextInputBehavior.TOGGLE
+                        binding.outputModeChipGroup.check(R.id.chip_toggle_output)
+                    } else {
+                        currentFlickItems = restoredItems
+                        currentToggleFlickItems = emptyItems
+                        selectedTextInputBehavior = KeyTextInputBehavior.NORMAL
+                    }
+
+                    val longPressFlickMap = state.layout.longPressFlickKeyMaps[key.keyId] ?: emptyMap()
+                    currentLongPressFlickItems = FlickDirectionMapper.allowedDirections.map { direction ->
+                        FlickMappingItem(
+                            direction = direction,
+                            output = longPressFlickMap[direction].orEmpty()
+                        )
+                    }.toMutableList()
+                }
+
+                handleInputStyleUi()
+            }
+
+            updateDoneButtonState()
+        }
+    }
+
+    private fun createDefaultTwoStepItems(): MutableList<TwoStepMappingItem> {
+        return TwoStepMappingItem.ALLOWED_TWO_STEP_PAIRS.map { (first, second) ->
+            TwoStepMappingItem(first = first, second = second, output = "")
+        }.toMutableList()
+    }
+
+    private fun createDefaultFlickLongPressItems(
+        source: Map<TfbiFlickDirection, String> = emptyMap()
+    ): MutableList<FlickLongPressMappingItem> {
+        return flickLongPressDirections.map { direction ->
+            FlickLongPressMappingItem(
+                direction = direction,
+                output = source[direction].orEmpty()
+            )
+        }.toMutableList()
+    }
+
+    private fun initialFlickLongPressNormalOutputs(): Map<TfbiFlickDirection, String> {
+        val tapOutput = currentFlickItems
+            .firstOrNull { it.direction == FlickDirection.TAP }
+            ?.output
+            .orEmpty()
+            .ifEmpty {
+                currentTwoStepItems
+                    .firstOrNull {
+                        it.first == TfbiFlickDirection.TAP &&
+                                it.second == TfbiFlickDirection.TAP
+                    }
+                    ?.output
+                    .orEmpty()
+            }
+            .ifEmpty {
+                currentCircularFlickMaps
+                    .getOrNull(currentCircularMapIndex)
+                    ?.firstOrNull { it.direction == CircularFlickDirection.TAP }
+                    ?.output
+                    .orEmpty()
+            }
+            .ifEmpty {
+                textOutputFromAction(currentKeyData?.action)
+            }
+            .ifEmpty {
+                binding.keyLabelEdittext.text.toString()
+            }
+
+        return tapOutput
+            .takeIf { it.isNotEmpty() }
+            ?.let { mapOf(TfbiFlickDirection.TAP to it) }
+            ?: emptyMap()
+    }
+
+    private fun applyTwoStepOutputs(
+        items: MutableList<TwoStepMappingItem>,
+        outputs: Map<TfbiFlickDirection, Map<TfbiFlickDirection, String>>
+    ) {
+        TwoStepMappingItem.ALLOWED_TWO_STEP_PAIRS.forEach { (first, second) ->
+            val value = outputs[first]?.get(second).orEmpty()
+            if (value.isNotEmpty()) {
+                updateTwoStepOutput(items, first, second, value)
+            }
+        }
+    }
+
+    private fun extractFlickLongPressOutputs(
+        outputs: Map<TfbiFlickDirection, Map<TfbiFlickDirection, String>>
+    ): Map<TfbiFlickDirection, String> {
+        return flickLongPressDirections.mapNotNull { direction ->
+            outputs[direction]
+                ?.get(direction)
+                ?.takeIf { it.isNotEmpty() }
+                ?.let { output -> direction to output }
+        }.toMap()
+    }
+
+    private fun buildTwoStepOutputMap(
+        items: List<TwoStepMappingItem>,
+        includeBaseFallback: Boolean
+    ): Map<TfbiFlickDirection, Map<TfbiFlickDirection, String>> {
+        val firstMap = mutableMapOf<TfbiFlickDirection, MutableMap<TfbiFlickDirection, String>>()
+        val base = items.firstOrNull {
+            it.first == TfbiFlickDirection.TAP && it.second == TfbiFlickDirection.TAP
+        }?.output.orEmpty()
+
+        items
+            .filter { it.output.isNotEmpty() }
+            .forEach { item ->
+                val inner = firstMap.getOrPut(item.first) { mutableMapOf() }
+                if (includeBaseFallback &&
+                    item.first != TfbiFlickDirection.TAP &&
+                    item.second != TfbiFlickDirection.TAP &&
+                    base.isNotEmpty()
+                ) {
+                    inner[TfbiFlickDirection.TAP] = base
+                }
+                inner[item.second] = item.output
+            }
+
+        return firstMap.mapValues { it.value.toMap() }
+    }
+
+    private fun buildFlickLongPressOutputMap(
+        items: List<FlickLongPressMappingItem>
+    ): Map<TfbiFlickDirection, Map<TfbiFlickDirection, String>> {
+        return items
+            .filter { it.output.isNotEmpty() }
+            .associate { item ->
+                item.direction to mapOf(item.direction to item.output)
+            }
+    }
+
+    private val requestRecordAudioPermission =
+        registerForActivityResult(ActivityResultContracts.RequestPermission()) { _ ->
+
+        }
+
+    private val pickImageIcon =
+        registerForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+            if (uri != null) {
+                saveUserImageIcon(uri)
+            }
+        }
+
+    private fun updateIconOverrideVisibility() {
+        val isSpecial = binding.keyTypeChipGroup.checkedChipId == R.id.chip_special
+        binding.keyIconOverrideGroup.isVisible = isSpecial
+        if (isSpecial) refreshIconPreview()
+    }
+
+    private fun updateSpecialKeyColorStyleVisibility(isSpecial: Boolean) {
+        binding.textSpecialKeyColorStyleTitle.isVisible = isSpecial
+        binding.specialKeyColorStyleChipGroup.isVisible = isSpecial
+        if (isSpecial && binding.specialKeyColorStyleChipGroup.checkedChipId == View.NO_ID) {
+            binding.specialKeyColorStyleChipGroup.check(R.id.chip_special_key_color_style_special)
+        }
+    }
+
+    private fun setSelectedSpecialKeyColorStyle(style: SpecialKeyColorStyle) {
+        binding.specialKeyColorStyleChipGroup.check(
+            when (style) {
+                SpecialKeyColorStyle.SPECIAL -> R.id.chip_special_key_color_style_special
+                SpecialKeyColorStyle.NORMAL -> R.id.chip_special_key_color_style_normal
+            }
+        )
+    }
+
+    private fun selectedSpecialKeyColorStyle(): SpecialKeyColorStyle =
+        when (binding.specialKeyColorStyleChipGroup.checkedChipId) {
+            R.id.chip_special_key_color_style_normal -> SpecialKeyColorStyle.NORMAL
+            else -> SpecialKeyColorStyle.SPECIAL
+        }
+
+    private fun replaceSelectedIcon(newIcon: KeyIconRef?) {
+        selectedIconRef = newIcon
+        refreshIconPreview()
+        updateDoneButtonState()
+    }
+
+    private fun refreshIconPreview() {
+        val icon = selectedIconRef
+        val fallback = currentSpecialKeyActionFallbackIconResId()
+        val previewKey = KeyData(
+            label = "",
+            row = 0,
+            column = 0,
+            isFlickable = false,
+            isSpecialKey = true,
+            drawableResId = fallback,
+            icon = icon
+        )
+        KeyIconResolver.setImage(binding.keyIconPreview, previewKey)
+        binding.keyIconStatus.text = when (icon?.type) {
+            KeyIconType.DRAWABLE_RESOURCE_NAME ->
+                getString(R.string.custom_key_icon_builtin, icon.value.orEmpty())
+            KeyIconType.USER_IMAGE_FILE -> getString(R.string.custom_key_icon_user_image)
+            KeyIconType.ACTION_DEFAULT,
+            null -> getString(R.string.custom_key_icon_action_default)
+        }
+    }
+
+    private fun currentSpecialKeyActionFallbackIconResId(): Int? {
+        if (binding.keyTypeChipGroup.checkedChipId != R.id.chip_special) return null
+        return when (binding.specialCategoryChipGroup.checkedChipId) {
+            R.id.chip_special_flick -> currentSpecialFlickItems
+                .firstOrNull { it.direction == FlickDirection.TAP }
+                ?.action
+                ?.let { displayActionForAction(it)?.iconResId }
+
+            else -> selectedSingleDisplayAction()?.iconResId
+        }
+    }
+
+    private fun showBuiltInIconPicker() {
+        val icons = KeyIconBuiltInDrawable.allowList
+        val adapter = object : ArrayAdapter<com.kazumaproject.custom_keyboard.data.BuiltInKeyIcon>(
+            requireContext(),
+            android.R.layout.simple_list_item_1,
+            mutableListOf<com.kazumaproject.custom_keyboard.data.BuiltInKeyIcon>()
+        ) {
+            override fun getView(position: Int, convertView: View?, parent: android.view.ViewGroup): View {
+                val context = parent.context
+                val row = (convertView as? android.widget.LinearLayout) ?: android.widget.LinearLayout(context).apply {
+                    orientation = android.widget.LinearLayout.HORIZONTAL
+                    gravity = android.view.Gravity.CENTER_VERTICAL
+                    setPadding(24, 16, 24, 16)
+                    addView(ImageView(context).apply {
+                        id = android.R.id.icon
+                        layoutParams = android.widget.LinearLayout.LayoutParams(48, 48)
+                        scaleType = ImageView.ScaleType.CENTER_INSIDE
+                    })
+                    addView(TextView(context).apply {
+                        id = android.R.id.text1
+                        layoutParams = android.widget.LinearLayout.LayoutParams(
+                            0,
+                            android.widget.LinearLayout.LayoutParams.WRAP_CONTENT,
+                            1f
+                        ).apply { marginStart = 24 }
+                    })
+                }
+                val item = getItem(position)!!
+                row.findViewById<ImageView>(android.R.id.icon).setImageResource(item.resId)
+                row.findViewById<TextView>(android.R.id.text1).text = item.resourceName
+                return row
+            }
+        }
+        val searchEditText = android.widget.EditText(requireContext()).apply {
+            hint = getString(R.string.custom_key_icon_builtin_search_hint)
+            isSingleLine = true
+            setPadding(24, 16, 24, 16)
+        }
+        val listView = android.widget.ListView(requireContext()).apply {
+            this.adapter = adapter
+            dividerHeight = 0
+        }
+        val contentView = android.widget.LinearLayout(requireContext()).apply {
+            orientation = android.widget.LinearLayout.VERTICAL
+            addView(
+                searchEditText,
+                android.widget.LinearLayout.LayoutParams(
+                    android.widget.LinearLayout.LayoutParams.MATCH_PARENT,
+                    android.widget.LinearLayout.LayoutParams.WRAP_CONTENT
+                )
+            )
+            addView(
+                listView,
+                android.widget.LinearLayout.LayoutParams(
+                    android.widget.LinearLayout.LayoutParams.MATCH_PARENT,
+                    0,
+                    1f
+                )
+            )
+        }
+        fun updateIconList(query: String) {
+            val normalized = query.trim()
+            val filtered = if (normalized.isEmpty()) {
+                icons
+            } else {
+                icons.filter { icon ->
+                    icon.resourceName.contains(normalized, ignoreCase = true) ||
+                            icon.resourceName.replace('_', ' ')
+                                .contains(normalized, ignoreCase = true)
+                }
+            }
+            adapter.clear()
+            adapter.addAll(filtered)
+            adapter.notifyDataSetChanged()
+        }
+        updateIconList("")
+
+        val dialog = AlertDialog.Builder(requireContext())
+            .setTitle(R.string.custom_key_icon_builtin_dialog_title)
+            .setView(contentView)
+            .setNegativeButton(R.string.close, null)
+            .create()
+        searchEditText.doAfterTextChanged { text ->
+            updateIconList(text?.toString().orEmpty())
+        }
+        listView.setOnItemClickListener { _, _, position, _ ->
+            val item = adapter.getItem(position) ?: return@setOnItemClickListener
+            replaceSelectedIcon(KeyIconRef(KeyIconType.DRAWABLE_RESOURCE_NAME, item.resourceName))
+            dialog.dismiss()
+        }
+        dialog.setOnShowListener {
+            listView.layoutParams = listView.layoutParams.apply {
+                height = resources.displayMetrics.heightPixels / 2
+            }
+        }
+        dialog.show()
+    }
+
+    private fun saveUserImageIcon(uri: Uri) {
+        val context = requireContext()
+        runCatching {
+            val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+            context.contentResolver.openInputStream(uri)?.use {
+                BitmapFactory.decodeStream(it, null, bounds)
+            }
+            if (bounds.outWidth <= 0 || bounds.outHeight <= 0) error("not an image")
+            val maxSourceSize = 2048
+            var sample = 1
+            while (bounds.outWidth / sample > maxSourceSize || bounds.outHeight / sample > maxSourceSize) {
+                sample *= 2
+            }
+            val decoded = context.contentResolver.openInputStream(uri)?.use {
+                BitmapFactory.decodeStream(
+                    it,
+                    null,
+                    BitmapFactory.Options().apply { inSampleSize = sample }
+                )
+            } ?: error("decode failed")
+            val oriented = decoded.applyExifOrientation(uri)
+            val normalized = oriented.scaleToIconBitmap(maxSize = 128)
+            val directory = File(context.filesDir, KeyIconResolver.USER_ICON_DIRECTORY).apply {
+                mkdirs()
+            }
+            val file = File(directory, "${UUID.randomUUID()}.png")
+            file.outputStream().use { out ->
+                normalized.compress(Bitmap.CompressFormat.PNG, 100, out)
+            }
+            val relativePath = "${KeyIconResolver.USER_ICON_DIRECTORY}/${file.name}"
+            pendingUserIconPaths += relativePath
+            if (decoded !== oriented) decoded.recycle()
+            if (oriented !== normalized) oriented.recycle()
+            replaceSelectedIcon(
+                KeyIconRef(
+                    KeyIconType.USER_IMAGE_FILE,
+                    relativePath
+                )
+            )
+        }.onFailure { error ->
+            Timber.w(error, "Failed to save custom key icon")
+            Toast.makeText(context, R.string.custom_key_icon_image_error, Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    private fun Bitmap.applyExifOrientation(uri: Uri): Bitmap {
+        val orientation = requireContext().contentResolver.openInputStream(uri)?.use {
+            ExifInterface(it).getAttributeInt(
+                ExifInterface.TAG_ORIENTATION,
+                ExifInterface.ORIENTATION_NORMAL
+            )
+        } ?: ExifInterface.ORIENTATION_NORMAL
+        val degrees = when (orientation) {
+            ExifInterface.ORIENTATION_ROTATE_90 -> 90f
+            ExifInterface.ORIENTATION_ROTATE_180 -> 180f
+            ExifInterface.ORIENTATION_ROTATE_270 -> 270f
+            else -> 0f
+        }
+        if (degrees == 0f) return this
+        return Bitmap.createBitmap(this, 0, 0, width, height, Matrix().apply { postRotate(degrees) }, true)
+    }
+
+    private fun Bitmap.scaleToIconBitmap(maxSize: Int): Bitmap {
+        val longest = max(width, height)
+        if (longest <= maxSize) return this
+        val scale = maxSize.toFloat() / longest.toFloat()
+        return Bitmap.createScaledBitmap(
+            this,
+            (width * scale).toInt().coerceAtLeast(1),
+            (height * scale).toInt().coerceAtLeast(1),
+            true
+        )
+    }
+
+    private fun deleteUserIconFile(relativePath: String?) {
+        relativePath
+            ?.takeIf { it.startsWith("${KeyIconResolver.USER_ICON_DIRECTORY}/") && !it.contains("..") }
+            ?.let { File(requireContext().filesDir, it) }
+            ?.takeIf { it.isFile }
+            ?.delete()
+    }
+
+    private fun onDone() {
+        val originalKey = currentKeyData ?: return
+
+        if (
+            binding.keyTypeChipGroup.checkedChipId == R.id.chip_normal &&
+            binding.inputStyleChipGroup.checkedChipId == R.id.chip_petal_flick &&
+            selectedTextInputBehavior == KeyTextInputBehavior.TOGGLE &&
+            currentToggleFlickItems.none {
+                it.direction == FlickDirection.TAP && it.output.isNotEmpty()
+            }
+        ) {
+            return
+        }
+
+        val newLabel: String
+        val newKeyType: KeyType
+        val isSpecial: Boolean
+        var newAction: KeyAction?
+        var newFlickMap: Map<FlickDirection, FlickAction> = emptyMap()
+        var newCircularFlickMaps: List<Map<CircularFlickDirection, FlickAction>> = emptyList()
+        var newTwoStepMap: Map<TfbiFlickDirection, Map<TfbiFlickDirection, String>> = emptyMap()
+        val newLongPressFlickMap: Map<FlickDirection, String>
+        val newTwoStepLongPressMap: Map<TfbiFlickDirection, Map<TfbiFlickDirection, String>>
+        val newDrawableResId: Int?
+
+        when (binding.keyTypeChipGroup.checkedChipId) {
+            R.id.chip_special -> {
+                val isFlick =
+                    binding.specialCategoryChipGroup.checkedChipId == R.id.chip_special_flick
+
+                isSpecial = true
+
+                if (!isFlick) {
+                    // Special: SINGLE (existing behavior)
+                    newKeyType = KeyType.NORMAL
+
+                    val selectedDisplayAction = selectedSingleDisplayAction()
+
+                    newAction = if (selectedDisplayAction?.action is KeyAction.MoveToCustomKeyboard) {
+                        val stableId = selectedTargetCustomKeyboardStableId
+                            ?.takeIf { id -> customKeyboardTargets.any { it.stableId == id } }
+                            ?: return
+                        KeyAction.MoveToCustomKeyboard(stableId)
+                    } else {
+                        selectedDisplayAction?.action
+                    }
+                    newDrawableResId = selectedDisplayAction?.iconResId
+                    newLabel =
+                        if (newDrawableResId != null) "" else selectedDisplayAction?.displayName
+                            ?: "ACTION"
+
+                    if (newAction == KeyAction.VoiceInput) {
+                        val context = requireContext()
+                        val hasPermission = ContextCompat.checkSelfPermission(
+                            context,
+                            Manifest.permission.RECORD_AUDIO
+                        ) == PackageManager.PERMISSION_GRANTED
+
+                        if (!hasPermission) {
+                            requestRecordAudioPermission.launch(Manifest.permission.RECORD_AUDIO)
+                        }
+                    }
+
+                    newFlickMap = emptyMap()
+                    newTwoStepMap = emptyMap()
+                    newLongPressFlickMap = emptyMap()
+                    newTwoStepLongPressMap = emptyMap()
+                } else {
+                    // Special: FLICK (NEW) -> KeyType.CROSS_FLICK + store KeyAction as FlickAction.Action
+                    newKeyType = KeyType.CROSS_FLICK
+
+                    val tapAction = currentSpecialFlickItems
+                        .firstOrNull { it.direction == FlickDirection.TAP }
+                        ?.action
+
+                    if (
+                        tapAction == null ||
+                        !currentSpecialFlickItems.hasOnlyValidMoveToCustomKeyboardTargets(
+                            validTargetStableIds()
+                        )
+                    ) {
+                        return
+                    }
+
+                    newAction = tapAction
+
+                    val tapDisplay = displayActionForAction(newAction)
+                    newDrawableResId = tapDisplay?.iconResId
+
+                    Timber.d("KeyEditorFragment onDone: [$newAction] [$newDrawableResId]")
+                    newLabel =
+                        newAction.toString()
+
+                    // Build flick map from 5 items (save only non-null)
+                    newFlickMap = currentSpecialFlickItems
+                        .mapNotNull { item ->
+                            val act = item.action ?: return@mapNotNull null
+                            val display = displayActionForAction(act)
+
+                            Timber.d("KeyEditorFragment onDone: act=$act, iconFromDisplayActions=${display?.iconResId} [${item.direction}]")
+
+                            item.direction to FlickAction.Action(
+                                action = act,
+                                label = null,
+                                drawableResId = display?.iconResId
+                            )
+                        }
+                        .toMap()
+
+                    if (newAction == KeyAction.VoiceInput) {
+                        val context = requireContext()
+                        val hasPermission = ContextCompat.checkSelfPermission(
+                            context,
+                            Manifest.permission.RECORD_AUDIO
+                        ) == PackageManager.PERMISSION_GRANTED
+
+                        if (!hasPermission) {
+                            requestRecordAudioPermission.launch(Manifest.permission.RECORD_AUDIO)
+                        }
+                    }
+
+                    newTwoStepMap = emptyMap()
+                    newLongPressFlickMap = emptyMap()
+                    newTwoStepLongPressMap = emptyMap()
+                }
+            }
+
+            else -> {
+                isSpecial = false
+                newDrawableResId = null
+
+                val isTwoStep =
+                    binding.inputStyleChipGroup.checkedChipId == R.id.chip_two_step_flick
+                val isCircular =
+                    binding.inputStyleChipGroup.checkedChipId == R.id.chip_circular_flick
+                val isFlickLongPress =
+                    binding.inputStyleChipGroup.checkedChipId == R.id.chip_flick_long_press
+
+                if (isCircular) {
+                    newKeyType = KeyType.CIRCULAR_FLICK
+                    newLabel = binding.keyLabelEdittext.text.toString()
+                    val tapOutput = currentCircularFlickMaps
+                        .firstOrNull()
+                        ?.firstOrNull { it.direction == CircularFlickDirection.TAP }
+                        ?.output
+                        .orEmpty()
+                    newAction = tapOutput
+                        .takeIf { it.isNotBlank() }
+                        ?.let { KeyAction.Text(it) }
+                    newCircularFlickMaps = currentCircularFlickMaps.map { items ->
+                        items
+                            .mapNotNull { item ->
+                                val action = CircularFlickSlotActionMapper.toFlickAction(
+                                    actionType = item.actionType,
+                                    output = item.output
+                                ) ?: return@mapNotNull null
+                                item.direction to action
+                            }
+                            .toMap()
+                    }.ifEmpty {
+                        listOf(emptyMap())
+                    }
+                    newFlickMap = emptyMap()
+                    newLongPressFlickMap = emptyMap()
+                    newTwoStepLongPressMap = emptyMap()
+                } else if (isFlickLongPress) {
+                    newKeyType = KeyType.FLICK_LONG_PRESS
+
+                    val tapOutput = currentFlickLongPressItems
+                        .firstOrNull { it.direction == TfbiFlickDirection.TAP }
+                        ?.output
+                        .orEmpty()
+                    val configuredLabel = binding.keyLabelEdittext.text.toString().trim()
+                    newLabel = configuredLabel.ifEmpty { tapOutput }
+                    newAction = tapOutput
+                        .takeIf { it.isNotBlank() }
+                        ?.let { KeyAction.Text(it) }
+
+                    newFlickMap = emptyMap()
+                    newTwoStepMap = buildFlickLongPressOutputMap(currentFlickLongPressItems)
+                    newLongPressFlickMap = emptyMap()
+                    newTwoStepLongPressMap = buildFlickLongPressOutputMap(
+                        currentFlickLongPressHoldItems
+                    )
+                } else if (!isTwoStep) {
+                    newLabel = binding.keyLabelEdittext.text.toString()
+                    val activeFlickItems = if (selectedTextInputBehavior == KeyTextInputBehavior.TOGGLE) {
+                        currentToggleFlickItems
+                    } else {
+                        currentFlickItems
+                    }
+                    if (selectedTextInputBehavior == KeyTextInputBehavior.TOGGLE &&
+                        activeFlickItems.any { it.output.isNotEmpty() && it.output.length != 1 }
+                    ) return
+                    val tapOutput = activeFlickItems
+                        .firstOrNull { it.direction == FlickDirection.TAP }
+                        ?.output
+                        .orEmpty()
+                    val nonTapFlickItems = activeFlickItems
+                        .filter { it.direction != FlickDirection.TAP && it.output.isNotEmpty() }
+                    newKeyType = if (
+                        selectedTextInputBehavior != KeyTextInputBehavior.TOGGLE &&
+                        originalKey.keyType == KeyType.NORMAL &&
+                        nonTapFlickItems.isEmpty() &&
+                        currentLongPressFlickItems.none { it.output.isNotEmpty() }
+                    ) {
+                        KeyType.NORMAL
+                    } else {
+                        KeyType.PETAL_FLICK
+                    }
+                    newAction = tapOutput
+                        .takeIf { it.isNotBlank() }
+                        ?.let { KeyAction.Text(it) }
+                    newFlickMap = if (newKeyType == KeyType.NORMAL) {
+                        emptyMap()
+                    } else {
+                        activeFlickItems
+                        .filter { it.output.isNotEmpty() }
+                        .associate { it.direction to FlickAction.Input(it.output) }
+                    }
+                    newLongPressFlickMap = currentLongPressFlickItems
+                        .filter { it.output.isNotEmpty() }
+                        .associate { it.direction to it.output }
+                    newTwoStepLongPressMap = emptyMap()
+                } else {
+                    newKeyType = KeyType.TWO_STEP_FLICK
+
+                    // Build nested map from 17 items
+                    val base =
+                        currentTwoStepItems.firstOrNull { it.first == TfbiFlickDirection.TAP && it.second == TfbiFlickDirection.TAP }
+                            ?.output.orEmpty()
+                    val configuredLabel = binding.keyLabelEdittext.text.toString().trim()
+                    newLabel = configuredLabel.ifEmpty { base }
+                    newAction = base
+                        .takeIf { it.isNotBlank() }
+                        ?.let { KeyAction.Text(it) }
+
+                    newTwoStepMap = buildTwoStepOutputMap(
+                        items = currentTwoStepItems,
+                        includeBaseFallback = true
+                    )
+                    newLongPressFlickMap = emptyMap()
+                    newTwoStepLongPressMap = buildTwoStepOutputMap(
+                        items = currentTwoStepLongPressItems,
+                        includeBaseFallback = false
+                    )
+                }
+            }
+        }
+
+        val selectedDoubleTapAction = selectedDoubleTapDisplayAction()
+            ?.action
+            ?.takeIf { isSpecial }
+        val resolvedDoubleTapAction = if (
+            selectedDoubleTapAction is KeyAction.MoveToCustomKeyboard
+        ) {
+            val stableId = selectedDoubleTapTargetStableId
+                ?.takeIf { id -> customKeyboardTargets.any { it.stableId == id } }
+                ?: return
+            KeyAction.MoveToCustomKeyboard(stableId)
+        } else {
+            selectedDoubleTapAction
+        }
+        val newDoubleTapBinding = resolvedDoubleTapAction
+            ?.takeIf { isSpecial }
+            ?.let {
+            DoubleTapBinding(
+                action = it,
+                policy = automaticDoubleTapPolicy(
+                    normalAction = newAction,
+                    doubleTapAction = it
+                )
+            )
+        }
+        if (newDoubleTapBinding?.action == KeyAction.VoiceInput) {
+            val hasPermission = ContextCompat.checkSelfPermission(
+                requireContext(),
+                Manifest.permission.RECORD_AUDIO
+            ) == PackageManager.PERMISSION_GRANTED
+            if (!hasPermission) {
+                requestRecordAudioPermission.launch(Manifest.permission.RECORD_AUDIO)
+            }
+        }
+
+        val savedIconRef = selectedIconRef?.takeIf { isSpecial }
+        val updatedKey = originalKey.copy(
+            label = newLabel,
+            keyType = newKeyType,
+            isSpecialKey = isSpecial,
+            action = newAction,
+            // IMPORTANT: special flick should still be flickable (KeyType != NORMAL)
+            isFlickable = (newKeyType != KeyType.NORMAL),
+            drawableResId = newDrawableResId,
+            icon = savedIconRef,
+            rowSpan = if (isFlexibleSizeEditing) {
+                currentRowSpanUnits.toCellSpanCeilFromGridUnits()
+            } else {
+                currentRowSpan
+            },
+            colSpan = if (isFlexibleSizeEditing) {
+                currentColumnSpanUnits.toCellSpanCeilFromGridUnits()
+            } else {
+                currentColSpan
+            },
+            specialKeyColorStyle = if (isSpecial) {
+                selectedSpecialKeyColorStyle()
+            } else {
+                SpecialKeyColorStyle.SPECIAL
+            },
+            doubleTapBinding = newDoubleTapBinding,
+            textInputBehavior = if (
+                !isSpecial &&
+                newKeyType == KeyType.PETAL_FLICK &&
+                selectedTextInputBehavior == KeyTextInputBehavior.TOGGLE
+            ) {
+                KeyTextInputBehavior.TOGGLE
+            } else {
+                KeyTextInputBehavior.NORMAL
+            }
+        )
+
+        val updated = viewModel.updateKeyAndMappings(
+            updatedKey,
+            newFlickMap,
+            newTwoStepMap,
+            newLongPressFlickMap,
+            newTwoStepLongPressMap,
+            newCircularFlickMaps,
+            flexibleRowSpanUnits = currentRowSpanUnits.takeIf { isFlexibleSizeEditing },
+            flexibleColumnSpanUnits = currentColumnSpanUnits.takeIf { isFlexibleSizeEditing }
+        )
+        if (updated) {
+            didSaveKey = true
+            val selectedUserPath = savedIconRef
+                ?.takeIf { it.type == KeyIconType.USER_IMAGE_FILE }
+                ?.value
+            if (originalIconRef?.type == KeyIconType.USER_IMAGE_FILE &&
+                originalIconRef?.value != selectedUserPath
+            ) {
+                deleteUserIconFile(originalIconRef?.value)
+            }
+            pendingUserIconPaths
+                .filter { it != selectedUserPath }
+                .forEach { deleteUserIconFile(it) }
+            pendingUserIconPaths.clear()
+            findNavController().popBackStack()
+        }
+    }
+
+    override fun onDestroyView() {
+        super.onDestroyView()
+        if (!didSaveKey) {
+            pendingUserIconPaths.forEach { deleteUserIconFile(it) }
+            pendingUserIconPaths.clear()
+        }
+        viewModel.doneNavigatingToKeyEditor()
+
+        _binding = null
+    }
+}

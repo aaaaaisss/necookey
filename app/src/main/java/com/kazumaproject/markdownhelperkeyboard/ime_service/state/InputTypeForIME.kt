@@ -10,7 +10,9 @@ sealed class InputTypeForIME {
     data object TextAutoCorrect : InputTypeForIME()
     data object TextAutoComplete : InputTypeForIME()
     data object TextMultiLine : InputTypeForIME()
+
     data object TextNextLine : InputTypeForIME()
+
     data object TextDone : InputTypeForIME()
     data object TextImeMultiLine : InputTypeForIME()
     data object TextNoSuggestion : InputTypeForIME()
@@ -29,7 +31,9 @@ sealed class InputTypeForIME {
     data object TextWebEmailAddress : InputTypeForIME()
     data object TextWebPassword : InputTypeForIME()
     data object TextWebSearchView : InputTypeForIME()
-    data object TextSend : InputTypeForIME()
+
+    data object TextSend: InputTypeForIME()
+
     data object TextSearchView : InputTypeForIME()
     data object TextEditTextInWebView : InputTypeForIME()
     data object TextWebSearchViewFireFox : InputTypeForIME()
