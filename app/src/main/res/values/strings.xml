@@ -1891,4 +1891,6 @@ ABC abc 0123456789　ＡＢＣ　１２３４５
     <string name="necookey_two_row_candidate_bar_summary">Top row: conversion result and alternatives for the first bunsetsu. Bottom row: predictions. Docked software keyboard only.</string>
     <string name="necookey_zenz_bunsetsu_gate_title">Check uncertain bunsetsu with zenz</string>
     <string name="necookey_zenz_bunsetsu_gate_summary">When the dictionary is unsure about a bunsetsu, the on-device zenz model picks the most likely of the top candidates for the leftmost slot.</string>
+    <string name="necookey_bunsetsu_resize_title">Resize bunsetsu with arrow keys</string>
+    <string name="necookey_bunsetsu_resize_summary">While converting, tap ←/→ on the custom keyboard to shrink/extend the focused bunsetsu (the rest is re-converted). Long-press ←/→ moves the focus to the previous/next bunsetsu.</string>
 </resources>

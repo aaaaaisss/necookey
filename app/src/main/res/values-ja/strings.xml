@@ -1889,4 +1889,6 @@ ABC abc 0123456789　ＡＢＣ　１２３４５
     <string name="necookey_two_row_candidate_bar_summary">上段に変換結果と最初の文節の別候補、下段に予測候補を表示します（通常のソフトウェアキーボードのみ）。</string>
     <string name="necookey_zenz_bunsetsu_gate_title">自信のない文節を zenz で確認</string>
     <string name="necookey_zenz_bunsetsu_gate_summary">辞書のスコア差が小さい文節だけ、端末内の zenz で上位候補を採点し、左端の候補を選び直します。</string>
+    <string name="necookey_bunsetsu_resize_title">矢印キーで文節の長さを変える</string>
+    <string name="necookey_bunsetsu_resize_summary">変換中、カスタムキーボードの ←/→ をタップすると注目文節を縮める/伸ばす（残りは再変換）。←/→ の長押しで前後の文節へ移動します。</string>
 </resources>

@@ -131,11 +131,14 @@ jobs:
           fi
           if [ "${{ steps.changes.outputs.core }}" = "true" ]; then TASKS="$TASKS :core:testDebugUnitTest"; fi
           if [ "${{ steps.changes.outputs.custom_keyboard }}" = "true" ]; then TASKS="$TASKS :custom_keyboard:testDebugUnitTest"; fi
-          ./gradlew $TASKS $GRADLE_FLAGS
+          ./gradlew $TASKS $GRADLE_FLAGS --quiet
 
-      - name: Verify no INTERNET permission
+      - name: Locate APK and verify no INTERNET permission
+        id: apk
         run: |
-          APK=$(ls app/build/outputs/apk/fullStandard/debug/*.apk | head -1)
+          APK=$(find app/build -name '*.apk' -path '*fullStandard*' -path '*debug*' | grep -v androidTest | head -1)
+          if [ -z "$APK" ]; then echo "APK not found"; find app/build -name '*.apk'; exit 1; fi
+          echo "path=$APK" >> "$GITHUB_OUTPUT"
           AAPT=$(ls "$ANDROID_HOME"/build-tools/*/aapt2 | sort -V | tail -1)
           "$AAPT" dump permissions "$APK" | tee perms.txt
           if grep -q 'android.permission.INTERNET' perms.txt; then echo "INTERNET permission present"; exit 1; fi
@@ -145,6 +148,6 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: necookey-fullStandard-debug-arm64
-          path: app/build/outputs/apk/fullStandard/debug/*.apk
+          path: ${{ steps.apk.outputs.path }}
           if-no-files-found: error
           retention-days: 14

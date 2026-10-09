@@ -202,6 +202,7 @@ import com.kazumaproject.markdownhelperkeyboard.clipboard_history.database.ItemT
 import com.kazumaproject.markdownhelperkeyboard.converter.candidate.BunsetsuCandidateResult
 import com.kazumaproject.markdownhelperkeyboard.converter.candidatebar.BunsetsuAnalysis
 import com.kazumaproject.markdownhelperkeyboard.converter.candidatebar.BunsetsuAnalyzer
+import com.kazumaproject.markdownhelperkeyboard.converter.candidatebar.BunsetsuRangeEditor
 import com.kazumaproject.markdownhelperkeyboard.converter.candidatebar.NecookeyCandidateBarConfig
 import com.kazumaproject.markdownhelperkeyboard.converter.candidatebar.TwoRowCandidateBar
 import com.kazumaproject.markdownhelperkeyboard.converter.candidatebar.TwoRowCandidateBarPlanner
@@ -15510,7 +15511,7 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
                         val insertString = inputString.value
                         val suggestions = suggestionAdapter?.suggestions ?: emptyList()
                         if (!leftCursorKeyLongKeyPressed.get()) {
-                            if (moveFocusedBunsetsuSegment(delta = -1)) {
+                            if (handleBunsetsuArrowTap(delta = -1)) {
                             } else if (isHenkan.get()) {
                                 handleDeleteKeyInHenkan(suggestions, insertString)
                             } else {
@@ -15525,7 +15526,7 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
                         val insertString = inputString.value
                         val suggestions = suggestionAdapter?.suggestions ?: emptyList()
                         if (!rightCursorKeyLongKeyPressed.get()) {
-                            if (moveFocusedBunsetsuSegment(delta = 1)) {
+                            if (handleBunsetsuArrowTap(delta = 1)) {
                             } else if (isHenkan.get()) {
                                 handleJapaneseModeSpaceKey(
                                     mainView, suggestions, insertString
@@ -21125,6 +21126,87 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         isFirstClickHasStringTail = false
         return rawInput
     }
+
+    /**
+     * necookey: Mozc/ATOK-style bunsetsu resizing. Moves the end of the focused bunsetsu by one
+     * character; the reading after it is re-converted and re-split by Sumire. Bunsetsu before the
+     * focused one keep their current choice. Returns false when no bunsetsu session is active.
+     */
+    private fun resizeFocusedBunsetsuSegment(
+        delta: Int,
+        floatingKeyboardLayoutBinding: FloatingKeyboardLayoutBinding? = null
+    ): Boolean {
+        if (!isBunsetsuCursorMoveSessionActive()) return false
+        val mainView = mainLayoutBinding ?: return false
+        launchBunsetsuOperation { session ->
+            val reading = session.conversionInput
+            val readings = session.segments.map { it.reading }
+            if (readings.joinToString(separator = "") != reading) return@launchBunsetsuOperation
+            val focusedIndex = session.focusedIndex.coerceIn(0, session.segments.lastIndex)
+            val resize = BunsetsuRangeEditor.resizeFocused(
+                reading = reading,
+                boundaries = BunsetsuRangeEditor.boundariesOf(readings),
+                focusedIndex = focusedIndex,
+                delta = delta,
+            ) ?: return@launchBunsetsuOperation
+
+            val focusedReading = reading.substring(resize.focusedStart, resize.focusedEnd)
+            val remainder = reading.substring(resize.remainderStart)
+            val remainderSegments: List<BunsetsuSegmentState>
+            val remainderSplits: List<Int>
+            if (remainder.isEmpty()) {
+                remainderSegments = emptyList()
+                remainderSplits = emptyList()
+            } else {
+                val result = queryBunsetsuConversion(remainder)
+                if (bunsetsuConversionSession !== session) return@launchBunsetsuOperation
+                remainderSplits = resolveInitialBunsetsuSplitPositions(
+                    remainder, result.candidates, result.bunsetsuResult,
+                )
+                val remainderSnapshot = BunsetsuConversionSnapshot(
+                    input = remainder,
+                    candidates = result.candidates,
+                    paths = result.candidateSegmentsByString,
+                    splitPatterns = result.bunsetsuResult?.splitPatterns.orEmpty(),
+                    initialSplitPositions = remainderSplits,
+                )
+                remainderSegments = buildBunsetsuSegments(remainder, remainderSplits, remainderSnapshot)
+                    .ifEmpty { listOf(BunsetsuSegmentState(reading = remainder, displayText = remainder)) }
+            }
+            val segments = session.segments.take(focusedIndex) +
+                BunsetsuSegmentState(reading = focusedReading, displayText = focusedReading) +
+                remainderSegments
+            if (segments.joinToString(separator = "") { it.reading } != reading) {
+                Timber.w("resizeFocusedBunsetsuSegment: segment readings do not cover the input")
+                return@launchBunsetsuOperation
+            }
+            val boundaries = BunsetsuRangeEditor.boundariesOf(segments.map { it.reading })
+            val splits = BunsetsuRangeEditor.interiorSplits(boundaries)
+            val resized = session.copy(
+                segments = segments,
+                focusedIndex = focusedIndex,
+                splitPatterns = listOf(splits) + session.splitPatterns.filter { it != splits },
+                activeSplitPatternIndex = 0,
+            )
+            val prepared = prepareBunsetsuSegments(resized)
+            if (bunsetsuConversionSession !== session || !isBunsetsuCursorMoveSessionActive()) {
+                return@launchBunsetsuOperation
+            }
+            bunsetsuPositionList = splits
+            bunsetsuSplitPatterns = prepared.splitPatterns
+            bunsetsuConversionSession = prepared
+            renderBunsetsuConversionSession(mainView, floatingKeyboardLayoutBinding)
+        }
+        return true
+    }
+
+    /** Custom keyboard arrow tap during conversion: resize (necookey) or Sumire's focus move. */
+    private fun handleBunsetsuArrowTap(delta: Int): Boolean =
+        if (appPreference.necookey_bunsetsu_resize_with_arrows_preference) {
+            resizeFocusedBunsetsuSegment(delta)
+        } else {
+            moveFocusedBunsetsuSegment(delta)
+        }
 
     private fun moveFocusedBunsetsuSegment(
         delta: Int,

@@ -683,10 +683,10 @@ object AppPreference {
         Pair("keyboard_corner_bottom_right_preference", true)
 
     private val BUNSETSU_SEPARATION_PREFERENCE =
-        Pair("conversion_bunsetsu_separation_preference", false)
+        Pair("conversion_bunsetsu_separation_preference", true) // necookey default ON
 
     private val BUNSETSU_CURSOR_MOVE_PREFERENCE =
-        Pair("conversion_bunsetsu_cursor_move_preference", false)
+        Pair("conversion_bunsetsu_cursor_move_preference", true) // necookey default ON
 
     private val RECONVERSION_PREFERENCE =
         Pair("reconversion_preference", false)
@@ -731,6 +731,8 @@ object AppPreference {
         Pair("necookey_two_row_candidate_bar_preference", true)
     private val NECOOKEY_ZENZ_BUNSETSU_GATE_PREFERENCE =
         Pair("necookey_zenz_bunsetsu_gate_preference", true)
+    private val NECOOKEY_BUNSETSU_RESIZE_WITH_ARROWS_PREFERENCE =
+        Pair("necookey_bunsetsu_resize_with_arrows_preference", true)
 
     private val ZENZ_DEBOUNCE_TIME_PREFERENCE = Pair("zenz_debounce_time_preference", 300)
 
@@ -3923,6 +3925,15 @@ object AppPreference {
         )
         set(value) = preferences.edit {
             it.putBoolean(NECOOKEY_ZENZ_BUNSETSU_GATE_PREFERENCE.first, value)
+        }
+
+    var necookey_bunsetsu_resize_with_arrows_preference: Boolean
+        get() = preferences.getBoolean(
+            NECOOKEY_BUNSETSU_RESIZE_WITH_ARROWS_PREFERENCE.first,
+            NECOOKEY_BUNSETSU_RESIZE_WITH_ARROWS_PREFERENCE.second
+        )
+        set(value) = preferences.edit {
+            it.putBoolean(NECOOKEY_BUNSETSU_RESIZE_WITH_ARROWS_PREFERENCE.first, value)
         }
 
     var enable_zenz_rerank_preference: Boolean

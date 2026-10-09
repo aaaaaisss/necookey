@@ -15,6 +15,12 @@
             android:title="@string/necookey_zenz_bunsetsu_gate_title"
             app:defaultValue="true"
             app:summary="@string/necookey_zenz_bunsetsu_gate_summary" />
+
+        <SwitchPreferenceCompat
+            android:key="necookey_bunsetsu_resize_with_arrows_preference"
+            android:title="@string/necookey_bunsetsu_resize_title"
+            app:defaultValue="true"
+            app:summary="@string/necookey_bunsetsu_resize_summary" />
     </PreferenceCategory>
 
     <PreferenceCategory android:title="@string/zenz_preference_category_title">
