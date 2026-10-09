@@ -44,7 +44,7 @@ class MainActivity : Activity() {
             startActivity(Intent().setClassName(
                 this,
                 "com.kazumaproject.markdownhelperkeyboard.setting_activity.MainActivity"
-            ))
+            ).putExtra("openSettingActivity", "custom_keyboard_fragment_request"))
         })
         root.addView(button("キーボードを有効にする") {
             startActivity(Intent(Settings.ACTION_INPUT_METHOD_SETTINGS))
