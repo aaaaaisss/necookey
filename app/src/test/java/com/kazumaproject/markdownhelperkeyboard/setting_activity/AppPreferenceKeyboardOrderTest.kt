@@ -27,18 +27,18 @@ class AppPreferenceKeyboardOrderTest {
     }
 
     @Test
-    fun freshInstallDefaultsToTenKeyAndQwertyOnly() {
+    fun freshInstallDefaultsToCustomThenTenKeyAndQwerty() {
         assertEquals(
-            listOf(KeyboardType.TENKEY, KeyboardType.QWERTY),
+            listOf(KeyboardType.CUSTOM, KeyboardType.TENKEY, KeyboardType.QWERTY),
             AppPreference.keyboard_order
         )
     }
 
     @Test
     @Config(qualifiers = "sw600dp")
-    fun freshTabletInstallDefaultsToGojuonAndQwertyOnly() {
+    fun freshTabletInstallDefaultsToCustomThenGojuonAndQwerty() {
         assertEquals(
-            listOf(KeyboardType.GOJUON, KeyboardType.QWERTY),
+            listOf(KeyboardType.CUSTOM, KeyboardType.GOJUON, KeyboardType.QWERTY),
             AppPreference.keyboard_order,
         )
     }

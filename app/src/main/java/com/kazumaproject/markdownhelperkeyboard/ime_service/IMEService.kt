@@ -14133,7 +14133,16 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         customKeyboardRenderJob = null
     }
 
+    /**
+     * necookey: set when CUSTOM had to fall back only because the custom layouts were not loaded
+     * yet (first frame after process start). Cleared once the layouts arrive and CUSTOM is shown.
+     */
+    private var pendingCustomKeyboardRecovery = false
+
     private fun fallbackFromCustomKeyboardIfNeeded() {
+        if (customLayouts.isEmpty() && keyboardOrder.firstOrNull() == KeyboardType.CUSTOM) {
+            pendingCustomKeyboardRecovery = true
+        }
         if (keyboardOrder.isEmpty()) {
             Timber.w("fallbackFromCustomKeyboardIfNeeded: keyboardOrder is empty")
             suggestionAdapter?.updateState(TenKeyQWERTYMode.Default, emptyList())
@@ -14212,6 +14221,20 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
 
         currentCustomKeyboardPosition = selection.index
         currentCustomKeyboardStableId = selection.stableId.takeIf { it.isNotBlank() }
+
+        if (pendingCustomKeyboardRecovery) {
+            pendingCustomKeyboardRecovery = false
+            if (qwertyMode.value != TenKeyQWERTYMode.Custom &&
+                qwertyMode.value != TenKeyQWERTYMode.Number &&
+                inputString.value.isEmpty()
+            ) {
+                keyboardOrder.indexOf(KeyboardType.CUSTOM)
+                    .takeIf { it >= 0 }
+                    ?.let { currentKeyboardOrder = it }
+                showKeyboard(KeyboardType.CUSTOM, source = "necookey.customLayoutsLoaded")
+                return
+            }
+        }
 
         val selectedLayout = customLayouts.getOrNull(selection.index) ?: run {
             clearCurrentCustomKeyboardSelection()

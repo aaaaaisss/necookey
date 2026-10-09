@@ -76,7 +76,7 @@ class AppPreferenceGojuonMigrationTest {
         AppPreference.init(context)
 
         assertEquals(
-            listOf(KeyboardType.TENKEY, KeyboardType.QWERTY),
+            listOf(KeyboardType.CUSTOM, KeyboardType.TENKEY, KeyboardType.QWERTY),
             AppPreference.keyboard_order,
         )
         assertFalse(preferences.getBoolean(AppPreference.GOJUON_KEYBOARD_TYPE_MIGRATION_KEY, false))

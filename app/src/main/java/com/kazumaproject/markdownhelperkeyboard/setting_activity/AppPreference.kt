@@ -1034,7 +1034,7 @@ object AppPreference {
         }
         if (preferences.getBoolean(GOJUON_KEYBOARD_TYPE_MIGRATION_KEY, false)) return
 
-        val legacyDefault = defaultKeyboardOrder(isTablet = false)
+        val legacyDefault = legacyDefaultKeyboardOrder(isTablet = false)
         val legacyOrder = if (preferences.contains(KEYBOARD_ORDER.first)) {
             parseKeyboardOrder(
                 preferences.getString(KEYBOARD_ORDER.first, defaultKeyboardOrderJson),
@@ -1063,11 +1063,20 @@ object AppPreference {
         }
     }
 
-    private fun defaultKeyboardOrder(isTablet: Boolean = isTabletDevice): List<KeyboardType> {
+    /** Sumire's original fresh-install order; kept for migrating Sumire-era settings. */
+    private fun legacyDefaultKeyboardOrder(isTablet: Boolean = isTabletDevice): List<KeyboardType> {
         return listOf(
             if (isTablet) KeyboardType.GOJUON else KeyboardType.TENKEY,
             KeyboardType.QWERTY,
         )
+    }
+
+    /**
+     * necookey: the custom keyboard (seeded with the built-in flick template on first launch,
+     * see NecookeyDefaultLayoutSeeder) comes first; Sumire's keyboards stay as fallbacks.
+     */
+    private fun defaultKeyboardOrder(isTablet: Boolean = isTabletDevice): List<KeyboardType> {
+        return listOf(KeyboardType.CUSTOM) + legacyDefaultKeyboardOrder(isTablet)
     }
 
     private fun parseKeyboardOrder(
