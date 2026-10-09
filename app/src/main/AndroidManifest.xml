@@ -1,11 +1,23 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
-    <application android:theme="@style/AppTheme" android:label="necookey" android:allowBackup="false" android:supportsRtl="true">
-        <activity android:name="com.aaaaaisss.necokey.MainActivity" android:exported="true">
+    <application
+        android:name="com.kazumaproject.markdownhelperkeyboard.setting_activity.Application"
+        android:theme="@style/AppTheme"
+        android:label="necookey"
+        android:allowBackup="false"
+        android:supportsRtl="true">
+        <activity
+            android:name="com.aaaaaisss.necokey.MainActivity"
+            android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+        <activity
+            android:name="com.kazumaproject.markdownhelperkeyboard.setting_activity.MainActivity"
+            android:label="necookey の設定"
+            android:theme="@style/Theme.MarkdownKeyboard"
+            android:exported="true" />
         <service
             android:name="com.aaaaaisss.necokey.NecokeYInputMethodService"
             android:label="necookey 日本語キーボード"
