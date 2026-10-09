@@ -3,6 +3,7 @@ package com.aaaaaisss.necokey
 import android.graphics.Color
 import android.inputmethodservice.InputMethodService
 import android.view.View
+import android.util.Log
 import android.view.inputmethod.EditorInfo
 import android.widget.LinearLayout
 import android.widget.TextView
@@ -35,7 +36,11 @@ class NecokeYInputMethodService : InputMethodService() {
 
         // Dictionary initialization is CPU-heavy, so never block IME startup.
         serviceScope.launch {
-            engine.initialize(this@NecokeYInputMethodService)
+            runCatching {
+                engine.initialize(this@NecokeYInputMethodService)
+            }.onFailure {
+                Log.e("necookey", "Failed to initialize conversion engine", it)
+            }
         }
 
         // Model loading is optional. A missing model keeps normal conversion intact.
@@ -81,9 +86,12 @@ class NecokeYInputMethodService : InputMethodService() {
             setBackgroundColor(Color.rgb(48, 48, 48))
         }
 
-        root.addView(composingView, LinearLayout.LayoutParams(-1, 0, 1f))
-        root.addView(candidatesView, LinearLayout.LayoutParams(-1, 0, 0.55f))
-        root.addView(keyboardView, LinearLayout.LayoutParams(-1, 0, 3.45f))
+        // The IME input frame can measure this root with WRAP_CONTENT height.
+        // Give its children real heights so the keyboard cannot collapse to 0 px.
+        root.addView(composingView, LinearLayout.LayoutParams(-1, dp(40)))
+        root.addView(candidatesView, LinearLayout.LayoutParams(-1, dp(56)))
+        root.addView(keyboardView, LinearLayout.LayoutParams(-1, dp(240)))
+        refresh()
         return root
     }
 
@@ -127,6 +135,12 @@ class NecokeYInputMethodService : InputMethodService() {
     }
 
     private fun refresh(showCandidates: Boolean = false) {
+        // onStartInput may run before Android asks for the input view.
+        if (!::composingView.isInitialized ||
+            !::conversionRow.isInitialized ||
+            !::predictionRow.isInitialized
+        ) return
+
         val generation = ++refreshGeneration
         composingView.text = composing
         conversionRow.removeAllViews()
@@ -180,6 +194,9 @@ class NecokeYInputMethodService : InputMethodService() {
             }
         }
     }
+
+    private fun dp(value: Int): Int =
+        (value * resources.displayMetrics.density).toInt()
 
     private fun createCandidateRow(): LinearLayout =
         LinearLayout(this).apply {
