@@ -2067,7 +2067,7 @@ object AppPreference {
             it.putBoolean(DELETE_KEY_HIGH_LIGHT.first, value ?: true)
         }
 
-    val custom_keyboard_suggestion_preference: Boolean? get() = true // S3: hardcoded, setting removed
+    val custom_keyboard_suggestion_preference: Boolean? get() = false // 候補欄のキーボード一覧表示は廃止
 
     var custom_direct_input_replace_composing_preference: Boolean
         get() = preferences.getBoolean(CUSTOM_DIRECT_INPUT_REPLACE_COMPOSING_KEY, false)

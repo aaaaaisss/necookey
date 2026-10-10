@@ -1185,11 +1185,8 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         }
     }
 
-    private fun isCustomLayoutPickerShownForCandidateStrip(): Boolean {
-        return qwertyMode.value == TenKeyQWERTYMode.Custom &&
-            customLayouts.isNotEmpty() &&
-            customKeyboardSuggestionPreference == true
-    }
+    // 候補欄のキーボード一覧表示は廃止（後続語・ゼロクエリ候補を常に優先）
+    private fun isCustomLayoutPickerShownForCandidateStrip(): Boolean = false
 
     private fun List<Candidate>.isSelectionActionCandidates(): Boolean {
         return isNotEmpty() && all { isSelectionActionCandidate(it) }
