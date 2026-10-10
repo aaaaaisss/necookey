@@ -79,3 +79,5 @@
 
 
 - 後続語がカスタムキーボード一覧に置き換わる不具合: カスタム配列使用中は `canShowZeroQueryAfterCommit` が `isCustomLayoutPickerShownForCandidateStrip()` で false を返し後続語検索自体をしていなかった。この判定を削除（Resolver は元々後続語を一覧より優先、後続語なしなら従来通り一覧）。`:app:compileFullStandardDebugKotlin` 成功。
+
+- 4b363df 候補欄のキーボード一覧表示を廃止（custom_keyboard_suggestion を false 固定、isCustomLayoutPickerShownForCandidateStrip を常に false）。コンパイル未確認・実機未確認。
