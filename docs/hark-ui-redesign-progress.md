@@ -33,7 +33,7 @@
 - 上記ホーム/カテゴリ/ナビ変更（5dcbbb0）
 - それ以前の整理（本セッション）: 外部辞書画面削除・Mozc UT 常時有効・NEologd/Web 辞書削除（1462643）、振動/キー音削除（fe35162）、
   設定 1 画面化（605cd86）、カスタムキーボード編集 UI 復元（0fb8aac）、テンキー/QWERTY/五十音・物理キーボード・フロート・グライド削除（0b239c2）
-- ようこそ画面（`EnableKeyboardFragment` / `fragment_enable_keyboard.xml` / ナビ項目 / 専用文字列）を削除（下記コミット「HEAD」）
+- ようこそ画面（`EnableKeyboardFragment` / `fragment_enable_keyboard.xml` / ナビ項目 / 専用文字列）を削除（ec166d1）
 - **後続語が表示されないバグ修正**（同コミット）
   - 原因: 9cc8895 で `zero_query_suggestion_preference` を `false` 固定にしたため、確定後の
     `consumePendingZeroQueryAfterCommit()` → `canShowZeroQueryAfterCommit()` が常に false となり、
@@ -74,6 +74,6 @@
 
 ## 履歴
 
-- HEAD ようこそ画面削除・後続語バグ修正・旧予測設定 UI 削除。`:app:compileFullStandardDebugKotlin` 成功
+- ec166d1 ようこそ画面削除・後続語バグ修正・旧予測設定 UI 削除。`:app:compileFullStandardDebugKotlin` と `:app:compileFullStandardDebugUnitTestKotlin` 成功（ローカルでは Hilt/KSP の増分キャッシュに削除済み Fragment が残り失敗したため、ksp 出力を消して --no-build-cache で再確認）
 - 5dcbbb0 ホーム（状態カード・試し入力・カテゴリ一覧）、カテゴリ別サブ画面、ボトムナビ廃止。`:app:compileFullStandardDebugKotlin` 成功
 
