@@ -618,10 +618,6 @@
     <string name="pref_clipboard_preview_summary">クリップボードにコピーした文字や画像を検知したとき、変換欄に表示します。</string>
     <string name="clipboard_sensitive_content_hidden">機密性の高いクリップボードの内容</string>
 
-    <string name="conversion_separation_title">変換キーで文節を分割</string>
-    <string name="conversion_separation_summary">変換キーを押すと、入力中の文字列を分割し、最初の文節を選択状態にします。</string>
-    <string name="conversion_bunsetsu_cursor_move_title">左右キーで文節を移動</string>
-    <string name="conversion_bunsetsu_cursor_move_summary">文節変換中に左右のカーソルキーでフォーカスする文節を移動します。</string>
     <string name="pref_title_space_longpress_cursor">スペース長押しでカーソル移動</string>
     <string name="pref_summary_space_longpress_cursor">未確定（プリエディット）入力中、スペースキーを長押しするとカーソルを移動します</string>
     <string name="pref_qwerty_shift_key_action_title">Shift キー動作 (ローマ字)</string>
@@ -1075,7 +1071,5 @@
     <string name="zenz_diagnostics_privacy">この診断履歴には時刻と文節数だけを保存し、入力文・文脈・候補文字列は含めません。</string>
     <string name="zenz_diagnostics_refresh">更新</string>
     <string name="zenz_diagnostics_badge_explanation">[Z] は、zenz文節ゲートが選び直した主候補を示します。</string>
-    <string name="necookey_bunsetsu_resize_title">矢印キーで文節の長さを変える</string>
-    <string name="necookey_bunsetsu_resize_summary">変換中、カスタムキーボードの ←/→ をタップすると注目文節を縮める/伸ばす（残りは再変換）。←/→ の長押しで前後の文節へ移動します。</string>
     <string name="cursor_move_target_pairs_not_set">未設定</string>
 </resources>

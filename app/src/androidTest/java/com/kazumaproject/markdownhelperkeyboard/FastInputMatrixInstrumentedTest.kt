@@ -295,8 +295,6 @@ class FastInputMatrixInstrumentedTest {
                     .putInt("save_last_used_keyboard_int", 0)
                     .putBoolean("keyboard_floating_preference", floating)
                     .putBoolean("qwerty_show_cursor_buttons_preference", true)
-                    .putBoolean("conversion_bunsetsu_separation_preference", true)
-                    .putBoolean("conversion_bunsetsu_cursor_move_preference", true)
                     .putBoolean("live_conversion_preference", false)
                     .putBoolean("candidate_order_override_enable_preference", false)
                     .putBoolean("learn_dictionary_preference", false)

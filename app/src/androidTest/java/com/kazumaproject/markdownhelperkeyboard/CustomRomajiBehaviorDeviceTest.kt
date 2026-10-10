@@ -125,7 +125,6 @@ class CustomRomajiBehaviorDeviceTest {
                     .putBoolean("save_last_used_keyboard", false)
                     .putBoolean("keyboard_floating_preference", false)
                     .putBoolean("live_conversion_preference", false)
-                    .putBoolean("conversion_bunsetsu_separation_preference", false)
                     .putBoolean("remember_custom_keyboard_input_mode_preference", false).commit())
                 android.util.Log.i("RomajiDeviceTest", "mode=$mode sokuon=$sokuon n=$n")
                 setSettings(sokuon, n)

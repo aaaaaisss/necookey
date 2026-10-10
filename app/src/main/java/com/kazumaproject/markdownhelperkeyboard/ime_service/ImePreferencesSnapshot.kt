@@ -180,8 +180,6 @@ data class ImePreferencesSnapshot(
     val keyboardCornerTopRight: Boolean,
     val keyboardCornerBottomLeft: Boolean,
     val keyboardCornerBottomRight: Boolean,
-    val bunsetsuSeparation: Boolean,
-    val bunsetsuCursorMove: Boolean,
     val reconversionEnabled: Boolean,
     val conversionKeySwipePreference: Boolean,
     val physicalKeyboardInputMode: String,
@@ -580,8 +578,6 @@ data class ImePreferencesSnapshot(
                 keyboardCornerTopRight = appPreference.keyboard_corner_top_right_preference,
                 keyboardCornerBottomLeft = appPreference.keyboard_corner_bottom_left_preference,
                 keyboardCornerBottomRight = appPreference.keyboard_corner_bottom_right_preference,
-                bunsetsuSeparation = appPreference.bunsetsu_separation_preference,
-                bunsetsuCursorMove = appPreference.bunsetsu_cursor_move_preference,
                 reconversionEnabled = appPreference.reconversion_preference,
                 conversionKeySwipePreference =
                     appPreference.conversion_key_swipe_cursor_move_preference,
