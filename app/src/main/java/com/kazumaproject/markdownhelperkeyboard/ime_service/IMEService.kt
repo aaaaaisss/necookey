@@ -1811,6 +1811,11 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
     private var predictionConfig: PredictionConfig = PredictionConfig()
     @Volatile
     private var kanaKanjiConversionSession: KanaKanjiConversionSession? = null
+    @Volatile
+    private var lastKanaKanjiQueryRequest: KanaKanjiQueryRequest? = null
+    /** Zenzai: 直前の入力と、そのとき得た制約（逐次入力で引き継ぐ）。 */
+    @Volatile
+    private var zenzaiCarry: Pair<String, String>? = null
     private val candidateRequestTracker = CandidateRequestTracker()
     private val editorMutationRevision = EditorMutationRevision()
     private var symbolKeyboardFirstItem: SymbolMode? = SymbolMode.EMOJI
@@ -1985,6 +1990,7 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
             (40).toByte()
         )
         private const val ZENZ_RERANK_TOP_K = 4
+        private const val ZENZAI_MAX_INFERENCE = 3
         private const val ZENZ_RERANK_ALPHA = 0.7f
         private const val ZENZ_RERANK_BETA = 0.3f
         private val DEFAULT_DELETE_KEY_FLICK_TARGETS =
@@ -10812,6 +10818,80 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         }
     }
 
+    /**
+     * Zenzai 方式の投機的デコーディング。sumire の制約付き最良経路をドラフトにし、
+     * zenz が FIX:prefix を返したらその prefix で再探索する。PASS で確定。
+     * 推論回数は [ZENZAI_MAX_INFERENCE] まで。得た制約は次の入力へ引き継ぐ。
+     */
+    private suspend fun runZenzaiDecoding(
+        insertString: String,
+        plan: ZenzRerankPlan,
+    ): Candidate? {
+        val baseRequest = lastKanaKanjiQueryRequest ?: return null
+        val session = kanaKanjiConversionSession ?: return null
+        val config = withContext(Dispatchers.Default) { resolveZenzRuntimeConfig() } ?: return null
+        val request = baseRequest.copy(input = insertString)
+        val input = insertString.hiraganaToKatakana()
+
+        var prefix = zenzaiCarry
+            ?.takeIf { (prevInput, _) -> insertString.startsWith(prevInput) }
+            ?.second
+            .orEmpty()
+        var best: Candidate? = null
+        var passed = false
+        for (step in 0 until ZENZAI_MAX_INFERENCE) {
+            var draft = withContext(Dispatchers.Default) { session.queryConstrained(request, prefix) }
+            if (draft == null && prefix.isNotEmpty() && best == null) {
+                // 引き継いだ制約が満たせない場合は制約なしでやり直す
+                prefix = ""
+                draft = withContext(Dispatchers.Default) { session.queryConstrained(request, prefix) }
+            }
+            if (draft == null) break
+            best = draft
+            val verdict = withContext(Dispatchers.Default) {
+                zenzRuntimeClient.evaluate(
+                    config = config,
+                    profile = "",
+                    topic = "",
+                    style = "",
+                    preference = "",
+                    leftContext = plan.leftContext,
+                    rightContext = plan.rightContext,
+                    input = input,
+                    candidate = draft.string,
+                )
+            }
+            when {
+                verdict.startsWith("PASS") -> {
+                    passed = true
+                    break
+                }
+                verdict.startsWith("FIX:") -> {
+                    val next = verdict.removePrefix("FIX:")
+                    if (next.isEmpty() || next == prefix || draft.string.startsWith(next)) break
+                    prefix = next
+                }
+                else -> break
+            }
+        }
+        zenzaiCarry = insertString to prefix
+        Timber.d("zenzai: input=[%s] prefix=[%s] best=[%s] passed=%s", insertString, prefix, best?.string, passed)
+        return best
+    }
+
+    private fun promoteZenzaiCandidate(candidates: List<Candidate>, top: Candidate?): List<Candidate> {
+        if (top == null) return candidates
+        val index = candidates.indexOfFirst { it.string == top.string }
+        if (index == 0) return candidates
+        val result = candidates.toMutableList()
+        if (index > 0) {
+            result.add(0, result.removeAt(index))
+        } else {
+            result.add(0, top)
+        }
+        return result
+    }
+
     private fun maybeLaunchZenzRerank(
         requestToken: Long,
         insertString: String,
@@ -10821,14 +10901,26 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         candidateToken: CandidateRequestToken,
     ) {
         zenzRerankJob = scope.launch {
-            val reranked = try {
+            val zenzaiTop = try {
+                runZenzaiDecoding(insertString, plan)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                Timber.e(e, "Error runZenzaiDecoding")
+                null
+            }
+            val rerankedOnly = try {
                 rerankCandidatesWithZenz(insertString, baseCandidates, plan)
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
                 Timber.e(e, "Error rerankCandidatesWithZenz")
                 null
-            } ?: return@launch
+            }
+            val reranked = promoteZenzaiCandidate(
+                rerankedOnly ?: baseCandidates,
+                zenzaiTop,
+            ).takeIf { rerankedOnly != null || zenzaiTop != null } ?: return@launch
 
             putCachedZenzRerank(plan.cacheKey, reranked)
 
@@ -16657,7 +16749,7 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
                 beamWidth = conversionBeamWidth,
                 predictionConfig = predictionConfig,
                 collectCandidateSegments = true, // bunsetsu cursor-move session is always on (S3)
-            )
+            ).also { lastKanaKanjiQueryRequest = it }
         )
         if (BuildConfig.DEBUG) {
             session.performanceSnapshot()?.let { snapshot ->

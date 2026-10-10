@@ -113,6 +113,28 @@ class KanaKanjiConversionSession(
         }
     }
 
+    /** Zenzai 用の制約付きドラフト探索。セッションの逐次状態は変更しない。 */
+    suspend fun queryConstrained(request: KanaKanjiQueryRequest, prefix: String): Candidate? =
+        mutex.withLock {
+            engine.getConstrainedBestCandidate(
+                input = request.input,
+                prefix = prefix,
+                mozcUtPersonName = request.mozcUtPersonName,
+                mozcUTPlaces = request.mozcUtPlaces,
+                mozcUTWiki = request.mozcUtWiki,
+                mozcUTNeologd = request.mozcUtNeologd,
+                mozcUTWeb = request.mozcUtWeb,
+                userDictionaryRepository = request.userDictionaryRepository,
+                learnRepository = request.learnRepository,
+                isOmissionSearchEnable = request.omissionSearchEnabled,
+                enableTypoCorrectionJapaneseFlick = request.typoCorrectionJapaneseFlickEnabled,
+                enableTypoCorrectionQwertyEnglish = request.typoCorrectionQwertyEnglishEnabled,
+                typoCorrectionOffsetScore = request.typoCorrectionOffsetScore,
+                omissionSearchOffsetScore = request.omissionSearchOffsetScore,
+                beamWidth = request.beamWidth,
+            )
+        }
+
     private suspend fun queryOriginal(request: KanaKanjiQueryRequest): KanaKanjiQueryResult {
         val segmentCollector = request.newCandidateSegmentCollector()
         return if (request.bunsetsuSeparation) {

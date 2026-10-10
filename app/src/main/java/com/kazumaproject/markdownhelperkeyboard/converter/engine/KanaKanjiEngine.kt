@@ -1059,6 +1059,95 @@ class KanaKanjiEngine {
         return !(this.webYomiTrie == null || this.webTangoTrie == null || this.webTokenArray == null)
     }
 
+    /**
+     * Zenzai 用: 出力先頭が [prefix] に一致する最良経路を1本返す（満たせなければ null）。
+     * 逐次変換のセッション状態は使わず、毎回新しいラティスを作る。
+     */
+    suspend fun getConstrainedBestCandidate(
+        input: String,
+        prefix: String,
+        mozcUtPersonName: Boolean?,
+        mozcUTPlaces: Boolean?,
+        mozcUTWiki: Boolean?,
+        mozcUTNeologd: Boolean?,
+        mozcUTWeb: Boolean?,
+        userDictionaryRepository: UserDictionaryRepository,
+        learnRepository: LearnRepository?,
+        isOmissionSearchEnable: Boolean,
+        enableTypoCorrectionJapaneseFlick: Boolean = false,
+        enableTypoCorrectionQwertyEnglish: Boolean = false,
+        typoCorrectionOffsetScore: Int,
+        omissionSearchOffsetScore: Int,
+        beamWidth: Int = 20,
+    ): Candidate? {
+        val conversionContext = currentCoroutineContext()
+        val graph = graphBuilder.constructGraph(
+            input,
+            systemYomiTrie,
+            systemTangoTrie,
+            systemTokenArray,
+            succinctBitVectorLBSYomi = systemSuccinctBitVectorLBSYomi,
+            succinctBitVectorIsLeafYomi = systemSuccinctBitVectorIsLeafYomi,
+            succinctBitVectorTokenArray = systemSuccinctBitVectorTokenArray,
+            succinctBitVectorTangoLBS = systemSuccinctBitVectorTangoLBS,
+            userDictionaryRepository = userDictionaryRepository,
+            learnRepository = learnRepository,
+            wikiYomiTrie = wikiYomiTrie,
+            wikiTangoTrie = wikiTangoTrie,
+            wikiTokenArray = wikiTokenArray,
+            succinctBitVectorLBSWikiYomi = wikiSuccinctBitVectorLBSYomi,
+            succinctBitVectorWikiTangoLBS = wikiSuccinctBitVectorLBSTango,
+            succinctBitVectorWikiTokenArray = wikiSuccinctBitVectorTokenArray,
+            succinctBitVectorIsLeafWikiYomi = wikiSuccinctBitVectorIsLeaf,
+            webYomiTrie = webYomiTrie,
+            webTangoTrie = webTangoTrie,
+            webTokenArray = webTokenArray,
+            succinctBitVectorLBSwebYomi = webSuccinctBitVectorLBSYomi,
+            succinctBitVectorwebTangoLBS = webSuccinctBitVectorLBSTango,
+            succinctBitVectorwebTokenArray = webSuccinctBitVectorTokenArray,
+            succinctBitVectorIsLeafwebYomi = webSuccinctBitVectorIsLeaf,
+            personYomiTrie = personYomiTrie,
+            personTangoTrie = personTangoTrie,
+            personTokenArray = personTokenArray,
+            succinctBitVectorLBSpersonYomi = personSuccinctBitVectorLBSYomi,
+            succinctBitVectorpersonTangoLBS = personSuccinctBitVectorLBSTango,
+            succinctBitVectorpersonTokenArray = personSuccinctBitVectorTokenArray,
+            succinctBitVectorIsLeafpersonYomi = personSuccinctBitVectorIsLeaf,
+            neologdYomiTrie = neologdYomiTrie,
+            neologdTangoTrie = neologdTangoTrie,
+            neologdTokenArray = neologdTokenArray,
+            succinctBitVectorLBSneologdYomi = neologdSuccinctBitVectorLBSYomi,
+            succinctBitVectorneologdTangoLBS = neologdSuccinctBitVectorLBSTango,
+            succinctBitVectorneologdTokenArray = neologdSuccinctBitVectorTokenArray,
+            succinctBitVectorIsLeafneologdYomi = neologdSuccinctBitVectorIsLeaf,
+            isOmissionSearchEnable = isOmissionSearchEnable,
+            enableTypoCorrectionJapaneseFlick = enableTypoCorrectionJapaneseFlick,
+            typoCorrectionOffsetScore = typoCorrectionOffsetScore,
+            omissionSearchOffSetScore = omissionSearchOffsetScore,
+            graphNodeDedupMode = graphNodeDedupModeForCurrentDictionary(),
+            mozcNodeAttributeTable = mozcNodeAttributeTableForCurrentDictionary(),
+            beamWidth = beamWidth,
+            sessionState = null,
+        )
+        if (graph.isEmpty()) return null
+        conversionContext.ensureActive()
+        val result = com.kazumaproject.markdownhelperkeyboard.converter.path_algorithm.ConstrainedPathSearch.search(
+            graph = graph,
+            length = input.length,
+            connectionMatrix = connectionMatrixSnapshot().costTable,
+            prefix = prefix,
+            cancellationCheck = { conversionContext.ensureActive() },
+        ) ?: return null
+        return Candidate(
+            string = result.surface,
+            type = (1).toByte(),
+            length = input.length.toUByte(),
+            score = result.cost,
+            yomi = input,
+            conversionSegments = result.segments,
+        )
+    }
+
     suspend fun getCandidatesOriginal(
         input: String,
         n: Int,
