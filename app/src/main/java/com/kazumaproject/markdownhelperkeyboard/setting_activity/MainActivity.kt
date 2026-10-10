@@ -77,7 +77,7 @@ class MainActivity : AppCompatActivity() {
         R.id.candidateHeightDefaultsFragment,
     )
     private val destinationsWithoutSharedActionBar =
-        destinationsWithOwnToolbar + R.id.enableKeyboardFragment
+        destinationsWithOwnToolbar
 
     override fun onCreate(savedInstanceState: Bundle?) {
         // ComponentActivity consumes the nested saved-state bundle while restoring

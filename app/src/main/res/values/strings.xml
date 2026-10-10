@@ -544,14 +544,6 @@
     <string name="pref_clipboard_delete_unpinned_after_hours_summary">オンにすると、ピン留めしていないクリップボード項目を指定時間後に削除します。</string>
     <string name="pref_clipboard_unpinned_retention_hours_title">削除までの時間</string>
     <string name="pref_clipboard_unpinned_retention_hours_summary">ピン留めしていないクリップボード項目を保持する時間を選択します。</string>
-    <string name="welcome_title">こんにちは</string>
-    <string name="enable_keyboard_description">
-        スミレをご利用いただきありがとうございます。このアプリを使用するには、まず端末のキーボード設定で有効にする必要があります。
-    </string>
-    <string name="enable_keyboard_button">設定に進む</string>
-    <string name="greeting_morning">おはようございます</string>
-    <string name="greeting_afternoon">こんにちは</string>
-    <string name="greeting_evening">こんばんは</string>
     <string name="enable_zenz_rerank_preference_title">zenz で変換候補を並び替える</string>
     <string name="enable_zenz_rerank_preference_summary">変換候補の上位を zenz のスコアで軽く並び替えます。既存の辞書スコアもあわせて利用します。タイピング修正とは併用できません。</string>
     <string name="zenz_maximum_letter_count_preference_summary">おおよそ「コンテキスト数 × 1.4」文字までが変換対象となり、それを超えた文字は切り捨てられます。</string>

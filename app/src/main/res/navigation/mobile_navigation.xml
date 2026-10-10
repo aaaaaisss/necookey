@@ -61,11 +61,6 @@
             app:argType="boolean" />
     </fragment>
     <fragment
-        android:id="@+id/enableKeyboardFragment"
-        android:name="com.kazumaproject.markdownhelperkeyboard.setting_activity.ui.enable_keyboard_setting.EnableKeyboardFragment"
-        android:label="@string/welcome_title"
-        tools:layout="@layout/fragment_enable_keyboard" />
-    <fragment
         android:id="@+id/deleteKeyFlickTargetsFragment"
         android:name="com.kazumaproject.markdownhelperkeyboard.delete_key_flick.ui.DeleteKeyFlickTargetsFragment"
         android:label="@string/delete_key_flick_targets_fragment_title"

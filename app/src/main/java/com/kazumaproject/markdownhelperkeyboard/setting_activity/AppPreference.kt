@@ -1620,61 +1620,37 @@ object AppPreference {
         }
 
     var japanese_prediction_enable_preference: Boolean
-        get() = preferences.getBoolean(
-            JAPANESE_PREDICTION_ENABLE_PREFERENCE.first,
-            JAPANESE_PREDICTION_ENABLE_PREFERENCE.second,
-        )
+        get() = JAPANESE_PREDICTION_ENABLE_PREFERENCE.second // 予測設定UI削除: 既定値に固定
         set(value) = preferences.edit {
             it.putBoolean(JAPANESE_PREDICTION_ENABLE_PREFERENCE.first, value)
         }
 
     var english_prediction_enable_preference: Boolean
-        get() = preferences.getBoolean(
-            ENGLISH_PREDICTION_ENABLE_PREFERENCE.first,
-            ENGLISH_PREDICTION_ENABLE_PREFERENCE.second,
-        )
+        get() = ENGLISH_PREDICTION_ENABLE_PREFERENCE.second // 予測設定UI削除: 既定値に固定
         set(value) = preferences.edit {
             it.putBoolean(ENGLISH_PREDICTION_ENABLE_PREFERENCE.first, value)
         }
 
     var system_dictionary_prediction_enable_preference: Boolean
-        get() = preferences.getBoolean(
-            SYSTEM_DICTIONARY_PREDICTION_ENABLE_PREFERENCE.first,
-            SYSTEM_DICTIONARY_PREDICTION_ENABLE_PREFERENCE.second,
-        )
+        get() = SYSTEM_DICTIONARY_PREDICTION_ENABLE_PREFERENCE.second // 予測設定UI削除: 既定値に固定
         set(value) = preferences.edit {
             it.putBoolean(SYSTEM_DICTIONARY_PREDICTION_ENABLE_PREFERENCE.first, value)
         }
 
     var prediction_minimum_input_length_preference: Int
-        get() = preferences.getInt(
-            PREDICTION_MINIMUM_INPUT_LENGTH_PREFERENCE.first,
-            PREDICTION_MINIMUM_INPUT_LENGTH_PREFERENCE.second,
-        ).coerceIn(3, 8)
+        get() = PREDICTION_MINIMUM_INPUT_LENGTH_PREFERENCE.second.coerceIn(3, 8) // 予測設定UI削除: 既定値に固定
         set(value) = preferences.edit {
             it.putInt(PREDICTION_MINIMUM_INPUT_LENGTH_PREFERENCE.first, value.coerceIn(3, 8))
         }
 
     var system_prediction_candidate_limit_preference: Int
-        get() = preferences.getInt(
-            SYSTEM_PREDICTION_CANDIDATE_LIMIT_PREFERENCE.first,
-            SYSTEM_PREDICTION_CANDIDATE_LIMIT_PREFERENCE.second,
-        ).coerceIn(1, 16)
+        get() = SYSTEM_PREDICTION_CANDIDATE_LIMIT_PREFERENCE.second.coerceIn(1, 16) // 予測設定UI削除: 既定値に固定
         set(value) = preferences.edit {
             it.putInt(SYSTEM_PREDICTION_CANDIDATE_LIMIT_PREFERENCE.first, value.coerceIn(1, 16))
         }
 
     var prediction_lookahead_character_count_preference: Int
-        get() = when (
-            val storedValue = preferences.all[PREDICTION_LOOKAHEAD_CHARACTER_COUNT_PREFERENCE.first]
-        ) {
-            is Number -> storedValue.toInt()
-            is String -> legacyPredictionLookaheadCharacterCount(storedValue)
-            else -> PREDICTION_LOOKAHEAD_CHARACTER_COUNT_PREFERENCE.second
-        }.coerceIn(
-            PREDICTION_LOOKAHEAD_CHARACTER_COUNT_MIN,
-            PREDICTION_LOOKAHEAD_CHARACTER_COUNT_MAX,
-        )
+        get() = PREDICTION_LOOKAHEAD_CHARACTER_COUNT_PREFERENCE.second // 予測設定UI削除: 既定値に固定
         set(value) = preferences.edit {
             it.putInt(
                 PREDICTION_LOOKAHEAD_CHARACTER_COUNT_PREFERENCE.first,
@@ -1710,46 +1686,31 @@ object AppPreference {
         }
 
     var prediction_aggressiveness_preference: String
-        get() = preferences.getString(
-            PREDICTION_AGGRESSIVENESS_PREFERENCE.first,
-            PREDICTION_AGGRESSIVENESS_PREFERENCE.second,
-        ) ?: PREDICTION_AGGRESSIVENESS_PREFERENCE.second
+        get() = PREDICTION_AGGRESSIVENESS_PREFERENCE.second // 予測設定UI削除: 既定値に固定
         set(value) = preferences.edit {
             it.putString(PREDICTION_AGGRESSIVENESS_PREFERENCE.first, value)
         }
 
     var system_user_dictionary_prediction_enable_preference: Boolean
-        get() = preferences.getBoolean(
-            SYSTEM_USER_DICTIONARY_PREDICTION_ENABLE_PREFERENCE.first,
-            SYSTEM_USER_DICTIONARY_PREDICTION_ENABLE_PREFERENCE.second,
-        )
+        get() = SYSTEM_USER_DICTIONARY_PREDICTION_ENABLE_PREFERENCE.second // 予測設定UI削除: 既定値に固定
         set(value) = preferences.edit {
             it.putBoolean(SYSTEM_USER_DICTIONARY_PREDICTION_ENABLE_PREFERENCE.first, value)
         }
 
     var reading_correction_prediction_enable_preference: Boolean
-        get() = preferences.getBoolean(
-            READING_CORRECTION_PREDICTION_ENABLE_PREFERENCE.first,
-            READING_CORRECTION_PREDICTION_ENABLE_PREFERENCE.second,
-        )
+        get() = READING_CORRECTION_PREDICTION_ENABLE_PREFERENCE.second // 予測設定UI削除: 既定値に固定
         set(value) = preferences.edit {
             it.putBoolean(READING_CORRECTION_PREDICTION_ENABLE_PREFERENCE.first, value)
         }
 
     var external_mozc_prediction_enable_preference: Boolean
-        get() = preferences.getBoolean(
-            EXTERNAL_MOZC_PREDICTION_ENABLE_PREFERENCE.first,
-            EXTERNAL_MOZC_PREDICTION_ENABLE_PREFERENCE.second,
-        )
+        get() = EXTERNAL_MOZC_PREDICTION_ENABLE_PREFERENCE.second // 予測設定UI削除: 既定値に固定
         set(value) = preferences.edit {
             it.putBoolean(EXTERNAL_MOZC_PREDICTION_ENABLE_PREFERENCE.first, value)
         }
 
     var symbol_emoji_prediction_enable_preference: Boolean
-        get() = preferences.getBoolean(
-            SYMBOL_EMOJI_PREDICTION_ENABLE_PREFERENCE.first,
-            SYMBOL_EMOJI_PREDICTION_ENABLE_PREFERENCE.second,
-        )
+        get() = SYMBOL_EMOJI_PREDICTION_ENABLE_PREFERENCE.second // 予測設定UI削除: 既定値に固定
         set(value) = preferences.edit {
             it.putBoolean(SYMBOL_EMOJI_PREDICTION_ENABLE_PREFERENCE.first, value)
         }
@@ -1848,7 +1809,7 @@ object AppPreference {
 
     val suppress_hentaigana_candidates_preference: Boolean get() = false // S3: hardcoded, setting removed
 
-    val zero_query_suggestion_preference: Boolean get() = false // S3: hardcoded, setting removed
+    val zero_query_suggestion_preference: Boolean get() = true // 確定後の後続語/ゼロクエリ候補を常時表示（false 固定だと後続語が出ない）
 
     val time_same_pronounce_typing_preference: Int? get() = 1000 // S3: hardcoded, setting removed
 
