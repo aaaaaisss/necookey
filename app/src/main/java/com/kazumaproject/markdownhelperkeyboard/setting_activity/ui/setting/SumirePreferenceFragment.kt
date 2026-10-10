@@ -182,6 +182,5 @@ class SumirePreferenceFragment : AsyncPreferenceFragment() {
             }
         }
 
-        applyLegacySearchResultFilterIfNeeded()
     }
 }

@@ -111,7 +111,6 @@ abstract class AsyncPreferenceFragment : PreferenceFragmentCompat() {
                 pendingListState?.let { listView.layoutManager?.onRestoreInstanceState(it) }
                 pendingListState = null
                 pendingPreferenceState = null
-                view?.let { scrollToHighlightedPreferenceAfterLayout(it) }
             }
         }
     }

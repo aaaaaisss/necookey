@@ -36,7 +36,6 @@ class ZenzPreferenceFragment : AsyncPreferenceFragment() {
         }
 
         updateModelPrefSummary()
-        applyLegacySearchResultFilterIfNeeded()
     }
 
     private fun showModelSelectDialog() {

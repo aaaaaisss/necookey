@@ -52,6 +52,5 @@ class KanaPreferenceFragment : AsyncPreferenceFragment() {
             true
         }
 
-        applyLegacySearchResultFilterIfNeeded()
     }
 }

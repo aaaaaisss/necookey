@@ -82,14 +82,13 @@ internal fun resolveKeyboardTouchEffectPreferenceVisibility(
 open class CommonPreferenceFragment : AsyncPreferenceFragment() {
 
     companion object {
-        const val ARG_HIGHLIGHT_PREFERENCE_KEY = "highlightPreferenceKey"
         private const val LONG_PRESS_TIMEOUT_MIN_MS = 100
         private const val LONG_PRESS_TIMEOUT_MAX_MS = 2000
         private const val LONG_PRESS_TIMEOUT_DEFAULT_MS = 300
     }
 
     @get:XmlRes
-    protected override val preferencesXmlRes: Int = R.xml.pref_common
+    protected override val preferencesXmlRes: Int = R.xml.pref_common_legacy
 
     @Inject
     lateinit var appPreference: AppPreference
@@ -859,7 +858,6 @@ open class CommonPreferenceFragment : AsyncPreferenceFragment() {
 
         setupRoutePreferences()
         onCommonPreferencesCreated()
-        applyLegacySearchResultFilterIfNeeded()
     }
 
     protected open fun onCommonPreferencesCreated() = Unit
@@ -867,29 +865,7 @@ open class CommonPreferenceFragment : AsyncPreferenceFragment() {
     private fun setupRoutePreferences() {
         val routeTargets = mapOf(
             "date_candidate_settings_preference" to R.id.dateCandidateSettingsFragment,
-            "setting_route_keyboard_display" to R.id.keyboardDisplayPreferenceFragment,
-            "setting_route_input_method" to R.id.inputMethodPreferenceFragment,
-            "setting_route_candidate_conversion" to R.id.candidateConversionPreferenceFragment,
-            "setting_route_conversion_engine" to R.id.conversionEnginePreferenceFragment,
             "setting_route_utility_candidates" to R.id.utilityCandidatePreferenceFragment,
-            "setting_route_dictionary" to R.id.dictionaryPreferenceFragment,
-            "setting_route_ai_conversion" to R.id.aiConversionPreferenceFragment,
-            "setting_route_clipboard_shortcut" to R.id.clipboardShortcutPreferenceFragment,
-            "setting_route_operation_feedback" to R.id.operationFeedbackPreferenceFragment,
-            "setting_route_general_info" to R.id.generalInfoPreferenceFragment,
-            "setting_route_advanced" to R.id.advancedPreferenceFragment,
-            "setting_route_legacy_settings" to R.id.settingMainFragment,
-            "setting_route_keyboard_theme" to R.id.keyboardThemeFragment,
-            "setting_route_kana_preferences" to R.id.kanaPreferenceFragment,
-            "setting_route_qwerty_preferences" to R.id.qwertyPreferenceFragment,
-            "setting_route_qwerty_english_preferences" to R.id.qwertyEnglishPreferenceFragment,
-            "setting_route_qwerty_romaji_preferences" to R.id.qwertyRomajiPreferenceFragment,
-            "setting_route_sumire_preferences" to R.id.sumirePreferenceFragment,
-            "setting_route_custom_keyboard_preferences" to R.id.customKeyboardPreferenceFragment,
-            "setting_route_tablet_preferences" to R.id.tabletPreferenceFragment,
-            "setting_route_hardware_keyboard_preferences" to R.id.hardwareKeyboardPreferenceFragment,
-            "setting_route_common_preferences" to R.id.commonPreferenceFragment,
-            "setting_route_zenz_preferences" to R.id.zenzPreferenceFragment,
         )
 
         routeTargets.forEach { (key, destinationId) ->
@@ -899,8 +875,6 @@ open class CommonPreferenceFragment : AsyncPreferenceFragment() {
             }
         }
 
-        findPreference<Preference>("setting_route_zenz_preferences")?.isVisible =
-            AppVariantConfig.hasZenz
     }
 
     override fun onPreferencesResumed() {

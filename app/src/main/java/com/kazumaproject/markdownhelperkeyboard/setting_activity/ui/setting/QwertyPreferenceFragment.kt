@@ -37,7 +37,6 @@ open class QwertyPreferenceFragment : AsyncPreferenceFragment() {
             }
         }
 
-        applyLegacySearchResultFilterIfNeeded()
     }
 
     companion object {

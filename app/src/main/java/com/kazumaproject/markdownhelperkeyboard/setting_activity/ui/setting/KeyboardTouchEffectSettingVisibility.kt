@@ -16,7 +16,4 @@ internal object KeyboardTouchEffectSettingVisibility {
             else -> true
         }
     }
-
-    fun isVisibleForEffect(destination: SettingDestination, effectType: String): Boolean =
-        isVisibleForEffect(destination.key, effectType)
 }

@@ -104,7 +104,6 @@ class DictionaryPreferenceFragment : AsyncPreferenceFragment() {
             }
         }
 
-        applyLegacySearchResultFilterIfNeeded()
     }
 
 }

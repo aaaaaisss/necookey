@@ -58,7 +58,7 @@ class EnableKeyboardFragment : Fragment() {
         super.onResume()
         isKeyboardBoardEnabled()?.let {
             if (it) {
-                navigateSafely(R.id.navigation_setting)
+                navigateSafely(R.id.settingMainFragment)
             }
         }
 

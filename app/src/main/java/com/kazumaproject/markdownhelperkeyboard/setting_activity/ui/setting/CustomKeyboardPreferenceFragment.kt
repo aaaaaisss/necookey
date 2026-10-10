@@ -28,6 +28,5 @@ class CustomKeyboardPreferenceFragment : AsyncPreferenceFragment() {
             }
         }
 
-        applyLegacySearchResultFilterIfNeeded()
     }
 }

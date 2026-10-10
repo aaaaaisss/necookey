@@ -1,20 +1,14 @@
 package com.kazumaproject.markdownhelperkeyboard.setting_activity.ui.setting
 
 import android.os.Bundle
-import android.view.Menu
-import android.view.MenuInflater
-import android.view.MenuItem
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.view.inputmethod.InputMethodManager
 import androidx.activity.OnBackPressedCallback
 import androidx.core.content.ContextCompat.getSystemService
-import androidx.core.os.bundleOf
-import androidx.core.view.MenuProvider
 import androidx.core.view.isVisible
 import androidx.fragment.app.Fragment
-import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.navigation.fragment.findNavController
 import com.google.android.material.tabs.TabLayoutMediator
@@ -73,54 +67,15 @@ class SettingMainFragment : Fragment() {
             }
         tabLayoutMediator?.attach()
 
-        setupSearchMenu()
-
         requireActivity().onBackPressedDispatcher.addCallback(
             viewLifecycleOwner,
             object : OnBackPressedCallback(true) {
                 override fun handleOnBackPressed() {
-                    val navController = findNavController()
-                    if (!appPreference.setting_use_new_home_screen_preference &&
-                        navController.previousBackStackEntry?.destination?.id ==
-                        R.id.navigation_setting
-                    ) {
-                        requireActivity().finish()
-                        return
-                    }
                     if (!findNavController().popBackStack()) {
                         requireActivity().finish()
                     }
                 }
             })
-    }
-
-    private fun setupSearchMenu() {
-        requireActivity().addMenuProvider(
-            object : MenuProvider {
-                override fun onCreateMenu(menu: Menu, menuInflater: MenuInflater) {
-                    menuInflater.inflate(R.menu.legacy_setting_search_menu, menu)
-                }
-
-                override fun onMenuItemSelected(menuItem: MenuItem): Boolean {
-                    return when (menuItem.itemId) {
-                        R.id.action_legacy_setting_search -> {
-                            navigateSafely(
-                                R.id.settingSearchFragment,
-                                bundleOf(
-                                    SettingSearchFragment.ARG_SEARCH_SCOPE to
-                                        SettingSearchScope.LEGACY_TABS.name
-                                ),
-                            )
-                            true
-                        }
-
-                        else -> false
-                    }
-                }
-            },
-            viewLifecycleOwner,
-            Lifecycle.State.RESUMED,
-        )
     }
 
     private fun loadInitialData() {

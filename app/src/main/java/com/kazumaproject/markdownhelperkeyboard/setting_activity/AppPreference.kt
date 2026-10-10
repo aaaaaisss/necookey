@@ -453,10 +453,6 @@ object AppPreference {
 
     private val defaultKeyboardOrderJson = gson.toJson(defaultKeyboardOrder(isTablet = false))
     private val KEYBOARD_ORDER = Pair("keyboard_order_preference", defaultKeyboardOrderJson)
-    private val SETTING_HOME_FREQUENT_KEYS =
-        Pair("setting_home_frequent_keys_preference", "")
-    private val SETTING_USE_NEW_HOME_SCREEN =
-        Pair("setting_use_new_home_screen_preference", true)
 
     private val defaultCandidateTabJson = gson.toJson(
         listOf(
@@ -1686,40 +1682,6 @@ object AppPreference {
         set(value) = preferences.edit {
             val json = gson.toJson(value)
             it.putString(KEYBOARD_ORDER.first, json)
-        }
-
-    var setting_home_frequent_keys: List<String>
-        get() {
-            val json = preferences.getString(
-                SETTING_HOME_FREQUENT_KEYS.first,
-                SETTING_HOME_FREQUENT_KEYS.second
-            )
-            if (json.isNullOrBlank()) return emptyList()
-            val type = object : TypeToken<List<String>>() {}.type
-            return runCatching {
-                gson.fromJson<List<String>>(json, type)
-                    .orEmpty()
-                    .filter { it.isNotBlank() }
-                    .distinct()
-            }.getOrDefault(emptyList())
-        }
-        set(value) = preferences.edit {
-            it.putString(
-                SETTING_HOME_FREQUENT_KEYS.first,
-                gson.toJson(value.filter { key -> key.isNotBlank() }.distinct())
-            )
-        }
-
-    val has_setting_home_frequent_keys: Boolean
-        get() = preferences.contains(SETTING_HOME_FREQUENT_KEYS.first)
-
-    var setting_use_new_home_screen_preference: Boolean
-        get() = preferences.getBoolean(
-            SETTING_USE_NEW_HOME_SCREEN.first,
-            SETTING_USE_NEW_HOME_SCREEN.second
-        )
-        set(value) = preferences.edit {
-            it.putBoolean(SETTING_USE_NEW_HOME_SCREEN.first, value)
         }
 
     var candidate_tab_order: List<CandidateTab>

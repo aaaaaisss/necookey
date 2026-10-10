@@ -3,14 +3,10 @@ package com.kazumaproject.markdownhelperkeyboard.setting_activity
 import android.content.Intent
 import android.graphics.drawable.Drawable
 import android.os.Bundle
-import android.view.Menu
-import android.view.MenuInflater
-import android.view.MenuItem
 import android.view.View
 import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.graphics.Insets
-import androidx.core.view.MenuProvider
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.doOnAttach
@@ -41,7 +37,6 @@ import com.kazumaproject.markdownhelperkeyboard.setting_activity.ui.setting.Sett
 import com.kazumaproject.markdownhelperkeyboard.setting_activity.ui.setting.SettingsLoadStage
 import com.kazumaproject.markdownhelperkeyboard.setting_activity.ui.setting.settingsIo
 import kotlinx.coroutines.Job
-import com.kazumaproject.core.R as CoreR
 
 @AndroidEntryPoint
 class MainActivity : AppCompatActivity() {
@@ -223,7 +218,6 @@ class MainActivity : AppCompatActivity() {
         installNavigationGraph(navController)
         val appBarConfiguration = AppBarConfiguration(
             setOf(
-                R.id.navigation_setting,
                 R.id.settingMainFragment,
                 R.id.navigation_learn_dictionary,
                 R.id.navigation_user_dictionary,
@@ -234,22 +228,16 @@ class MainActivity : AppCompatActivity() {
             themedBackground(com.google.android.material.R.attr.colorSurfaceContainer)
                 ?.let { supportActionBar?.setBackgroundDrawable(it) }
         }
-        setupSettingHomeSwitchMenu(navController)
-        applySettingHomeModeFromPreference(navController)
+        updateBottomNavigationVisibility(navController)
         navController.addOnDestinationChangedListener { _, destination, _ ->
             currentDestinationId = destination.id
-            if (destination.id == R.id.navigation_setting ||
-                destination.id == R.id.settingMainFragment
-            ) {
+            if (destination.id == R.id.settingMainFragment) {
                 bottomNavigationView
                     ?.menu
-                    ?.findItem(R.id.navigation_setting)
+                    ?.findItem(R.id.settingMainFragment)
                     ?.isChecked = true
             }
-            updateBottomNavigationVisibility(
-                appPreference.setting_use_new_home_screen_preference,
-                navController,
-            )
+            updateBottomNavigationVisibility(navController)
             updateSharedActionBarVisibility(destination.id)
             invalidateOptionsMenu()
         }
@@ -261,7 +249,7 @@ class MainActivity : AppCompatActivity() {
             initialIntentHandled = true
         } else if (!initialIntentHandled) {
             if (!handleIntent(intent)) {
-                navigateToPreferredSettingHome(navController)
+                navigateToSettingHome(navController)
             }
             initialIntentHandled = true
         }
@@ -326,7 +314,7 @@ class MainActivity : AppCompatActivity() {
     private fun handleSettingRequest(request: String?): Boolean {
         return when (request) {
             "setting_fragment_request" -> {
-                navigateToPreferredSettingHome(currentNavController())
+                navigateToSettingHome(currentNavController())
                 true
             }
 
@@ -356,32 +344,11 @@ class MainActivity : AppCompatActivity() {
     private fun installNavigationGraph(navController: NavController) {
         if (navController.currentDestination != null) return
         val graph = navController.navInflater.inflate(R.navigation.mobile_navigation)
-        graph.setStartDestination(preferredSettingHomeDestination())
+        graph.setStartDestination(R.id.settingMainFragment)
         navController.graph = graph
     }
 
-    private fun preferredSettingHomeDestination(): Int =
-        if (appPreference.setting_use_new_home_screen_preference) {
-            R.id.navigation_setting
-        } else {
-            R.id.settingMainFragment
-        }
-
-    fun applySettingHomeModeFromPreference(navController: NavController? = null) {
-        val useNewDashboard = appPreference.setting_use_new_home_screen_preference
-        val resolvedNavController = navController ?: currentNavController()
-        updateBottomNavigationVisibility(useNewDashboard, resolvedNavController)
-        ensurePreferredSettingHomeIfNeeded(resolvedNavController)
-    }
-
-    private fun updateBottomNavigationVisibility(
-        useNewDashboard: Boolean,
-        navController: NavController,
-    ) {
-        if (useNewDashboard) {
-            binding.navViewContainer.visibility = View.GONE
-            return
-        }
+    private fun updateBottomNavigationVisibility(navController: NavController) {
         ensureBottomNavigation(navController)
         binding.navViewContainer.visibility =
             if (navController.currentDestination?.id in destinationsWithoutBottomNavigation) {
@@ -410,89 +377,23 @@ class MainActivity : AppCompatActivity() {
     ) {
         navView.setupWithNavController(navController)
         navView.setOnItemSelectedListener { item ->
-            if (item.itemId == R.id.navigation_setting) {
-                navigateToPreferredSettingHome(navController)
+            if (item.itemId == R.id.settingMainFragment) {
+                navigateToSettingHome(navController)
                 true
             } else {
                 NavigationUI.onNavDestinationSelected(item, navController)
             }
         }
         navView.setOnItemReselectedListener { item ->
-            if (item.itemId == R.id.navigation_setting) {
-                navigateToPreferredSettingHome(navController)
+            if (item.itemId == R.id.settingMainFragment) {
+                navigateToSettingHome(navController)
             }
         }
     }
 
-    private fun setupSettingHomeSwitchMenu(navController: NavController) {
-        addMenuProvider(
-            object : MenuProvider {
-                override fun onCreateMenu(menu: Menu, menuInflater: MenuInflater) {
-                    menuInflater.inflate(R.menu.setting_home_switch_menu, menu)
-                }
-
-                override fun onPrepareMenu(menu: Menu) {
-                    updateSettingHomeSwitchMenuItem(
-                        menu.findItem(R.id.action_switch_setting_home)
-                    )
-                }
-
-                override fun onMenuItemSelected(menuItem: MenuItem): Boolean {
-                    return when (menuItem.itemId) {
-                        R.id.action_switch_setting_home -> {
-                            switchSettingHome(navController)
-                            true
-                        }
-
-                        else -> false
-                    }
-                }
-            },
-            this,
-        )
-    }
-
-    private fun updateSettingHomeSwitchMenuItem(item: MenuItem?) {
-        if (item == null) return
-        val destinationId = currentDestinationId
-        val visible = destinationId == R.id.navigation_setting ||
-            destinationId == R.id.settingMainFragment
-        item.isVisible = visible
-        if (!visible) return
-
-        if (appPreference.setting_use_new_home_screen_preference) {
-            item.setTitle(R.string.setting_switch_to_legacy_home)
-        } else {
-            item.setTitle(R.string.setting_switch_to_new_home)
-        }
-        item.setIcon(CoreR.drawable.swap_horiz_24px)
-        item.setShowAsAction(MenuItem.SHOW_AS_ACTION_IF_ROOM)
-    }
-
-    private fun switchSettingHome(navController: NavController) {
-        appPreference.setting_use_new_home_screen_preference =
-            !appPreference.setting_use_new_home_screen_preference
-        applySettingHomeModeFromPreference()
-        navigateToPreferredSettingHome(navController)
-        invalidateOptionsMenu()
-    }
-
-    private fun ensurePreferredSettingHomeIfNeeded(navController: NavController): Boolean {
-        val currentDestinationId = navController.currentDestination?.id ?: return false
-        if (currentDestinationId != R.id.navigation_setting &&
-            currentDestinationId != R.id.settingMainFragment
-        ) {
-            return false
-        }
-        return navigateToPreferredSettingHome(navController)
-    }
-
-    private fun navigateToPreferredSettingHome(navController: NavController): Boolean {
-        val targetDestinationId = preferredSettingHomeDestination()
+    private fun navigateToSettingHome(navController: NavController): Boolean {
+        val targetDestinationId = R.id.settingMainFragment
         if (navController.currentDestination?.id == targetDestinationId) return false
-        // Both home modes are roots. Clear detail/tab history even when the
-        // other home has never been created in this activity.
-        navController.graph.setStartDestination(targetDestinationId)
         val options = NavOptions.Builder()
             .setLaunchSingleTop(true)
             .setPopUpTo(navController.graph.id, false)

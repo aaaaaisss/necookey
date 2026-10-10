@@ -2,7 +2,7 @@
 <menu xmlns:android="http://schemas.android.com/apk/res/android">
 
     <item
-        android:id="@+id/navigation_setting"
+        android:id="@+id/settingMainFragment"
         android:icon="@drawable/baseline_settings_24"
         android:title="@string/setting_fragment_title" />
 

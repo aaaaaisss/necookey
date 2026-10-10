@@ -81,6 +81,5 @@ class HardwareKeyboardPreferenceFragment : AsyncPreferenceFragment() {
                 navigateSafely(R.id.physicalKeyboardShortcutListFragment)
                 true
             }
-        applyLegacySearchResultFilterIfNeeded()
     }
 }

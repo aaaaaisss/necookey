@@ -9,6 +9,5 @@ class TabletPreferenceFragment : AsyncPreferenceFragment() {
     override val preferencesXmlRes: Int = R.xml.pref_tablet
 
     override fun onPreferencesReady(savedInstanceState: Bundle?, rootKey: String?) {
-        applyLegacySearchResultFilterIfNeeded()
     }
 }
