@@ -48,6 +48,32 @@ class ConversionDictionarySnapshotTest {
         verify(dao, times(2)).findByInputPrefix("な", "な\uFFFF")
     }
 
+    @Test
+    fun learnDictionary_readRacingADeleteIsNotCached() = runTest {
+        val dao = mock<LearnDao>()
+        val deleted = LearnEntity(input = "なか", out = "仲")
+        lateinit var repository: LearnRepository
+        var reads = 0
+        whenever(dao.findByInputPrefix("な", "な\uFFFF")).thenAnswer {
+            reads += 1
+            if (reads == 1) {
+                // The delete (and its invalidation) lands while this read is in flight.
+                kotlinx.coroutines.runBlocking { repository.deleteByInputAndOutput("なか", "仲") }
+                listOf(deleted)
+            } else {
+                emptyList()
+            }
+        }
+        whenever(dao.deleteByInputAndOutput("なか", "仲")).thenReturn(1)
+        repository = LearnRepository(dao)
+
+        // The in-flight read still answers with what it saw ...
+        assertEquals(listOf(deleted), repository.findCommonPrefixes("なか"))
+        // ... but it must not be cached: the next lookup reads again and the entry is gone.
+        assertEquals(emptyList<LearnEntity>(), repository.findCommonPrefixes("なか"))
+        verify(dao, times(2)).findByInputPrefix("な", "な\uFFFF")
+    }
+
     private fun userWord(id: Int, word: String, reading: String) = UserWord(
         id = id,
         word = word,

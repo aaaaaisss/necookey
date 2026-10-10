@@ -173,18 +173,36 @@ class LearnRepository @Inject constructor(
     private suspend fun getConversionBucket(firstCharacter: Char): List<LearnEntity> {
         conversionSnapshot[firstCharacter]?.let { return it }
         return conversionSnapshotMutex.withLock {
-            conversionSnapshot[firstCharacter] ?: learnDao.findByInputPrefix(
+            conversionSnapshot[firstCharacter]?.let { return@withLock it }
+            val revision = conversionRevision
+            val words = learnDao.findByInputPrefix(
                 firstCharacter.toString(),
                 firstCharacter.toString().upperBound(),
-            ).also { words ->
-                conversionSnapshot = conversionSnapshot + (firstCharacter to words)
-            }
+            )
+            publishConversionBucket(revision, firstCharacter, words)
+            words
         }
     }
 
+    /**
+     * Caches a bucket only when no write happened while it was being read. Without this check a
+     * read that started before a delete could store the pre-delete rows after the delete's
+     * invalidation, and the deleted entry would keep coming back until the next write.
+     */
+    private fun publishConversionBucket(
+        revisionAtRead: Long,
+        firstCharacter: Char,
+        words: List<LearnEntity>,
+    ) {
+        if (revisionAtRead != conversionRevision) return
+        conversionSnapshot = conversionSnapshot + (firstCharacter to words)
+        // An invalidation can race between the check and the assignment; undo the publish then.
+        if (revisionAtRead != conversionRevision) conversionSnapshot = emptyMap()
+    }
+
     private fun invalidateConversionSnapshot() {
-        conversionSnapshot = emptyMap()
         conversionRevision++
+        conversionSnapshot = emptyMap()
     }
 }
 

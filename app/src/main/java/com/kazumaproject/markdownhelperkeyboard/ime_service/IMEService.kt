@@ -336,6 +336,7 @@ import com.kazumaproject.markdownhelperkeyboard.ime_service.romaji_kana.RomajiKa
 import com.kazumaproject.markdownhelperkeyboard.ime_service.state.CandidateTab
 import com.kazumaproject.markdownhelperkeyboard.ime_service.state.InputTypeForIME
 import com.kazumaproject.markdownhelperkeyboard.ime_service.state.KeyboardType
+import com.kazumaproject.markdownhelperkeyboard.learning.database.LearnEntity
 import com.kazumaproject.markdownhelperkeyboard.learning.session.ConversionLearningSession
 import com.kazumaproject.markdownhelperkeyboard.learning.session.LearningFragment
 import com.kazumaproject.markdownhelperkeyboard.ng_word.NgWordMatcher
@@ -11577,15 +11578,44 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
 
     private fun shouldShowCandidateLongPressActions(candidate: Candidate): Boolean {
         if (candidate.type == CANDIDATE_TYPE_TEXT_MACRO) return false
-        return candidate.type == CANDIDATE_TYPE_LEARNED_DICTIONARY ||
-            isNgWordEnable == true
+        // Any text candidate may correspond to a learned entry (learning also feeds the
+        // conversion lattice, so learned outputs do not always carry the learned type).
+        return candidate.string.isNotEmpty()
     }
 
     private fun showCandidateLongPressActions(
         insertString: String, candidate: Candidate, candidatePosition: Int
     ) {
         val request = beginKeyboardPopupRequest() ?: return
-        showCandidateLongPressActionsPopup(insertString, candidate, request)
+        val readings = learnedCandidateReadings(insertString, candidate)
+        val outputs = listOf(candidate.string, candidate.commitText).distinct()
+        ioScope.launch {
+            val learned = try {
+                findLearnedEntryForCandidate(readings, outputs)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                Timber.w(e, "learned entry lookup failed")
+                null
+            }
+            withContext(Dispatchers.Main) {
+                if (!isKeyboardPopupRequestCurrent(request)) return@withContext
+                if (learned == null && isNgWordEnable != true) return@withContext
+                showCandidateLongPressActionsPopup(insertString, candidate, request, learned)
+            }
+        }
+    }
+
+    private suspend fun findLearnedEntryForCandidate(
+        readings: List<String>,
+        outputs: List<String>,
+    ): LearnEntity? {
+        for (reading in readings) {
+            for (output in outputs) {
+                learnRepository.findLearnDataByInputAndOutput(reading, output)?.let { return it }
+            }
+        }
+        return null
     }
 
     private suspend fun reportKeyboardPopupFailure(request: KeyboardPopupRequest, exception: Exception) {
@@ -11602,9 +11632,10 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         insertString: String,
         candidate: Candidate,
         request: KeyboardPopupRequest,
+        learnedEntry: LearnEntity?,
     ) {
         val actions = buildList {
-            if (candidate.type == CANDIDATE_TYPE_LEARNED_DICTIONARY) {
+            if (learnedEntry != null) {
                 add(CandidateLongPressAction.ForgetLearnedEntry)
             }
             if (isNgWordEnable == true) {
@@ -11626,16 +11657,18 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
             val selectedAction = actions.getOrNull(position)
             when (selectedAction) {
                 CandidateLongPressAction.ForgetLearnedEntry -> {
-                    val reading = resolveLearnedCandidateReading(insertString, candidate)
-                    if (reading.isNotEmpty()) {
-                        ioScope.launch {
-                            learnRepository.deleteByInputAndOutput(
-                                input = reading,
-                                output = candidate.string,
-                            )
-                            withContext(Dispatchers.Main) {
-                                requestCandidateRefresh(CandidateShowFlag.Updating)
-                            }
+                    val entry = learnedEntry ?: return@showKeyboardSelectionList
+                    // Hide it right away: the refresh below can be skipped or superseded (henkan
+                    // state, a newer request), and must never leave the deleted word visible.
+                    removeCandidateFromVisibleLists(candidate)
+                    ioScope.launch {
+                        learnRepository.deleteByInputAndOutput(
+                            input = entry.input,
+                            output = entry.out,
+                        )
+                        withContext(Dispatchers.Main) {
+                            necookeyZenzOverrideCacheClear()
+                            requestCandidateRefresh(CandidateShowFlag.Updating)
                         }
                     }
                 }
@@ -11776,19 +11809,35 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         }
     }
 
-    private fun resolveLearnedCandidateReading(
+    /**
+     * Readings a learned entry for [candidate] may be stored under, most specific first. The
+     * candidate's own yomi wins (prediction candidates are longer than the typed input, so the
+     * typed prefix is not their reading).
+     */
+    private fun learnedCandidateReadings(
         insertString: String,
         candidate: Candidate,
-    ): String {
+    ): List<String> = buildList {
+        candidate.yomi?.takeIf { it.isNotEmpty() }?.let(::add)
         val session = bunsetsuConversionSession
         if (session != null && isBunsetsuCursorMoveSessionActive() && session.segments.isNotEmpty()) {
-            return session.segments[
-                session.focusedIndex.coerceIn(0, session.segments.lastIndex)
-            ].reading
+            add(session.segments[session.focusedIndex.coerceIn(0, session.segments.lastIndex)].reading)
         }
-        candidate.yomi?.takeIf { it.isNotEmpty() }?.let { return it }
         val readingLength = candidate.length.toInt().coerceAtMost(insertString.length)
-        return insertString.take(readingLength)
+        insertString.take(readingLength).takeIf { it.isNotEmpty() }?.let(::add)
+    }.distinct()
+
+    /** Drops [candidate] from every list currently on screen (top row, full list, bottom row). */
+    private fun removeCandidateFromVisibleLists(candidate: Candidate) {
+        val sameWord: (Candidate) -> Boolean = { it.string == candidate.string && it.type != CANDIDATE_TYPE_TEXT_MACRO }
+        currentCandidateStripCandidates = currentCandidateStripCandidates.filterNot(sameWord)
+        currentCandidateStripFullCandidates = currentCandidateStripFullCandidates.filterNot(sameWord)
+        necookeyPredictionRowCandidates = necookeyPredictionRowCandidates.filterNot(sameWord)
+        refreshCandidateStripContent()
+    }
+
+    private fun necookeyZenzOverrideCacheClear() {
+        synchronized(necookeyZenzOverrideCache) { necookeyZenzOverrideCache.clear() }
     }
 
     private fun handleSelectedTextSelection(selectedText: String) {
@@ -21118,6 +21167,19 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
                     position = position,
                     displayedCandidates = adapter.suggestions
                 )
+            }
+            adapter.setOnItemLongClickListener { candidate, position ->
+                val insertString = inputString.value
+                if (insertString.isEmpty() || isNecookeyActionCandidate(candidate)) {
+                    return@setOnItemLongClickListener
+                }
+                if (shouldShowCandidateLongPressActions(candidate)) {
+                    showCandidateLongPressActions(
+                        insertString = insertString,
+                        candidate = candidate,
+                        candidatePosition = position,
+                    )
+                }
             }
         }
         suggestionAdapterFull?.let { adapter ->
