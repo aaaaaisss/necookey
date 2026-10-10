@@ -193,7 +193,6 @@ data class ImePreferencesSnapshot(
     val isDeleteLeftFlickPreference: Boolean,
     val isDeleteUpFlickPreference: Boolean,
     val isDeleteDownFlickPreference: Boolean,
-    val zenzDebounceTimePreference: Int,
     val zenzMaximumLetterSizePreference: Int,
     val zenzMaximumContextSizePreference: Int,
     val zenzMaximumThreadSizePreference: Int,
@@ -229,10 +228,6 @@ data class ImePreferencesSnapshot(
     val tenkeyLandscapeBottomMarginPreferenceValue: Int,
     val qwertyLandscapePositionPreferenceValue: Boolean,
     val qwertyLandscapeBottomMarginPreferenceValue: Int,
-    val zenzEnableStatePreference: Boolean,
-    val zenzaiEnableStatePreference: Boolean,
-    val zenzProfilePreference: String,
-    val zenzEnableLongPressConversionPreference: Boolean,
     val zenzRerankPreference: Boolean,
     val qwertyKeyVerticalMargin: Float,
     val qwertyKeyHorizontalGap: Float,
@@ -598,8 +593,6 @@ data class ImePreferencesSnapshot(
                 isDeleteLeftFlickPreference = appPreference.delete_key_left_flick_preference,
                 isDeleteUpFlickPreference = appPreference.delete_key_up_flick_preference,
                 isDeleteDownFlickPreference = appPreference.delete_key_down_flick_preference,
-                zenzDebounceTimePreference =
-                    appPreference.zenz_debounce_time_preference ?: 300,
                 zenzMaximumLetterSizePreference =
                     appPreference.zenz_maximum_letter_size_preference ?: 32,
                 zenzMaximumContextSizePreference =
@@ -661,13 +654,6 @@ data class ImePreferencesSnapshot(
                     appPreference.qwerty_keyboard_position_landscape ?: true,
                 qwertyLandscapeBottomMarginPreferenceValue =
                     appPreference.qwerty_keyboard_vertical_margin_bottom_landscape ?: 0,
-                zenzEnableStatePreference =
-                    AppVariantConfig.hasZenz && appPreference.enable_zenz_preference,
-                zenzaiEnableStatePreference =
-                    AppVariantConfig.hasZenz && appPreference.enable_zenzai_preference,
-                zenzProfilePreference = appPreference.zenz_profile_preference,
-                zenzEnableLongPressConversionPreference =
-                    AppVariantConfig.hasZenz && appPreference.enable_zenz_long_press_preference,
                 zenzRerankPreference =
                     AppVariantConfig.hasZenz && appPreference.enable_zenz_rerank_preference,
                 qwertyKeyVerticalMargin = appPreference.qwerty_key_vertical_margin ?: 5.0f,

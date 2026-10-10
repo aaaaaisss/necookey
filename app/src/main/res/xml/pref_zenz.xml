@@ -23,21 +23,8 @@
     </PreferenceCategory>
 
     <PreferenceCategory android:title="@string/zenz_preference_category_title">
-        <SwitchPreferenceCompat
-            android:defaultValue="false"
-            android:key="enable_ai_conversion_zenz_preference"
-            android:title="@string/enable_ai_preference_title"
-            app:summary="@string/enable_ai_preference_summary" />
 
         <SwitchPreferenceCompat
-            android:dependency="enable_ai_conversion_zenz_preference"
-            android:key="enable_ai_conversion_zenzai_preference"
-            android:summary="@string/enable_ai_conversion_zenz_preference_summary"
-            android:title="@string/enable_zenzai_preference_title"
-            app:defaultValue="false" />
-
-        <SwitchPreferenceCompat
-            android:dependency="enable_ai_conversion_zenz_preference"
             android:key="enable_zenz_rerank_preference"
             android:title="@string/enable_zenz_rerank_preference_title"
             app:defaultValue="false"
@@ -48,27 +35,11 @@
             android:title="モデルの読み込み元"
             app:summary="デフォルト（Assets）" />
 
-        <EditTextPreference
-            android:key="zenz_profile_string_preference"
-            android:title="@string/zenz_profile_preference_title"
-            app:defaultValue=""
-            app:summary="@string/zenz_profile_preference_summary" />
-
         <SwitchPreferenceCompat
             android:key="enable_zenz_right_context_preference"
             android:title="@string/enable_zenz_right_context_preference_title"
             app:defaultValue="false"
             app:summary="@string/enable_zenz_right_context_preference_summary" />
-
-        <SeekBarPreference
-            android:defaultValue="300"
-            android:key="zenz_debounce_time_preference"
-            android:max="1024"
-            android:title="@string/zenz_debounce_time_preference_title"
-            app:min="0"
-            app:seekBarIncrement="10"
-            app:showSeekBarValue="true"
-            app:summary="@string/zenz_debounce_time_preference_summary" />
 
         <SeekBarPreference
             android:defaultValue="32"

@@ -1862,10 +1862,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
     private var sumireLastInputModePreference: String = "japanese"
     private var sumireLastInputModePresentationPreference: String = "native"
 
-    private var zenzEnableStatePreference: Boolean? = false
-    private var zenzaiEnableStatePreference: Boolean? = false
-    private var zenzProfilePreference: String? = ""
-    private var zenzEnableLongPressConversionPreference: Boolean? = false
     private var zenzRerankPreference: Boolean? = false
 
     private var qwertyKeyVerticalMargin: Float? = 5.0f
@@ -1967,7 +1963,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
     private var deleteKeyHighLight: Boolean? = true
     private var customKeyboardSuggestionPreference: Boolean? = true
     private var customDirectInputReplaceComposingPreference = false
-    private var zenzDebounceTimePreference: Int? = 300
     private var zenzMaximumLetterSizePreference: Int? = 32
     private var zenzMaximumContextSizePreference: Int? = 512
     private var zenzMaximumThreadSizePreference: Int? = 4
@@ -2236,22 +2231,7 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
 
     private var bunsetusMultipleDetect = false
 
-    private val _zenzCandidates = MutableStateFlow<List<ZenzCandidate>>(emptyList())
-    private val zenzCandidates: StateFlow<List<ZenzCandidate>> = _zenzCandidates
     private var lastCandidate: String? = ""
-
-    private enum class ZenzRequestSource {
-        AutoLive,
-        ManualConvertLongPress,
-        BunsetsuSegment
-    }
-
-    private data class ZenzLiveRequest(
-        val displayInput: String,
-        val requestToken: Long,
-        val source: ZenzRequestSource,
-        val bunsetsuTarget: BunsetsuZenzTarget? = null
-    )
 
     private data class BunsetsuZenzTarget(
         val conversionInput: String,
@@ -2260,41 +2240,11 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         val leftContext: String
     )
 
-    private data class ZenzLiveResultMeta(
-        val requestToken: Long,
-        val requestInput: String,
-        val displayInput: String,
-        val source: ZenzRequestSource,
-        val bunsetsuTarget: BunsetsuZenzTarget? = null
-    )
-
-    private data class ZenzLiveSlotState(
-        val requestInput: String,
-        val displayInput: String,
-        val candidate: Candidate?,
-        val isLoading: Boolean,
-        val requestToken: Long,
-        val source: ZenzRequestSource,
-        val bunsetsuTarget: BunsetsuZenzTarget? = null
-    )
-
-    private val _zenzRequest = MutableSharedFlow<ZenzLiveRequest>(
-        extraBufferCapacity = 0
-    )
-
-    private val zenzRequest = _zenzRequest
-
     private val lastLocalUpdatedInput = MutableStateFlow("")
 
     private var addUserDictionaryPopup: PopupWindow? = null
 
     private var filteredCandidateList: List<Candidate>? = emptyList()
-    private val _zenzLiveSlotState = MutableStateFlow<ZenzLiveSlotState?>(null)
-    private var zenzLiveLocalCandidatesSnapshot: List<Candidate> = emptyList()
-    private var zenzLiveSnapshotDisplayInput: String = ""
-    private var zenzLiveSnapshotRequestInput: String = ""
-    private var zenzLiveRequestToken: Long = 0L
-    private var zenzLiveLatestResultMeta: ZenzLiveResultMeta? = null
     private var zenzRerankJob: Job? = null
     private var zenzRerankRequestToken: Long = 0L
 
@@ -3964,7 +3914,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         if (deleteKeyFlickPreferencesChanged) {
             refreshDeleteKeyFlickPreferenceLayouts()
         }
-        zenzDebounceTimePreference = preferences.zenzDebounceTimePreference
         zenzMaximumLetterSizePreference = preferences.zenzMaximumLetterSizePreference
         zenzMaximumContextSizePreference = preferences.zenzMaximumContextSizePreference
         zenzMaximumThreadSizePreference = preferences.zenzMaximumThreadSizePreference
@@ -4029,11 +3978,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
             preferences.qwertyLandscapePositionPreferenceValue
         qwertyLandScapeBottomMarginPreferenceValue =
             preferences.qwertyLandscapeBottomMarginPreferenceValue
-        zenzEnableStatePreference = preferences.zenzEnableStatePreference
-        zenzaiEnableStatePreference = preferences.zenzaiEnableStatePreference
-        zenzProfilePreference = preferences.zenzProfilePreference
-        zenzEnableLongPressConversionPreference =
-            preferences.zenzEnableLongPressConversionPreference
         zenzRerankPreference = preferences.zenzRerankPreference
         qwertyKeyVerticalMargin = preferences.qwertyKeyVerticalMargin
         qwertyKeyHorizontalGap = preferences.qwertyKeyHorizontalGap
@@ -5482,7 +5426,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         val hasPhysicalKeyboard = inputManager.inputDeviceIds.any { deviceId ->
             isDevicePhysicalKeyboard(inputManager.getInputDevice(deviceId))
         }
-        clearZenzLiveSlot("onStartInputView")
         setSuggestionAdapterSuggestionsOnMain(emptyList())
         val candidateTextSize = appPreference.candidate_letter_size ?: 14.0f
         suggestionAdapter?.setCandidateTextSize(candidateTextSize)
@@ -5978,7 +5921,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         cachedZenzModelPath = null
         qwertyGlideInputCoordinator?.cancelPending()
         englishEngine.cancelQwertyGlideWarmup()
-        clearZenzLiveSlot("onDestroy")
         kanaKanjiEngineActivationJob?.cancel()
         suggestionAdapter?.release()
         suggestionAdapter = null
@@ -6104,10 +6046,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         qwertyLandScapePositionPreferenceValue = null
         qwertyLandScapeBottomMarginPreferenceValue = null
 
-        zenzEnableStatePreference = null
-        zenzaiEnableStatePreference = null
-        zenzProfilePreference = null
-        zenzEnableLongPressConversionPreference = null
         zenzRerankPreference = null
 
         qwertyKeyVerticalMargin = null
@@ -6158,7 +6096,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         sumireKeymapGuideSettings = ModeKeymapGuideSettings()
         flickGuideTextSizeSpPreference = null
         flickGuideMaxCharactersPreference = null
-        zenzDebounceTimePreference = null
         zenzMaximumLetterSizePreference = null
         zenzMaximumContextSizePreference = null
         zenzMaximumThreadSizePreference = null
@@ -11972,7 +11909,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
                 }
 
                 selectionActionSession = session
-                clearZenzLiveSlot("selection actions")
                 setSuggestionAdaptersOnMain(
                     session.entries.map(SelectionActionEntry::candidate)
                 )
@@ -12006,7 +11942,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         selectionActionMenuRequestId.incrementAndGet()
         selectionActionSession = null
         if (!clearSuggestions) return
-        clearZenzLiveSlot("selection actions cleared")
         setSuggestionAdaptersOnMain(emptyList())
         suggestionAdapter?.updateHighlightPosition(RecyclerView.NO_POSITION)
         suggestionAdapterFull?.updateHighlightPosition(RecyclerView.NO_POSITION)
@@ -12396,65 +12331,56 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         val insertString = inputString.value
         markSpaceConvertLongPressConsumed()
         if (insertString.isNotEmpty()) {
-            if (zenzEnableLongPressConversionPreference == true) {
-                scope.launch {
-                    performImmediateZenzLiveRequest(
-                        displayInput = insertString,
-                        source = ZenzRequestSource.ManualConvertLongPress
-                    )
+            if (conversionKeySwipePreference == true) {
+                if (!isHenkan.get()) {
+                    enterTenKeyCursorMoveMode()
                 }
             } else {
-                if (conversionKeySwipePreference == true) {
-                    if (!isHenkan.get()) {
-                        enterTenKeyCursorMoveMode()
-                    }
-                } else {
-                    mainLayoutBinding?.let {
-                        if (currentInputModeForSession == InputMode.ModeJapanese) {
-                            if (isHenkan.get()) return
-                            if (hasConvertedKatakana) {
-                                if (isLiveConversionEnable == true) {
-                                    applyFirstSuggestion(
-                                        Candidate(
-                                            string = insertString.hiraganaToKatakana(),
-                                            type = (3).toByte(),
-                                            length = insertString.length.toUByte(),
-                                            score = 4000
-                                        )
+                mainLayoutBinding?.let {
+                    if (currentInputModeForSession == InputMode.ModeJapanese) {
+                        if (isHenkan.get()) return
+                        if (hasConvertedKatakana) {
+                            if (isLiveConversionEnable == true) {
+                                applyFirstSuggestion(
+                                    Candidate(
+                                        string = insertString.hiraganaToKatakana(),
+                                        type = (3).toByte(),
+                                        length = insertString.length.toUByte(),
+                                        score = 4000
                                     )
-                                } else {
-                                    applyFirstSuggestion(
-                                        Candidate(
-                                            string = insertString,
-                                            type = (3).toByte(),
-                                            length = insertString.length.toUByte(),
-                                            score = 4000
-                                        )
-                                    )
-                                }
+                                )
                             } else {
-                                if (isLiveConversionEnable == true) {
-                                    applyFirstSuggestion(
-                                        Candidate(
-                                            string = insertString,
-                                            type = (3).toByte(),
-                                            length = insertString.length.toUByte(),
-                                            score = 4000
-                                        )
+                                applyFirstSuggestion(
+                                    Candidate(
+                                        string = insertString,
+                                        type = (3).toByte(),
+                                        length = insertString.length.toUByte(),
+                                        score = 4000
                                     )
-                                } else {
-                                    applyFirstSuggestion(
-                                        Candidate(
-                                            string = insertString.hiraganaToKatakana(),
-                                            type = (3).toByte(),
-                                            length = insertString.length.toUByte(),
-                                            score = 4000
-                                        )
-                                    )
-                                }
+                                )
                             }
-                            hasConvertedKatakana = !hasConvertedKatakana
+                        } else {
+                            if (isLiveConversionEnable == true) {
+                                applyFirstSuggestion(
+                                    Candidate(
+                                        string = insertString,
+                                        type = (3).toByte(),
+                                        length = insertString.length.toUByte(),
+                                        score = 4000
+                                    )
+                                )
+                            } else {
+                                applyFirstSuggestion(
+                                    Candidate(
+                                        string = insertString.hiraganaToKatakana(),
+                                        type = (3).toByte(),
+                                        length = insertString.length.toUByte(),
+                                        score = 4000
+                                    )
+                                )
+                            }
                         }
+                        hasConvertedKatakana = !hasConvertedKatakana
                     }
                 }
             }
@@ -13691,27 +13617,18 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
                                 flickView.setCursorMode(true)
                             }
                         } else {
-                            if (zenzEnableLongPressConversionPreference == true) {
-                                scope.launch {
-                                    performImmediateZenzLiveRequest(
-                                        displayInput = insertString,
-                                        source = ZenzRequestSource.ManualConvertLongPress
-                                    )
+                            if (conversionKeySwipePreference == true) {
+                                if (!isHenkan.get()) {
+                                    enterSpaceConvertCursorMoveMode(
+                                        SpaceConvertCursorMoveSource.SumireCustomConvert
+                                    ) {
+                                        flickView.setCursorMode(true)
+                                    }
                                 }
                             } else {
-                                if (conversionKeySwipePreference == true) {
-                                    if (!isHenkan.get()) {
-                                        enterSpaceConvertCursorMoveMode(
-                                            SpaceConvertCursorMoveSource.SumireCustomConvert
-                                        ) {
-                                            flickView.setCursorMode(true)
-                                        }
-                                    }
-                                } else {
-                                    handleSpaceLongActionSumire(
-                                        SpaceConvertCursorMoveSource.SumireCustomConvert
-                                    )
-                                }
+                                handleSpaceLongActionSumire(
+                                    SpaceConvertCursorMoveSource.SumireCustomConvert
+                                )
                             }
                         }
                     }
@@ -13982,28 +13899,18 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
                             return
                         }
                         markSpaceConvertLongPressConsumed()
-                        if (zenzEnableLongPressConversionPreference == true) {
-                            val insertString = inputString.value
-                            scope.launch {
-                                performImmediateZenzLiveRequest(
-                                    displayInput = insertString,
-                                    source = ZenzRequestSource.ManualConvertLongPress
-                                )
+                        if (conversionKeySwipePreference == true) {
+                            if (!isHenkan.get()) {
+                                enterSpaceConvertCursorMoveMode(
+                                    SpaceConvertCursorMoveSource.SumireCustomFlickConvert
+                                ) {
+                                    flickView.setCursorMode(true)
+                                }
                             }
                         } else {
-                            if (conversionKeySwipePreference == true) {
-                                if (!isHenkan.get()) {
-                                    enterSpaceConvertCursorMoveMode(
-                                        SpaceConvertCursorMoveSource.SumireCustomFlickConvert
-                                    ) {
-                                        flickView.setCursorMode(true)
-                                    }
-                                }
-                            } else {
-                                handleSpaceLongActionSumire(
-                                    SpaceConvertCursorMoveSource.SumireCustomFlickConvert
-                                )
-                            }
+                            handleSpaceLongActionSumire(
+                                SpaceConvertCursorMoveSource.SumireCustomFlickConvert
+                            )
                         }
                     }
 
@@ -16216,298 +16123,51 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         }
     }
 
-    private fun zenzLiveRequestBlockReason(
-        displayInput: String,
-        source: ZenzRequestSource
-    ): String? {
-        return when {
-            displayInput.isEmpty() -> "input empty"
-            source == ZenzRequestSource.ManualConvertLongPress &&
-                    zenzEnableLongPressConversionPreference != true -> "Zenz long press preference disabled"
-            source != ZenzRequestSource.ManualConvertLongPress &&
-                    zenzEnableStatePreference != true -> "Zenz preference disabled"
-            hasHardwareKeyboardConnected == true -> "hardware keyboard connected"
-            displayInput.length <= 1 -> "input too short"
-            !displayInput.isAllHiraganaWithSymbols() -> "input not hiragana"
-            source != ZenzRequestSource.ManualConvertLongPress &&
-                    zenzRerankPreference == true &&
-                    zenzaiEnableStatePreference != true -> "Zenz rerank active"
-            else -> null
-        }
-    }
-
-    private fun shouldRequestZenzLiveGenerate(
-        displayInput: String,
-        source: ZenzRequestSource = ZenzRequestSource.AutoLive
-    ): Boolean {
-        return zenzLiveRequestBlockReason(displayInput, source) == null
-    }
-
-    private fun currentBunsetsuZenzTargetOrNull(): BunsetsuZenzTarget? {
-        val session = bunsetsuConversionSession ?: return null
-        if (!isBunsetsuCursorMoveSessionActive()) return null
-        if (session.segments.isEmpty()) return null
-
-        val focusedIndex = session.focusedIndex.coerceIn(0, session.segments.lastIndex)
-        val focusedSegment = session.segments[focusedIndex]
-        return BunsetsuZenzTarget(
-            conversionInput = session.conversionInput,
-            segmentIndex = focusedIndex,
-            segmentReading = focusedSegment.reading,
-            leftContext = buildBunsetsuZenzLeftContext(
-                segmentDisplayTexts = session.segments.map { it.displayText },
-                focusedIndex = focusedIndex
-            )
-        )
-    }
-
-    private fun doesBunsetsuSessionStillContainZenzTarget(
-        target: BunsetsuZenzTarget
-    ): Boolean {
-        val session = bunsetsuConversionSession ?: return false
-        if (!isBunsetsuCursorMoveSessionActive()) return false
-        val targetSegment = session.segments.getOrNull(target.segmentIndex) ?: return false
-        if (session.conversionInput != target.conversionInput) return false
-        if (targetSegment.reading != target.segmentReading) return false
-        return buildBunsetsuZenzLeftContext(
-            segmentDisplayTexts = session.segments.map { it.displayText },
-            focusedIndex = target.segmentIndex
-        ) == target.leftContext
-    }
-
-    private fun isCurrentBunsetsuZenzTarget(target: BunsetsuZenzTarget): Boolean {
-        val session = bunsetsuConversionSession ?: return false
-        if (!isBunsetsuCursorMoveSessionActive()) return false
-        return isBunsetsuZenzTargetCurrent(
-            conversionInput = session.conversionInput,
-            segmentReadings = session.segments.map { it.reading },
-            segmentDisplayTexts = session.segments.map { it.displayText },
-            focusedIndex = session.focusedIndex,
-            targetConversionInput = target.conversionInput,
-            targetSegmentIndex = target.segmentIndex,
-            targetSegmentReading = target.segmentReading,
-            targetLeftContext = target.leftContext
-        )
-    }
-
+    @Suppress("UNUSED_PARAMETER") // zenz live slot removed in S3
     private fun currentBunsetsuZenzSlotTargetOrNull(
         session: BunsetsuConversionSession,
         focusedIndex: Int
     ): BunsetsuZenzTarget? {
-        if (session.segments.isEmpty()) return null
-        val safeFocusedIndex = focusedIndex.coerceIn(0, session.segments.lastIndex)
-        val target = _zenzLiveSlotState.value?.bunsetsuTarget ?: return null
-        if (target.segmentIndex != safeFocusedIndex) return null
-        if (!isCurrentBunsetsuZenzTarget(target)) return null
-        return target
+        return null
     }
 
-    private fun Candidate.isZenzLiveSlot(displayInput: String): Boolean {
-        return displayInput.isNotEmpty() &&
-                type in ZENZ_LIVE_SLOT_TYPES &&
-                yomi == displayInput &&
-                length.toInt() == displayInput.length
-    }
-
+    @Suppress("UNUSED_PARAMETER") // zenz live slot removed in S3
     private fun Candidate.isZenzLiveLoadingSlot(
         currentInput: String,
         bunsetsuTarget: BunsetsuZenzTarget? = null
     ): Boolean {
-        val state = _zenzLiveSlotState.value ?: return false
-        if (state.bunsetsuTarget != bunsetsuTarget) return false
-        if (bunsetsuTarget != null && !isCurrentBunsetsuZenzTarget(bunsetsuTarget)) {
-            return false
-        }
-        return state.isLoading &&
-                state.candidate == null &&
-                state.requestToken == zenzLiveRequestToken &&
-                state.displayInput == currentInput &&
-                string == ZENZ_LIVE_SLOT_EMPTY_TEXT &&
-                type == ZENZ_LIVE_SLOT_TYPE &&
-                isZenzLiveSlot(currentInput)
+        return false
     }
 
-    private fun List<Candidate>.withoutZenzLiveSlot(displayInput: String): List<Candidate> {
-        if (displayInput.isEmpty()) return this
-        return filterNot { it.isZenzLiveSlot(displayInput) }
-    }
-
-    private fun List<Candidate>.withoutFirstDuplicateOfZenzSlotCandidate(
-        displayInput: String,
-        zenzSlotCandidate: Candidate
-    ): List<Candidate> {
-        if (isEmpty()) return this
-
-        val zenzCommitString = getCandidateCommitString(zenzSlotCandidate)
-        var duplicateIndex = -1
-
-        for (index in indices) {
-            val candidate = this[index]
-
-            if (candidate.isZenzLiveSlot(displayInput)) {
-                continue
-            }
-
-            if (candidate.length.toInt() != displayInput.length) {
-                continue
-            }
-
-            if (getCandidateCommitString(candidate) == zenzCommitString) {
-                duplicateIndex = index
-                break
-            }
-        }
-
-        if (duplicateIndex == -1) {
-            return this.withoutZenzLiveSlot(displayInput)
-        }
-
-        val result = ArrayList<Candidate>(size - 1)
-
-        for (index in indices) {
-            val candidate = this[index]
-
-            if (candidate.isZenzLiveSlot(displayInput)) {
-                continue
-            }
-
-            if (index == duplicateIndex) {
-                continue
-            }
-
-            result.add(candidate)
-        }
-
-        return result
-    }
-
-    private fun buildZenzLiveLoadingCandidate(displayInput: String): Candidate {
-        return Candidate(
-            string = ZENZ_LIVE_SLOT_EMPTY_TEXT,
-            type = ZENZ_LIVE_SLOT_TYPE,
-            length = displayInput.length.toUByte(),
-            score = Int.MAX_VALUE,
-            yomi = displayInput
-        )
-    }
-
-    private fun ZenzCandidate.toZenzLiveSlotCandidate(displayInput: String): Candidate {
-        return Candidate(
-            string = string,
-            type = type,
-            length = displayInput.length.toUByte(),
-            score = score,
-            yomi = displayInput,
-            leftId = leftId,
-            rightId = rightId
-        )
-    }
-
-    private fun buildDisplayedCandidatesWithZenzSlot(
-        localCandidates: List<Candidate>,
-        input: String,
-        zenzSlotState: ZenzLiveSlotState?,
-        allowBunsetsuTarget: Boolean = false
-    ): List<Candidate> {
-        if (input.isEmpty()) return localCandidates
-        if (zenzSlotState == null) return localCandidates
-        if (zenzSlotState.bunsetsuTarget != null && !allowBunsetsuTarget) return localCandidates
-        if (zenzSlotState.displayInput != input) return localCandidates
-        if (zenzSlotState.requestToken != zenzLiveRequestToken) return localCandidates
-        if (!shouldRequestZenzLiveGenerate(input, zenzSlotState.source)) return localCandidates
-
-        val zenzSlotCandidate = zenzSlotState.candidate ?: buildZenzLiveLoadingCandidate(input)
-        val filteredLocalCandidates =
-            if (zenzSlotState.candidate == null) {
-                localCandidates.withoutZenzLiveSlot(input)
-            } else {
-                localCandidates.withoutFirstDuplicateOfZenzSlotCandidate(
-                    displayInput = input,
-                    zenzSlotCandidate = zenzSlotCandidate
-                )
-            }
-
-        return listOf(zenzSlotCandidate) + filteredLocalCandidates
-    }
-
+    @Suppress("UNUSED_PARAMETER") // zenz live slot removed in S3
     private fun buildDisplayedBunsetsuCandidatesWithZenzSlot(
         session: BunsetsuConversionSession,
         focusedIndex: Int,
         segmentCandidates: List<Candidate>,
         displayInput: String
     ): List<Candidate> {
-        if (session.segments.isEmpty()) return segmentCandidates
-        val safeFocusedIndex = focusedIndex.coerceIn(0, session.segments.lastIndex)
-        val segment = session.segments[safeFocusedIndex]
-        val state = _zenzLiveSlotState.value ?: return segmentCandidates
-        val target = state.bunsetsuTarget ?: return segmentCandidates
-        if (!isCurrentBunsetsuZenzTarget(target)) return segmentCandidates
-        if (target.segmentIndex != safeFocusedIndex) return segmentCandidates
-        if (target.segmentReading != segment.reading) return segmentCandidates
-
-        val zenzSlotDisplayInput = segment.reading.ifEmpty { displayInput }
-        return buildDisplayedCandidatesWithZenzSlot(
-            localCandidates = segmentCandidates.withoutZenzLiveSlot(zenzSlotDisplayInput),
-            input = zenzSlotDisplayInput,
-            zenzSlotState = state,
-            allowBunsetsuTarget = true
-        )
+        return segmentCandidates
     }
 
     private fun isZenzLiveSlotCandidate(candidate: Candidate): Boolean {
         return isZenzLiveSlotCandidate(candidate, inputString.value)
     }
 
+    @Suppress("UNUSED_PARAMETER") // zenz live slot removed in S3
     private fun isZenzLiveSlotCandidate(
         candidate: Candidate,
         displayInput: String,
         bunsetsuTarget: BunsetsuZenzTarget? = null
     ): Boolean {
-        val state = _zenzLiveSlotState.value ?: return false
-        if (displayInput.isEmpty()) return false
-        if (!shouldRequestZenzLiveGenerate(displayInput, state.source)) return false
-        if (state.displayInput != displayInput) return false
-        if (state.bunsetsuTarget != bunsetsuTarget) return false
-        if (bunsetsuTarget != null && !isCurrentBunsetsuZenzTarget(bunsetsuTarget)) {
-            return false
-        }
-        if (state.requestToken != zenzLiveRequestToken) return false
-        if (!candidate.isZenzLiveSlot(displayInput)) return false
-        return if (state.isLoading) {
-            state.candidate == null && candidate.isZenzLiveLoadingSlot(displayInput, bunsetsuTarget)
-        } else {
-            state.candidate == candidate
-        }
+        return false
     }
 
+    @Suppress("UNUSED_PARAMETER") // zenz live slot removed in S3
     private fun Candidate.isCurrentZenzLiveResultSlot(
         displayInput: String,
         bunsetsuTarget: BunsetsuZenzTarget? = null
     ): Boolean {
-        val state = _zenzLiveSlotState.value ?: return false
-        return !state.isLoading &&
-                state.candidate == this &&
-                isZenzLiveSlotCandidate(this, displayInput, bunsetsuTarget)
-    }
-
-    private fun shouldApplyZenzLiveResultToComposingText(
-        state: ZenzLiveSlotState,
-        candidate: Candidate
-    ): Boolean {
-        if (suppressSuggestions) return false
-        if (inputString.value != state.displayInput) return false
-        if (state.requestToken != zenzLiveRequestToken) return false
-        if (state.candidate != candidate) return false
-        if (candidate.yomi != state.displayInput) return false
-        if (candidate.length.toInt() != state.displayInput.length) return false
-        if (!shouldRequestZenzLiveGenerate(state.displayInput, state.source)) return false
-        if (isBunsetsuCursorMoveSessionActive()) return false
-        if (state.source == ZenzRequestSource.ManualConvertLongPress) return true
-        if (hasConvertedKatakana) return false
-        if (suggestionClickNum > 0) return false
-
-        return shouldStartLiveConversion(state.displayInput) ||
-                (isLiveConversionEnable != true && henkanPressedWithBunsetsuDetect)
+        return false
     }
 
     private fun hasLeadingZenzLiveSlot(
@@ -16609,508 +16269,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
             floatingKeyboardLayoutBinding = floatingKeyboardBinding
         )
         return true
-    }
-
-    private fun refreshBunsetsuSuggestionViewsForCurrentZenzTargetIfActive(
-        target: BunsetsuZenzTarget? = _zenzLiveSlotState.value?.bunsetsuTarget
-    ): Boolean {
-        val mainView = mainLayoutBinding ?: return false
-        val session = bunsetsuConversionSession ?: return false
-        if (!isBunsetsuCursorMoveSessionActive()) return false
-        if (session.segments.isEmpty()) return false
-        val currentTarget = target ?: return false
-        if (!isCurrentBunsetsuZenzTarget(currentTarget)) return false
-
-        val focusedIndex = session.focusedIndex.coerceIn(0, session.segments.lastIndex)
-        updateSuggestionViewsForBunsetsuSegment(
-            session = session,
-            focusedIndex = focusedIndex,
-            mainView = mainView,
-            floatingKeyboardLayoutBinding = floatingKeyboardBinding
-        )
-        return true
-    }
-
-    private fun clearZenzLiveSlot(
-        reason: String,
-        updateDisplayedCandidates: Boolean = false,
-        invalidateRequest: Boolean = true
-    ) {
-        val previousState = _zenzLiveSlotState.value
-        val previousDisplayInput = previousState?.displayInput ?: zenzLiveSnapshotDisplayInput
-        val previousLocalCandidates = zenzLiveLocalCandidatesSnapshot
-        val hadState = previousState != null ||
-                zenzLiveSnapshotDisplayInput.isNotEmpty() ||
-                zenzLiveSnapshotRequestInput.isNotEmpty() ||
-                previousLocalCandidates.isNotEmpty()
-
-        if (invalidateRequest) {
-            zenzLiveRequestToken += 1L
-            if (AppVariantConfig.hasZenz) {
-                zenzRuntimeClient.cancelActive()
-            }
-        }
-        _zenzLiveSlotState.value = null
-        zenzLiveLocalCandidatesSnapshot = emptyList()
-        zenzLiveSnapshotDisplayInput = ""
-        zenzLiveSnapshotRequestInput = ""
-        zenzLiveLatestResultMeta = null
-        lastLocalUpdatedInput.value = ""
-        _zenzCandidates.update { emptyList() }
-
-        if (hadState) {
-            Timber.d("Zenz live slot cleared: reason=%s", reason)
-        }
-        if (previousState?.bunsetsuTarget != null) {
-            if (refreshBunsetsuSuggestionViewsForCurrentZenzTargetIfActive(previousState.bunsetsuTarget)) {
-                return
-            }
-            return
-        }
-        if (isBunsetsuCursorMoveSessionActive()) {
-            refreshCurrentBunsetsuSuggestionViews()
-            return
-        }
-        if (
-            updateDisplayedCandidates &&
-            previousDisplayInput.isNotEmpty() &&
-            inputString.value == previousDisplayInput &&
-            !suppressSuggestions
-        ) {
-            setSuggestionAdapterSuggestionsOnMain(previousLocalCandidates)
-        }
-    }
-
-    private fun beginZenzLiveRequest(
-        displayInput: String,
-        localCandidates: List<Candidate> = emptyList(),
-        source: ZenzRequestSource = ZenzRequestSource.AutoLive,
-        bunsetsuTarget: BunsetsuZenzTarget? = null
-    ): ZenzLiveRequest? {
-        val blockReason = zenzLiveRequestBlockReason(displayInput, source)
-        if (blockReason != null) {
-            clearZenzLiveSlot(blockReason)
-            return null
-        }
-
-        zenzLiveRequestToken += 1L
-        if (AppVariantConfig.hasZenz) {
-            zenzRuntimeClient.cancelActive()
-        }
-        val requestToken = zenzLiveRequestToken
-        val localSnapshot = localCandidates.withoutZenzLiveSlot(displayInput)
-
-        zenzLiveLocalCandidatesSnapshot = localSnapshot
-        zenzLiveSnapshotDisplayInput = displayInput
-        zenzLiveSnapshotRequestInput = displayInput
-        zenzLiveLatestResultMeta = null
-        _zenzCandidates.update { emptyList() }
-        val loadingState = ZenzLiveSlotState(
-            requestInput = displayInput,
-            displayInput = displayInput,
-            candidate = null,
-            isLoading = true,
-            requestToken = requestToken,
-            source = source,
-            bunsetsuTarget = bunsetsuTarget
-        )
-        _zenzLiveSlotState.value = loadingState
-        if (bunsetsuTarget != null) {
-            Timber.d(
-                "Bunsetsu Zenz live request started: focusedIndex=%d segmentReading=%s leftContext=%s requestToken=%d",
-                bunsetsuTarget.segmentIndex,
-                bunsetsuTarget.segmentReading,
-                bunsetsuTarget.leftContext,
-                requestToken
-            )
-        } else {
-            Timber.d("Zenz live slot loading shown: input=%s", displayInput)
-        }
-
-        if (bunsetsuTarget != null) {
-            if (isCurrentBunsetsuZenzTarget(bunsetsuTarget) && !suppressSuggestions) {
-                refreshBunsetsuSuggestionViewsForCurrentZenzTargetIfActive(bunsetsuTarget)
-            }
-        } else if (localSnapshot.isNotEmpty() && inputString.value == displayInput && !suppressSuggestions) {
-            setSuggestionAdapterSuggestionsOnMain(
-                buildDisplayedCandidatesWithZenzSlot(
-                    localCandidates = localSnapshot,
-                    input = displayInput,
-                    zenzSlotState = loadingState
-                )
-            )
-        }
-
-        return ZenzLiveRequest(
-            displayInput = displayInput,
-            requestToken = requestToken,
-            source = source,
-            bunsetsuTarget = bunsetsuTarget
-        )
-    }
-
-    private suspend fun emitZenzLiveRequest(displayInput: String) {
-        if (isBunsetsuCursorMoveSessionActive()) {
-            requestZenzForCurrentBunsetsuSegmentIfNeeded(immediate = false)
-            return
-        }
-        val request = beginZenzLiveRequest(
-            displayInput = displayInput,
-            source = ZenzRequestSource.AutoLive
-        ) ?: return
-        _zenzRequest.emit(request)
-    }
-
-    private fun isCurrentZenzLiveRequest(request: ZenzLiveRequest): Boolean {
-        val state = _zenzLiveSlotState.value ?: return false
-        if (request.requestToken != zenzLiveRequestToken) return false
-        if (state.requestToken != request.requestToken) return false
-        if (state.displayInput != request.displayInput) return false
-        if (state.source != request.source) return false
-        if (state.bunsetsuTarget != request.bunsetsuTarget) return false
-        if (!shouldRequestZenzLiveGenerate(request.displayInput, request.source)) return false
-
-        val target = request.bunsetsuTarget
-        return if (target == null) {
-            inputString.value == request.displayInput
-        } else {
-            isCurrentBunsetsuZenzTarget(target)
-        }
-    }
-
-    private fun isZenzLiveRequestStateCurrentForResult(
-        request: ZenzLiveRequest
-    ): Boolean {
-        val state = _zenzLiveSlotState.value ?: return false
-        if (request.requestToken != zenzLiveRequestToken) return false
-        if (state.requestToken != request.requestToken) return false
-        if (state.displayInput != request.displayInput) return false
-        if (state.source != request.source) return false
-        if (state.bunsetsuTarget != request.bunsetsuTarget) return false
-        if (!shouldRequestZenzLiveGenerate(request.displayInput, request.source)) return false
-
-        val target = request.bunsetsuTarget
-        return if (target == null) {
-            inputString.value == request.displayInput
-        } else {
-            doesBunsetsuSessionStillContainZenzTarget(target)
-        }
-    }
-
-    private fun resolveZenzLiveRequestInput(request: ZenzLiveRequest): String? {
-        if (!isCurrentZenzLiveRequest(request)) return null
-
-        val requestInput = if (
-            request.source != ZenzRequestSource.ManualConvertLongPress &&
-            zenzaiEnableStatePreference == true
-        ) {
-            val suggestions = if (request.bunsetsuTarget == null) {
-                zenzLiveLocalCandidatesSnapshot
-                    .takeIf { zenzLiveSnapshotDisplayInput == request.displayInput }
-                    ?: emptyList()
-            } else {
-                val target = request.bunsetsuTarget
-                val session = bunsetsuConversionSession
-                val segmentCandidates = session
-                    ?.segments
-                    ?.getOrNull(target.segmentIndex)
-                    ?.takeIf { segment ->
-                        session.conversionInput == target.conversionInput &&
-                                segment.reading == target.segmentReading
-                    }
-                    ?.candidates
-                    ?: emptyList()
-                segmentCandidates.withoutZenzLiveSlot(target.segmentReading)
-            }
-            val firstCandidate = suggestions.firstOrNull()
-            if (firstCandidate == null) {
-                clearZenzLiveSlot(
-                    reason = "zenzai local candidates empty",
-                    updateDisplayedCandidates = true
-                )
-                return null
-            }
-            firstCandidate.yomi ?: request.bunsetsuTarget?.segmentReading ?: request.displayInput
-        } else {
-            request.bunsetsuTarget?.segmentReading ?: request.displayInput
-        }
-
-        val state = _zenzLiveSlotState.value ?: return null
-        _zenzLiveSlotState.value = state.copy(requestInput = requestInput)
-        zenzLiveSnapshotRequestInput = requestInput
-        return requestInput
-    }
-
-    private fun publishZenzLiveResult(
-        request: ZenzLiveRequest,
-        requestInput: String,
-        candidates: List<ZenzCandidate>
-    ) {
-        if (!isZenzLiveRequestStateCurrentForResult(request)) {
-            val target = request.bunsetsuTarget
-            if (target != null) {
-                Timber.d(
-                    "Stale bunsetsu Zenz result ignored: requestToken=%d targetIndex=%d segmentReading=%s leftContext=%s",
-                    request.requestToken,
-                    target.segmentIndex,
-                    target.segmentReading,
-                    target.leftContext
-                )
-            } else {
-                Timber.d(
-                    "Zenz live result ignored because stale: requestInput=%s currentInput=%s",
-                    requestInput,
-                    inputString.value
-                )
-            }
-            return
-        }
-
-        zenzLiveLatestResultMeta = ZenzLiveResultMeta(
-            requestToken = request.requestToken,
-            requestInput = requestInput,
-            displayInput = request.displayInput,
-            source = request.source,
-            bunsetsuTarget = request.bunsetsuTarget
-        )
-        if (candidates.isEmpty()) {
-            clearZenzLiveSlot(
-                reason = "empty result",
-                updateDisplayedCandidates = true
-            )
-            return
-        }
-        _zenzCandidates.update { candidates }
-    }
-
-    private suspend fun performImmediateZenzLiveRequest(
-        displayInput: String,
-        source: ZenzRequestSource = ZenzRequestSource.ManualConvertLongPress
-    ) {
-        if (isBunsetsuCursorMoveSessionActive()) {
-            requestZenzForCurrentBunsetsuSegmentIfNeeded(immediate = true)
-            return
-        }
-        val localCandidates = suggestionAdapter?.suggestions.orEmpty()
-            .withoutZenzLiveSlot(displayInput)
-        filteredCandidateList = localCandidates
-        val request = beginZenzLiveRequest(
-            displayInput = displayInput,
-            localCandidates = localCandidates,
-            source = source
-        ) ?: return
-        val requestInput = resolveZenzLiveRequestInput(request) ?: return
-        val candidates = performZenzRequest(
-            insertString = requestInput,
-            leftContextOverride = request.bunsetsuTarget?.leftContext
-        )
-        publishZenzLiveResult(
-            request = request,
-            requestInput = requestInput,
-            candidates = candidates
-        )
-    }
-
-    private suspend fun requestZenzForCurrentBunsetsuSegmentIfNeeded(
-        immediate: Boolean
-    ): Boolean {
-        val session = bunsetsuConversionSession ?: return false
-        if (!isBunsetsuCursorMoveSessionActive()) return false
-        if (session.segments.isEmpty()) return false
-
-        val focusedIndex = session.focusedIndex.coerceIn(0, session.segments.lastIndex)
-        val segment = session.segments[focusedIndex]
-        if (!shouldRequestZenzLiveGenerate(segment.reading, ZenzRequestSource.BunsetsuSegment)) return false
-        val target = currentBunsetsuZenzTargetOrNull() ?: return false
-        val request = beginZenzLiveRequest(
-            displayInput = segment.reading,
-            localCandidates = segment.candidates,
-            source = ZenzRequestSource.BunsetsuSegment,
-            bunsetsuTarget = target
-        ) ?: return false
-
-        if (immediate) {
-            val requestInput = resolveZenzLiveRequestInput(request) ?: return true
-            val candidates = performZenzRequest(
-                insertString = requestInput,
-                leftContextOverride = target.leftContext
-            )
-            publishZenzLiveResult(
-                request = request,
-                requestInput = requestInput,
-                candidates = candidates
-            )
-        } else {
-            _zenzRequest.emit(request)
-        }
-        return true
-    }
-
-    private fun acceptZenzLiveResult(resultFromZenz: List<ZenzCandidate>) {
-        val meta = zenzLiveLatestResultMeta
-        val state = _zenzLiveSlotState.value
-        val rawFirstResult = resultFromZenz.firstOrNull()
-        val firstResult = rawFirstResult?.takeIf {
-            ZenzOutputPolicy.acceptedTextOrNull(it.string) != null
-        }
-        if (rawFirstResult != null && firstResult == null) {
-            Timber.w("Rejected unsafe Zenz live output before candidate adoption")
-        }
-        if (state?.bunsetsuTarget != null) {
-            acceptBunsetsuZenzLiveResult(
-                firstResult = firstResult,
-                meta = meta,
-                state = state
-            )
-            return
-        }
-
-        val currentInput = inputString.value
-
-        if (currentInput.isEmpty()) {
-            clearZenzLiveSlot("input empty")
-            return
-        }
-        if (!shouldRequestZenzLiveGenerate(currentInput, state?.source ?: ZenzRequestSource.AutoLive)) {
-            clearZenzLiveSlot(
-                zenzLiveRequestBlockReason(
-                    currentInput,
-                    state?.source ?: ZenzRequestSource.AutoLive
-                ) ?: "not target"
-            )
-            return
-        }
-        if (firstResult == null) {
-            if (meta != null && state != null && meta.requestToken == state.requestToken) {
-                clearZenzLiveSlot(
-                    reason = "empty result",
-                    updateDisplayedCandidates = true
-                )
-            }
-            return
-        }
-
-        val isStale = meta == null ||
-                state == null ||
-                meta.requestToken != zenzLiveRequestToken ||
-                state.requestToken != meta.requestToken ||
-                state.requestInput != meta.requestInput ||
-                state.displayInput != meta.displayInput ||
-                state.source != meta.source ||
-                firstResult.originalString != state.requestInput ||
-                state.displayInput != currentInput
-
-        if (isStale) {
-            Timber.d(
-                "Zenz live result ignored because stale: originalString=%s currentInput=%s",
-                firstResult.originalString,
-                currentInput
-            )
-            return
-        }
-
-        val currentState = state ?: return
-        val resultSlot = firstResult.toZenzLiveSlotCandidate(currentState.displayInput)
-        val acceptedState = currentState.copy(
-            candidate = resultSlot,
-            isLoading = false
-        )
-        _zenzLiveSlotState.value = acceptedState
-
-        if (isBunsetsuCursorMoveSessionActive()) {
-            refreshCurrentBunsetsuSuggestionViews()
-            return
-        }
-
-        val localCandidates = zenzLiveLocalCandidatesSnapshot
-            .withoutZenzLiveSlot(currentState.displayInput)
-        val displayedCandidates = buildDisplayedCandidatesWithZenzSlot(
-            localCandidates = localCandidates,
-            input = currentState.displayInput,
-            zenzSlotState = acceptedState
-        )
-        setSuggestionAdapterSuggestionsOnMain(displayedCandidates)
-        if (shouldApplyZenzLiveResultToComposingText(acceptedState, resultSlot)) {
-            isContinuousTapInputEnabled.set(true)
-            lastFlickConvertedNextHiragana.set(true)
-            val zenzCommitString = getCandidateCommitString(resultSlot)
-            if (zenzCommitString != lastCandidate) {
-                applyFirstSuggestion(resultSlot)
-            }
-        }
-        Timber.d(
-            "Zenz live result accepted: input=%s result=%s",
-            currentState.displayInput,
-            resultSlot.string
-        )
-    }
-
-    private fun acceptBunsetsuZenzLiveResult(
-        firstResult: ZenzCandidate?,
-        meta: ZenzLiveResultMeta?,
-        state: ZenzLiveSlotState
-    ) {
-        val target = state.bunsetsuTarget ?: return
-        if (firstResult == null) {
-            if (meta != null && meta.requestToken == state.requestToken && meta.bunsetsuTarget == target) {
-                clearZenzLiveSlot(
-                    reason = "empty result",
-                    updateDisplayedCandidates = true
-                )
-            }
-            return
-        }
-
-        val isStale = meta == null ||
-                meta.requestToken != zenzLiveRequestToken ||
-                state.requestToken != meta.requestToken ||
-                state.requestInput != meta.requestInput ||
-                state.displayInput != meta.displayInput ||
-                state.source != meta.source ||
-                state.bunsetsuTarget != meta.bunsetsuTarget ||
-                firstResult.originalString != state.requestInput ||
-                !shouldRequestZenzLiveGenerate(state.displayInput, state.source) ||
-                !doesBunsetsuSessionStillContainZenzTarget(target)
-
-        if (isStale) {
-            Timber.d(
-                "Stale bunsetsu Zenz result ignored: requestToken=%d targetIndex=%d segmentReading=%s leftContext=%s",
-                state.requestToken,
-                target.segmentIndex,
-                target.segmentReading,
-                target.leftContext
-            )
-            return
-        }
-
-        val resultSlot = firstResult.toZenzLiveSlotCandidate(state.displayInput)
-        val acceptedState = state.copy(
-            candidate = resultSlot,
-            isLoading = false
-        )
-        _zenzLiveSlotState.value = acceptedState
-
-        val currentFocusedIndex = bunsetsuConversionSession
-            ?.takeIf { it.segments.isNotEmpty() }
-            ?.let { it.focusedIndex.coerceIn(0, it.segments.lastIndex) }
-            ?: RecyclerView.NO_POSITION
-        Timber.d(
-            "Bunsetsu Zenz result accepted: focusedIndex=%d targetIndex=%d segmentReading=%s result=%s",
-            currentFocusedIndex,
-            target.segmentIndex,
-            target.segmentReading,
-            resultSlot.string
-        )
-
-        if (isCurrentBunsetsuZenzTarget(target)) {
-            refreshBunsetsuSuggestionViewsForCurrentZenzTargetIfActive(target)
-        } else {
-            Timber.d(
-                "Bunsetsu Zenz result accepted but not displayed: currentFocusedIndex=%d targetIndex=%d",
-                currentFocusedIndex,
-                target.segmentIndex
-            )
-        }
     }
 
     private fun resolveNonLoadingCandidateIndex(
@@ -17215,7 +16373,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
                 when (currentFlag) {
                     CandidateShowFlag.Idle -> {
                         var resetCandidateTabSelection = false
-                        clearZenzLiveSlot("suggestion idle")
                         setSuggestionAdaptersOnMain(emptyList())
                         if (stringInTail.get().isEmpty()) {
                             shortcutToolbarHiddenForCandidates = false
@@ -17659,48 +16816,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
             }
         }
 
-        launch {
-            zenzRequest
-                .debounce { resolveZenzDebounceMillis(zenzDebounceTimePreference) }
-                .collectLatest { request ->
-                    if (request.bunsetsuTarget == null) {
-                        lastLocalUpdatedInput.first { completedInput ->
-                            completedInput == request.displayInput ||
-                                    request.requestToken != zenzLiveRequestToken ||
-                                    inputString.value != request.displayInput
-                        }
-                    }
-                    if (!isCurrentZenzLiveRequest(request)) {
-                        if (
-                            request.bunsetsuTarget != null &&
-                            _zenzLiveSlotState.value?.requestToken == request.requestToken
-                        ) {
-                            clearZenzLiveSlot("bunsetsu target changed before Zenz request")
-                        }
-                        return@collectLatest
-                    }
-
-                    val requestInput = resolveZenzLiveRequestInput(request)
-                        ?: return@collectLatest
-                    val zenzCandidates = performZenzRequest(
-                        insertString = requestInput,
-                        leftContextOverride = request.bunsetsuTarget?.leftContext
-                    )
-                    publishZenzLiveResult(
-                        request = request,
-                        requestInput = requestInput,
-                        candidates = zenzCandidates
-                    )
-                }
-        }
-
-        launch {
-            zenzCandidates
-                .buffer(kotlinx.coroutines.channels.Channel.CONFLATED)
-                .collectLatest { resultFromZenz ->
-                    acceptZenzLiveResult(resultFromZenz)
-                }
-        }
 
         launch {
             inputString.collect { string ->
@@ -17724,218 +16839,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
 
     }
 
-
-    /**
-     * Zenzエンジンを使用して変換候補を生成するサスペンド関数
-     * collectLatest 内から呼び出されることを想定しています。
-     */
-    private fun buildAcceptedZenzCandidate(
-        generatedText: String?,
-        type: Byte,
-        insertString: String,
-        score: Int = 2000,
-    ): ZenzCandidate? {
-        val acceptedText = ZenzOutputPolicy.acceptedTextOrNull(generatedText) ?: return null
-        return ZenzCandidate(
-            string = acceptedText,
-            type = type,
-            length = insertString.length.toUByte(),
-            score = score,
-            originalString = insertString,
-        )
-    }
-
-    private suspend fun performZenzRequest(
-        insertString: String,
-        leftContextOverride: String? = null
-    ): List<ZenzCandidate> = measureDebugStage("IMEService.Zenz.liveRequest") {
-        withContext(Dispatchers.Default) {
-
-        // 2. バリデーション (ひらがな以外や、1文字以下の場合はスキップなど)
-        // ※元のロジック: insertString.length == 1 の場合は emptyList
-        if (insertString.length <= 1) {
-            return@withContext emptyList()
-        }
-
-        if (!insertString.isAllHiraganaWithSymbols()) {
-            return@withContext emptyList()
-        }
-
-        val zenzContext = getZenzContext(
-            insertString = insertString,
-            leftContextOverride = leftContextOverride
-        )
-
-        Timber.d(
-            "performZenzRequest: $insertString leftContext: [${zenzContext.leftContext}] rightContext: [${zenzContext.rightContext}]"
-        )
-
-        // 4. エンジンによる生成処理
-        try {
-            // 処理直前にキャンセルされていないかチェック
-            ensureActive()
-            val runtimeConfig = resolveZenzRuntimeConfig() ?: return@withContext emptyList()
-
-            val stringFromZenz = zenzRuntimeClient.generate(
-                config = runtimeConfig,
-                profile = zenzProfilePreference ?: "",
-                topic = "",
-                style = "",
-                preference = "",
-                leftContext = zenzContext.leftContext,
-                rightContext = zenzContext.rightContext,
-                input = insertString.hiraganaToKatakana(),
-                maxTokens = zenzMaximumLetterSizePreference ?: 32
-            )
-
-            // 生成後もチェック
-            ensureActive()
-
-            // Native returns an empty string for any generation that did not
-            // reach a clean EOG/protocol boundary. Never publish such a
-            // result as a live candidate.
-            listOfNotNull(
-                buildAcceptedZenzCandidate(
-                    generatedText = stringFromZenz,
-                    type = (33).toByte(),
-                    insertString = insertString,
-                )
-            )
-        } catch (e: CancellationException) {
-            // collectLatestによりキャンセルされた場合はここで再スローして処理を中断させる
-            throw e
-        } catch (e: Exception) {
-            Timber.e(e, "Error in zenzEngine generation")
-            emptyList()
-        }
-        }
-    }
-
-    private suspend fun performZenzaiRequest(
-        insertString: String,
-        suggesions: List<Candidate>,
-    ): List<ZenzCandidate> = withContext(Dispatchers.Default) {
-
-        // suggesions が空だと first() で落ちるので防御
-        val firstCandidate = suggesions.firstOrNull()?.string ?: return@withContext emptyList()
-
-        // 2. バリデーション (ひらがな以外や、1文字以下の場合はスキップなど)
-        if (insertString.length <= 1) {
-            return@withContext emptyList()
-        }
-
-        if (!insertString.isAllHiraganaWithSymbols()) {
-            return@withContext emptyList()
-        }
-
-        val zenzContext = getZenzContext(insertString)
-
-        // 4. エンジンによる生成処理
-        try {
-            ensureActive()
-            val runtimeConfig = resolveZenzRuntimeConfig() ?: return@withContext emptyList()
-
-            val stringFromZenz = zenzRuntimeClient.evaluate(
-                config = runtimeConfig,
-                profile = zenzProfilePreference ?: "",
-                topic = "",
-                style = "",
-                preference = "",
-                leftContext = zenzContext.leftContext,
-                rightContext = zenzContext.rightContext,
-                input = insertString.hiraganaToKatakana(),
-                candidate = firstCandidate
-            )
-
-            ensureActive()
-
-            Timber.d("performZenzaiRequest: [$firstCandidate] result: [$stringFromZenz]")
-
-            val zenzaiResultType = CandidateEvaluationResult.parse(stringFromZenz)
-
-            return@withContext when (zenzaiResultType) {
-                CandidateEvaluationResult.Error -> {
-                    listOfNotNull(
-                        buildAcceptedZenzCandidate(
-                            generatedText = firstCandidate,
-                            type = (39).toByte(),
-                            insertString = insertString,
-                        )
-                    )
-                }
-
-                is CandidateEvaluationResult.FixRequired -> {
-                    val prefix = zenzaiResultType.prefix
-                    // prefix と前方一致する candidate.string を suggesions から探す
-                    // 見つからなければ firstCandidate を採用
-
-                    val firstCandidateFromPrefix = suggesions
-                        .subList(0, (nBest ?: 4))
-                        .firstOrNull { it.string.startsWith(prefix) }
-                        ?.string
-
-                    Timber.d("CandidateEvaluationResult.FixRequired :[$firstCandidateFromPrefix] [$prefix] [$insertString] [${suggesions.map { it.string }}]")
-
-
-                    val firstCandidateFromKanakanjiEngine = buildAcceptedZenzCandidate(
-                        generatedText = firstCandidateFromPrefix ?: firstCandidate,
-                        type = (37).toByte(),
-                        insertString = insertString,
-                    )
-
-                    val secondCandidateFromZenz = buildAcceptedZenzCandidate(
-                        generatedText = zenzRuntimeClient.generate(
-                            config = runtimeConfig,
-                            profile = zenzProfilePreference ?: "",
-                            topic = "",
-                            style = "",
-                            preference = "",
-                            leftContext = prefix,
-                            rightContext = zenzContext.rightContext,
-                            input = insertString.hiraganaToKatakana(),
-                            maxTokens = zenzMaximumLetterSizePreference ?: 32
-                        ),
-                        type = (40).toByte(),
-                        insertString = insertString,
-                    )
-
-                    val candidates = listOfNotNull(
-                        secondCandidateFromZenz,
-                        firstCandidateFromKanakanjiEngine,
-                    )
-
-                    val topCandidate = candidates.maxByOrNull { it.rank(prefix) }
-
-                    listOfNotNull(topCandidate)
-                }
-
-                is CandidateEvaluationResult.Pass -> {
-                    listOfNotNull(
-                        buildAcceptedZenzCandidate(
-                            generatedText = firstCandidate,
-                            type = (36).toByte(),
-                            insertString = insertString,
-                        )
-                    )
-                }
-
-                is CandidateEvaluationResult.WholeResult -> {
-                    listOfNotNull(
-                        buildAcceptedZenzCandidate(
-                            generatedText = zenzaiResultType.result,
-                            type = (38).toByte(),
-                            insertString = insertString,
-                        )
-                    )
-                }
-            }
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Exception) {
-            Timber.e(e, "Error in zenzEngine generation")
-            emptyList()
-        }
-    }
 
     private fun beginZenzRerankRequest(): Long {
         zenzRerankJob?.cancel()
@@ -17961,7 +16864,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         candidates: List<Candidate>
     ): ZenzRerankPlan? {
         if (zenzRerankPreference != true) return null
-        if (zenzaiEnableStatePreference == true) return null
         if (hasHardwareKeyboardConnected == true) return null
         if (insertString.length <= 1 || !insertString.isAllHiraganaWithSymbols()) return null
         if (candidates.size < 2) return null
@@ -17977,7 +16879,7 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
 
         val zenzContext = getZenzContext(insertString)
         val cacheKey = buildZenzRerankCacheKey(
-            profile = zenzProfilePreference ?: "",
+            profile = "",
             leftContext = zenzContext.leftContext,
             rightContext = zenzContext.rightContext,
             input = insertString.hiraganaToKatakana(),
@@ -18007,7 +16909,7 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
                 ?: return@withContext FloatArray(0)
             zenzRuntimeClient.score(
                 config = runtimeConfig,
-                profile = zenzProfilePreference ?: "",
+                profile = "",
                 topic = "",
                 style = "",
                 preference = "",
@@ -18158,20 +17060,8 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         if (!shouldApplyCandidateResult(insertString, token)) {
             return
         }
-        val localCandidates = candidates.withoutZenzLiveSlot(insertString)
-        if (
-            _zenzLiveSlotState.value?.displayInput == insertString &&
-            _zenzLiveSlotState.value?.bunsetsuTarget == null &&
-            shouldRequestZenzLiveGenerate(insertString)
-        ) {
-            zenzLiveLocalCandidatesSnapshot = localCandidates
-            zenzLiveSnapshotDisplayInput = insertString
-        }
-        val displayedCandidatesWithZenz = buildDisplayedCandidatesWithZenzSlot(
-            localCandidates = localCandidates,
-            input = insertString,
-            zenzSlotState = _zenzLiveSlotState.value
-        )
+        val localCandidates = candidates
+        val displayedCandidatesWithZenz = localCandidates
         val displayedCandidates = composeUtilityCandidates(
             input = insertString,
             candidates = displayedCandidatesWithZenz,
@@ -18197,10 +17087,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
             }
         }
 
-        if (zenzEnableStatePreference == true) {
-            filteredCandidateList = localCandidates
-            lastLocalUpdatedInput.emit(insertString)
-        }
     }
 
     private fun composeUtilityCandidates(
@@ -18271,7 +17157,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
     }
 
     private fun clearSuggestionStateAfterCommit() {
-        clearZenzLiveSlot("commit")
         setSuggestionAdaptersOnMain(emptyList())
         filteredCandidateList = emptyList()
         if (physicalKeyboardEnable.replayCache.isNotEmpty() && physicalKeyboardEnable.replayCache.first()) {
@@ -19351,7 +18236,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
                 onRightKeyLongPressUp.set(true)
                 onDeleteLongPressUp.set(true)
             }
-            clearZenzLiveSlot("input empty")
             hasConvertedKatakana = false
             filteredCandidateList = emptyList()
             resetInputString()
@@ -19617,7 +18501,7 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         if ((bunsetusMultipleDetect || henkanPressedWithBunsetsuDetect)) {
             return true
         }
-        if (zenzEnableStatePreference == true || zenzRerankPreference == true || zenzaiEnableStatePreference == true) {
+        if (zenzRerankPreference == true) {
             return true
         }
         if (hasHardwareKeyboardConnected == true || physicalKeyboardEnable.replayCache.firstOrNull() == true) {
@@ -19920,7 +18804,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
                 activeSplitPatternIndex = 0
             )
 
-            clearZenzLiveSlot("bunsetsu conversion session activated")
             isHenkan.set(true)
             henkanPressedWithBunsetsuDetect = true
             bunsetusMultipleDetect = true
@@ -22982,20 +21865,11 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
                                     setCursorMode(true)
                                 }
                             } else {
-                                if (zenzEnableLongPressConversionPreference == true) {
-                                    scope.launch {
-                                        performImmediateZenzLiveRequest(
-                                            displayInput = insertString,
-                                            source = ZenzRequestSource.ManualConvertLongPress
-                                        )
-                                    }
-                                } else {
-                                    if (!isHenkan.get()) {
-                                        enterSpaceConvertCursorMoveMode(
-                                            SpaceConvertCursorMoveSource.QwertySpace
-                                        ) {
-                                            setCursorMode(true)
-                                        }
+                                if (!isHenkan.get()) {
+                                    enterSpaceConvertCursorMoveMode(
+                                        SpaceConvertCursorMoveSource.QwertySpace
+                                    ) {
+                                        setCursorMode(true)
                                     }
                                 }
                             }
@@ -23121,7 +21995,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
     ) {
         if (candidates.isEmpty()) return
         if (currentQwertyRomajiModeForSession) return
-        clearZenzLiveSlot("qwerty glide candidates")
         suggestionClickNum = 0
         suggestionAdapter?.updateHighlightPosition(RecyclerView.NO_POSITION)
         setSuggestionAdaptersOnMain(candidates)
@@ -24527,7 +23400,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         clearFunctionKeyConversionSource()
         _inputString.update { "" }
         _tenKeyQWERTYMode.update { TenKeyQWERTYMode.Default }
-        clearZenzLiveSlot("resetAllFlags")
         setSuggestionAdapterSuggestionsOnMain(emptyList())
         isPrivateMode = false
         candidateStripIncognitoVisible = false
@@ -24600,7 +23472,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         bunsetsuPositionList = emptyList()
         bunsetsuSplitPatterns = emptyList()
         currentHighlightIndex = RecyclerView.NO_POSITION
-        clearZenzLiveSlot(reason)
         clearBunsetsuConversionSession()
         clearPendingReconversionEntry()
         clearBunsetsuReconversionDraft()
@@ -25321,19 +24192,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         token: CandidateRequestToken,
     ) {
         val requestToken = beginZenzRerankRequest()
-        if (
-            zenzEnableStatePreference == true &&
-            hasHardwareKeyboardConnected != true &&
-            zenzRerankPreference != true
-        ) {
-            emitZenzLiveRequest(insertString)
-        }
-        if (zenzEnableStatePreference == true &&
-            zenzRerankPreference == true &&
-            zenzaiEnableStatePreference == true
-        ) {
-            emitZenzLiveRequest(insertString)
-        }
         val candidates = getSuggestionList(insertString, mainView, token)
         val filtered = if (stringInTail.get().isNotEmpty()) {
             candidates.filter { it.length.toInt() == insertString.length }
@@ -25422,19 +24280,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         token: CandidateRequestToken,
     ) {
         val requestToken = beginZenzRerankRequest()
-        if (
-            zenzEnableStatePreference == true &&
-            hasHardwareKeyboardConnected != true &&
-            zenzRerankPreference != true
-        ) {
-            emitZenzLiveRequest(insertString)
-        }
-        if (zenzEnableStatePreference == true &&
-            zenzRerankPreference == true &&
-            zenzaiEnableStatePreference == true
-        ) {
-            emitZenzLiveRequest(insertString)
-        }
         val candidates = getSuggestionListOriginal(insertString, mainView, token)
         val filtered = if (stringInTail.get().isNotEmpty()) {
             candidates.filter { it.length.toInt() == insertString.length }
@@ -25520,7 +24365,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         token: CandidateRequestToken,
     ) {
         beginZenzRerankRequest()
-        clearZenzLiveSlot("candidate tab without Zenz live")
         val candidates = getSuggestionListWithoutPrediction(insertString, token)
         val filtered = if (stringInTail.get().isNotEmpty()) {
             candidates.filter { it.length.toInt() == insertString.length }
@@ -25643,7 +24487,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         token: CandidateRequestToken,
     ) {
         beginZenzRerankRequest()
-        clearZenzLiveSlot("necookey two-row bar")
         necookeyZenzJob?.cancel()
         necookeyZenzJob = null
 
@@ -25669,7 +24512,7 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         // conversion and mutate the composing text. This exact snapshot is used for both the
         // cache identity and the later asynchronous scoring calls.
         val context = if (gateEnabled) getZenzContext(insertString) else null
-        val profile = zenzProfilePreference.orEmpty()
+        val profile = ""
         if (!shouldApplyCandidateResult(insertString, token)) return
         val leftContext = when {
             isLearnDictionaryMode != true -> ""
@@ -25962,7 +24805,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         token: CandidateRequestToken,
     ) {
         beginZenzRerankRequest()
-        clearZenzLiveSlot("eisukana tab")
         val candidates = getSuggestionListEnglishKana(insertString)
         val filtered = if (stringInTail.get().isNotEmpty()) {
             candidates.filter { it.length.toInt() == insertString.length }

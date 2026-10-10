@@ -636,16 +636,8 @@
     <string name="greeting_morning">おはようございます</string>
     <string name="greeting_afternoon">こんにちは</string>
     <string name="greeting_evening">こんばんは</string>
-    <string name="enable_ai_preference_title">AI による予測変換を有効にする</string>
-    <string name="enable_ai_preference_summary">ニューラルかな漢字モデル「zenz-v3.2-xsmall」を使った逐次的な予測変換を有効にします。</string>
-    <string name="zenz_profile_preference_title">zenz で使用するプロフィールの設定</string>
-    <string name="zenz_profile_preference_summary">zenz が予測変換に利用するプロフィールを設定できます。\n例：この欄に「職業：医者」と入力すると、「ちゅうしゃ」と入力したときに「注射」が候補に出やすくなります。</string>
     <string name="enable_zenz_rerank_preference_title">zenz で変換候補を並び替える</string>
     <string name="enable_zenz_rerank_preference_summary">変換候補の上位を zenz のスコアで軽く並び替えます。既存の辞書スコアもあわせて利用します。タイピング修正とは併用できません。</string>
-    <string name="conversion_key_long_press_ai_conversion_preference_title">変換キー長押しで AI 変換候補を追加する</string>
-    <string name="conversion_key_long_press_ai_conversion_preference_summary">変換キーを長押ししたときに、zenz の推論結果を変換候補に追加します。</string>
-    <string name="zenz_debounce_time_preference_title">zenz の連続推論の待ち時間（デバウンス）</string>
-    <string name="zenz_debounce_time_preference_summary">zenz の逐次的な変換の待ち時間を設定します。\n設定を反映するにはキーボードの切り替えが必要です</string>
     <string name="zenz_maximum_letter_count_preference_summary">おおよそ「コンテキスト数 × 1.4」文字までが変換対象となり、それを超えた文字は切り捨てられます。</string>
     <string name="zenz_maximum_letter_count_preference_title">zenz の変換コンテキストの上限</string>
     <string name="zenz_maximum_context_count_preference_title">zenz の最大のコンテキスト数</string>
@@ -683,8 +675,6 @@
     <string name="enable_typo_correction_japanese_flick_keyboard_preference_sumary">フリック入力でミスを検知した場合、補正した変換候補を表示します。</string>
     <string name="enable_typo_correction_qwerty_english_keyboard_preference_title">QWERTY（英語）</string>
     <string name="enable_typo_correction_qwerty_english_keyboard_preference_summary">QWERTY入力でミスを検知した場合、補正した候補を表示します。</string>
-    <string name="enable_zenzai_preference_title">タイピング修正を有効にする</string>
-    <string name="enable_ai_conversion_zenz_preference_summary">タイピング修正を有効にしている場合は、zenz に渡す入力を「タイピング修正後の文字列」にします。</string>
     <string name="back_up">設定のバックアップ</string>
     <string name="pref_backup_export_title">設定をエクスポート</string>
     <string name="pref_backup_export_summary">現在の設定をバックアップファイルとして保存します</string>

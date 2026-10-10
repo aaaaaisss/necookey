@@ -642,17 +642,9 @@ object AppPreference {
     private val TENKEY_SHOW_IME_SWITCH_BUTTON =
         Pair("tenkey_show_switch_ime_button_preference", true)
 
-    private val ENABLE_ZENZ_PREFERENCE =
-        Pair("enable_ai_conversion_zenz_preference", false)
 
-    private val ENABLE_ZENZAI_PREFERENCE =
-        Pair("enable_ai_conversion_zenzai_preference", false)
 
-    private val ZENZ_PROFILE_PREFERENCE =
-        Pair("zenz_profile_string_preference", "")
 
-    private val ENABLE_ZENZ_CONVERSION_LONG_PRESS_PREFERENCE =
-        Pair("conversion_key_long_press_ai_conversion_preference", false)
 
     private val ENABLE_ZENZ_RERANK_PREFERENCE =
         Pair("enable_zenz_rerank_preference", false)
@@ -663,7 +655,6 @@ object AppPreference {
     private val NECOOKEY_ZENZ_BUNSETSU_GATE_PREFERENCE =
         Pair("necookey_zenz_bunsetsu_gate_preference", true)
 
-    private val ZENZ_DEBOUNCE_TIME_PREFERENCE = Pair("zenz_debounce_time_preference", 300)
 
     private val ZENZ_MAXIMUM_LETTER_SIZE_PREFERENCE =
         Pair("zenz_maximum_letter_count_preference", 32)
@@ -3507,42 +3498,6 @@ object AppPreference {
             it.putBoolean(TENKEY_SHOW_IME_SWITCH_BUTTON.first, value)
         }
 
-    var enable_zenz_preference: Boolean
-        get() = preferences.getBoolean(
-            ENABLE_ZENZ_PREFERENCE.first,
-            ENABLE_ZENZ_PREFERENCE.second
-        )
-        set(value) = preferences.edit {
-            it.putBoolean(ENABLE_ZENZ_PREFERENCE.first, value)
-        }
-
-    var enable_zenzai_preference: Boolean
-        get() = preferences.getBoolean(
-            ENABLE_ZENZAI_PREFERENCE.first,
-            ENABLE_ZENZAI_PREFERENCE.second
-        )
-        set(value) = preferences.edit {
-            it.putBoolean(ENABLE_ZENZAI_PREFERENCE.first, value)
-        }
-
-    var zenz_profile_preference: String
-        get() = preferences.getString(
-            ZENZ_PROFILE_PREFERENCE.first,
-            ZENZ_PROFILE_PREFERENCE.second
-        ) ?: ""
-        set(value) = preferences.edit {
-            it.putString(ZENZ_PROFILE_PREFERENCE.first, value)
-        }
-
-    var enable_zenz_long_press_preference: Boolean
-        get() = preferences.getBoolean(
-            ENABLE_ZENZ_CONVERSION_LONG_PRESS_PREFERENCE.first,
-            ENABLE_ZENZ_CONVERSION_LONG_PRESS_PREFERENCE.second
-        )
-        set(value) = preferences.edit {
-            it.putBoolean(ENABLE_ZENZ_CONVERSION_LONG_PRESS_PREFERENCE.first, value)
-        }
-
     var necookey_two_row_candidate_bar_preference: Boolean
         get() = preferences.getBoolean(
             NECOOKEY_TWO_ROW_CANDIDATE_BAR_PREFERENCE.first,
@@ -3568,14 +3523,6 @@ object AppPreference {
         )
         set(value) = preferences.edit {
             it.putBoolean(ENABLE_ZENZ_RERANK_PREFERENCE.first, value)
-        }
-
-    var zenz_debounce_time_preference: Int?
-        get() = preferences.getInt(
-            ZENZ_DEBOUNCE_TIME_PREFERENCE.first, ZENZ_DEBOUNCE_TIME_PREFERENCE.second
-        )
-        set(value) = preferences.edit {
-            it.putInt(ZENZ_DEBOUNCE_TIME_PREFERENCE.first, value ?: 300)
         }
 
     var zenz_maximum_letter_size_preference: Int?
