@@ -1,7 +1,5 @@
 package com.kazumaproject.markdownhelperkeyboard.sumire_special_key
 
-import com.kazumaproject.markdownhelperkeyboard.sumire_special_key.ui.AppSumireSpecialKeyActionEditorDefaultActionsProvider
-import com.kazumaproject.markdownhelperkeyboard.sumire_special_key.ui.SumireSpecialKeyActionEditorDefaultActionsProvider
 import dagger.Binds
 import dagger.Module
 import dagger.hilt.InstallIn
@@ -16,9 +14,4 @@ abstract class SumireSpecialKeyModule {
     abstract fun bindSumireSpecialKeyDataSource(
         repository: SumireSpecialKeyRepository
     ): SumireSpecialKeyDataSource
-
-    @Binds
-    abstract fun bindSumireSpecialKeyActionEditorDefaultActionsProvider(
-        provider: AppSumireSpecialKeyActionEditorDefaultActionsProvider
-    ): SumireSpecialKeyActionEditorDefaultActionsProvider
 }

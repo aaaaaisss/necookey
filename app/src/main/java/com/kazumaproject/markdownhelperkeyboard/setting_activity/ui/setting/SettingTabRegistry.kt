@@ -5,8 +5,6 @@ import androidx.annotation.IdRes
 import androidx.annotation.XmlRes
 import androidx.fragment.app.Fragment
 import com.kazumaproject.markdownhelperkeyboard.R
-import com.kazumaproject.markdownhelperkeyboard.setting_activity.ui.keyboard_theme.KeyboardThemeFragment
-import com.kazumaproject.markdownhelperkeyboard.text_macro.ui.TextMacroFragment
 import com.kazumaproject.markdownhelperkeyboard.variant.AppVariantConfig
 
 data class SettingTabSpec(
@@ -19,20 +17,9 @@ data class SettingTabSpec(
 
 object SettingTabRegistry {
     const val TAB_COMMON = "common"
-    const val TAB_THEME = "theme"
+    const val TAB_ZENZ = "zenz"
     const val TAB_CONVERSION_ENGINE = "conversion_engine"
     const val TAB_DICTIONARY = "dictionary"
-    const val TAB_TEXT_MACRO = "text_macro"
-    const val TAB_KANA = "kana"
-    const val TAB_QWERTY = "qwerty"
-    const val TAB_QWERTY_ENGLISH = "qwerty_english"
-    const val TAB_QWERTY_ROMAJI = "qwerty_romaji"
-    const val TAB_SUMIRE = "sumire"
-    const val TAB_SPLIT = "split_keyboard"
-    const val TAB_CUSTOM = "custom"
-    const val TAB_TABLET = "tablet"
-    const val TAB_HARDWARE_KEYBOARD = "hardware_keyboard"
-    const val TAB_ZENZ = "zenz"
 
     fun createTabs(): List<SettingTabSpec> {
         val tabs = mutableListOf(
@@ -42,13 +29,6 @@ object SettingTabRegistry {
                 xmlRes = R.xml.pref_common_legacy,
                 destinationId = R.id.legacyCommonPreferenceFragment,
                 fragmentFactory = { LegacyCommonPreferenceFragment() },
-            ),
-            SettingTabSpec(
-                key = TAB_THEME,
-                title = { context -> context.getString(R.string.keyboardthemefragment) },
-                xmlRes = null,
-                destinationId = R.id.keyboardThemeFragment,
-                fragmentFactory = { KeyboardThemeFragment() },
             ),
         )
 
@@ -76,76 +56,6 @@ object SettingTabRegistry {
                 xmlRes = R.xml.pref_dictionary,
                 destinationId = R.id.dictionaryPreferenceFragment,
                 fragmentFactory = { DictionaryPreferenceFragment() },
-            ),
-            SettingTabSpec(
-                key = TAB_TEXT_MACRO,
-                title = { context -> context.getString(R.string.setting_category_text_macro_title) },
-                xmlRes = null,
-                destinationId = R.id.textMacroFragment,
-                fragmentFactory = { TextMacroFragment() },
-            ),
-            SettingTabSpec(
-                key = TAB_KANA,
-                title = { context -> context.getString(R.string.category_kana) },
-                xmlRes = R.xml.pref_kana,
-                destinationId = R.id.kanaPreferenceFragment,
-                fragmentFactory = { KanaPreferenceFragment() },
-            ),
-            SettingTabSpec(
-                key = TAB_QWERTY,
-                title = { it.getString(R.string.qwerty_common_category_title) },
-                xmlRes = R.xml.pref_qwerty,
-                destinationId = R.id.qwertyPreferenceFragment,
-                fragmentFactory = { QwertyPreferenceFragment() },
-            ),
-            SettingTabSpec(
-                key = TAB_QWERTY_ENGLISH,
-                title = { it.getString(R.string.qwerty_english_category_title) },
-                xmlRes = R.xml.pref_qwerty_english,
-                destinationId = R.id.qwertyEnglishPreferenceFragment,
-                fragmentFactory = { QwertyEnglishPreferenceFragment() },
-            ),
-            SettingTabSpec(
-                key = TAB_QWERTY_ROMAJI,
-                title = { it.getString(R.string.qwerty_romaji_category_title) },
-                xmlRes = R.xml.pref_qwerty_romaji,
-                destinationId = R.id.qwertyRomajiPreferenceFragment,
-                fragmentFactory = { QwertyRomajiPreferenceFragment() },
-            ),
-            SettingTabSpec(
-                key = TAB_SUMIRE,
-                title = { context -> context.getString(R.string.category_sumire_input_keyboard_title) },
-                xmlRes = R.xml.pref_sumire,
-                destinationId = R.id.sumirePreferenceFragment,
-                fragmentFactory = { SumirePreferenceFragment() },
-            ),
-            SettingTabSpec(
-                key = TAB_CUSTOM,
-                title = { context -> context.getString(R.string.category_custom_keyboard_title) },
-                xmlRes = R.xml.pref_custom,
-                destinationId = R.id.customKeyboardPreferenceFragment,
-                fragmentFactory = { CustomKeyboardPreferenceFragment() },
-            ),
-            SettingTabSpec(
-                key = TAB_SPLIT,
-                title = { it.getString(R.string.split_keyboard_title) },
-                xmlRes = R.xml.pref_split_keyboard,
-                destinationId = R.id.splitKeyboardPreferenceFragment,
-                fragmentFactory = { SplitKeyboardPreferenceFragment() },
-            ),
-            SettingTabSpec(
-                key = TAB_TABLET,
-                title = { context -> context.getString(R.string.tablet_preference_category_title) },
-                xmlRes = R.xml.pref_tablet,
-                destinationId = R.id.tabletPreferenceFragment,
-                fragmentFactory = { TabletPreferenceFragment() },
-            ),
-            SettingTabSpec(
-                key = TAB_HARDWARE_KEYBOARD,
-                title = { context -> context.getString(R.string.hardware_keyboard_category_title) },
-                xmlRes = R.xml.pref_hardware_keyboard,
-                destinationId = R.id.hardwareKeyboardPreferenceFragment,
-                fragmentFactory = { HardwareKeyboardPreferenceFragment() },
             ),
         )
 

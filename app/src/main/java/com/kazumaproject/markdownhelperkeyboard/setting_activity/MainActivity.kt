@@ -80,7 +80,6 @@ class MainActivity : AppCompatActivity() {
         R.id.candidateViewHeightSettingFragment,
         R.id.candidateHeightLandscapeSettingFragment,
         R.id.candidateHeightDefaultsFragment,
-        R.id.localFontSettingsFragment,
     )
     private val destinationsWithOwnToolbar = setOf(
         R.id.candidateViewHeightSettingFragment,

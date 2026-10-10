@@ -12,11 +12,6 @@
         tools:layout="@layout/fragment_setting_main" />
 
     <fragment
-        android:id="@+id/localFontSettingsFragment"
-        android:name="com.kazumaproject.markdownhelperkeyboard.local_font.LocalFontSettingsFragment"
-        android:label="@string/local_font_title" />
-
-    <fragment
         android:id="@+id/legacyCommonPreferenceFragment"
         android:name="com.kazumaproject.markdownhelperkeyboard.setting_activity.ui.setting.LegacyCommonPreferenceFragment"
         android:label="@string/category_common" />
@@ -56,46 +51,6 @@
         android:name="com.kazumaproject.markdownhelperkeyboard.setting_activity.ui.setting.ZenzDiagnosticsFragment"
         android:label="@string/zenz_diagnostics_title"
         tools:layout="@layout/fragment_zenz_diagnostics" />
-
-    <fragment
-        android:id="@+id/kanaPreferenceFragment"
-        android:name="com.kazumaproject.markdownhelperkeyboard.setting_activity.ui.setting.KanaPreferenceFragment"
-        android:label="@string/category_kana" />
-
-    <fragment
-        android:id="@+id/qwertyPreferenceFragment"
-        android:name="com.kazumaproject.markdownhelperkeyboard.setting_activity.ui.setting.QwertyPreferenceFragment"
-        android:label="@string/qwerty_common_category_title" />
-
-    <fragment
-        android:id="@+id/qwertyEnglishPreferenceFragment"
-        android:name="com.kazumaproject.markdownhelperkeyboard.setting_activity.ui.setting.QwertyEnglishPreferenceFragment"
-        android:label="@string/qwerty_english_category_title" />
-
-    <fragment
-        android:id="@+id/qwertyRomajiPreferenceFragment"
-        android:name="com.kazumaproject.markdownhelperkeyboard.setting_activity.ui.setting.QwertyRomajiPreferenceFragment"
-        android:label="@string/qwerty_romaji_category_title" />
-
-    <fragment
-        android:id="@+id/sumirePreferenceFragment"
-        android:name="com.kazumaproject.markdownhelperkeyboard.setting_activity.ui.setting.SumirePreferenceFragment"
-        android:label="@string/category_sumire_input_keyboard_title" />
-
-    <fragment
-        android:id="@+id/customKeyboardPreferenceFragment"
-        android:name="com.kazumaproject.markdownhelperkeyboard.setting_activity.ui.setting.CustomKeyboardPreferenceFragment"
-        android:label="@string/category_custom_keyboard_title" />
-
-    <fragment
-        android:id="@+id/tabletPreferenceFragment"
-        android:name="com.kazumaproject.markdownhelperkeyboard.setting_activity.ui.setting.TabletPreferenceFragment"
-        android:label="@string/tablet_preference_category_title" />
-
-    <fragment
-        android:id="@+id/hardwareKeyboardPreferenceFragment"
-        android:name="com.kazumaproject.markdownhelperkeyboard.setting_activity.ui.setting.HardwareKeyboardPreferenceFragment"
-        android:label="@string/hardware_keyboard_category_title" />
 
     <fragment
         android:id="@+id/openSourceFragment"
@@ -162,20 +117,6 @@
         android:id="@+id/userTemplateFragment"
         android:name="com.kazumaproject.markdownhelperkeyboard.user_template.ui.UserTemplateFragment"
         android:label="@string/user_template_fragment_title" />
-    <fragment
-        android:id="@+id/textMacroFragment"
-        android:name="com.kazumaproject.markdownhelperkeyboard.text_macro.ui.TextMacroFragment"
-        android:label="@string/text_macro_title" />
-    <fragment
-        android:id="@+id/textMacroEditorFragment"
-        android:name="com.kazumaproject.markdownhelperkeyboard.text_macro.ui.TextMacroEditorFragment"
-        android:label="@string/text_macro_editor_title"
-        tools:layout="@layout/fragment_text_macro_editor">
-        <argument
-            android:name="macroId"
-            android:defaultValue="0L"
-            app:argType="long" />
-    </fragment>
     <fragment
         android:id="@+id/clipboardHistoryFragment"
         android:name="com.kazumaproject.markdownhelperkeyboard.clipboard_history.ui.ClipboardHistoryFragment"
@@ -291,93 +232,6 @@
         android:label="@string/shortcut_toolbar_size_title"
         tools:layout="@layout/fragment_shortcut_toolbar_size_setting" />
     <fragment
-        android:id="@+id/qwertyMarginSettingFragment"
-        android:name="com.kazumaproject.markdownhelperkeyboard.setting_activity.ui.qwerty_button_size.QwertyMarginSettingFragment"
-        android:label="@string/qwertymarginsettingfragment" />
-    <fragment
-        android:id="@+id/qwertyNumberKeyFlickSettingFragment"
-        android:name="com.kazumaproject.markdownhelperkeyboard.setting_activity.ui.qwerty_number_key_flick.QwertyNumberKeyFlickSettingFragment"
-        android:label="QWERTY 数字キーのフリック設定"
-        tools:layout="@layout/fragment_qwerty_number_key_flick_setting" />
-    <fragment
-        android:id="@+id/keyboardThemeFragment"
-        android:name="com.kazumaproject.markdownhelperkeyboard.setting_activity.ui.keyboard_theme.KeyboardThemeFragment"
-        android:label="@string/keyboardthemefragment" />
-    <fragment
-        android:id="@+id/keyboardSkinSelectionFragment"
-        android:name="com.kazumaproject.markdownhelperkeyboard.setting_activity.ui.keyboard_theme.KeyboardSkinSelectionFragment"
-        android:label="@string/keyboard_skin_choose" />
-    <fragment
-        android:id="@+id/tenKeyCandidateLetterSizeFragment"
-        android:name="com.kazumaproject.markdownhelperkeyboard.setting_activity.ui.tenkey_letter_size_setting.TenKeyCandidateLetterSizeFragment"
-        android:label="@string/tenkeycandidatelettersizefragment" />
-    <fragment
-        android:id="@+id/tenKeyPopupStyleSettingFragment"
-        android:name="com.kazumaproject.markdownhelperkeyboard.setting_activity.ui.popup_style.TenKeyPopupStyleSettingFragment"
-        android:label="@string/tenkey_popup_view_style_preference_title" />
-    <fragment
-        android:id="@+id/qwertyPopupStyleSettingFragment"
-        android:name="com.kazumaproject.markdownhelperkeyboard.setting_activity.ui.popup_style.QwertyPopupStyleSettingFragment"
-        android:label="@string/qwerty_popup_view_style_preference_title" />
-    <fragment
-        android:id="@+id/flickKeyboardPopupStyleListFragment"
-        android:name="com.kazumaproject.markdownhelperkeyboard.setting_activity.ui.popup_style.FlickKeyboardPopupStyleListFragment"
-        android:label="@string/flick_keyboard_popup_view_style_preference_title">
-        <action
-            android:id="@+id/action_flickKeyboardPopupStyleListFragment_to_flickKeyboardPopupStyleEditFragment"
-            app:destination="@id/flickKeyboardPopupStyleEditFragment" />
-    </fragment>
-    <fragment
-        android:id="@+id/flickKeyboardPopupStyleEditFragment"
-        android:name="com.kazumaproject.markdownhelperkeyboard.setting_activity.ui.popup_style.FlickKeyboardPopupStyleEditFragment"
-        android:label="Popup 表示編集">
-        <argument
-            android:name="target"
-            android:defaultValue="DIRECTIONAL"
-            app:argType="string" />
-    </fragment>
-    <fragment
-        android:id="@+id/circularFlickSettingsFragment"
-        android:name="com.kazumaproject.markdownhelperkeyboard.setting_activity.ui.sumire_custom_angle.CircularFlickSettingsFragment"
-        android:label="@string/circularflicksettingsfragment" />
-    <fragment
-        android:id="@+id/hierarchicalFlickAngleMarginFragment"
-        android:name="com.kazumaproject.markdownhelperkeyboard.setting_activity.ui.sumire_flick_angle.HierarchicalFlickAngleMarginFragment"
-        android:label="@string/hierarchical_flick_angle_margin_preference_title"
-        tools:layout="@layout/fragment_hierarchical_flick_angle_margin" />
-    <fragment
-        android:id="@+id/circularSlotActionSettingFragment"
-        android:name="com.kazumaproject.markdownhelperkeyboard.setting_activity.ui.circular_slot.CircularSlotActionSettingFragment"
-        android:label="Circular Flick SLOT4〜6 設定" />
-    <fragment
-        android:id="@+id/sumireSpecialKeyEditorFragment"
-        android:name="com.kazumaproject.markdownhelperkeyboard.sumire_special_key.ui.SumireSpecialKeyEditorFragment"
-        android:label="@string/sumire_special_key_editor_title"
-        tools:layout="@layout/fragment_sumire_special_key_editor">
-        <action
-            android:id="@+id/action_sumireSpecialKeyEditorFragment_to_sumireSpecialKeyActionEditorFragment"
-            app:destination="@id/sumireSpecialKeyActionEditorFragment" />
-    </fragment>
-    <fragment
-        android:id="@+id/sumireSpecialKeyActionEditorFragment"
-        android:name="com.kazumaproject.markdownhelperkeyboard.sumire_special_key.ui.SumireSpecialKeyActionEditorFragment"
-        android:label="@string/sumire_special_key_action_editor_title"
-        tools:layout="@layout/fragment_sumire_special_key_action_editor">
-        <argument
-            android:name="layoutType"
-            app:argType="string" />
-        <argument
-            android:name="inputMode"
-            app:argType="string" />
-        <argument
-            android:name="keyId"
-            app:argType="string" />
-    </fragment>
-    <fragment
-        android:id="@+id/flickKeyboardSizeSettingsFragment"
-        android:name="com.kazumaproject.markdownhelperkeyboard.setting_activity.ui.sumire_custom_key_setting.FlickKeyboardSizeSettingsFragment"
-        android:label="@string/flickKeyboardSizeSettingsFragment_title" />
-    <fragment
         android:id="@+id/systemUserDictionaryBuilderFragment"
         android:name="com.kazumaproject.markdownhelperkeyboard.system_user_dictionary.ui.SystemUserDictionaryBuilderFragment"
         android:label="@string/system_user_dictionary_builder_title"
@@ -401,25 +255,4 @@
         android:name="com.kazumaproject.markdownhelperkeyboard.cursor_move_targets.ui.CursorMoveTargetPairsFragment"
         android:label="@string/cursor_move_target_pairs_fragment_title"
         tools:layout="@layout/fragment_cursor_move_target_pairs" />
-    <fragment
-        android:id="@+id/physicalKeyboardShortcutListFragment"
-        android:name="com.kazumaproject.markdownhelperkeyboard.physical_keyboard.shortcut.ui.PhysicalKeyboardShortcutListFragment"
-        android:label="@string/physical_keyboard_shortcut_list_title">
-        <action
-            android:id="@+id/action_physicalKeyboardShortcutListFragment_to_physicalKeyboardShortcutEditFragment"
-            app:destination="@id/physicalKeyboardShortcutEditFragment" />
-    </fragment>
-    <fragment
-        android:id="@+id/physicalKeyboardShortcutEditFragment"
-        android:name="com.kazumaproject.markdownhelperkeyboard.physical_keyboard.shortcut.ui.PhysicalKeyboardShortcutEditFragment"
-        android:label="@string/physical_keyboard_shortcut_edit_title">
-        <argument
-            android:name="shortcutId"
-            android:defaultValue="0L"
-            app:argType="long" />
-    </fragment>
-
-    <fragment android:id="@+id/splitKeyboardPreferenceFragment"
-        android:name="com.kazumaproject.markdownhelperkeyboard.setting_activity.ui.setting.SplitKeyboardPreferenceFragment"
-        android:label="@string/split_keyboard_title" />
 </navigation>

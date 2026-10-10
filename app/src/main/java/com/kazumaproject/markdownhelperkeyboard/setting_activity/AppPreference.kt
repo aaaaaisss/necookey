@@ -433,12 +433,8 @@ object AppPreference {
         Pair("sumire_last_input_mode_saved_at_epoch_millis_preference", 0L)
 
     private val DELETE_KEY_HIGH_LIGHT = Pair("henkan_delete_key_action_preference", true)
-    private val CUSTOM_KEYBOARD_SUGGESTION_PREFERENCE =
-        Pair("custom_keyboard_suggestion_preference", true)
     private val CUSTOM_KEYBOARD_INPUT_IN_EMPTY_AREAS_PREFERENCE =
         Pair(CUSTOM_KEYBOARD_INPUT_IN_EMPTY_AREAS_KEY, false)
-    private val REMEMBER_LAST_CUSTOM_KEYBOARD_PREFERENCE =
-        Pair("remember_last_custom_keyboard_preference", false)
     private val LAST_USED_CUSTOM_KEYBOARD_STABLE_ID =
         Pair("last_used_custom_keyboard_stable_id", "")
     private val REMEMBER_CUSTOM_KEYBOARD_INPUT_MODE_PREFERENCE =
@@ -2614,14 +2610,7 @@ object AppPreference {
             it.putBoolean(DELETE_KEY_HIGH_LIGHT.first, value ?: true)
         }
 
-    var custom_keyboard_suggestion_preference: Boolean?
-        get() = preferences.getBoolean(
-            CUSTOM_KEYBOARD_SUGGESTION_PREFERENCE.first,
-            CUSTOM_KEYBOARD_SUGGESTION_PREFERENCE.second
-        )
-        set(value) = preferences.edit {
-            it.putBoolean(CUSTOM_KEYBOARD_SUGGESTION_PREFERENCE.first, value ?: true)
-        }
+    val custom_keyboard_suggestion_preference: Boolean? get() = true // S3: hardcoded, setting removed
 
     var custom_direct_input_replace_composing_preference: Boolean
         get() = preferences.getBoolean(CUSTOM_DIRECT_INPUT_REPLACE_COMPOSING_KEY, false)
@@ -2638,14 +2627,7 @@ object AppPreference {
             it.putBoolean(CUSTOM_KEYBOARD_INPUT_IN_EMPTY_AREAS_PREFERENCE.first, value)
         }
 
-    var remember_last_custom_keyboard_preference: Boolean?
-        get() = preferences.getBoolean(
-            REMEMBER_LAST_CUSTOM_KEYBOARD_PREFERENCE.first,
-            REMEMBER_LAST_CUSTOM_KEYBOARD_PREFERENCE.second
-        )
-        set(value) = preferences.edit {
-            it.putBoolean(REMEMBER_LAST_CUSTOM_KEYBOARD_PREFERENCE.first, value ?: false)
-        }
+    val remember_last_custom_keyboard_preference: Boolean? get() = true // S3: hardcoded, setting removed
 
     var remember_custom_keyboard_input_mode_preference: Boolean?
         get() = preferences.getBoolean(
