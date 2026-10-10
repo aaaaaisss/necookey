@@ -80,12 +80,6 @@ object AppPreference {
     const val CUSTOM_KEYMAP_GUIDE_KEY = "flick_keymap_guide"
     const val CUSTOM_KEYBOARD_INPUT_IN_EMPTY_AREAS_KEY =
         "custom_keyboard_input_in_empty_areas_preference"
-    const val LONG_PRESS_TIMEOUT_KEY = "long_press_timeout_preference"
-    const val DELETE_LONG_PRESS_CONVERSION_BEHAVIOR_KEY =
-        "delete_long_press_conversion_behavior"
-    const val VIBRATION_KEY = "vibration_preference"
-    const val KEY_SOUND_KEY = "key_sound_preference"
-    const val KEY_SOUND_VOLUME_PERCENT_KEY = "key_sound_volume_percent_preference"
     const val INLINE_SUGGESTION_ENABLED_KEY = "inline_suggestion_enabled_preference"
     internal const val CANDIDATE_HEIGHT_DEFAULTS_MIGRATION_VERSION_KEY =
         "candidate_height_defaults_migration_version_preference"
@@ -125,13 +119,6 @@ object AppPreference {
         TFBI_DIAGONAL_RECOGNITION_MODE_KEY,
         TfbiDiagonalRecognitionMode.LEGACY.preferenceValue
     )
-    private val LONG_PRESS_TIMEOUT = Pair(LONG_PRESS_TIMEOUT_KEY, 300)
-    private val DELETE_LONG_PRESS_CONVERSION_BEHAVIOR =
-        Pair(DELETE_LONG_PRESS_CONVERSION_BEHAVIOR_KEY, "deferred")
-    private val VIBRATION_PREFERENCE = Pair(VIBRATION_KEY, true)
-    private val KEY_SOUND_PREFERENCE = Pair(KEY_SOUND_KEY, false)
-    private val KEY_SOUND_VOLUME_PERCENT_PREFERENCE =
-        Pair(KEY_SOUND_VOLUME_PERCENT_KEY, 0)
     private val INLINE_SUGGESTION_ENABLED_PREFERENCE =
         Pair(INLINE_SUGGESTION_ENABLED_KEY, true)
     private val LEARN_DICTIONARY_PREFERENCE = Pair("learn_dictionary_preference", true)
@@ -1621,30 +1608,11 @@ object AppPreference {
             it.putString(DEFAULT_EMOJI_SKIN_TONE_PREFERENCE.first, skinTone)
         }
 
-    var vibration_preference: Boolean?
-        get() = preferences.getBoolean(VIBRATION_PREFERENCE.first, VIBRATION_PREFERENCE.second)
-        set(value) = preferences.edit {
-            it.putBoolean(VIBRATION_PREFERENCE.first, value ?: true)
-        }
 
-    val ng_word_preference: Boolean? get() = false // S3: hardcoded, setting removed
+    val ng_word_preference: Boolean get() = true // NG words always applied; edit list in settings (empty list = no effect)
 
-    val vibration_timing_preference: String? get() = "both" // S3: hardcoded, setting removed
 
-    var key_sound_preference: Boolean?
-        get() = preferences.getBoolean(KEY_SOUND_PREFERENCE.first, KEY_SOUND_PREFERENCE.second)
-        set(value) = preferences.edit {
-            it.putBoolean(KEY_SOUND_PREFERENCE.first, value ?: false)
-        }
 
-    var key_sound_volume_percent_preference: Int?
-        get() = preferences.getInt(
-            KEY_SOUND_VOLUME_PERCENT_PREFERENCE.first,
-            KEY_SOUND_VOLUME_PERCENT_PREFERENCE.second
-        )
-        set(value) = preferences.edit {
-            it.putInt(KEY_SOUND_VOLUME_PERCENT_PREFERENCE.first, value ?: 0)
-        }
 
     var flick_sensitivity_preference: Int?
         get() = preferences.getInt(
@@ -1681,22 +1649,9 @@ object AppPreference {
 
     val independent_multi_touch_preference: Boolean get() = false // S3: hardcoded, setting removed
 
-    var long_press_timeout_preference: Int?
-        get() = preferences.getInt(
-            LONG_PRESS_TIMEOUT.first, LONG_PRESS_TIMEOUT.second
-        )
-        set(value) = preferences.edit {
-            it.putInt(LONG_PRESS_TIMEOUT.first, value ?: 300)
-        }
+    val long_press_timeout_preference: Int get() = 300 // hardcoded: vibration/long-press group removed
 
-    var delete_long_press_conversion_behavior: String
-        get() = preferences.getString(
-            DELETE_LONG_PRESS_CONVERSION_BEHAVIOR.first,
-            DELETE_LONG_PRESS_CONVERSION_BEHAVIOR.second,
-        ) ?: DELETE_LONG_PRESS_CONVERSION_BEHAVIOR.second
-        set(value) = preferences.edit {
-            it.putString(DELETE_LONG_PRESS_CONVERSION_BEHAVIOR.first, value)
-        }
+    val delete_long_press_conversion_behavior: String get() = "deferred" // hardcoded: vibration/long-press group removed
 
     var n_best_preference: Int?
         get() = preferences.getInt(

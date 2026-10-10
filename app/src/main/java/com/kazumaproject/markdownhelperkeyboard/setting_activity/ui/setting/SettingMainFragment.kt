@@ -11,7 +11,6 @@ import androidx.core.view.isVisible
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
 import androidx.navigation.fragment.findNavController
-import com.google.android.material.tabs.TabLayoutMediator
 import com.kazumaproject.markdownhelperkeyboard.R
 import com.kazumaproject.markdownhelperkeyboard.databinding.FragmentSettingMainBinding
 import com.kazumaproject.markdownhelperkeyboard.setting_activity.AppPreference
@@ -25,11 +24,8 @@ class SettingMainFragment : Fragment() {
     private var _binding: FragmentSettingMainBinding? = null
     private val binding get() = _binding!!
 
-    // リーク対策: Mediatorを変数で保持してonDestroyViewで解放できるようにする
     private var loadingUi: SettingsLoadingUi? = null
     private var initializationJob: kotlinx.coroutines.Job? = null
-
-    private var tabLayoutMediator: TabLayoutMediator? = null
 
     @Inject
     lateinit var appPreference: AppPreference
@@ -44,7 +40,7 @@ class SettingMainFragment : Fragment() {
     ): View {
         _binding = FragmentSettingMainBinding.inflate(inflater, container, false)
         loadingUi = SettingsLoadingUi(requireContext(), ::loadInitialData, blocksContent = false)
-        (binding.settingViewPager.parent as android.widget.FrameLayout).addView(
+        binding.settingRoot.addView(
             loadingUi!!.overlay, android.widget.FrameLayout.LayoutParams(-1, -1),
         )
         binding.settingProgressBar.isVisible = false
@@ -56,16 +52,12 @@ class SettingMainFragment : Fragment() {
 
         loadInitialData()
 
-        val adapter = SettingPagerAdapter(this)
-        binding.settingViewPager.adapter = adapter
-
-        // タブのタイトル設定
-        // 変数に代入してからattachする
-        tabLayoutMediator =
-            TabLayoutMediator(binding.settingTabLayout, binding.settingViewPager) { tab, position ->
-                tab.text = adapter.getTitle(position, this)
-            }
-        tabLayoutMediator?.attach()
+        // 設定は 1 画面（セクション構成）。タブ/ViewPager は廃止。
+        if (childFragmentManager.findFragmentById(R.id.setting_container) == null) {
+            childFragmentManager.beginTransaction()
+                .replace(R.id.setting_container, MainPreferenceFragment())
+                .commit()
+        }
 
         requireActivity().onBackPressedDispatcher.addCallback(
             viewLifecycleOwner,
@@ -108,11 +100,6 @@ class SettingMainFragment : Fragment() {
     }
 
     override fun onDestroyView() {
-        // リーク対策: ViewPagerとMediatorの参照を断つ
-        tabLayoutMediator?.detach()
-        tabLayoutMediator = null
-        binding.settingViewPager.adapter = null
-
         initializationJob = null
         loadingUi = null
         super.onDestroyView()
