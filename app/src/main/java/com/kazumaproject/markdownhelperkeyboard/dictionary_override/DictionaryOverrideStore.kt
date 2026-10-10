@@ -62,89 +62,15 @@ class DictionaryOverrideStore private constructor(
         get() = prefs.getLong(REVISION_PREF_KEY, 0L)
 
     init {
-        OptionalDictionaryMigration(defaultPrefs, prefs).migrateIfNeeded()
+        // necookey: importing external dictionary files was removed together with the
+        // 外部辞書ファイル screen. Drop anything imported earlier so only bundled dictionaries load.
+        if (baseDirectory.exists()) baseDirectory.deleteRecursively()
     }
 
-    fun hasOverride(key: DictionaryFileKey): Boolean = overrideFile(key).exists()
+    /** External dictionary overrides are no longer supported (import UI removed). */
+    fun hasOverride(@Suppress("UNUSED_PARAMETER") key: DictionaryFileKey): Boolean = false
 
     fun openOverride(key: DictionaryFileKey): InputStream = FileInputStream(overrideFile(key))
-
-    fun saveOverrideFromUri(key: DictionaryFileKey, uri: Uri): ValidationResult {
-        val originalFileName = nameResolver(uri) ?: key.name
-        val inputStream = streamOpener(uri)
-            ?: return ValidationResult.invalid("Could not open selected file")
-        return inputStream.use { input ->
-            saveOverrideFromInputStream(key, input, originalFileName)
-        }
-    }
-
-    fun importOverridesFromZipUri(context: Context, zipUri: Uri): DictionaryZipImportResult =
-        ExternalDictionaryZipImporter(context, this).importFromUri(zipUri)
-
-    fun saveOverrideFromZipEntryInputStream(
-        key: DictionaryFileKey,
-        inputStream: InputStream,
-        entryName: String,
-    ): ValidationResult =
-        saveOverrideFromInputStream(
-            key = key,
-            inputStream = inputStream,
-            originalFileName = entryName,
-        )
-
-    fun saveOverrideFromInputStream(
-        key: DictionaryFileKey,
-        inputStream: InputStream,
-        originalFileName: String = key.name,
-    ): ValidationResult {
-        ensureDirectory()
-        val spec = DictionaryFileSpecs.get(key)
-        val tempFile = File(directory, "${key.name}.tmp")
-        runCatching {
-            FileOutputStream(tempFile).use { output -> inputStream.copyTo(output) }
-        }.getOrElse { error ->
-            tempFile.delete()
-            return ValidationResult.invalid(error.message ?: error::class.java.simpleName)
-        }
-
-        val validationResult = validator.validate(tempFile, spec)
-        if (!validationResult.isValid) {
-            tempFile.delete()
-            return validationResult
-        }
-
-        val target = overrideFile(key)
-        if (target.exists()) target.delete()
-        if (!tempFile.renameTo(target)) {
-            tempFile.delete()
-            return ValidationResult.invalid("Could not save override file")
-        }
-
-        val metadata = DictionaryOverrideMetadata(
-            key = key,
-            category = spec.category,
-            originalFileName = originalFileName,
-            importedAt = System.currentTimeMillis(),
-            size = target.length(),
-            contentType = spec.contentType,
-            validationStatus = validationResult.status,
-            validationMessage = validationResult.message,
-        )
-        val autoEnableTripleCategory = spec.partOfTripleDictionary &&
-            DictionaryFileSpecs.forCategory(spec.category).all { it.key == key || isValidOverride(it.key) }
-        val enableExternal = !spec.category.isDisableableBundledDictionary() ||
-            isOptionalBundledEnabled(spec.category)
-        applyRevisionedEdit {
-            putMetadata(metadata)
-            if (autoEnableTripleCategory) {
-                putBoolean(categoryExternalEnabledKey(spec.category), enableExternal)
-            } else if (!spec.partOfTripleDictionary) {
-                putBoolean(keyExternalEnabledKey(key), true)
-            }
-            true
-        }
-        return validationResult
-    }
 
     fun removeOverride(key: DictionaryFileKey) {
         val fileChanged = overrideFile(key).delete()
@@ -206,47 +132,25 @@ class DictionaryOverrideStore private constructor(
             )
         }
 
-    fun setExternalEnabledForCategory(category: DictionaryCategory, enabled: Boolean) {
-        putBooleanIfChanged(categoryExternalEnabledKey(category), enabled)
-    }
+    fun isExternalEnabledForCategory(@Suppress("UNUSED_PARAMETER") category: DictionaryCategory): Boolean =
+        false
 
-    fun isExternalEnabledForCategory(category: DictionaryCategory): Boolean =
-        prefs.getBoolean(categoryExternalEnabledKey(category), false)
+    fun isExternalEnabledForKey(@Suppress("UNUSED_PARAMETER") key: DictionaryFileKey): Boolean =
+        false
 
-    fun setExternalEnabledForKey(key: DictionaryFileKey, enabled: Boolean) {
-        putBooleanIfChanged(keyExternalEnabledKey(key), enabled)
-    }
-
-    fun isExternalEnabledForKey(key: DictionaryFileKey): Boolean =
-        prefs.getBoolean(keyExternalEnabledKey(key), false)
-
+    /**
+     * necookey: the optional bundled dictionaries are no longer user toggles.
+     * Mozc UT 人名 / 地名 / Wikipedia and 読み補正 are always on; NEologd and Web were dropped
+     * (assets removed). The English reading dictionary keeps its own switch in 予測変換.
+     */
     fun isOptionalBundledEnabled(category: DictionaryCategory): Boolean =
         if (category == DictionaryCategory.ENGLISH_READING) {
             defaultPrefs.getBoolean(ENGLISH_READING_ENABLED_PREFERENCE, true)
         } else {
-            prefs.getBoolean(
-                optionalBundledEnabledKey(category),
-                category in setOf(DictionaryCategory.READING_CORRECTION),
-            )
+            category in ALWAYS_ENABLED_OPTIONAL_DICTIONARIES
         }
 
-    fun setOptionalBundledEnabled(category: DictionaryCategory, enabled: Boolean) {
-        if (isOptionalBundledEnabled(category) == enabled) return
-        if (category == DictionaryCategory.ENGLISH_READING) {
-            defaultPrefs.edit().putBoolean(ENGLISH_READING_ENABLED_PREFERENCE, enabled).apply()
-            applyRevisionedEdit { true }
-            return
-        }
-        applyRevisionedEdit {
-            putBoolean(optionalBundledEnabledKey(category), enabled)
-            true
-        }
-    }
-
-    fun isValidOverride(key: DictionaryFileKey): Boolean {
-        val metadata = getOverrideMetadata(key) ?: return false
-        return hasOverride(key) && metadata.validationStatus == ValidationStatus.VALID
-    }
+    fun isValidOverride(@Suppress("UNUSED_PARAMETER") key: DictionaryFileKey): Boolean = false
 
     fun markInvalid(key: DictionaryFileKey, message: String) {
         val metadata = getOverrideMetadata(key) ?: return
@@ -332,6 +236,12 @@ class DictionaryOverrideStore private constructor(
         private const val PREF_NAME = "dictionary_override_store"
         private const val DIRECTORY_NAME = "dictionary_overrides"
         const val REVISION_PREF_KEY = "dictionary_override_revision"
+        val ALWAYS_ENABLED_OPTIONAL_DICTIONARIES = setOf(
+            DictionaryCategory.READING_CORRECTION,
+            DictionaryCategory.PERSON_NAME,
+            DictionaryCategory.PLACES,
+            DictionaryCategory.WIKI,
+        )
         const val ENGLISH_READING_ENABLED_PREFERENCE =
             "english_reading_dictionary_enable_preference"
         private val metadataType = object : TypeToken<DictionaryOverrideMetadata>() {}.type

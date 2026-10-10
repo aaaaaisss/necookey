@@ -1161,3 +1161,27 @@ dependencies {
 
 //    debugImplementation("com.squareup.leakcanary:leakcanary-android:2.14")
 }
+
+// APK size: the raw serialized dictionaries below are build inputs for the compact images
+// (generated/compactSystemDictionary, generated/compactConnectionMatrix) and runtime fallbacks
+// that only matter when the compact image is missing. External dictionary overrides were removed,
+// so release APKs ship only the compact images. Debug builds and unit tests keep the raw files.
+def releaseOnlyCompactDictionaryInputs = [
+        "connectionId.dat.zip",
+        "system/tango.dat.zip", "system/yomi.dat.zip", "system/token.dat.zip",
+        "single_kanji/tango_singleKanji.dat", "single_kanji/yomi_singleKanji.dat", "single_kanji/token_singleKanji.dat",
+        "emoji/tango_emoji.dat", "emoji/yomi_emoji.dat", "emoji/token_emoji.dat",
+        "emoticon/tango_emoticon.dat", "emoticon/yomi_emoticon.dat", "emoticon/token_emoticon.dat",
+        "symbol/tango_symbol.dat", "symbol/yomi_symbol.dat", "symbol/token_symbol.dat",
+        "reading_correction/tango_reading_correction.dat", "reading_correction/yomi_reading_correction.dat", "reading_correction/token_reading_correction.dat",
+        "english/reading.dat.zip", "english/word.dat", "english/token.dat.zip",
+]
+tasks.withType(com.android.build.gradle.tasks.MergeSourceSetFolders).configureEach { mergeTask ->
+    if (mergeTask.name.startsWith("merge") && mergeTask.name.endsWith("ReleaseAssets")) {
+        def excluded = releaseOnlyCompactDictionaryInputs
+        mergeTask.doLast { task ->
+            def out = task.outputDir.get().asFile
+            excluded.each { path -> new File(out, path).delete() }
+        }
+    }
+}
