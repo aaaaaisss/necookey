@@ -11,8 +11,6 @@ import com.kazumaproject.markdownhelperkeyboard.dictionary_override.DictionarySo
 import com.kazumaproject.markdownhelperkeyboard.converter.session.ConversionBackend
 import com.kazumaproject.markdownhelperkeyboard.converter.engine.PredictionAggressiveness
 import com.kazumaproject.markdownhelperkeyboard.converter.engine.PredictionConfig
-import com.kazumaproject.markdownhelperkeyboard.converter.utility.UtilityCandidateConfig
-import com.kazumaproject.markdownhelperkeyboard.converter.date.DateCandidateConfig
 import com.kazumaproject.markdownhelperkeyboard.setting_activity.AppPreference
 import com.kazumaproject.markdownhelperkeyboard.variant.AppVariantConfig
 
@@ -258,8 +256,6 @@ data class ImePreferencesSnapshot(
     val enableTypoCorrectionJapaneseFlickKeyboardOffsetScorePreference: Int,
     val enableTypoCorrectionJapaneseFlickKeyboardPreference: Boolean,
     val enableTypoCorrectionQwertyEnglishKeyboardPreference: Boolean,
-    val utilityCandidateConfig: UtilityCandidateConfig,
-    val dateCandidateConfig: DateCandidateConfig,
     val keyboardSkin: KeyboardSkinId = KeyboardSkinId.DEFAULT,
 ) {
     val keyboardThemeMode get() = appearance.keyboardThemeMode
@@ -434,7 +430,6 @@ data class ImePreferencesSnapshot(
                         appPreference.system_user_dictionary_prediction_enable_preference,
                     readingCorrectionEnabled =
                         appPreference.reading_correction_prediction_enable_preference,
-                    proverbEnabled = appPreference.proverb_prediction_enable_preference,
                     externalMozcEnabled =
                         appPreference.external_mozc_prediction_enable_preference,
                     symbolEmojiEnabled =
@@ -778,8 +773,6 @@ data class ImePreferencesSnapshot(
                     appPreference.enable_typo_correction_japanese_flick_keyboard_preference,
                 enableTypoCorrectionQwertyEnglishKeyboardPreference =
                     appPreference.enable_typo_correction_qwerty_english_keyboard_preference,
-                utilityCandidateConfig = appPreference.utility_candidate_config,
-                dateCandidateConfig = appPreference.date_candidate_config,
             )
         }
     }

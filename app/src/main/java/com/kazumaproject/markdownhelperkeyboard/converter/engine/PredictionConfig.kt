@@ -22,7 +22,6 @@ data class PredictionConfig(
     val aggressiveness: PredictionAggressiveness = PredictionAggressiveness.STANDARD,
     val systemUserDictionaryEnabled: Boolean = true,
     val readingCorrectionEnabled: Boolean = true,
-    val proverbEnabled: Boolean = true,
     val externalMozcEnabled: Boolean = true,
     val symbolEmojiEnabled: Boolean = true,
     val showSymbolCandidates: Boolean = true,

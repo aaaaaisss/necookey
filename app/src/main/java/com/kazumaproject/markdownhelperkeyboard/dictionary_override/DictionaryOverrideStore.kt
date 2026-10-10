@@ -226,7 +226,7 @@ class DictionaryOverrideStore private constructor(
         } else {
             prefs.getBoolean(
                 optionalBundledEnabledKey(category),
-                category in setOf(DictionaryCategory.READING_CORRECTION, DictionaryCategory.KOTOWAZA),
+                category in setOf(DictionaryCategory.READING_CORRECTION),
             )
         }
 
@@ -293,8 +293,7 @@ class DictionaryOverrideStore private constructor(
 
     private fun optionalBundledResetValue(category: DictionaryCategory): Boolean =
         when (category) {
-            DictionaryCategory.READING_CORRECTION,
-            DictionaryCategory.KOTOWAZA -> true
+            DictionaryCategory.READING_CORRECTION -> true
             DictionaryCategory.ENGLISH_READING -> true
             DictionaryCategory.PERSON_NAME ->
                 defaultPrefs.getBoolean("mozc_ut_person_name_preference", false)

@@ -172,11 +172,6 @@ internal object TestEngineFactory {
             "reading_correction/yomi_reading_correction.dat",
             "reading_correction/token_reading_correction.dat",
         )
-        val kotowaza = loadTriple(
-            "kotowaza/tango_kotowaza.dat",
-            "kotowaza/yomi_kotowaza.dat",
-            "kotowaza/token_kotowaza.dat",
-        )
         val segmenter = assetInput("mozc/segmenter.dat") {
             MozcSegmenter(MozcSegmenterDataReader().read(it))
         }
@@ -231,13 +226,6 @@ internal object TestEngineFactory {
                 readingCorrectionSuccinctBitVectorIsLeafYomi = readingCorrection.succinctBitVectorIsLeafYomi,
                 readingCorrectionSuccinctBitVectorTokenArray = readingCorrection.succinctBitVectorTokenArray,
                 readingCorrectionSuccinctBitVectorTangoLBS = readingCorrection.succinctBitVectorTangoLBS,
-                kotowazaTangoTrie = kotowaza.tangoTrie,
-                kotowazaYomiTrie = kotowaza.yomiTrie,
-                kotowazaTokenArray = kotowaza.tokenArray,
-                kotowazaSuccinctBitVectorLBSYomi = kotowaza.succinctBitVectorLBSYomi,
-                kotowazaSuccinctBitVectorIsLeafYomi = kotowaza.succinctBitVectorIsLeafYomi,
-                kotowazaSuccinctBitVectorTokenArray = kotowaza.succinctBitVectorTokenArray,
-                kotowazaSuccinctBitVectorTangoLBS = kotowaza.succinctBitVectorTangoLBS,
                 engineEngine = englishEngine,
                 mozcSegmenter = segmenter,
                 mozcNodeAttributeTable = nodeAttributeTable,

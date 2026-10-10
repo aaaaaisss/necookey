@@ -60,7 +60,6 @@ class IncrementalConversionSessionPerformanceInstrumentedTest {
             Triple(DictionaryFileKey.EMOTICON_TANGO, DictionaryFileKey.EMOTICON_YOMI, DictionaryFileKey.EMOTICON_TOKEN),
             Triple(DictionaryFileKey.SYMBOL_TANGO, DictionaryFileKey.SYMBOL_YOMI, DictionaryFileKey.SYMBOL_TOKEN),
             Triple(DictionaryFileKey.READING_CORRECTION_TANGO, DictionaryFileKey.READING_CORRECTION_YOMI, DictionaryFileKey.READING_CORRECTION_TOKEN),
-            Triple(DictionaryFileKey.KOTOWAZA_TANGO, DictionaryFileKey.KOTOWAZA_YOMI, DictionaryFileKey.KOTOWAZA_TOKEN),
         )
         val report = buildString {
             appendLine("device=${android.os.Build.MANUFACTURER} ${android.os.Build.MODEL} API ${android.os.Build.VERSION.SDK_INT}")
@@ -231,12 +230,6 @@ class IncrementalConversionSessionPerformanceInstrumentedTest {
             DictionaryFileKey.READING_CORRECTION_YOMI,
             DictionaryFileKey.READING_CORRECTION_TOKEN,
         )
-        loadTriple(
-            "kotowaza",
-            DictionaryFileKey.KOTOWAZA_TANGO,
-            DictionaryFileKey.KOTOWAZA_YOMI,
-            DictionaryFileKey.KOTOWAZA_TOKEN,
-        )
         val report = buildString {
             appendLine("device=${android.os.Build.MANUFACTURER} ${android.os.Build.MODEL} API ${android.os.Build.VERSION.SDK_INT}")
             phases.forEach { (name, milliseconds) -> appendLine("$name=$milliseconds") }
@@ -342,7 +335,6 @@ class IncrementalConversionSessionPerformanceInstrumentedTest {
             "emoticonDictionary" to fields.keys.filter { it.startsWith("emoticon") },
             "symbolDictionary" to fields.keys.filter { it.startsWith("symbol") },
             "readingCorrectionDictionary" to fields.keys.filter { it.startsWith("readingCorrection") },
-            "kotowazaDictionary" to fields.keys.filter { it.startsWith("kotowaza") },
             "englishDictionary" to fields.keys.filter { it == "englishEngine" },
             "mozcBoundaryTables" to fields.keys.filter { it.startsWith("mozc") },
             "graphAndPath" to fields.keys.filter { it == "graphBuilder" || it == "findPath" },
@@ -882,7 +874,6 @@ class IncrementalConversionSessionPerformanceInstrumentedTest {
             name.startsWith("emoticon") ||
             name.startsWith("symbol") ||
             name.startsWith("readingCorrection") ||
-            name.startsWith("kotowaza") ||
             name == "englishEngine" ||
             name.startsWith("mozc") ||
             name == "graphBuilder" ||

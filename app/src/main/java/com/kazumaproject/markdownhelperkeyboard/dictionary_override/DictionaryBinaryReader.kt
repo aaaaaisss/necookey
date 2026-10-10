@@ -314,7 +314,6 @@ class DictionaryBinaryReader @Inject constructor(
             DictionaryCategory.EMOTICON -> CompactDictionaryKind.EMOTICON
             DictionaryCategory.SYMBOL -> CompactDictionaryKind.SYMBOL
             DictionaryCategory.READING_CORRECTION -> CompactDictionaryKind.READING_CORRECTION
-            DictionaryCategory.KOTOWAZA -> CompactDictionaryKind.KOTOWAZA
             else -> return null
         }
         if (resolver.shouldUseOverrideCategory(category)) return null

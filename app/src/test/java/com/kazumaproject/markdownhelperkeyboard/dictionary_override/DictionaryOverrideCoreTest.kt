@@ -430,7 +430,7 @@ class DictionaryOverrideCoreTest {
     }
 
     @Test
-    fun coreReplacementScopeDoesNotIncludeReadingCorrectionOrKotowaza() {
+    fun coreReplacementScopeDoesNotIncludeReadingCorrection() {
         assertEquals(
             listOf(
                 DictionaryCategory.SYSTEM,
@@ -443,7 +443,6 @@ class DictionaryOverrideCoreTest {
             CORE_REPLACEMENT_CATEGORIES,
         )
         assertFalse(CORE_REPLACEMENT_CATEGORIES.contains(DictionaryCategory.READING_CORRECTION))
-        assertFalse(CORE_REPLACEMENT_CATEGORIES.contains(DictionaryCategory.KOTOWAZA))
     }
 
     @Test
@@ -860,9 +859,6 @@ class DictionaryOverrideCoreTest {
                 "tango_reading_correction.dat",
                 "yomi_reading_correction.dat",
                 "token_reading_correction.dat",
-                "tango_kotowaza.dat",
-                "yomi_kotowaza.dat",
-                "token_kotowaza.dat",
             )
         )
 
@@ -889,9 +885,6 @@ class DictionaryOverrideCoreTest {
                 DictionaryFileKey.READING_CORRECTION_TANGO,
                 DictionaryFileKey.READING_CORRECTION_YOMI,
                 DictionaryFileKey.READING_CORRECTION_TOKEN,
-                DictionaryFileKey.KOTOWAZA_TANGO,
-                DictionaryFileKey.KOTOWAZA_YOMI,
-                DictionaryFileKey.KOTOWAZA_TOKEN,
             ),
             plan.importableEntries.map { it.key }.toSet(),
         )

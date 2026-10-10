@@ -42,7 +42,6 @@ class DictionaryMemoryFootprintTest {
             loadTriple(assetsDir, posTable, "emoticon/tango_emoticon.dat", "emoticon/yomi_emoticon.dat", "emoticon/token_emoticon.dat"),
             loadTriple(assetsDir, posTable, "symbol/tango_symbol.dat", "symbol/yomi_symbol.dat", "symbol/token_symbol.dat"),
             loadTriple(assetsDir, posTable, "reading_correction/tango_reading_correction.dat", "reading_correction/yomi_reading_correction.dat", "reading_correction/token_reading_correction.dat"),
-            loadTriple(assetsDir, posTable, "kotowaza/tango_kotowaza.dat", "kotowaza/yomi_kotowaza.dat", "kotowaza/token_kotowaza.dat"),
         ))
         report += "coreWithSmallDictionaries" to usedHeapBytes()
 

@@ -18,13 +18,6 @@ import com.kazumaproject.custom_keyboard.data.KeyboardInputMode
 import com.kazumaproject.custom_keyboard.data.buildEvenCircularRanges
 import com.kazumaproject.domain.EmojiSkinToneSupport
 import com.kazumaproject.markdownhelperkeyboard.converter.engine.PredictionConfig
-import com.kazumaproject.markdownhelperkeyboard.converter.date.DateCandidateConfig
-import com.kazumaproject.markdownhelperkeyboard.converter.date.DateCandidateFormat
-import com.kazumaproject.markdownhelperkeyboard.converter.utility.AngleMode
-import com.kazumaproject.markdownhelperkeyboard.converter.utility.Precision
-import com.kazumaproject.markdownhelperkeyboard.converter.utility.RegionalUnitProfile
-import com.kazumaproject.markdownhelperkeyboard.converter.utility.UnitTargetSettingsJsonCodec
-import com.kazumaproject.markdownhelperkeyboard.converter.utility.UtilityCandidateConfig
 import com.kazumaproject.markdownhelperkeyboard.ime_service.image_effect.CinematicWaveSettings
 import com.kazumaproject.markdownhelperkeyboard.ime_service.image_effect.KeyboardTouchEffectQuality
 import com.kazumaproject.markdownhelperkeyboard.ime_service.image_effect.KeyboardTouchEffectType
@@ -55,16 +48,6 @@ object AppPreference {
     internal const val GOJUON_KEYBOARD_TYPE_MIGRATION_KEY =
         "gojuon_keyboard_type_migrated_v1"
 
-    const val UTILITY_CALCULATION_ENABLED_KEY = "utility_calculation_enabled"
-    const val UTILITY_UNIT_CONVERSION_ENABLED_KEY = "utility_unit_conversion_enabled"
-    const val UTILITY_EXPRESSION_CANDIDATE_ENABLED_KEY = "utility_expression_candidate_enabled"
-    const val UTILITY_ANGLE_MODE_KEY = "utility_angle_mode"
-    const val UTILITY_CALCULATION_PRECISION_KEY = "utility_calculation_precision"
-    const val UTILITY_REGIONAL_PROFILE_KEY = "utility_regional_profile"
-    const val UTILITY_UNIT_TARGETS_JSON_KEY = "utility_unit_targets_json"
-    const val DATE_CANDIDATE_ORDER_KEY = "date_candidate_order"
-    const val DATE_CANDIDATE_ENABLED_FORMATS_KEY = "date_candidate_enabled_formats"
-    private const val UTILITY_DECIMAL_PRECISION_PREFIX = "decimal:"
 
     const val DEFAULT_CUSTOM_THEME_CANDIDATE_ITEM_BG_COLOR = 0x00000000
     const val DEFAULT_CUSTOM_THEME_CANDIDATE_ITEM_PRESSED_BG_COLOR = 0xFFF0F0F3.toInt()
@@ -105,7 +88,6 @@ object AppPreference {
     const val VIBRATION_KEY = "vibration_preference"
     const val KEY_SOUND_KEY = "key_sound_preference"
     const val KEY_SOUND_VOLUME_PERCENT_KEY = "key_sound_volume_percent_preference"
-    const val ALLOW_FULLSCREEN_MODE_KEY = "allow_fullscreen_mode_preference"
     const val INLINE_SUGGESTION_ENABLED_KEY = "inline_suggestion_enabled_preference"
     internal const val CANDIDATE_HEIGHT_DEFAULTS_MIGRATION_VERSION_KEY =
         "candidate_height_defaults_migration_version_preference"
@@ -131,7 +113,6 @@ object AppPreference {
     private lateinit var appContext: Context
     private var isTabletDevice: Boolean = false
     private val gson = Gson()
-    private val unitTargetSettingsCodec = UnitTargetSettingsJsonCodec()
     private const val LEGACY_SYMBOL_EMOJI_CANDIDATE_ENABLE_KEY =
         "symbol_emoji_candidate_enable_preference"
     private val circularSlotActionEditableSlots = setOf(
@@ -193,8 +174,6 @@ object AppPreference {
         Pair("system_user_dictionary_prediction_enable_preference", true)
     private val READING_CORRECTION_PREDICTION_ENABLE_PREFERENCE =
         Pair("reading_correction_prediction_enable_preference", true)
-    private val PROVERB_PREDICTION_ENABLE_PREFERENCE =
-        Pair("proverb_prediction_enable_preference", true)
     private val EXTERNAL_MOZC_PREDICTION_ENABLE_PREFERENCE =
         Pair("external_mozc_prediction_enable_preference", true)
     private val SYMBOL_EMOJI_PREDICTION_ENABLE_PREFERENCE =
@@ -1765,137 +1744,6 @@ object AppPreference {
             it.putBoolean(INCREMENTAL_CONVERSION_SESSION_PREFERENCE.first, value)
         }
 
-    var date_candidate_config: DateCandidateConfig
-        get() {
-            val formatsByValue = DateCandidateFormat.entries.associateBy { it.preferenceValue }
-            val order = preferences.getString(DATE_CANDIDATE_ORDER_KEY, null)
-                ?.split(',')?.mapNotNull(formatsByValue::get).orEmpty()
-            val enabledValues = preferences.getStringSet(DATE_CANDIDATE_ENABLED_FORMATS_KEY, null)
-            val enabledFormats = enabledValues?.mapNotNull(formatsByValue::get)?.toSet()
-                ?: DateCandidateFormat.entries.toSet()
-            val config = DateCandidateConfig(order = order, enabledFormats = enabledFormats)
-            return config.copy(order = config.normalizedOrder)
-        }
-        set(value) = preferences.edit { editor ->
-            editor.putString(
-                DATE_CANDIDATE_ORDER_KEY,
-                value.normalizedOrder.joinToString(",") { it.preferenceValue },
-            )
-            editor.putStringSet(
-                DATE_CANDIDATE_ENABLED_FORMATS_KEY,
-                value.enabledFormats.mapTo(mutableSetOf()) { it.preferenceValue },
-            )
-        }
-
-    var utility_candidate_config: UtilityCandidateConfig
-        get() {
-            val calculationPrecision = preferences.getString(
-                UTILITY_CALCULATION_PRECISION_KEY,
-                "auto",
-            ).toUtilityPrecision()
-            return UtilityCandidateConfig(
-                calculationEnabled = preferences.getBoolean(
-                    UTILITY_CALCULATION_ENABLED_KEY,
-                    true,
-                ),
-                unitConversionEnabled = preferences.getBoolean(
-                    UTILITY_UNIT_CONVERSION_ENABLED_KEY,
-                    true,
-                ),
-                includeExpressionCandidate = preferences.getBoolean(
-                    UTILITY_EXPRESSION_CANDIDATE_ENABLED_KEY,
-                    true,
-                ),
-                angleMode = preferences.getString(UTILITY_ANGLE_MODE_KEY, "degrees")
-                    .toAngleMode(),
-                calculationPrecision = calculationPrecision,
-                regionalUnitProfile = preferences.getString(
-                    UTILITY_REGIONAL_PROFILE_KEY,
-                    "japan",
-                ).toRegionalUnitProfile(),
-                unitTargets = unitTargetSettingsCodec.decodeOrDefault(
-                    preferences.getString(UTILITY_UNIT_TARGETS_JSON_KEY, null),
-                ),
-            )
-        }
-        set(value) = preferences.edit { editor ->
-            editor.putBoolean(UTILITY_CALCULATION_ENABLED_KEY, value.calculationEnabled)
-            editor.putBoolean(UTILITY_UNIT_CONVERSION_ENABLED_KEY, value.unitConversionEnabled)
-            editor.putBoolean(
-                UTILITY_EXPRESSION_CANDIDATE_ENABLED_KEY,
-                value.includeExpressionCandidate,
-            )
-            editor.putString(
-                UTILITY_ANGLE_MODE_KEY,
-                if (value.angleMode == AngleMode.DEGREES) "degrees" else "radians",
-            )
-            editor.putString(
-                UTILITY_CALCULATION_PRECISION_KEY,
-                value.calculationPrecision.toPreferenceValue(),
-            )
-            editor.putString(
-                UTILITY_REGIONAL_PROFILE_KEY,
-                when (value.regionalUnitProfile) {
-                    RegionalUnitProfile.JAPAN -> "japan"
-                    RegionalUnitProfile.UNITED_STATES -> "united_states"
-                    RegionalUnitProfile.UNITED_KINGDOM -> "united_kingdom"
-                },
-            )
-            editor.putString(
-                UTILITY_UNIT_TARGETS_JSON_KEY,
-                unitTargetSettingsCodec.encode(value.unitTargets),
-            )
-        }
-
-    fun resetUtilityCandidateConfig() {
-        preferences.edit { editor ->
-            editor.remove(UTILITY_CALCULATION_ENABLED_KEY)
-            editor.remove(UTILITY_UNIT_CONVERSION_ENABLED_KEY)
-            editor.remove(UTILITY_EXPRESSION_CANDIDATE_ENABLED_KEY)
-            editor.remove(UTILITY_ANGLE_MODE_KEY)
-            editor.remove(UTILITY_CALCULATION_PRECISION_KEY)
-            editor.remove(UTILITY_REGIONAL_PROFILE_KEY)
-            editor.remove(UTILITY_UNIT_TARGETS_JSON_KEY)
-        }
-    }
-
-    private fun String?.toAngleMode(): AngleMode = when (this) {
-        "radians" -> AngleMode.RADIANS
-        else -> AngleMode.DEGREES
-    }
-
-    private fun String?.toRegionalUnitProfile(): RegionalUnitProfile = when (this) {
-        "united_states" -> RegionalUnitProfile.UNITED_STATES
-        "united_kingdom" -> RegionalUnitProfile.UNITED_KINGDOM
-        else -> RegionalUnitProfile.JAPAN
-    }
-
-    private fun String?.toUtilityPrecision(): Precision = when (this) {
-        "auto", null -> Precision.Auto
-        "integer" -> Precision.DecimalPlaces(0)
-        else -> if (startsWith(UTILITY_DECIMAL_PRECISION_PREFIX)) {
-            removePrefix(UTILITY_DECIMAL_PRECISION_PREFIX).toIntOrNull()
-                ?.takeIf {
-                    it in Precision.MIN_DECIMAL_PLACES..Precision.MAX_DECIMAL_PLACES
-                }
-                ?.let(Precision::DecimalPlaces)
-                ?: Precision.Auto
-        } else {
-            toIntOrNull()
-                ?.takeIf { it in Precision.MIN_DIGITS..Precision.MAX_DIGITS }
-                ?.let(Precision::SignificantDigits)
-                ?: Precision.Auto
-        }
-    }
-
-    @Suppress("DEPRECATION")
-    private fun Precision.toPreferenceValue(): String = when (this) {
-        Precision.Auto -> "auto"
-        Precision.Integer -> "${UTILITY_DECIMAL_PRECISION_PREFIX}0"
-        is Precision.DecimalPlaces -> "$UTILITY_DECIMAL_PRECISION_PREFIX$places"
-        is Precision.SignificantDigits -> digits.toString()
-    }
-
     var japanese_prediction_enable_preference: Boolean
         get() = preferences.getBoolean(
             JAPANESE_PREDICTION_ENABLE_PREFERENCE.first,
@@ -2011,15 +1859,6 @@ object AppPreference {
         )
         set(value) = preferences.edit {
             it.putBoolean(READING_CORRECTION_PREDICTION_ENABLE_PREFERENCE.first, value)
-        }
-
-    var proverb_prediction_enable_preference: Boolean
-        get() = preferences.getBoolean(
-            PROVERB_PREDICTION_ENABLE_PREFERENCE.first,
-            PROVERB_PREDICTION_ENABLE_PREFERENCE.second,
-        )
-        set(value) = preferences.edit {
-            it.putBoolean(PROVERB_PREDICTION_ENABLE_PREFERENCE.first, value)
         }
 
     var external_mozc_prediction_enable_preference: Boolean

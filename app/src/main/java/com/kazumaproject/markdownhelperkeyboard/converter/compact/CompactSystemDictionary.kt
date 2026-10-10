@@ -18,7 +18,6 @@ enum class CompactDictionaryKind(val id: Int) {
     EMOTICON(3),
     SYMBOL(4),
     READING_CORRECTION(5),
-    KOTOWAZA(6),
     ;
 
     companion object {

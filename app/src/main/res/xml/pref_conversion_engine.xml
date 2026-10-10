@@ -12,12 +12,6 @@
             android:title="@string/incremental_conversion_session_title"
             app:iconSpaceReserved="false" />
 
-        <Preference
-            android:key="date_candidate_settings_preference"
-            android:title="@string/date_candidate_settings_title"
-            android:summary="@string/date_candidate_settings_summary"
-            app:iconSpaceReserved="false" />
-
     </PreferenceCategory>
 
     <PreferenceCategory android:title="@string/prediction_language_category_title">
@@ -116,14 +110,6 @@
         <SwitchPreferenceCompat
             android:defaultValue="true"
             android:dependency="japanese_prediction_enable_preference"
-            android:key="proverb_prediction_enable_preference"
-            android:summary="@string/proverb_prediction_enable_summary"
-            android:title="@string/proverb_prediction_enable_title"
-            app:iconSpaceReserved="false" />
-
-        <SwitchPreferenceCompat
-            android:defaultValue="true"
-            android:dependency="japanese_prediction_enable_preference"
             android:key="external_mozc_prediction_enable_preference"
             android:summary="@string/external_mozc_prediction_enable_summary"
             android:title="@string/external_mozc_prediction_enable_title"
@@ -156,12 +142,6 @@
             android:key="emoticon_candidate_enable_preference"
             android:summary="@string/emoticon_candidate_enable_summary"
             android:title="@string/emoticon_candidate_enable_title"
-            app:iconSpaceReserved="false" />
-
-        <Preference
-            android:key="setting_route_utility_candidates"
-            android:summary="@string/utility_candidate_settings_summary"
-            android:title="@string/utility_candidate_settings_title"
             app:iconSpaceReserved="false" />
 
     </PreferenceCategory>

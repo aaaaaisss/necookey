@@ -594,7 +594,6 @@ class ExternalDictionarySettingsFragment : AsyncPreferenceFragment() {
             DictionaryCategory.EMOTICON -> preferenceContext().getString(R.string.external_dictionary_category_emoticon)
             DictionaryCategory.SYMBOL -> preferenceContext().getString(R.string.external_dictionary_category_symbol)
             DictionaryCategory.READING_CORRECTION -> "reading_correction"
-            DictionaryCategory.KOTOWAZA -> "kotowaza"
             DictionaryCategory.ENGLISH -> preferenceContext().getString(R.string.external_dictionary_category_english)
             DictionaryCategory.ENGLISH_READING -> preferenceContext().getString(R.string.external_dictionary_category_english_reading)
             DictionaryCategory.PERSON_NAME -> preferenceContext().getString(R.string.mozc_ut_person_name_title)
@@ -639,7 +638,6 @@ private val DICTIONARY_CATEGORIES = listOf(
     DictionaryCategory.ENGLISH,
     DictionaryCategory.ENGLISH_READING,
     DictionaryCategory.READING_CORRECTION,
-    DictionaryCategory.KOTOWAZA,
     DictionaryCategory.PERSON_NAME,
     DictionaryCategory.PLACES,
     DictionaryCategory.WIKI,

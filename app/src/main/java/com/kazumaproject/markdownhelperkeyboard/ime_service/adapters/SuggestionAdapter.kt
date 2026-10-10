@@ -38,10 +38,8 @@ import com.kazumaproject.core.ui.font.KeyboardFontSnapshot
 import com.kazumaproject.markdownhelperkeyboard.setting_activity.AppPreference
 import com.kazumaproject.markdownhelperkeyboard.R
 import com.kazumaproject.markdownhelperkeyboard.converter.candidate.CANDIDATE_TYPE_ERA
-import com.kazumaproject.markdownhelperkeyboard.converter.candidate.CANDIDATE_TYPE_CALCULATION
 import com.kazumaproject.markdownhelperkeyboard.converter.candidate.CANDIDATE_TYPE_LEARNED_DICTIONARY
 import com.kazumaproject.markdownhelperkeyboard.converter.candidate.CANDIDATE_TYPE_TIME
-import com.kazumaproject.markdownhelperkeyboard.converter.candidate.CANDIDATE_TYPE_UNIT_CONVERSION
 import com.kazumaproject.markdownhelperkeyboard.converter.candidate.CANDIDATE_TYPE_USER_DICTIONARY
 import com.kazumaproject.markdownhelperkeyboard.converter.candidate.CANDIDATE_TYPE_USER_TEMPLATE
 import com.kazumaproject.markdownhelperkeyboard.converter.candidate.CANDIDATE_TYPE_TEXT_MACRO
@@ -2191,8 +2189,6 @@ class SuggestionAdapter internal constructor(
                 )
                 spannable
             }
-            /** ことわざ **/
-            (16).toByte() -> ""
             /** 数 漢字混じり **/
             (17).toByte() -> ""
             /** 数 カンマあり**/
@@ -2227,10 +2223,6 @@ class SuggestionAdapter internal constructor(
             (30).toByte() -> "[全]"
             CANDIDATE_TYPE_TIME -> ""
             CANDIDATE_TYPE_ERA -> ""
-            CANDIDATE_TYPE_CALCULATION ->
-                holder.itemView.context.getString(R.string.candidate_badge_calculation)
-            CANDIDATE_TYPE_UNIT_CONVERSION ->
-                holder.itemView.context.getString(R.string.candidate_badge_unit_conversion)
             CANDIDATE_TYPE_USER_TEMPLATE ->
                 if (showDictionaryCandidateLabels) "[定型]" else ""
             CANDIDATE_TYPE_TEXT_MACRO -> "[マクロ]"

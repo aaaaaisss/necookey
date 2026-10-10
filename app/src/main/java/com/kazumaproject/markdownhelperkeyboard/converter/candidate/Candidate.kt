@@ -1,6 +1,5 @@
 package com.kazumaproject.markdownhelperkeyboard.converter.candidate
 
-import com.kazumaproject.markdownhelperkeyboard.converter.date.DateCandidateFormat
 
 /**
  * @see 1:NBest 2:Part of letters 3:Hirakana 4:Katakana 5:Combine part of letter 6. Single Kanji
@@ -19,8 +18,6 @@ data class Candidate(
     val commitText: String = string,
     /** Exact conversion path used only to align live candidate readings. */
     val conversionSegments: List<CandidateConversionSegment> = emptyList(),
-    /** Date format identity for daily date candidates that can be reordered or disabled. */
-    val dateFormat: DateCandidateFormat? = null,
     /** True when the two-row bar's primary was selected by the zenz bunsetsu gate. */
     val zenzAdjusted: Boolean = false,
 )

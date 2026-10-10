@@ -22,21 +22,6 @@
         android:label="@string/conversion_engine_category_title" />
 
     <fragment
-        android:id="@+id/utilityCandidatePreferenceFragment"
-        android:name="com.kazumaproject.markdownhelperkeyboard.setting_activity.ui.setting.UtilityCandidatePreferenceFragment"
-        android:label="@string/utility_candidate_settings_title" />
-
-    <fragment
-        android:id="@+id/unitTargetSettingsFragment"
-        android:name="com.kazumaproject.markdownhelperkeyboard.setting_activity.ui.setting.UnitTargetSettingsFragment"
-        android:label="@string/utility_conversion_targets_title" />
-
-    <fragment
-        android:id="@+id/dateCandidateSettingsFragment"
-        android:name="com.kazumaproject.markdownhelperkeyboard.setting_activity.ui.setting.DateCandidateSettingsFragment"
-        android:label="@string/date_candidate_settings_title" />
-
-    <fragment
         android:id="@+id/dictionaryPreferenceFragment"
         android:name="com.kazumaproject.markdownhelperkeyboard.setting_activity.ui.setting.DictionaryPreferenceFragment"
         android:label="@string/category_dictionary" />

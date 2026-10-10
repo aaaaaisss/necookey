@@ -24,7 +24,6 @@ import com.kazumaproject.markdownhelperkeyboard.converter.candidate.CANDIDATE_TY
 import com.kazumaproject.markdownhelperkeyboard.converter.candidate.CANDIDATE_TYPE_TIME
 import com.kazumaproject.markdownhelperkeyboard.converter.candidate.Candidate
 import com.kazumaproject.markdownhelperkeyboard.converter.candidate.CandidateConversionSegment
-import com.kazumaproject.markdownhelperkeyboard.converter.date.DateCandidateProvider
 import com.kazumaproject.markdownhelperkeyboard.converter.graph.GraphBuilder
 import com.kazumaproject.markdownhelperkeyboard.converter.graph.GraphNodeDedupMode
 import com.kazumaproject.markdownhelperkeyboard.converter.mozc.MozcBoundaryMode
@@ -236,18 +235,6 @@ class KanaKanjiEngine {
 
     @Volatile
     private var readingCorrectionDictionaryEnabled: Boolean = true
-
-    private lateinit var kotowazaYomiTrie: LOUDSWithTermId
-    private lateinit var kotowazaTangoTrie: LOUDS
-    private lateinit var kotowazaTokenArray: TokenArray
-
-    private lateinit var kotowazaSuccinctBitVectorLBSYomi: SuccinctBitVector
-    private lateinit var kotowazaSuccinctBitVectorIsLeafYomi: SuccinctBitVector
-    private lateinit var kotowazaSuccinctBitVectorTokenArray: SuccinctBitVector
-    private lateinit var kotowazaSuccinctBitVectorTangoLBS: SuccinctBitVector
-
-    @Volatile
-    private var kotowazaDictionaryEnabled: Boolean = true
 
     @Volatile
     private var englishReadingDictionary: TripleDictionaryData? = null
@@ -478,13 +465,6 @@ class KanaKanjiEngine {
             null
         }
 
-        val kotowazaState = reader.resolveCategoryLoadState(DictionaryCategory.KOTOWAZA)
-        val newKotowaza = if (kotowazaState in loadableOptionalStates) {
-            loadTripleDictionary(reader, DictionaryCategory.KOTOWAZA)
-        } else {
-            null
-        }
-
         val newPerson = loadOptionalTripleDictionary(reader, DictionaryCategory.PERSON_NAME)
         val newPlaces = loadOptionalTripleDictionary(reader, DictionaryCategory.PLACES)
         val newWiki = loadOptionalTripleDictionary(reader, DictionaryCategory.WIKI)
@@ -507,13 +487,6 @@ class KanaKanjiEngine {
                 readingCorrectionDictionaryEnabled = true
             } else {
                 readingCorrectionDictionaryEnabled = false
-            }
-
-            if (newKotowaza != null) {
-                assignKotowazaDictionary(newKotowaza)
-                kotowazaDictionaryEnabled = true
-            } else {
-                kotowazaDictionaryEnabled = false
             }
 
             assignPersonDictionary(newPerson)
@@ -651,13 +624,6 @@ class KanaKanjiEngine {
         readingCorrectionSuccinctBitVectorTokenArray: SuccinctBitVector,
         readingCorrectionSuccinctBitVectorTangoLBS: SuccinctBitVector,
 
-        kotowazaTangoTrie: LOUDS,
-        kotowazaYomiTrie: LOUDSWithTermId,
-        kotowazaTokenArray: TokenArray,
-        kotowazaSuccinctBitVectorLBSYomi: SuccinctBitVector,
-        kotowazaSuccinctBitVectorIsLeafYomi: SuccinctBitVector,
-        kotowazaSuccinctBitVectorTokenArray: SuccinctBitVector,
-        kotowazaSuccinctBitVectorTangoLBS: SuccinctBitVector,
         engineEngine: EnglishEngine,
         mozcSegmenter: MozcSegmenter? = null,
         mozcNodeAttributeTable: MozcNodeAttributeTable? = null,
@@ -745,16 +711,6 @@ class KanaKanjiEngine {
         this@KanaKanjiEngine.readingCorrectionSuccinctBitVectorTangoLBS =
             readingCorrectionSuccinctBitVectorTangoLBS
 
-        /**  Kotowaza **/
-        this@KanaKanjiEngine.kotowazaTangoTrie = kotowazaTangoTrie
-        this@KanaKanjiEngine.kotowazaTokenArray = kotowazaTokenArray
-        this@KanaKanjiEngine.kotowazaYomiTrie = kotowazaYomiTrie
-        this@KanaKanjiEngine.kotowazaSuccinctBitVectorLBSYomi = kotowazaSuccinctBitVectorLBSYomi
-        this@KanaKanjiEngine.kotowazaSuccinctBitVectorIsLeafYomi =
-            kotowazaSuccinctBitVectorIsLeafYomi
-        this@KanaKanjiEngine.kotowazaSuccinctBitVectorTokenArray =
-            kotowazaSuccinctBitVectorTokenArray
-        this@KanaKanjiEngine.kotowazaSuccinctBitVectorTangoLBS = kotowazaSuccinctBitVectorTangoLBS
 
         this@KanaKanjiEngine.graphBuilder.updateSystemUserDictionary(
             yomiTrie = null,
@@ -826,16 +782,6 @@ class KanaKanjiEngine {
         readingCorrectionSuccinctBitVectorIsLeafYomi = data.succinctBitVectorIsLeafYomi
         readingCorrectionSuccinctBitVectorTokenArray = data.succinctBitVectorTokenArray
         readingCorrectionSuccinctBitVectorTangoLBS = data.succinctBitVectorTangoLBS
-    }
-
-    private fun assignKotowazaDictionary(data: TripleDictionaryData) {
-        kotowazaTangoTrie = data.tangoTrie
-        kotowazaYomiTrie = data.yomiTrie
-        kotowazaTokenArray = data.tokenArray
-        kotowazaSuccinctBitVectorLBSYomi = data.succinctBitVectorLBSYomi
-        kotowazaSuccinctBitVectorIsLeafYomi = data.succinctBitVectorIsLeafYomi
-        kotowazaSuccinctBitVectorTokenArray = data.succinctBitVectorTokenArray
-        kotowazaSuccinctBitVectorTangoLBS = data.succinctBitVectorTangoLBS
     }
 
     private fun assignEnglishReadingDictionary(data: TripleDictionaryData?) {
@@ -1482,17 +1428,6 @@ class KanaKanjiEngine {
             emptyList()
         }
 
-        val kotowazaCommonPrefixDeferred = if (kotowazaDictionaryEnabled && predictionConfig.japanesePredictionEnabled && predictionConfig.proverbEnabled) {
-            deferredPrediction(
-                input = input,
-                yomiTrie = kotowazaYomiTrie,
-                succinctBitVector = kotowazaSuccinctBitVectorLBSYomi,
-                predictionConfig = predictionConfig,
-            )
-        } else {
-            emptyList()
-        }
-
         val predictiveSearchResult: List<Candidate> =
             buildPredictiveCandidatesIncludingSystemUser(input, predictionConfig)
 
@@ -1559,41 +1494,6 @@ class KanaKanjiEngine {
                 }
             }
 
-        val kotowazaListDeferred: List<Candidate> = kotowazaCommonPrefixDeferred.flatMap { yomi ->
-            val termId = kotowazaYomiTrie.getTermIdShortArray(
-                kotowazaYomiTrie.getNodeIndex(
-                    yomi, kotowazaSuccinctBitVectorLBSYomi
-                ), kotowazaSuccinctBitVectorIsLeafYomi
-            )
-            kotowazaTokenArray.getListDictionaryByYomiTermIdShortArray(
-                termId, kotowazaSuccinctBitVectorTokenArray
-            ).map {
-                Candidate(
-                    string = when (it.nodeId) {
-                        -2 -> yomi
-                        -1 -> yomi.hiraToKata()
-                        else -> kotowazaTangoTrie.getLetterShortArray(
-                            it.nodeId, kotowazaSuccinctBitVectorTangoLBS
-                        )
-                    },
-                    type = 16,
-                    length = yomi.length.toUByte(),
-                    score = if (yomi.length == input.length) {
-                        it.wordCost.toInt()
-                    } else {
-                            it.wordCost.toInt() + predictionConfig.completionPenalty(
-                                input.length,
-                                yomi.length,
-                                penaltyPerCharacter = 8_000,
-                                longInputFlatPenalty = null,
-                            )
-                    },
-                    leftId = kotowazaTokenArray.leftIds[it.posTableIndex.toInt()],
-                    rightId = kotowazaTokenArray.rightIds[it.posTableIndex.toInt()]
-                )
-            }
-        }
-
         val listOfDictionaryToday: List<Candidate> = createTemporalDictionaryCandidates(input)
 
         val convertYearToEra: List<Candidate> = when {
@@ -1628,7 +1528,7 @@ class KanaKanjiEngine {
             resultList.sortedWith(compareBy<Candidate> { it.score }.thenBy { it.string })
 
         val englishReadingDeferred = deferredEnglishReadingCandidates(input, resultList)
-        return resultListFinal + englishReadingDeferred + kotowazaListDeferred + symbolHalfWidthListDeferred + (englishDeferred + englishZenkaku).sortedBy { it.score } + (emojiListDeferred + emoticonListDeferred).sortedBy { it.score } + symbolListDeferred + hirakanaAndKana + yomiPartListDeferred + singleKanjiListDeferred
+        return resultListFinal + englishReadingDeferred + symbolHalfWidthListDeferred + (englishDeferred + englishZenkaku).sortedBy { it.score } + (emojiListDeferred + emoticonListDeferred).sortedBy { it.score } + symbolListDeferred + hirakanaAndKana + yomiPartListDeferred + singleKanjiListDeferred
 
     }
 
@@ -2016,17 +1916,6 @@ class KanaKanjiEngine {
             emptyList()
         }
 
-        val kotowazaCommonPrefixDeferred = if (kotowazaDictionaryEnabled && predictionConfig.japanesePredictionEnabled && predictionConfig.proverbEnabled) {
-            deferredPrediction(
-                input = input,
-                yomiTrie = kotowazaYomiTrie,
-                succinctBitVector = kotowazaSuccinctBitVectorLBSYomi,
-                predictionConfig = predictionConfig,
-            )
-        } else {
-            emptyList()
-        }
-
         val predictiveSearchResult: List<Candidate> =
             buildPredictiveCandidatesIncludingSystemUser(input, predictionConfig)
 
@@ -2093,41 +1982,6 @@ class KanaKanjiEngine {
                 }
             }
 
-        val kotowazaListDeferred: List<Candidate> = kotowazaCommonPrefixDeferred.flatMap { yomi ->
-            val termId = kotowazaYomiTrie.getTermIdShortArray(
-                kotowazaYomiTrie.getNodeIndex(
-                    yomi, kotowazaSuccinctBitVectorLBSYomi
-                ), kotowazaSuccinctBitVectorIsLeafYomi
-            )
-            kotowazaTokenArray.getListDictionaryByYomiTermIdShortArray(
-                termId, kotowazaSuccinctBitVectorTokenArray
-            ).map {
-                Candidate(
-                    string = when (it.nodeId) {
-                        -2 -> yomi
-                        -1 -> yomi.hiraToKata()
-                        else -> kotowazaTangoTrie.getLetterShortArray(
-                            it.nodeId, kotowazaSuccinctBitVectorTangoLBS
-                        )
-                    },
-                    type = 16,
-                    length = yomi.length.toUByte(),
-                    score = if (yomi.length == input.length) {
-                        it.wordCost.toInt()
-                    } else {
-                            it.wordCost.toInt() + predictionConfig.completionPenalty(
-                                input.length,
-                                yomi.length,
-                                penaltyPerCharacter = 8_000,
-                                longInputFlatPenalty = null,
-                            )
-                    },
-                    leftId = kotowazaTokenArray.leftIds[it.posTableIndex.toInt()],
-                    rightId = kotowazaTokenArray.rightIds[it.posTableIndex.toInt()]
-                )
-            }
-        }
-
         val listOfDictionaryToday: List<Candidate> = createTemporalDictionaryCandidates(input)
 
         val convertYearToEra: List<Candidate> = when {
@@ -2164,7 +2018,7 @@ class KanaKanjiEngine {
                 compareByDescending<Candidate> { it.string in systemNgramMatchedCandidates }
                     .thenBy { it.score }
                     .thenBy { it.string },
-            ) + deferredEnglishReadingCandidates(input, resultList) + kotowazaListDeferred + symbolHalfWidthListDeferred + (englishDeferred + englishZenkaku).sortedBy { it.score } + (emojiListDeferred + emoticonListDeferred).sortedBy { it.score } + symbolListDeferred + hirakanaAndKana + yomiPartListDeferred + singleKanjiListDeferred
+            ) + deferredEnglishReadingCandidates(input, resultList) + symbolHalfWidthListDeferred + (englishDeferred + englishZenkaku).sortedBy { it.score } + (emojiListDeferred + emoticonListDeferred).sortedBy { it.score } + symbolListDeferred + hirakanaAndKana + yomiPartListDeferred + singleKanjiListDeferred
 
         return BunsetsuCandidateResult(
             candidates = resultListFinal,
@@ -2540,17 +2394,6 @@ class KanaKanjiEngine {
             emptyList()
         }
 
-        val kotowazaCommonPrefixDeferred = if (kotowazaDictionaryEnabled && predictionConfig.japanesePredictionEnabled && predictionConfig.proverbEnabled) {
-            deferredPrediction(
-                input = input,
-                yomiTrie = kotowazaYomiTrie,
-                succinctBitVector = kotowazaSuccinctBitVectorLBSYomi,
-                predictionConfig = predictionConfig,
-            )
-        } else {
-            emptyList()
-        }
-
         val predictiveSearchResult: List<Candidate> =
             buildPredictiveCandidatesIncludingSystemUser(input, predictionConfig)
 
@@ -2617,41 +2460,6 @@ class KanaKanjiEngine {
                 }
             }
 
-        val kotowazaListDeferred: List<Candidate> = kotowazaCommonPrefixDeferred.flatMap { yomi ->
-            val termId = kotowazaYomiTrie.getTermIdShortArray(
-                kotowazaYomiTrie.getNodeIndex(
-                    yomi, kotowazaSuccinctBitVectorLBSYomi
-                ), kotowazaSuccinctBitVectorIsLeafYomi
-            )
-            kotowazaTokenArray.getListDictionaryByYomiTermIdShortArray(
-                termId, kotowazaSuccinctBitVectorTokenArray
-            ).map {
-                Candidate(
-                    string = when (it.nodeId) {
-                        -2 -> yomi
-                        -1 -> yomi.hiraToKata()
-                        else -> kotowazaTangoTrie.getLetterShortArray(
-                            it.nodeId, kotowazaSuccinctBitVectorTangoLBS
-                        )
-                    },
-                    type = 16,
-                    length = yomi.length.toUByte(),
-                    score = if (yomi.length == input.length) {
-                        it.wordCost.toInt()
-                    } else {
-                            it.wordCost.toInt() + predictionConfig.completionPenalty(
-                                input.length,
-                                yomi.length,
-                                penaltyPerCharacter = 8_000,
-                                longInputFlatPenalty = null,
-                            )
-                    },
-                    leftId = kotowazaTokenArray.leftIds[it.posTableIndex.toInt()],
-                    rightId = kotowazaTokenArray.rightIds[it.posTableIndex.toInt()]
-                )
-            }
-        }
-
         val listOfDictionaryToday: List<Candidate> = createTemporalDictionaryCandidates(input)
 
         val convertYearToEra: List<Candidate> = when {
@@ -2690,7 +2498,7 @@ class KanaKanjiEngine {
         )
 
         val finalList =
-            resultListFinal + deferredEnglishReadingCandidates(input, resultList) + kotowazaListDeferred + (englishDeferred + englishZenkaku).sortedBy { it.score } + (emojiListDeferred + emoticonListDeferred).sortedBy { it.score } + hirakanaAndKana + yomiPartListDeferred + symbolListDeferred + singleKanjiListDeferred
+            resultListFinal + deferredEnglishReadingCandidates(input, resultList) + (englishDeferred + englishZenkaku).sortedBy { it.score } + (emojiListDeferred + emoticonListDeferred).sortedBy { it.score } + hirakanaAndKana + yomiPartListDeferred + symbolListDeferred + singleKanjiListDeferred
 
         return BunsetsuCandidateResult(
             candidates = finalList,
@@ -3062,17 +2870,6 @@ class KanaKanjiEngine {
             emptyList()
         }
 
-        val kotowazaCommonPrefixDeferred = if (kotowazaDictionaryEnabled && predictionConfig.japanesePredictionEnabled && predictionConfig.proverbEnabled) {
-            deferredPrediction(
-                input = input,
-                yomiTrie = kotowazaYomiTrie,
-                succinctBitVector = kotowazaSuccinctBitVectorLBSYomi,
-                predictionConfig = predictionConfig,
-            )
-        } else {
-            emptyList()
-        }
-
         val predictiveSearchResult: List<Candidate> =
             buildPredictiveCandidatesIncludingSystemUser(input, predictionConfig)
 
@@ -3139,41 +2936,6 @@ class KanaKanjiEngine {
                 }
             }
 
-        val kotowazaListDeferred: List<Candidate> = kotowazaCommonPrefixDeferred.flatMap { yomi ->
-            val termId = kotowazaYomiTrie.getTermIdShortArray(
-                kotowazaYomiTrie.getNodeIndex(
-                    yomi, kotowazaSuccinctBitVectorLBSYomi
-                ), kotowazaSuccinctBitVectorIsLeafYomi
-            )
-            kotowazaTokenArray.getListDictionaryByYomiTermIdShortArray(
-                termId, kotowazaSuccinctBitVectorTokenArray
-            ).map {
-                Candidate(
-                    string = when (it.nodeId) {
-                        -2 -> yomi
-                        -1 -> yomi.hiraToKata()
-                        else -> kotowazaTangoTrie.getLetterShortArray(
-                            it.nodeId, kotowazaSuccinctBitVectorTangoLBS
-                        )
-                    },
-                    type = 16,
-                    length = yomi.length.toUByte(),
-                    score = if (yomi.length == input.length) {
-                        it.wordCost.toInt()
-                    } else {
-                            it.wordCost.toInt() + predictionConfig.completionPenalty(
-                                input.length,
-                                yomi.length,
-                                penaltyPerCharacter = 8_000,
-                                longInputFlatPenalty = null,
-                            )
-                    },
-                    leftId = kotowazaTokenArray.leftIds[it.posTableIndex.toInt()],
-                    rightId = kotowazaTokenArray.rightIds[it.posTableIndex.toInt()]
-                )
-            }
-        }
-
         val listOfDictionaryToday: List<Candidate> = createTemporalDictionaryCandidates(input)
 
         val convertYearToEra: List<Candidate> = when {
@@ -3207,7 +2969,7 @@ class KanaKanjiEngine {
         val resultListFinal =
             resultList.sortedWith(compareBy<Candidate> { it.score }.thenBy { it.string })
 
-        return resultListFinal + deferredEnglishReadingCandidates(input, resultList) + kotowazaListDeferred + (englishDeferred + englishZenkaku).sortedBy { it.score } + (emojiListDeferred + emoticonListDeferred).sortedBy { it.score } + hirakanaAndKana + yomiPartListDeferred + symbolListDeferred + singleKanjiListDeferred
+        return resultListFinal + deferredEnglishReadingCandidates(input, resultList) + (englishDeferred + englishZenkaku).sortedBy { it.score } + (emojiListDeferred + emoticonListDeferred).sortedBy { it.score } + hirakanaAndKana + yomiPartListDeferred + symbolListDeferred + singleKanjiListDeferred
 
     }
 
@@ -3565,17 +3327,6 @@ class KanaKanjiEngine {
             emptyList()
         }
 
-        val kotowazaCommonPrefixDeferred = if (kotowazaDictionaryEnabled && predictionConfig.japanesePredictionEnabled && predictionConfig.proverbEnabled) {
-            deferredPrediction(
-                input = input,
-                yomiTrie = kotowazaYomiTrie,
-                succinctBitVector = kotowazaSuccinctBitVectorLBSYomi,
-                predictionConfig = predictionConfig,
-            )
-        } else {
-            emptyList()
-        }
-
         val yomiPartListDeferred: List<Candidate> = yomiPartOfDeferred.flatMap { yomi ->
             val termId = systemYomiTrie.getTermId(
                 systemYomiTrie.getNodeIndex(
@@ -3639,41 +3390,6 @@ class KanaKanjiEngine {
                 }
             }
 
-        val kotowazaListDeferred: List<Candidate> = kotowazaCommonPrefixDeferred.flatMap { yomi ->
-            val termId = kotowazaYomiTrie.getTermIdShortArray(
-                kotowazaYomiTrie.getNodeIndex(
-                    yomi, kotowazaSuccinctBitVectorLBSYomi
-                ), kotowazaSuccinctBitVectorIsLeafYomi
-            )
-            kotowazaTokenArray.getListDictionaryByYomiTermIdShortArray(
-                termId, kotowazaSuccinctBitVectorTokenArray
-            ).map {
-                Candidate(
-                    string = when (it.nodeId) {
-                        -2 -> yomi
-                        -1 -> yomi.hiraToKata()
-                        else -> kotowazaTangoTrie.getLetterShortArray(
-                            it.nodeId, kotowazaSuccinctBitVectorTangoLBS
-                        )
-                    },
-                    type = 16,
-                    length = yomi.length.toUByte(),
-                    score = if (yomi.length == input.length) {
-                        it.wordCost.toInt()
-                    } else {
-                            it.wordCost.toInt() + predictionConfig.completionPenalty(
-                                input.length,
-                                yomi.length,
-                                penaltyPerCharacter = 8_000,
-                                longInputFlatPenalty = null,
-                            )
-                    },
-                    leftId = kotowazaTokenArray.leftIds[it.posTableIndex.toInt()],
-                    rightId = kotowazaTokenArray.rightIds[it.posTableIndex.toInt()]
-                )
-            }
-        }
-
         val listOfDictionaryToday: List<Candidate> = createTemporalDictionaryCandidates(input)
 
         val convertYearToEra: List<Candidate> = when {
@@ -3707,7 +3423,7 @@ class KanaKanjiEngine {
         val resultListFinal =
             resultList.sortedWith(compareBy<Candidate> { it.score }.thenBy { it.string })
 
-        return resultListFinal + deferredEnglishReadingCandidates(input, resultList) + (englishDeferred + englishZenkaku).sortedBy { it.score } + symbolHalfWidthListDeferred + (emojiListDeferred + emoticonListDeferred).sortedBy { it.score } + symbolListDeferred + kotowazaListDeferred + hirakanaAndKana + yomiPartListDeferred + singleKanjiListDeferred
+        return resultListFinal + deferredEnglishReadingCandidates(input, resultList) + (englishDeferred + englishZenkaku).sortedBy { it.score } + symbolHalfWidthListDeferred + (emojiListDeferred + emoticonListDeferred).sortedBy { it.score } + symbolListDeferred + hirakanaAndKana + yomiPartListDeferred + singleKanjiListDeferred
 
     }
 
@@ -4087,17 +3803,6 @@ class KanaKanjiEngine {
             emptyList()
         }
 
-        val kotowazaCommonPrefixDeferred = if (kotowazaDictionaryEnabled && predictionConfig.japanesePredictionEnabled && predictionConfig.proverbEnabled) {
-            deferredPrediction(
-                input = input,
-                yomiTrie = kotowazaYomiTrie,
-                succinctBitVector = kotowazaSuccinctBitVectorLBSYomi,
-                predictionConfig = predictionConfig,
-            )
-        } else {
-            emptyList()
-        }
-
         val yomiPartListDeferred: List<Candidate> = yomiPartOfDeferred.flatMap { yomi ->
             val termId = systemYomiTrie.getTermId(
                 systemYomiTrie.getNodeIndex(
@@ -4161,41 +3866,6 @@ class KanaKanjiEngine {
                 }
             }
 
-        val kotowazaListDeferred: List<Candidate> = kotowazaCommonPrefixDeferred.flatMap { yomi ->
-            val termId = kotowazaYomiTrie.getTermIdShortArray(
-                kotowazaYomiTrie.getNodeIndex(
-                    yomi, kotowazaSuccinctBitVectorLBSYomi
-                ), kotowazaSuccinctBitVectorIsLeafYomi
-            )
-            kotowazaTokenArray.getListDictionaryByYomiTermIdShortArray(
-                termId, kotowazaSuccinctBitVectorTokenArray
-            ).map {
-                Candidate(
-                    string = when (it.nodeId) {
-                        -2 -> yomi
-                        -1 -> yomi.hiraToKata()
-                        else -> kotowazaTangoTrie.getLetterShortArray(
-                            it.nodeId, kotowazaSuccinctBitVectorTangoLBS
-                        )
-                    },
-                    type = 16,
-                    length = yomi.length.toUByte(),
-                    score = if (yomi.length == input.length) {
-                        it.wordCost.toInt()
-                    } else {
-                            it.wordCost.toInt() + predictionConfig.completionPenalty(
-                                input.length,
-                                yomi.length,
-                                penaltyPerCharacter = 8_000,
-                                longInputFlatPenalty = null,
-                            )
-                    },
-                    leftId = kotowazaTokenArray.leftIds[it.posTableIndex.toInt()],
-                    rightId = kotowazaTokenArray.rightIds[it.posTableIndex.toInt()]
-                )
-            }
-        }
-
         val listOfDictionaryToday: List<Candidate> = createTemporalDictionaryCandidates(input)
 
         val convertYearToEra: List<Candidate> = when {
@@ -4232,7 +3902,7 @@ class KanaKanjiEngine {
                 compareByDescending<Candidate> { it.string in systemNgramMatchedCandidates }
                     .thenBy { it.score }
                     .thenBy { it.string },
-            ) + deferredEnglishReadingCandidates(input, resultList) + (englishDeferred + englishZenkaku).sortedBy { it.score } + symbolHalfWidthListDeferred + (emojiListDeferred + emoticonListDeferred).sortedBy { it.score } + symbolListDeferred + kotowazaListDeferred + hirakanaAndKana + yomiPartListDeferred + singleKanjiListDeferred
+            ) + deferredEnglishReadingCandidates(input, resultList) + (englishDeferred + englishZenkaku).sortedBy { it.score } + symbolHalfWidthListDeferred + (emojiListDeferred + emoticonListDeferred).sortedBy { it.score } + symbolListDeferred + hirakanaAndKana + yomiPartListDeferred + singleKanjiListDeferred
 
         return BunsetsuCandidateResult(
             candidates = resultListFinal,
@@ -4374,21 +4044,6 @@ class KanaKanjiEngine {
     }
 
     private fun createTemporalDictionaryCandidates(input: String): List<Candidate> = when (input) {
-        "きょう" -> {
-            val today = Calendar.getInstance()
-            createCandidatesForDate(today, input)
-        }
-
-        "きのう" -> {
-            val yesterday = Calendar.getInstance().apply { add(Calendar.DAY_OF_YEAR, -1) }
-            createCandidatesForDate(yesterday, input)
-        }
-
-        "あした" -> {
-            val tomorrow = Calendar.getInstance().apply { add(Calendar.DAY_OF_YEAR, 1) }
-            createCandidatesForDate(tomorrow, input)
-        }
-
         "いま" -> {
             val now = Calendar.getInstance()
             createCandidatesForTime(now, input)
@@ -4640,10 +4295,6 @@ class KanaKanjiEngine {
             codePoint in 0x1B000..0x1B0FF
         }
     }
-
-    private fun createCandidatesForDate(
-        calendar: Calendar, input: String
-    ): List<Candidate> = DateCandidateProvider.provide(calendar, input)
 
     /**
      * 4桁の数字を時刻の候補に変換する。

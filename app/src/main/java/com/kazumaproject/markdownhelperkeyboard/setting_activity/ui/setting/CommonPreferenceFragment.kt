@@ -375,26 +375,10 @@ open class CommonPreferenceFragment : AsyncPreferenceFragment() {
             }
         }
 
-        setupRoutePreferences()
         onCommonPreferencesCreated()
     }
 
     protected open fun onCommonPreferencesCreated() = Unit
-
-    private fun setupRoutePreferences() {
-        val routeTargets = mapOf(
-            "date_candidate_settings_preference" to R.id.dateCandidateSettingsFragment,
-            "setting_route_utility_candidates" to R.id.utilityCandidatePreferenceFragment,
-        )
-
-        routeTargets.forEach { (key, destinationId) ->
-            findPreference<Preference>(key)?.setOnPreferenceClickListener {
-                navigateSafely(destinationId)
-                true
-            }
-        }
-
-    }
 
     override fun onPreferencesResumed() {
         val guideSettings = com.kazumaproject.markdownhelperkeyboard.ime_service.composing_guide.ComposingGuideSettings(

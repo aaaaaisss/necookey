@@ -381,7 +381,6 @@ def bundledCoreDictionaryTriples = [
     [id: 3, zipped: false, tango: file("src/main/assets/emoticon/tango_emoticon.dat"), yomi: file("src/main/assets/emoticon/yomi_emoticon.dat"), token: file("src/main/assets/emoticon/token_emoticon.dat")],
     [id: 4, zipped: false, tango: file("src/main/assets/symbol/tango_symbol.dat"), yomi: file("src/main/assets/symbol/yomi_symbol.dat"), token: file("src/main/assets/symbol/token_symbol.dat")],
     [id: 5, zipped: false, tango: file("src/main/assets/reading_correction/tango_reading_correction.dat"), yomi: file("src/main/assets/reading_correction/yomi_reading_correction.dat"), token: file("src/main/assets/reading_correction/token_reading_correction.dat")],
-    [id: 6, zipped: false, tango: file("src/main/assets/kotowaza/tango_kotowaza.dat"), yomi: file("src/main/assets/kotowaza/yomi_kotowaza.dat"), token: file("src/main/assets/kotowaza/token_kotowaza.dat")],
 ]
 def compactSystemDictionaryAsset = layout.buildDirectory.file(
     "generated/compactSystemDictionary/assets/system/system.compact.kdict"

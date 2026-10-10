@@ -566,50 +566,12 @@ object AppModule {
     fun provideReadingCorrectionSuccinctBitVectorTangoLBS(@ReadingCorrectionTangoTrie tangoTrie: LOUDS, reader: DictionaryBinaryReader): SuccinctBitVector =
         reader.loadTangoLbsIndex(DictionaryFileKey.READING_CORRECTION_TANGO, tangoTrie)
 
-    @KotowazaTangoTrie
-    @Singleton
-    @Provides
-    fun provideKotowazaTangoTrie(reader: DictionaryBinaryReader): LOUDS {
-        return reader.loadLouds(DictionaryFileKey.KOTOWAZA_TANGO)
-    }
 
-    @KotowazaYomiTrie
-    @Singleton
-    @Provides
-    fun provideKotowazaYomiTrie(reader: DictionaryBinaryReader): LOUDSWithTermId {
-        return reader.loadLoudsWithTermId(DictionaryFileKey.KOTOWAZA_YOMI)
-    }
 
-    @KotowazaTokenArray
-    @Singleton
-    @Provides
-    fun providesKotowazaTokenArray(reader: DictionaryBinaryReader): TokenArray {
-        return reader.loadTokenArray(DictionaryFileKey.KOTOWAZA_TOKEN)
-    }
 
-    @Singleton
-    @Provides
-    @KotowazaSuccinctBitVectorLBSYomi
-    fun provideKotowazaSuccinctBitVectorLBSYomi(@KotowazaYomiTrie yomiTrie: LOUDSWithTermId, reader: DictionaryBinaryReader): SuccinctBitVector =
-        reader.loadYomiLbsIndex(DictionaryFileKey.KOTOWAZA_YOMI, yomiTrie)
 
-    @Singleton
-    @Provides
-    @KotowazaSuccinctBitVectorIsLeafYomi
-    fun provideKotowazaSuccinctBitVectorIsLeafYomi(@KotowazaYomiTrie yomiTrie: LOUDSWithTermId, reader: DictionaryBinaryReader): SuccinctBitVector =
-        reader.loadYomiLeafIndex(DictionaryFileKey.KOTOWAZA_YOMI, yomiTrie)
 
-    @Singleton
-    @Provides
-    @KotowazaSuccinctBitVectorTokenArray
-    fun provideKotowazaSuccinctBitVectorTokenArray(@KotowazaTokenArray tokenArray: TokenArray, reader: DictionaryBinaryReader): SuccinctBitVector =
-        reader.loadTokenIndex(DictionaryFileKey.KOTOWAZA_TOKEN, tokenArray)
 
-    @Singleton
-    @Provides
-    @KotowazaSuccinctBitVectorTangoLBS
-    fun provideKotowazaSuccinctBitVectorTangoLBS(@KotowazaTangoTrie tangoTrie: LOUDS, reader: DictionaryBinaryReader): SuccinctBitVector =
-        reader.loadTangoLbsIndex(DictionaryFileKey.KOTOWAZA_TANGO, tangoTrie)
 
     @Singleton
     @Provides
@@ -664,13 +626,6 @@ object AppModule {
         @ReadingCorrectionSuccinctBitVectorTokenArray readingCorrectionSuccinctBitVectorTokenArray: SuccinctBitVector,
         @ReadingCorrectionSuccinctBitVectorTangoLBS readingCorrectionSuccinctBitVectorTangoLBS: SuccinctBitVector,
 
-        @KotowazaTangoTrie kotowazaTangoTrie: LOUDS,
-        @KotowazaYomiTrie kotowazaYomiTrie: LOUDSWithTermId,
-        @KotowazaTokenArray kotowazaTokenArray: TokenArray,
-        @KotowazaSuccinctBitVectorLBSYomi kotowazaSuccinctBitVectorLBSYomi: SuccinctBitVector,
-        @KotowazaSuccinctBitVectorIsLeafYomi kotowazaSuccinctBitVectorIsLeafYomi: SuccinctBitVector,
-        @KotowazaSuccinctBitVectorTokenArray kotowazaSuccinctBitVectorTokenArray: SuccinctBitVector,
-        @KotowazaSuccinctBitVectorTangoLBS kotowazaSuccinctBitVectorTangoLBS: SuccinctBitVector,
         englishEngine: EnglishEngine,
         ngramRuleScorerManager: NgramRuleScorerManager,
         dictionaryBinaryReader: DictionaryBinaryReader,
@@ -771,13 +726,6 @@ object AppModule {
             readingCorrectionSuccinctBitVectorTokenArray = readingCorrectionSuccinctBitVectorTokenArray,
             readingCorrectionSuccinctBitVectorTangoLBS = readingCorrectionSuccinctBitVectorTangoLBS,
 
-            kotowazaTangoTrie = kotowazaTangoTrie,
-            kotowazaYomiTrie = kotowazaYomiTrie,
-            kotowazaTokenArray = kotowazaTokenArray,
-            kotowazaSuccinctBitVectorLBSYomi = kotowazaSuccinctBitVectorLBSYomi,
-            kotowazaSuccinctBitVectorIsLeafYomi = kotowazaSuccinctBitVectorIsLeafYomi,
-            kotowazaSuccinctBitVectorTokenArray = kotowazaSuccinctBitVectorTokenArray,
-            kotowazaSuccinctBitVectorTangoLBS = kotowazaSuccinctBitVectorTangoLBS,
             engineEngine = englishEngine,
             mozcSegmenter = mozcSegmenter,
             mozcNodeAttributeTable = mozcNodeAttributeTable,

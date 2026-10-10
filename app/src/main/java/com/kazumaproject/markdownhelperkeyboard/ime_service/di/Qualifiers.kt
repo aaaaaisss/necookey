@@ -176,34 +176,6 @@ annotation class ReadingCorrectionSuccinctBitVectorTangoLBS
 
 @Retention(AnnotationRetention.RUNTIME)
 @Qualifier
-annotation class KotowazaYomiTrie
-
-@Retention(AnnotationRetention.RUNTIME)
-@Qualifier
-annotation class KotowazaTangoTrie
-
-@Retention(AnnotationRetention.RUNTIME)
-@Qualifier
-annotation class KotowazaTokenArray
-
-@Retention(AnnotationRetention.RUNTIME)
-@Qualifier
-annotation class KotowazaSuccinctBitVectorLBSYomi
-
-@Retention(AnnotationRetention.RUNTIME)
-@Qualifier
-annotation class KotowazaSuccinctBitVectorIsLeafYomi
-
-@Retention(AnnotationRetention.RUNTIME)
-@Qualifier
-annotation class KotowazaSuccinctBitVectorTokenArray
-
-@Retention(AnnotationRetention.RUNTIME)
-@Qualifier
-annotation class KotowazaSuccinctBitVectorTangoLBS
-
-@Retention(AnnotationRetention.RUNTIME)
-@Qualifier
 annotation class EnglishReadingLOUDS
 
 @Retention(AnnotationRetention.RUNTIME)

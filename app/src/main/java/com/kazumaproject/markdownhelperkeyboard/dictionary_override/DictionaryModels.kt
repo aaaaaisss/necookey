@@ -11,7 +11,6 @@ enum class DictionaryCategory {
     EMOTICON,
     SYMBOL,
     READING_CORRECTION,
-    KOTOWAZA,
     ENGLISH,
     ENGLISH_READING,
     PERSON_NAME,
@@ -69,9 +68,6 @@ enum class DictionaryFileKey {
     READING_CORRECTION_TANGO,
     READING_CORRECTION_YOMI,
     READING_CORRECTION_TOKEN,
-    KOTOWAZA_TANGO,
-    KOTOWAZA_YOMI,
-    KOTOWAZA_TOKEN,
     ENGLISH_READING,
     ENGLISH_WORD,
     ENGLISH_TOKEN,
@@ -186,9 +182,6 @@ object DictionaryFileSpecs {
         triple(DictionaryFileKey.READING_CORRECTION_YOMI, DictionaryCategory.READING_CORRECTION, DictionaryFileRole.YOMI, "reading_correction/yomi_reading_correction.dat", DictionaryContentType.LOUDS_WITH_TERM_ID, R.string.external_dictionary_file_yomi, true),
         triple(DictionaryFileKey.READING_CORRECTION_TOKEN, DictionaryCategory.READING_CORRECTION, DictionaryFileRole.TOKEN, "reading_correction/token_reading_correction.dat", DictionaryContentType.TOKEN_ARRAY, R.string.external_dictionary_file_token, true),
 
-        triple(DictionaryFileKey.KOTOWAZA_TANGO, DictionaryCategory.KOTOWAZA, DictionaryFileRole.TANGO, "kotowaza/tango_kotowaza.dat", DictionaryContentType.LOUDS, R.string.external_dictionary_file_tango, true),
-        triple(DictionaryFileKey.KOTOWAZA_YOMI, DictionaryCategory.KOTOWAZA, DictionaryFileRole.YOMI, "kotowaza/yomi_kotowaza.dat", DictionaryContentType.LOUDS_WITH_TERM_ID, R.string.external_dictionary_file_yomi, true),
-        triple(DictionaryFileKey.KOTOWAZA_TOKEN, DictionaryCategory.KOTOWAZA, DictionaryFileRole.TOKEN, "kotowaza/token_kotowaza.dat", DictionaryContentType.TOKEN_ARRAY, R.string.external_dictionary_file_token, true),
 
         triple(DictionaryFileKey.ENGLISH_READING, DictionaryCategory.ENGLISH, DictionaryFileRole.ENGLISH_READING, "english/reading.dat.zip", DictionaryContentType.ENGLISH_READING, R.string.external_dictionary_file_english_reading, true),
         triple(DictionaryFileKey.ENGLISH_WORD, DictionaryCategory.ENGLISH, DictionaryFileRole.ENGLISH_WORD, "english/word.dat", DictionaryContentType.ENGLISH_WORD, R.string.external_dictionary_file_english_word, true),
@@ -273,7 +266,6 @@ fun DictionaryCategory.isOptionalMozcUt(): Boolean =
 fun DictionaryCategory.isDisableableBundledDictionary(): Boolean =
     this in setOf(
         DictionaryCategory.READING_CORRECTION,
-        DictionaryCategory.KOTOWAZA,
         DictionaryCategory.ENGLISH_READING,
         DictionaryCategory.PERSON_NAME,
         DictionaryCategory.PLACES,
