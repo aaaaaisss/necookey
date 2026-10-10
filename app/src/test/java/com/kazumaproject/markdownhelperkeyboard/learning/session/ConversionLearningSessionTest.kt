@@ -72,6 +72,60 @@ class ConversionLearningSessionTest {
         assertTrue(entries.any { it.input == "しうん" && it.out == "紫雲" })
     }
 
+    @Test
+    fun longSentenceLearnsOnlyBunsetsuNotWholeSentence() {
+        val session = ConversionLearningSession()
+        val reading = "きょうはとてもいいてんきですね"
+        session.beginIfNeeded(reading)
+        session.record(fragment("きょうは", "今日は", index = 1))
+        session.record(fragment("とても", "とても", index = 0))
+        session.record(fragment("いい", "良い", index = 1))
+        session.record(fragment("てんきですね", "天気ですね", index = 0))
+
+        val entries = session.finish(learnFirstCandidate = false)
+
+        assertTrue(entries.any { it.input == "きょうは" && it.out == "今日は" && !it.isPhrase })
+        assertTrue(entries.any { it.input == "いい" && it.out == "良い" })
+        assertTrue(entries.none { it.input == reading })
+        assertTrue(entries.all { it.input.length <= ConversionLearningSession.MAX_PHRASE_READING_LENGTH })
+        // Short cumulative phrases are still learned.
+        assertTrue(entries.any { it.input == "きょうはとてもいい" && it.out == "今日はとても良い" })
+    }
+
+    @Test
+    fun longUnsplitWholeCommitIsNotLearned() {
+        val session = ConversionLearningSession()
+        val reading = "きょうはとてもいいてんきですね"
+        session.beginIfNeeded(reading)
+        session.record(
+            LearningFragment(
+                reading = reading,
+                output = "今日はとても良い天気ですね",
+                candidateScore = 40_000,
+                candidateIndex = 1,
+                unsplitWhole = true,
+            )
+        )
+        assertTrue(session.finish(learnFirstCandidate = true).isEmpty())
+    }
+
+    @Test
+    fun shortUnsplitWholeCommitIsLearned() {
+        val session = ConversionLearningSession()
+        session.beginIfNeeded("きょうは")
+        session.record(
+            LearningFragment(
+                reading = "きょうは",
+                output = "今日は",
+                candidateScore = 40_000,
+                candidateIndex = 1,
+                unsplitWhole = true,
+            )
+        )
+        val entries = session.finish(learnFirstCandidate = false)
+        assertEquals(listOf("きょうは" to "今日は"), entries.map { it.input to it.out })
+    }
+
     private fun fragment(reading: String, output: String, index: Int) = LearningFragment(
         reading = reading,
         output = output,

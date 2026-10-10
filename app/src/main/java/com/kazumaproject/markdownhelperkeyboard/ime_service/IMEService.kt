@@ -200,6 +200,8 @@ import com.kazumaproject.markdownhelperkeyboard.converter.candidatebar.NecookeyC
 import com.kazumaproject.markdownhelperkeyboard.converter.candidatebar.TwoRowCandidateBar
 import com.kazumaproject.markdownhelperkeyboard.converter.candidatebar.TwoRowCandidateBarPlanner
 import com.kazumaproject.markdownhelperkeyboard.converter.candidatebar.ZenzBunsetsuReselector
+import com.kazumaproject.markdownhelperkeyboard.learning.session.BunsetsuLearningSplitter
+import com.kazumaproject.markdownhelperkeyboard.learning.session.LearnedBunsetsu
 import com.kazumaproject.markdownhelperkeyboard.converter.candidatebar.ZenzSpanScorer
 import com.kazumaproject.markdownhelperkeyboard.converter.candidate.CANDIDATE_TYPE_ERA
 import com.kazumaproject.markdownhelperkeyboard.converter.candidate.CANDIDATE_TYPE_CALCULATION
@@ -2250,6 +2252,12 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
     private val necookeyCandidateBarConfig = NecookeyCandidateBarConfig.DEFAULT
     private val necookeyZenzReselector = ZenzBunsetsuReselector(necookeyCandidateBarConfig)
     private var necookeyZenzJob: Job? = null
+    /** Bunsetsu analysis + paths of the latest two-row conversion; used to learn per bunsetsu. */
+    @Volatile
+    private var necookeyLearningAnalysis: BunsetsuAnalysis? = null
+    @Volatile
+    private var necookeyLearningSegmentsByString: Map<String, List<CandidateConversionSegment>> =
+        emptyMap()
     private var necookeyPredictionAdapter: SuggestionAdapter? = null
     /** Input the bottom row currently belongs to; the row hides itself for any other input. */
     private var necookeyPredictionRowInput: String = ""
@@ -24234,18 +24242,60 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
             return
         }
         conversionLearningSession.beginIfNeeded(originalReading)
-        conversionLearningSession.record(
-            LearningFragment(
-                reading = segmentReading,
-                output = output,
-                candidateScore = candidate.score,
-                candidateIndex = candidateIndex,
-                leftId = candidate.leftId,
-                rightId = candidate.rightId,
-                explicitlySelected = explicitlySelected,
+        val bunsetsu = learningBunsetsuFor(segmentReading, output, candidate)
+        if (bunsetsu != null && bunsetsu.size > 1) {
+            bunsetsu.forEachIndexed { index, part ->
+                conversionLearningSession.record(
+                    LearningFragment(
+                        reading = part.reading,
+                        output = part.output,
+                        candidateScore = candidate.score,
+                        candidateIndex = candidateIndex,
+                        leftId = if (index == 0) candidate.leftId else null,
+                        rightId = if (index == bunsetsu.lastIndex) candidate.rightId else null,
+                        explicitlySelected = explicitlySelected,
+                    )
+                )
+            }
+        } else {
+            conversionLearningSession.record(
+                LearningFragment(
+                    reading = segmentReading,
+                    output = output,
+                    candidateScore = candidate.score,
+                    candidateIndex = candidateIndex,
+                    leftId = candidate.leftId,
+                    rightId = candidate.rightId,
+                    explicitlySelected = explicitlySelected,
+                    // Proven single bunsetsu only when the analysis of this reading says so.
+                    unsplitWhole = bunsetsu == null,
+                )
             )
-        )
+        }
         if (complete) persistCompletedLearningSession()
+    }
+
+    /**
+     * Bunsetsu of a committed candidate, from its own conversion path and the bunsetsu
+     * boundaries of the analysis made for the same reading. Null when either is unavailable.
+     */
+    private fun learningBunsetsuFor(
+        reading: String,
+        output: String,
+        candidate: Candidate,
+    ): List<LearnedBunsetsu>? {
+        val analysis = necookeyLearningAnalysis?.takeIf { it.input.startsWith(reading) }
+            ?: return null
+        val segments = candidate.conversionSegments.takeIf { it.isNotEmpty() }
+            ?: necookeyLearningSegmentsByString[candidate.string]
+                ?.takeIf { analysis.input.length == reading.length }
+            ?: return null
+        return BunsetsuLearningSplitter.split(
+            reading = reading,
+            output = output,
+            segments = segments,
+            bunsetsuBoundaries = analysis.slots.map { it.span.end },
+        )
     }
 
     private fun recordBunsetsuLearning(
@@ -25443,6 +25493,8 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         if (!shouldApplyCandidateResult(insertString, token)) return
 
         val baseAnalysis = core?.let { result -> analyzeNecookeyBunsetsu(insertString, result) }
+        necookeyLearningAnalysis = baseAnalysis
+        necookeyLearningSegmentsByString = core?.candidateSegmentsByString.orEmpty()
         val gateEnabled = baseAnalysis != null && necookeyZenzGateEnabled()
         // Capture editor context before publishing the initial bar, which may apply live
         // conversion and mutate the composing text. This exact snapshot is used for both the
