@@ -5833,6 +5833,23 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         super.onWindowHidden()
     }
 
+    /**
+     * The zenz model lives in the separate :zenz process and is loaded lazily on the first
+     * rerank. Under real memory pressure (RUNNING_LOW / RUNNING_CRITICAL, or once we are in the
+     * background LRU list) unbind it so that process and its model/KV buffers can be reclaimed;
+     * the next rerank reconnects and re-initializes it. UI_HIDDEN alone does not release it.
+     */
+    @Suppress("DEPRECATION")
+    override fun onTrimMemory(level: Int) {
+        super.onTrimMemory(level)
+        val release = level == android.content.ComponentCallbacks2.TRIM_MEMORY_RUNNING_LOW ||
+            level == android.content.ComponentCallbacks2.TRIM_MEMORY_RUNNING_CRITICAL ||
+            level >= android.content.ComponentCallbacks2.TRIM_MEMORY_BACKGROUND
+        if (AppVariantConfig.hasZenz && release) {
+            zenzRuntimeClient.close()
+        }
+    }
+
     override fun onDestroy() {
         localFontScope.cancel()
         dismissKeyboardSelectionPopups()
