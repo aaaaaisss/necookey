@@ -51,6 +51,9 @@ class ConversionLearningSession {
         fragments += fragment
     }
 
+    /** Fragments recorded so far, in commit order (read before [finish], which clears them). */
+    fun recordedFragments(): List<LearningFragment> = fragments.toList()
+
     fun finish(
         learnFirstCandidate: Boolean,
         timestamp: Long = System.currentTimeMillis(),

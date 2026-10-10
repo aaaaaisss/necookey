@@ -337,6 +337,8 @@ import com.kazumaproject.markdownhelperkeyboard.ime_service.state.CandidateTab
 import com.kazumaproject.markdownhelperkeyboard.ime_service.state.InputTypeForIME
 import com.kazumaproject.markdownhelperkeyboard.ime_service.state.KeyboardType
 import com.kazumaproject.markdownhelperkeyboard.learning.database.LearnEntity
+import com.kazumaproject.markdownhelperkeyboard.learning.nextword.NextWordPolicy
+import com.kazumaproject.markdownhelperkeyboard.learning.nextword.NextWordRepository
 import com.kazumaproject.markdownhelperkeyboard.learning.session.ConversionLearningSession
 import com.kazumaproject.markdownhelperkeyboard.learning.session.LearningFragment
 import com.kazumaproject.markdownhelperkeyboard.ng_word.NgWordMatcher
@@ -579,6 +581,9 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
 
     @Inject
     lateinit var learnRepository: LearnRepository
+
+    @Inject
+    lateinit var nextWordRepository: NextWordRepository
 
     @Inject
     lateinit var userDictionaryRepository: UserDictionaryRepository
@@ -1427,9 +1432,17 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
             return
         }
 
+        val learnedEnabled = isLearnDictionaryMode == true
+        val leftContext = if (learnedEnabled) {
+            currentInputConnection?.getTextBeforeCursor(NextWordPolicy.MAX_CONTEXT_LENGTH * 2, 0)
+                ?.toString().orEmpty()
+        } else {
+            ""
+        }
         zeroQueryLookupJob = scope.launch {
             val candidates = withContext(Dispatchers.IO) {
-                zeroQueryLookupUseCase.lookup(key)
+                val learned = if (learnedEnabled) learnedFollowingWords(key, leftContext) else emptyList()
+                learned + zeroQueryLookupUseCase.lookup(key)
             }
                 .filter { it.string.isNotBlank() }
                 .distinctBy { it.string }
@@ -1448,6 +1461,45 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
             zeroQuerySelectionUpdateSuppressCount += 1
             zeroQueryLookupJob = null
             refreshCandidateStripContent(candidatesShown = false)
+        }
+    }
+
+    /**
+     * Following-word candidates from learning: learned next words for the left context, then
+     * learned phrases that continue the committed text (their remainder).
+     */
+    private suspend fun learnedFollowingWords(committedText: String, leftContext: String): List<Candidate> {
+        return try {
+            val context = leftContext.ifEmpty { committedText }
+            val nextWords = nextWordRepository.lookup(context, "", NEXT_WORD_CANDIDATE_LIMIT).map {
+                Candidate(
+                    string = it.output,
+                    type = CANDIDATE_TYPE_NEXT_WORD,
+                    length = it.reading.length.toUByte(),
+                    score = 0,
+                    yomi = it.reading,
+                )
+            }
+            val tail = committedText.takeLast(NextWordPolicy.MAX_CONTEXT_LENGTH)
+            val continuations = learnRepository.findByOutputPrefix(
+                outputPrefix = tail,
+                limit = NEXT_WORD_CANDIDATE_LIMIT,
+            ).mapNotNull { entry ->
+                NextWordPolicy.remainderAfter(tail, entry.out)?.let { rest ->
+                    Candidate(
+                        string = rest,
+                        type = CANDIDATE_TYPE_LEARNED_DICTIONARY,
+                        length = 0u,
+                        score = entry.score,
+                    )
+                }
+            }
+            nextWords + continuations
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            Timber.w(e, "learned following word lookup failed")
+            emptyList()
         }
     }
 
@@ -2075,6 +2127,9 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         )
 
     companion object {
+        /** Learned following word (後続語) from the next-word table. */
+        const val CANDIDATE_TYPE_NEXT_WORD: Byte = 53
+        private const val NEXT_WORD_CANDIDATE_LIMIT = 6
         private const val LONG_DELAY_TIME = 64L
         private const val DEFAULT_DELAY_MS = 1000L
         private const val DEFAULT_LIVE_CONVERSION_APPLY_DELAY_MS = 120L
@@ -2255,6 +2310,16 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
     private val necookeyZenzReselector = ZenzBunsetsuReselector(necookeyCandidateBarConfig)
     private var necookeyZenzJob: Job? = null
     /** Bunsetsu analysis + paths of the latest two-row conversion; used to learn per bunsetsu. */
+    /** Editor text left of the composition, captured for [necookeyLeftContextInput]. */
+    @Volatile
+    private var necookeyLeftContext: String = ""
+    @Volatile
+    private var necookeyLeftContextInput: String = ""
+    /** Left context of the conversion the current learning session started with. */
+    private var learningSessionLeftContext: String? = null
+    /** Output of the last bunsetsu learned; the context of the next commit's first bunsetsu. */
+    private var lastLearnedBunsetsuOutput: String? = null
+
     /** Reading the visible two-row top row was built for (it is not hidden while stale). */
     private var necookeyTopRowInput: String = ""
     /** Set only while a top-row candidate commit is being processed; see [recordCandidateLearning]. */
@@ -11587,6 +11652,12 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         insertString: String, candidate: Candidate, candidatePosition: Int
     ) {
         val request = beginKeyboardPopupRequest() ?: return
+        if (candidate.type == CANDIDATE_TYPE_NEXT_WORD) {
+            val reading = candidate.yomi.orEmpty()
+            val entry = LearnEntity(input = reading, out = candidate.string)
+            showCandidateLongPressActionsPopup(insertString, candidate, request, entry)
+            return
+        }
         val readings = learnedCandidateReadings(insertString, candidate)
         val outputs = listOf(candidate.string, candidate.commitText).distinct()
         ioScope.launch {
@@ -11662,10 +11733,14 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
                     // state, a newer request), and must never leave the deleted word visible.
                     removeCandidateFromVisibleLists(candidate)
                     ioScope.launch {
-                        learnRepository.deleteByInputAndOutput(
-                            input = entry.input,
-                            output = entry.out,
-                        )
+                        if (candidate.type == CANDIDATE_TYPE_NEXT_WORD) {
+                            nextWordRepository.delete(reading = entry.input, output = entry.out)
+                        } else {
+                            learnRepository.deleteByInputAndOutput(
+                                input = entry.input,
+                                output = entry.out,
+                            )
+                        }
                         withContext(Dispatchers.Main) {
                             necookeyZenzOverrideCacheClear()
                             requestCandidateRefresh(CandidateShowFlag.Updating)
@@ -24342,6 +24417,7 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
             conversionLearningSession.cancel()
             return
         }
+        captureLearningSessionLeftContext(originalReading)
         conversionLearningSession.beginIfNeeded(originalReading)
         val bunsetsu = learningBunsetsuFor(segmentReading, output, candidate)
         if (bunsetsu != null && bunsetsu.size > 1) {
@@ -24409,6 +24485,7 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
             conversionLearningSession.cancel()
             return
         }
+        captureLearningSessionLeftContext(originalReading)
         conversionLearningSession.beginIfNeeded(originalReading)
         segments.forEach { segment ->
             val candidate = segment.overrideDisplayCandidate
@@ -24429,10 +24506,21 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         if (complete) persistCompletedLearningSession()
     }
 
+    private fun captureLearningSessionLeftContext(originalReading: String) {
+        if (conversionLearningSession.isActive) return
+        learningSessionLeftContext = necookeyLeftContext.takeIf {
+            necookeyLeftContextInput.isNotEmpty() && originalReading.startsWith(necookeyLeftContextInput)
+        }
+    }
+
     private fun persistCompletedLearningSession() {
+        val fragments = conversionLearningSession.recordedFragments()
+        val sessionLeftContext = learningSessionLeftContext
+        learningSessionLeftContext = null
         val entries = conversionLearningSession.finish(
             learnFirstCandidate = learnFirstCandidateDictionaryPreference == true,
         )
+        persistNextWords(sessionLeftContext, fragments)
         if (entries.isEmpty()) return
         val allowMixedSymbolsAndNumbers = learnDictionaryAllowMixedSymbolsNumbersPreference
         ioScope.launch {
@@ -24445,6 +24533,29 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
                 throw e
             } catch (e: Exception) {
                 Timber.e(e, "Saving conversion learning session failed")
+            }
+        }
+    }
+
+    /** Learns (preceding bunsetsu -> next bunsetsu) pairs; never runs in private mode. */
+    private fun persistNextWords(leftContext: String?, fragments: List<LearningFragment>) {
+        val previous = lastLearnedBunsetsuOutput
+        lastLearnedBunsetsuOutput = fragments.lastOrNull()?.output
+        if (fragments.isEmpty() || !isLearningWriteEnabled()) return
+        val preceding = previous?.takeIf { leftContext != null && leftContext.endsWith(it) }
+        val pairs = NextWordPolicy.pairs(
+            precedingBunsetsu = preceding,
+            bunsetsu = fragments.map { it.reading to it.output },
+            timestamp = System.currentTimeMillis(),
+        )
+        if (pairs.isEmpty()) return
+        ioScope.launch {
+            try {
+                nextWordRepository.record(pairs)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                Timber.e(e, "Saving next words failed")
             }
         }
     }
@@ -25605,6 +25716,15 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         val context = if (gateEnabled) getZenzContext(insertString) else null
         val profile = zenzProfilePreference.orEmpty()
         if (!shouldApplyCandidateResult(insertString, token)) return
+        val leftContext = when {
+            isLearnDictionaryMode != true -> ""
+            context != null -> context.leftContext
+            else -> getZenzContext(insertString).leftContext
+        }
+        necookeyLeftContext = leftContext
+        necookeyLeftContextInput = insertString
+        val nextWordCandidates = lookupNextWordCandidates(leftContext, insertString)
+        if (!shouldApplyCandidateResult(insertString, token)) return
 
         val cacheKey = if (baseAnalysis != null && context != null) {
             buildNecookeyZenzOverrideCacheKey(
@@ -25628,7 +25748,7 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
             conversionCandidates = conversion,
             analysis = baseAnalysis,
             primaryOverride = cachedOverride,
-            predictionCandidates = predictions,
+            predictionCandidates = nextWordCandidates + predictions,
             config = necookeyCandidateBarConfig,
             isActionCandidate = ::isNecookeyActionCandidate,
         )
@@ -25647,9 +25767,36 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
                 context = context,
                 profile = profile,
                 conversion = conversion,
-                predictions = predictions,
+                predictions = nextWordCandidates + predictions,
                 token = token,
             )
+        }
+    }
+
+    /** Learned following words for [leftContext] whose reading starts with the current input. */
+    private suspend fun lookupNextWordCandidates(
+        leftContext: String,
+        insertString: String,
+    ): List<Candidate> {
+        if (isLearnDictionaryMode != true || leftContext.isBlank()) return emptyList()
+        if (insertString.length > NextWordPolicy.MAX_READING_LENGTH) return emptyList()
+        return try {
+            withContext(Dispatchers.IO) {
+                nextWordRepository.lookup(leftContext, insertString, NEXT_WORD_CANDIDATE_LIMIT)
+            }.map { entry ->
+                Candidate(
+                    string = entry.output,
+                    type = CANDIDATE_TYPE_NEXT_WORD,
+                    length = entry.reading.length.toUByte(),
+                    score = 0,
+                    yomi = entry.reading,
+                )
+            }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            Timber.w(e, "next word lookup failed")
+            emptyList()
         }
     }
 

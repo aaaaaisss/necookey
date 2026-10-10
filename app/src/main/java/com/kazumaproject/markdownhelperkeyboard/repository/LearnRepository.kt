@@ -125,6 +125,16 @@ class LearnRepository @Inject constructor(
             .toList()
     }
 
+    /** Learned entries whose output continues [outputPrefix]; used for following-word candidates. */
+    suspend fun findByOutputPrefix(
+        outputPrefix: String,
+        limit: Int,
+        maxReadingLength: Int = PredictionConfig.MAX_PREDICTION_INPUT_LENGTH,
+    ): List<LearnEntity> {
+        if (outputPrefix.isEmpty() || limit <= 0) return emptyList()
+        return learnDao.findByOutputPrefix(outputPrefix, maxReadingLength, limit)
+    }
+
     fun all(): Flow<List<LearnEntity>> = learnDao.all()
 
     suspend fun allSuspend(): List<LearnEntity> = learnDao.getAllSuspend()

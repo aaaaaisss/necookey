@@ -27,6 +27,8 @@ import com.kazumaproject.markdownhelperkeyboard.custom_romaji.database.RomajiMap
 import com.kazumaproject.markdownhelperkeyboard.custom_romaji.database.RomajiMapEntity
 import com.kazumaproject.markdownhelperkeyboard.delete_key_flick.database.DeleteKeyFlickDeleteTarget
 import com.kazumaproject.markdownhelperkeyboard.delete_key_flick.database.DeleteKeyFlickDeleteTargetDao
+import com.kazumaproject.markdownhelperkeyboard.learning.nextword.NextWordDao
+import com.kazumaproject.markdownhelperkeyboard.learning.nextword.NextWordEntity
 import com.kazumaproject.markdownhelperkeyboard.learning.database.LearnDao
 import com.kazumaproject.markdownhelperkeyboard.learning.database.LearnEntity
 import com.kazumaproject.markdownhelperkeyboard.ngram_rule.database.NgramRuleDao
@@ -80,8 +82,9 @@ import com.kazumaproject.markdownhelperkeyboard.zeroquery.custom.CustomZeroQuery
         SumireSpecialKeyPlacementOverrideEntity::class,
         CustomZeroQueryEntry::class,
         TextMacro::class,
+        NextWordEntity::class,
     ],
-    version = 49,
+    version = 50,
     exportSchema = false
 )
 @TypeConverters(
@@ -93,6 +96,7 @@ import com.kazumaproject.markdownhelperkeyboard.zeroquery.custom.CustomZeroQuery
 abstract class AppDatabase : RoomDatabase() {
 
     abstract fun learnDao(): LearnDao
+    abstract fun nextWordDao(): NextWordDao
     abstract fun clickedSymbolDao(): ClickedSymbolDao
     abstract fun userWordDao(): UserWordDao
     abstract fun keyboardLayoutDao(): KeyboardLayoutDao
@@ -1214,6 +1218,26 @@ abstract class AppDatabase : RoomDatabase() {
                 db.execSQL("DROP INDEX IF EXISTS `index_gemma_prompt_template_inputModality_isEnabled`")
                 db.execSQL("DROP INDEX IF EXISTS `index_gemma_prompt_template_builtInKey`")
                 db.execSQL("DROP TABLE IF EXISTS `gemma_prompt_template`")
+            }
+        }
+
+        /** necookey: learned following words (後続語) with their preceding bunsetsu. */
+        val MIGRATION_49_50 = object : Migration(49, 50) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS `next_word_table` (" +
+                        "`context` TEXT NOT NULL, `reading` TEXT NOT NULL, `output` TEXT NOT NULL, " +
+                        "`usageCount` INTEGER NOT NULL, `lastUsedAt` INTEGER NOT NULL, " +
+                        "`id` INTEGER PRIMARY KEY AUTOINCREMENT)"
+                )
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS `index_next_word_table_context` " +
+                        "ON `next_word_table` (`context`)"
+                )
+                db.execSQL(
+                    "CREATE UNIQUE INDEX IF NOT EXISTS `index_next_word_table_context_reading_output` " +
+                        "ON `next_word_table` (`context`, `reading`, `output`)"
+                )
             }
         }
 

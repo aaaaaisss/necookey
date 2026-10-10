@@ -254,6 +254,16 @@ private class FakeLearnDao(
         return before - entries.size
     }
 
+    override suspend fun findByOutputPrefix(
+        outputPrefix: String,
+        maxReadingLength: Int,
+        limit: Int,
+    ): List<LearnEntity> = entries
+        .filter { it.out.startsWith(outputPrefix) && it.out.length > outputPrefix.length }
+        .filter { it.input.length <= maxReadingLength }
+        .sortedBy { it.score }
+        .take(limit)
+
     override suspend fun deleteByInputAndOutput(input: String, output: String): Int {
         val before = entries.size
         entries.removeAll { it.input == input && it.out == output }

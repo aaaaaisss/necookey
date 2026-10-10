@@ -141,6 +141,14 @@ interface LearnDao {
     @Query("DELETE FROM learn_table WHERE input = :input")
     suspend fun deleteByInput(input: String): Int
 
+    /** Learned entries whose output continues [outputPrefix] (following-word candidates). */
+    @Query(
+        "SELECT * FROM learn_table WHERE substr(out, 1, length(:outputPrefix)) = :outputPrefix " +
+            "AND length(out) > length(:outputPrefix) AND length(input) <= :maxReadingLength " +
+            "ORDER BY score ASC LIMIT :limit"
+    )
+    suspend fun findByOutputPrefix(outputPrefix: String, maxReadingLength: Int, limit: Int): List<LearnEntity>
+
     @Query("DELETE FROM learn_table WHERE input = :input AND out = :output")
     suspend fun deleteByInputAndOutput(input: String, output: String): Int
 

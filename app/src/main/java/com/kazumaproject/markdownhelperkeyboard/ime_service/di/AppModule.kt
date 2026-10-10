@@ -62,6 +62,7 @@ import com.kazumaproject.markdownhelperkeyboard.database.AppDatabase.Companion.M
 import com.kazumaproject.markdownhelperkeyboard.database.AppDatabase.Companion.MIGRATION_45_46
 import com.kazumaproject.markdownhelperkeyboard.database.AppDatabase.Companion.MIGRATION_47_48
 import com.kazumaproject.markdownhelperkeyboard.database.AppDatabase.Companion.MIGRATION_48_49
+import com.kazumaproject.markdownhelperkeyboard.database.AppDatabase.Companion.MIGRATION_49_50
 import com.kazumaproject.markdownhelperkeyboard.database.AppDatabase.Companion.MIGRATION_46_47
 import com.kazumaproject.markdownhelperkeyboard.database.AppDatabase.Companion.MIGRATION_2_3
 import com.kazumaproject.markdownhelperkeyboard.database.AppDatabase.Companion.MIGRATION_3_4
@@ -80,6 +81,7 @@ import com.kazumaproject.markdownhelperkeyboard.converter.ConnectionMatrix
 import com.kazumaproject.markdownhelperkeyboard.ime_service.clipboard.ClipboardUtil
 import com.kazumaproject.markdownhelperkeyboard.ime_service.models.PressedKeyStatus
 import com.kazumaproject.markdownhelperkeyboard.learning.database.LearnDao
+import com.kazumaproject.markdownhelperkeyboard.learning.nextword.NextWordDao
 import com.kazumaproject.markdownhelperkeyboard.ng_word.database.NgWordDao
 import com.kazumaproject.markdownhelperkeyboard.ngram_rule.NgramRuleScorerManager
 import com.kazumaproject.markdownhelperkeyboard.ngram_rule.database.NgramRuleDao
@@ -167,12 +169,17 @@ object AppModule {
             MIGRATION_46_47,
             MIGRATION_47_48,
             MIGRATION_48_49,
+            MIGRATION_49_50,
         )
         .build()
 
     @Singleton
     @Provides
     fun providesLearnDao(db: AppDatabase): LearnDao = db.learnDao()
+
+    @Singleton
+    @Provides
+    fun providesNextWordDao(db: AppDatabase): NextWordDao = db.nextWordDao()
 
     @Singleton
     @Provides
