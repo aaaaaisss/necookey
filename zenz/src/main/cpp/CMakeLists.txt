@@ -10,6 +10,8 @@ if(ZENZ_NATIVE_OPTIMIZED)
     # Release builds need fast inference; debug builds can opt in via zenzDebugOptimizedNative.
     set(CMAKE_BUILD_TYPE Release CACHE STRING "" FORCE)
     add_compile_options(-O3 -ffast-math -fno-finite-math-only -DNDEBUG)
+    # Size: per-function sections so the linker can drop unused llama/ggml code.
+    add_compile_options(-ffunction-sections -fdata-sections)
 endif()
 
 set(CMAKE_CXX_STANDARD 17)
@@ -54,3 +56,13 @@ target_link_libraries(zenz
         ggml
         ${log-lib}
 )
+
+if(ZENZ_NATIVE_OPTIMIZED)
+    # Only the JNI entry points need to be exported: hide the static llama/ggml symbols,
+    # garbage-collect unreferenced sections and strip debug info + the static symbol table.
+    target_link_options(zenz PRIVATE
+            -Wl,--gc-sections
+            -Wl,--exclude-libs,ALL
+            -Wl,--strip-all
+    )
+endif()
