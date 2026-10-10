@@ -14,7 +14,7 @@ internal object QwertyEnglishDirectInputPolicy {
         if (inputMode != InputMode.ModeEnglish) return false
         if (currentQwertyRomajiModeForSession) return false
 
-        return qwertyMode == TenKeyQWERTYMode.TenKeyQWERTY ||
-                qwertyMode == TenKeyQWERTYMode.TenKeyQWERTYRomaji
+        // No QWERTY keyboard any more: never forced.
+        return false
     }
 }

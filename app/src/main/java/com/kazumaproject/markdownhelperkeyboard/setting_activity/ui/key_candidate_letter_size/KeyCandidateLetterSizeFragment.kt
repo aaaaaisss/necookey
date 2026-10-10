@@ -57,17 +57,12 @@ class KeyCandidateLetterSizeFragment : Fragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
         setKeyboardSize()
-        binding.tenkeyLetterSizePreview.setKeySizeScale(
-            appPreference.tenkey_key_width_scale_percent ?: DEFAULT_KEY_SCALE_PERCENT,
-            appPreference.tenkey_key_height_scale_percent ?: DEFAULT_KEY_SCALE_PERCENT
-        )
-        binding.tenkeyLetterSizePreview.setUseThreeStateKeyboard(
-            appPreference.tenkey_use_three_state_keyboard_preference,
-            appPreference.tenkey_number_symbol_key_gap_preference,
-        )
-        binding.tenkeyLetterSizePreview.setUseQwertyNumberWhenThreeStateOff(
-            appPreference.tenkey_switch_number_to_qwerty_number_preference
-        )
+        runCatching {
+            binding.tenkeyLetterSizePreview.setKeyboard(
+                com.kazumaproject.custom_keyboard.layout.KeyboardDefaultLayouts
+                    .createFlickKanaTemplateLayout(isDefaultKey = true)
+            )
+        }
         setupRecyclerView()
         setupPreviewData()
         setupCandidateLetterSizeSeekBar()
@@ -164,7 +159,6 @@ class KeyCandidateLetterSizeFragment : Fragment() {
         // Reset key letter size
         appPreference.key_letter_size = 0.0f
         //binding.keyLetterSizeSeekbar.progress = keyProgress
-        binding.tenkeyLetterSizePreview.setKeyLetterSize(defaultKeyTextSize)
 
         // Reset candidate letter size
         appPreference.candidate_letter_size = defaultCandidateTextSize

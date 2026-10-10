@@ -1,4 +1,4 @@
-package com.kazumaproject.tenkey.extensions
+package com.kazumaproject.core.domain.extensions
 
 fun Char.getNextInputChar(charAtInsertPosition: Char): Char? {
     return when {

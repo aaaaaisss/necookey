@@ -1097,11 +1097,8 @@ dependencies {
     implementation 'androidx.preference:preference-ktx:1.2.1'
     implementation 'androidx.autofill:autofill:1.3.0'
     implementation project(':flexbox')
-    implementation project(':tenkey')
     implementation project(':core')
     implementation project(':symbol_keyboard')
-    implementation project(':gojuon_keyboard')
-    implementation project(':qwerty_keyboard')
     implementation project(':custom_keyboard')
     fullImplementation project(':zenz')
 

@@ -3,11 +3,11 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent">
 
-    <com.kazumaproject.qwerty_keyboard.ui.QWERTYKeyboardView
-        android:id="@+id/qwerty_view"
+    <com.kazumaproject.custom_keyboard.view.FlickKeyboardView
+        android:id="@+id/custom_keyboard_preview"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:clickable="true"
-        android:focusable="true" />
+        android:clickable="false"
+        android:focusable="false" />
 
 </FrameLayout>

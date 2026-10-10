@@ -20,7 +20,7 @@ class RuntimeInputBehaviorPolicyTest {
             assertEquals(
                 ResolvedInputBehavior.DIRECT_COMMIT,
                 RuntimeInputBehaviorPolicy.resolveBaseline(
-                    qwertyMode = TenKeyQWERTYMode.Default,
+                    qwertyMode = TenKeyQWERTYMode.Custom,
                     isCustomLayoutDirectMode = false,
                     resolvedInputBehavior = resolved,
                 )
@@ -37,7 +37,7 @@ class RuntimeInputBehaviorPolicyTest {
         assertEquals(
             ResolvedInputBehavior.COMPOSING_TEXT,
             RuntimeInputBehaviorPolicy.resolveBaseline(
-                qwertyMode = TenKeyQWERTYMode.Default,
+                qwertyMode = TenKeyQWERTYMode.Custom,
                 isCustomLayoutDirectMode = false,
                 resolvedInputBehavior = resolved,
             )
@@ -53,7 +53,7 @@ class RuntimeInputBehaviorPolicyTest {
         assertEquals(
             ResolvedInputBehavior.COMPOSING_TEXT,
             RuntimeInputBehaviorPolicy.resolveBaseline(
-                qwertyMode = TenKeyQWERTYMode.Default,
+                qwertyMode = TenKeyQWERTYMode.Custom,
                 isCustomLayoutDirectMode = false,
                 resolvedInputBehavior = resolved,
             )

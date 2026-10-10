@@ -13,7 +13,6 @@ import android.widget.ListView
 import android.widget.PopupWindow
 import com.kazumaproject.markdownhelperkeyboard.R
 import com.kazumaproject.markdownhelperkeyboard.databinding.MainLayoutBinding
-import com.kazumaproject.markdownhelperkeyboard.ime_service.adapters.FloatingCandidateListAdapter
 import com.kazumaproject.markdownhelperkeyboard.ime_service.image_effect.InkTouchDispatchFrameLayout
 import com.kazumaproject.markdownhelperkeyboard.repository.UserTemplateRepository
 import com.kazumaproject.markdownhelperkeyboard.setting_activity.AppPreference
@@ -54,7 +53,6 @@ class ImeSelectionPopupBehaviorTest {
         service.userTemplateRepository = mock<UserTemplateRepository>()
         ReflectionHelpers.setField(service, "mainLayoutBinding", binding)
         ReflectionHelpers.setField(service, "isInputViewActive", true)
-        ReflectionHelpers.setField(service, "listAdapter", mock<FloatingCandidateListAdapter>())
         doReturn(Dialog(activity)).whenever(service).getWindow()
         doReturn(android.view.LayoutInflater.from(activity)).whenever(service).getLayoutInflater()
         doAnswer {

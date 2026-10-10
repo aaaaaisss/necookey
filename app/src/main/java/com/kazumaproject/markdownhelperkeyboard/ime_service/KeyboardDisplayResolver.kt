@@ -23,7 +23,7 @@ fun resolveKeyboardDisplay(
     val requestedKeyboard = requested ?: savedPositionKeyboard
     val usedEmptyOrderFallback = keyboardOrder.isEmpty()
     val resolvedKeyboard = when {
-        usedEmptyOrderFallback -> KeyboardType.TENKEY
+        usedEmptyOrderFallback -> KeyboardType.CUSTOM
         requestedKeyboard != null && requestedKeyboard in keyboardOrder -> requestedKeyboard
         else -> keyboardOrder.first()
     }

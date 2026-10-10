@@ -27,7 +27,7 @@ class Application : Application() {
         // The `:zenz` process must not touch Room; seed only in the main process. This blocks only
         // on the very first launch (one Room insert) so the IME never starts before the default
         // custom layout exists; afterwards it is a single SharedPreferences read.
-        if (isMainProcess() && NecookeyDefaultLayoutSeeder.needsSeeding(this)) {
+        if (isMainProcess() && NecookeyDefaultLayoutSeeder.needsStartupCheck(this)) {
             runBlocking(Dispatchers.IO) {
                 NecookeyDefaultLayoutSeeder.seedIfNeeded(this@Application, keyboardRepository)
             }

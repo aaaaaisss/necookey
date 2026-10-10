@@ -5,54 +5,44 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import androidx.recyclerview.widget.RecyclerView
+import com.kazumaproject.custom_keyboard.layout.KeyboardDefaultLayouts
+import com.kazumaproject.custom_keyboard.view.FlickKeyboardView
 import com.kazumaproject.markdownhelperkeyboard.R
-import com.kazumaproject.qwerty_keyboard.ui.QWERTYKeyboardView
-import com.kazumaproject.tenkey.TenKey
 
+/**
+ * Preview pages for the keyboard position/size editor. necookey only has the custom keyboard, so
+ * there is a single page showing the default custom flick layout. The (former) tenkey size
+ * preferences are what the custom keyboard uses for its size.
+ */
 class KeyboardViewPagerAdapter : RecyclerView.Adapter<KeyboardViewPagerAdapter.ViewHolder>() {
-
-    private val pageLayouts = listOf(
-        R.layout.page_tenkey,
-        R.layout.page_qwerty
-    )
 
     companion object {
         const val TEN_KEY_PAGE_POSITION = 0
-        const val QWERTY_PAGE_POSITION = 1
+        /** No QWERTY page any more; kept only so callers compile (never selected). */
+        const val QWERTY_PAGE_POSITION = -1
     }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ViewHolder {
-        val view = LayoutInflater.from(parent.context).inflate(viewType, parent, false)
+        val view = LayoutInflater.from(parent.context)
+            .inflate(R.layout.page_custom_keyboard_preview, parent, false)
         return ViewHolder(view)
     }
 
     @SuppressLint("ClickableViewAccessibility")
     override fun onBindViewHolder(holder: ViewHolder, position: Int) {
-        when (position) {
-            TEN_KEY_PAGE_POSITION -> {
-                holder.tenKeyView?.setOnTouchListener { _, _ ->
-                    true
-                }
+        holder.preview?.let { preview ->
+            runCatching {
+                preview.setKeyboard(
+                    KeyboardDefaultLayouts.createFlickKanaTemplateLayout(isDefaultKey = true)
+                )
             }
-
-            QWERTY_PAGE_POSITION -> {
-                holder.qwertyView?.setOnTouchListener { _, _ ->
-                    true
-                }
-            }
+            preview.setOnTouchListener { _, _ -> true }
         }
     }
 
-    override fun getItemCount(): Int = pageLayouts.size
+    override fun getItemCount(): Int = 1
 
-    override fun getItemViewType(position: Int): Int {
-        return pageLayouts[position]
-    }
-
-    // Updated ViewHolder to hold references to the specific keyboard views
     class ViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
-        // These can be nullable because a given layout will only have one of them.
-        val tenKeyView: TenKey? = itemView.findViewById(R.id.keyboard_view)
-        val qwertyView: QWERTYKeyboardView? = itemView.findViewById(R.id.qwerty_view)
+        val preview: FlickKeyboardView? = itemView.findViewById(R.id.custom_keyboard_preview)
     }
 }

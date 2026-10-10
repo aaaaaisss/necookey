@@ -835,9 +835,6 @@ class CandidateViewHeightSettingFragment : Fragment() {
             sumireSpecialKeyRepository = sumireSpecialKeyRepository,
             views = CandidateKeyboardPreviewViews(
                 container = binding.keyboardPreviewContainer,
-                tenKey = binding.candidateHeightSettingTenkeyPreview,
-                gojuon = binding.candidateHeightSettingGojuonPreview,
-                qwerty = binding.candidateHeightSettingQwertyPreview,
                 flick = binding.candidateHeightSettingFlickPreview
             ),
             isLandscape = false,

@@ -6,7 +6,6 @@ import android.view.View
 import androidx.test.core.app.ApplicationProvider
 import com.kazumaproject.core.data.popup.PopupViewStyle
 import com.kazumaproject.core.domain.skin.KeyboardSkinId
-import com.kazumaproject.qwerty_keyboard.ui.VariationsPopupView
 import org.junit.Assert.assertEquals
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -126,25 +125,6 @@ class KeyboardSkinVariationSelectionTest {
         controller.pause().stop().destroy()
     }
 
-    @Test fun skinRoundTripPreservesThreeColumnSelectionAndCharacterOrder() {
-        val context=ContextThemeWrapper(ApplicationProvider.getApplicationContext<Context>(),
-            com.kazumaproject.markdownhelperkeyboard.R.style.Theme_MarkdownKeyboard)
-        val view=VariationsPopupView(context)
-        val chars=listOf('e','è','é','ê','ë','ē','ė','ę','ě','ə')
-        val points=listOf(50f to 75f,150f to 75f,250f to 75f,50f to 225f,150f to 225f,
-            250f to 225f,50f to 375f,150f to 375f,250f to 375f,50f to 525f)
-        for(id in listOf(KeyboardSkinId.DEFAULT,KeyboardSkinId.CUPERTINO_LIGHT,KeyboardSkinId.CUPERTINO_DARK,KeyboardSkinId.DEFAULT)) {
-            view.applyPopupViewStyle(PopupViewStyle(100,28f,skinId=id))
-            view.setChars(chars)
-            view.measure(View.MeasureSpec.makeMeasureSpec(300,View.MeasureSpec.EXACTLY),View.MeasureSpec.makeMeasureSpec(600,View.MeasureSpec.EXACTLY))
-            view.layout(0,0,300,600)
-            assertEquals(3,view.maxColumns)
-            assertEquals(chars,points.map { (x,y) -> view.updateSelection(x,y);view.getSelectedChar() })
-            // Empty last-row cells and out-of-window movement retain the last valid selection.
-            view.updateSelection(250f,525f);assertEquals('ə',view.getSelectedChar())
-            view.updateSelection(-1f,75f);assertEquals('ə',view.getSelectedChar())
-        }
-    }
     @Test fun leavingSkinRestoresLegacyPopupPresentationBeforeApplyingSavedSettings() {
         val controller=org.robolectric.Robolectric.buildActivity(android.app.Activity::class.java)
         val activity=controller.get()

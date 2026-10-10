@@ -159,7 +159,7 @@ class SuggestionAdapter2 : RecyclerView.Adapter<RecyclerView.ViewHolder>() {
     private var isPasteEnabled: Boolean = true
     private var isClipboardDescriptionShow: Boolean = true
 
-    private var currentMode: TenKeyQWERTYMode = TenKeyQWERTYMode.Default
+    private var currentMode: TenKeyQWERTYMode = TenKeyQWERTYMode.Custom
     private var customLayouts: List<CustomKeyboardLayout> = emptyList()
     private var showCustomTab: Boolean = true
 

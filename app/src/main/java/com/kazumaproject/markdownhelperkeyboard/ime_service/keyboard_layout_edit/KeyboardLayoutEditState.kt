@@ -24,13 +24,7 @@ enum class KeyboardLayoutEditTarget {
 
     companion object {
         fun from(mode: TenKeyQWERTYMode): KeyboardLayoutEditTarget {
-            return if (mode == TenKeyQWERTYMode.TenKeyQWERTY ||
-                mode == TenKeyQWERTYMode.TenKeyQWERTYRomaji
-            ) {
-                QwertyFamily
-            } else {
-                TenKeyFamily
-            }
+            return TenKeyFamily
         }
     }
 }

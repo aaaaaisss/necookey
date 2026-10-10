@@ -839,7 +839,6 @@ object AppPreference {
                 migratePredictionLookaheadPreferenceIfNeeded()
                 migrateSymbolEmojiCandidatePreferenceIfNeeded()
                 migrateSumireKeymapGuideModesIfNeeded()
-                migrateGojuonKeyboardTypeIfNeeded(context)
                 migrateSumirePreferenceIfNeeded()
                 initialized = true
                 initialization.complete(Unit)
@@ -852,59 +851,12 @@ object AppPreference {
         }
     }
 
-    fun migrateGojuonKeyboardTypeIfNeeded(context: Context = appContext) {
-        isTabletDevice = context.resources.getBoolean(CoreR.bool.isTablet)
-        if (!isTabletDevice) {
-            if (preferences.contains(GOJUON_KEYBOARD_TYPE_MIGRATION_KEY)) {
-                preferences.edit { it.remove(GOJUON_KEYBOARD_TYPE_MIGRATION_KEY) }
-            }
-            return
-        }
-        if (preferences.getBoolean(GOJUON_KEYBOARD_TYPE_MIGRATION_KEY, false)) return
-
-        val legacyDefault = legacyDefaultKeyboardOrder(isTablet = false)
-        val legacyOrder = if (preferences.contains(KEYBOARD_ORDER.first)) {
-            parseKeyboardOrder(
-                preferences.getString(KEYBOARD_ORDER.first, defaultKeyboardOrderJson),
-                fallback = legacyDefault,
-                preserveEmpty = true,
-            )
-        } else {
-            legacyDefault
-        }
-        val result = GojuonKeyboardTypeMigration.resolve(
-            legacyGojuonEnabled = preferences.getBoolean(
-                TABLET_GOJUON_LAYOUT_PREFERENCE.first,
-                TABLET_GOJUON_LAYOUT_PREFERENCE.second,
-            ),
-            keyboardOrder = legacyOrder,
-            selectedPosition = preferences.getInt(
-                SAVE_LAST_USED_KEYBOARD_POSITION.first,
-                SAVE_LAST_USED_KEYBOARD_POSITION.second,
-            ),
-        )
-        preferences.edit {
-            it.putString(KEYBOARD_ORDER.first, gson.toJson(result.keyboardOrder))
-            it.putInt(SAVE_LAST_USED_KEYBOARD_POSITION.first, result.selectedPosition)
-            it.putBoolean(GOJUON_KEYBOARD_TYPE_MIGRATION_KEY, true)
-            it.remove(TABLET_GOJUON_LAYOUT_PREFERENCE.first)
-        }
-    }
-
-    /** Sumire's original fresh-install order; kept for migrating Sumire-era settings. */
-    private fun legacyDefaultKeyboardOrder(isTablet: Boolean = isTabletDevice): List<KeyboardType> {
-        return listOf(
-            if (isTablet) KeyboardType.GOJUON else KeyboardType.TENKEY,
-            KeyboardType.QWERTY,
-        )
-    }
-
     /**
-     * necookey: the custom keyboard (seeded with the built-in flick template on first launch,
-     * see NecookeyDefaultLayoutSeeder) comes first; Sumire's keyboards stay as fallbacks.
+     * necookey: the custom keyboard is the only input keyboard (a default layout is always
+     * ensured by NecookeyDefaultLayoutSeeder).
      */
     private fun defaultKeyboardOrder(isTablet: Boolean = isTabletDevice): List<KeyboardType> {
-        return listOf(KeyboardType.CUSTOM) + legacyDefaultKeyboardOrder(isTablet)
+        return listOf(KeyboardType.CUSTOM)
     }
 
     private fun parseKeyboardOrder(
@@ -1543,16 +1495,11 @@ object AppPreference {
             it.putBoolean(QWERTY_SHOW_KUTOUTEN_BUTTONS.first, value ?: false)
         }
 
+    /** Only the custom keyboard exists; stored legacy orders (tenkey/QWERTY/...) are ignored. */
     var keyboard_order: List<KeyboardType>
-        get() {
-            val fallback = defaultKeyboardOrder()
-            if (!preferences.contains(KEYBOARD_ORDER.first)) return fallback
-            val json = preferences.getString(KEYBOARD_ORDER.first, gson.toJson(fallback))
-            return parseKeyboardOrder(json, fallback, preserveEmpty = true)
-        }
+        get() = listOf(KeyboardType.CUSTOM)
         set(value) = preferences.edit {
-            val json = gson.toJson(value)
-            it.putString(KEYBOARD_ORDER.first, json)
+            it.putString(KEYBOARD_ORDER.first, gson.toJson(listOf(KeyboardType.CUSTOM)))
         }
 
     var candidate_tab_order: List<CandidateTab>
@@ -4289,7 +4236,6 @@ object AppPreference {
             }
         }
         migrateSumireKeymapGuideModesIfNeeded()
-        migrateGojuonKeyboardTypeIfNeeded()
     }
 
     fun migrateSumirePreferenceIfNeeded() {

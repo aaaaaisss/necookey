@@ -9,30 +9,6 @@ import org.junit.Test
 class KeyboardLayoutEditStateTest {
 
     @Test
-    fun targetFromModeTreatsOnlyTenKeyQwertyModesAsQwertyFamily() {
-        assertEquals(
-            KeyboardLayoutEditTarget.QwertyFamily,
-            KeyboardLayoutEditTarget.from(TenKeyQWERTYMode.TenKeyQWERTY),
-        )
-        assertEquals(
-            KeyboardLayoutEditTarget.QwertyFamily,
-            KeyboardLayoutEditTarget.from(TenKeyQWERTYMode.TenKeyQWERTYRomaji),
-        )
-        assertEquals(
-            KeyboardLayoutEditTarget.TenKeyFamily,
-            KeyboardLayoutEditTarget.from(TenKeyQWERTYMode.Default),
-        )
-        assertEquals(
-            KeyboardLayoutEditTarget.TenKeyFamily,
-            KeyboardLayoutEditTarget.from(TenKeyQWERTYMode.Gojuon),
-        )
-        assertEquals(
-            KeyboardLayoutEditTarget.TenKeyFamily,
-            KeyboardLayoutEditTarget.from(TenKeyQWERTYMode.Number),
-        )
-    }
-
-    @Test
     fun preferenceSlotSeparatesPortraitLandscapeAndTenkeyQwerty() {
         val slots = setOf(
             KeyboardLayoutEditPreferenceSlot(

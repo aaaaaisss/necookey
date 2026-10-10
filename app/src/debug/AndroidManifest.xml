@@ -4,7 +4,6 @@
     <application>
         <activity android:name=".ImePopupHostActivity" android:exported="false"
             android:theme="@style/Theme.MarkdownKeyboard" android:windowSoftInputMode="adjustResize" />
-        <activity android:name=".SkinTestHostActivity" android:exported="false" android:theme="@style/Theme.MarkdownKeyboard" />
         <activity
             android:name=".autofill.DebugInlineAutofillAttributionActivity"
             android:exported="false"

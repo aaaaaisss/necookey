@@ -6,19 +6,8 @@ import com.kazumaproject.markdownhelperkeyboard.converter.english.louds.LOUDS
 import com.kazumaproject.markdownhelperkeyboard.converter.english.louds.louds_with_term_id.LOUDSWithTermId
 import com.kazumaproject.markdownhelperkeyboard.converter.english.tokenArray.TokenArray
 import com.kazumaproject.markdownhelperkeyboard.BuildConfig
-import com.kazumaproject.markdownhelperkeyboard.converter.glide.QwertyGlideDecodeOptions
-import com.kazumaproject.markdownhelperkeyboard.converter.glide.QwertyGlideDecoder
-import com.kazumaproject.markdownhelperkeyboard.converter.glide.QwertyGlideDecodeMetrics
-import com.kazumaproject.markdownhelperkeyboard.converter.glide.QwertyGlideDictionaryEntry
-import com.kazumaproject.markdownhelperkeyboard.converter.glide.QwertyGlideCandidateCaseExpander
-import com.kazumaproject.markdownhelperkeyboard.converter.glide.QwertyGlideCandidateProvider
-import com.kazumaproject.markdownhelperkeyboard.converter.glide.QwertyGlideIndexedDictionaryProvider
-import com.kazumaproject.markdownhelperkeyboard.converter.glide.QwertyGlidePrebuiltDictionaryLoader
-import com.kazumaproject.markdownhelperkeyboard.converter.glide.QwertyGlidePrebuiltLoadResult
 import com.kazumaproject.markdownhelperkeyboard.dictionary_override.DictionaryBinaryReader
 import com.kazumaproject.markdownhelperkeyboard.dictionary_override.DictionaryFileKey
-import com.kazumaproject.qwerty_keyboard.glide.QwertyInputPointers
-import com.kazumaproject.qwerty_keyboard.glide.QwertyKeyboardProximityInfo
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
@@ -50,7 +39,7 @@ internal fun candidateCaseVariants(input: String, candidate: String): List<Pair<
         candidate.uppercase() to 2000
     ).distinctBy { (surface, _) -> surface }
 
-class EnglishEngine : QwertyGlideCandidateProvider {
+class EnglishEngine {
     private lateinit var readingLOUDS: LOUDSWithTermId
     private lateinit var wordLOUDS: LOUDS
     private lateinit var tokenArray: TokenArray
@@ -62,18 +51,6 @@ class EnglishEngine : QwertyGlideCandidateProvider {
     private var dictionariesReady: Boolean = false
     @Volatile
     private var dictionaryLoader: (() -> EnglishDictionaryData)? = null
-    @Volatile
-    private var qwertyGlideDecoder: QwertyGlideDecoder? = null
-    @Volatile
-    private var qwertyFallbackGlideDecoder: QwertyGlideDecoder? = null
-    @Volatile
-    private var qwertyGlideDictionaryReady: Boolean = false
-    @Volatile
-    private var qwertyGlideWarmupJob: Job? = null
-    @Volatile
-    private var qwertyGlideInputEnabled: Boolean = false
-    private val qwertyGlideCandidateCaseExpander = QwertyGlideCandidateCaseExpander()
-    private val qwertyGlideWarmupScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
     fun buildEngine(
         englishReadingLOUDS: LOUDSWithTermId,
@@ -93,406 +70,20 @@ class EnglishEngine : QwertyGlideCandidateProvider {
         this.succinctBitVectorTokenArray = englishSuccinctBitVectorTokenArray
         dictionariesReady = true
         dictionaryLoader = null
-        qwertyGlideDictionaryReady = false
-        qwertyGlideDecoder = null
-        qwertyGlideInputEnabled = false
-        qwertyFallbackGlideDecoder = createQwertyGlideDecoder(
-            entries = fallbackGlideDictionaryEntries(),
-            dictionaryReady = false
-        )
     }
 
     fun configureLazyDictionaryLoading(reader: DictionaryBinaryReader) {
         dictionaryLoader = { loadDictionaryData(reader) }
         dictionariesReady = false
-        qwertyGlideDictionaryReady = false
-        qwertyGlideDecoder = null
-        qwertyGlideInputEnabled = false
-        qwertyFallbackGlideDecoder = createQwertyGlideDecoder(
-            entries = fallbackGlideDictionaryEntries(),
-            dictionaryReady = false,
-        )
-    }
-
-    override suspend fun getGlideCandidates(
-        inputPointers: QwertyInputPointers,
-        proximityInfo: QwertyKeyboardProximityInfo,
-        previousText: String,
-        limit: Int
-    ): List<Candidate> {
-        if (limit <= 0 || inputPointers.points.size < 2 || proximityInfo.keys.isEmpty()) return emptyList()
-        if (!qwertyGlideInputEnabled) return emptyList()
-        val decoder = qwertyGlideDecoder ?: run {
-            warmUpQwertyGlideDecoderAsync()
-            getOrCreateFallbackQwertyGlideDecoder()
-        }
-        val baseCandidates = decoder.decode(
-            inputPointers = inputPointers,
-            proximityInfo = proximityInfo,
-            previousText = previousText,
-            limit = (limit * 3).coerceAtLeast(limit)
-        )
-        return qwertyGlideCandidateCaseExpander.expand(baseCandidates, limit)
-    }
-
-    fun warmUpQwertyGlideDecoderAsync() {
-        if (!qwertyGlideInputEnabled) {
-            logQwertyGlidePrebuilt("QWERTY glide preference disabled, skip runtime warmup")
-            return
-        }
-        if (qwertyGlideDictionaryReady && qwertyGlideDecoder != null) return
-        synchronized(this) {
-            val existing = qwertyGlideWarmupJob
-            if (existing?.isActive == true) return
-            qwertyGlideWarmupJob = qwertyGlideWarmupScope.launch {
-                val startedAt = System.nanoTime()
-                val entries = buildGlideDictionaryEntries()
-                val decoder = createQwertyGlideDecoder(
-                    entries = entries,
-                    dictionaryReady = true
-                )
-                if (!isActive) return@launch
-                synchronized(this@EnglishEngine) {
-                    if (!isActive) return@launch
-                    qwertyGlideDecoder = decoder
-                    qwertyGlideDictionaryReady = true
-                }
-                if (BuildConfig.DEBUG) {
-                    Timber.d(
-                        "QWERTY glide dictionary warmup complete: entries=${entries.size} elapsed_ms=${(System.nanoTime() - startedAt) / 1_000_000L}"
-                    )
-                }
-            }
-        }
     }
 
     fun reloadDictionariesFromCurrentSources(reader: DictionaryBinaryReader) {
-        reloadDictionariesFromCurrentSources(
-            reader = reader,
-            qwertyGlideInputEnabled = qwertyGlideInputEnabled,
-            qwertyGlidePrebuiltDictionaryLoader = null,
-            canUseBundledPrebuiltIndex = false,
-        )
-    }
-
-    fun reloadDictionariesFromCurrentSources(
-        reader: DictionaryBinaryReader,
-        qwertyGlideInputEnabled: Boolean,
-        qwertyGlidePrebuiltDictionaryLoader: QwertyGlidePrebuiltDictionaryLoader?,
-        canUseBundledPrebuiltIndex: Boolean,
-    ) {
         synchronized(this) {
-            cancelQwertyGlideWarmup()
             dictionaryLoader = { loadDictionaryData(reader) }
             dictionariesReady = false
-            this.qwertyGlideInputEnabled = qwertyGlideInputEnabled
-            qwertyGlideDictionaryReady = false
-            qwertyGlideDecoder = null
-            qwertyFallbackGlideDecoder = createQwertyGlideDecoder(
-                entries = fallbackGlideDictionaryEntries(),
-                dictionaryReady = false,
-            )
-        }
-        configureQwertyGlideDecoder(
-            enabled = qwertyGlideInputEnabled,
-            canUseBundledPrebuiltIndex = canUseBundledPrebuiltIndex,
-            prebuiltDictionaryLoader = qwertyGlidePrebuiltDictionaryLoader,
-        )
-    }
-
-    fun isQwertyGlideDictionaryReady(): Boolean = qwertyGlideDictionaryReady
-
-    fun isQwertyGlideInputEnabled(): Boolean = qwertyGlideInputEnabled
-
-    fun hasQwertyGlideDecoder(): Boolean = qwertyGlideDecoder != null
-
-    fun isQwertyGlideWarmupActive(): Boolean = qwertyGlideWarmupJob?.isActive == true
-
-    fun configureQwertyGlideDecoder(
-        enabled: Boolean,
-        canUseBundledPrebuiltIndex: Boolean,
-        prebuiltDictionaryLoader: QwertyGlidePrebuiltDictionaryLoader?,
-    ) {
-        if (!enabled) {
-            synchronized(this) {
-                qwertyGlideInputEnabled = false
-                cancelQwertyGlideWarmup()
-                qwertyGlideDecoder = null
-                qwertyGlideDictionaryReady = false
-            }
-            logQwertyGlidePrebuilt("QWERTY glide preference disabled, skip prebuilt load")
-            return
-        }
-
-        if (
-            canUseBundledPrebuiltIndex &&
-            qwertyGlideInputEnabled &&
-            qwertyGlideDictionaryReady &&
-            qwertyGlideDecoder != null
-        ) {
-            return
-        }
-
-        synchronized(this) {
-            qwertyGlideInputEnabled = true
-            cancelQwertyGlideWarmup()
-            qwertyGlideDecoder = null
-            qwertyGlideDictionaryReady = false
-        }
-
-        if (!canUseBundledPrebuiltIndex || prebuiltDictionaryLoader == null) {
-            logQwertyGlidePrebuilt("External English dictionary override active, skip bundled prebuilt glide index")
-            logQwertyGlidePrebuilt("Fallback to runtime glide dictionary build")
-            return
-        }
-
-        when (val result = prebuiltDictionaryLoader.load()) {
-            is QwertyGlidePrebuiltLoadResult.Loaded -> {
-                val decoder = createQwertyGlideDecoder(
-                    provider = result.provider,
-                    dictionaryReady = true,
-                )
-                synchronized(this) {
-                    if (!qwertyGlideInputEnabled) return
-                    qwertyGlideDecoder = decoder
-                    qwertyGlideDictionaryReady = true
-                }
-                logQwertyGlidePrebuilt("Bundled prebuilt glide index loaded: entries=${result.provider.entryCount}")
-            }
-
-            is QwertyGlidePrebuiltLoadResult.NotAvailable -> {
-                synchronized(this) {
-                    qwertyGlideDecoder = null
-                    qwertyGlideDictionaryReady = false
-                }
-                logQwertyGlidePrebuilt("Bundled prebuilt glide index unavailable: ${result.reason}")
-                logQwertyGlidePrebuilt("Fallback to runtime glide dictionary build")
-            }
-
-            is QwertyGlidePrebuiltLoadResult.Invalid -> {
-                synchronized(this) {
-                    qwertyGlideDecoder = null
-                    qwertyGlideDictionaryReady = false
-                }
-                logQwertyGlidePrebuilt("Bundled prebuilt glide index invalid: ${result.reason}")
-                logQwertyGlidePrebuilt("Fallback to runtime glide dictionary build")
-            }
         }
     }
 
-    /**
-     * Loads the bundled glide index away from the IME main thread.
-     *
-     * Until the index is ready, glide input continues to use the small fallback decoder. Repeated
-     * input sessions share the in-flight job instead of restarting the same asset read.
-     */
-    fun configureQwertyGlideDecoderAsync(
-        enabled: Boolean,
-        canUseBundledPrebuiltIndex: Boolean,
-        prebuiltDictionaryLoader: QwertyGlidePrebuiltDictionaryLoader?,
-    ) {
-        if (!enabled) {
-            configureQwertyGlideDecoder(
-                enabled = false,
-                canUseBundledPrebuiltIndex = canUseBundledPrebuiltIndex,
-                prebuiltDictionaryLoader = prebuiltDictionaryLoader,
-            )
-            return
-        }
-
-        synchronized(this) {
-            if (
-                canUseBundledPrebuiltIndex &&
-                qwertyGlideInputEnabled &&
-                (qwertyGlideDictionaryReady && qwertyGlideDecoder != null ||
-                    qwertyGlideWarmupJob?.isActive == true)
-            ) {
-                return
-            }
-            qwertyGlideInputEnabled = true
-            cancelQwertyGlideWarmup()
-            qwertyGlideDecoder = null
-            qwertyGlideDictionaryReady = false
-        }
-
-        if (!canUseBundledPrebuiltIndex || prebuiltDictionaryLoader == null) {
-            logQwertyGlidePrebuilt(
-                "External English dictionary override active, skip bundled prebuilt glide index"
-            )
-            logQwertyGlidePrebuilt("Fallback to runtime glide dictionary build")
-            return
-        }
-
-        val job = qwertyGlideWarmupScope.launch(start = CoroutineStart.LAZY) {
-            val startedAt = System.nanoTime()
-            val result = prebuiltDictionaryLoader.load()
-            if (!isActive) return@launch
-            when (result) {
-                is QwertyGlidePrebuiltLoadResult.Loaded -> {
-                    val decoder = createQwertyGlideDecoder(
-                        provider = result.provider,
-                        dictionaryReady = true,
-                    )
-                    if (!isActive) return@launch
-                    synchronized(this@EnglishEngine) {
-                        if (!isActive || !qwertyGlideInputEnabled) return@synchronized
-                        qwertyGlideDecoder = decoder
-                        qwertyGlideDictionaryReady = true
-                    }
-                    logQwertyGlidePrebuilt(
-                        "Bundled prebuilt glide index loaded asynchronously: " +
-                            "entries=${result.provider.entryCount} " +
-                            "elapsed_ms=${(System.nanoTime() - startedAt) / 1_000_000L}"
-                    )
-                }
-
-                is QwertyGlidePrebuiltLoadResult.NotAvailable -> {
-                    logQwertyGlidePrebuilt(
-                        "Bundled prebuilt glide index unavailable: ${result.reason}"
-                    )
-                    logQwertyGlidePrebuilt("Fallback to runtime glide dictionary build")
-                }
-
-                is QwertyGlidePrebuiltLoadResult.Invalid -> {
-                    logQwertyGlidePrebuilt(
-                        "Bundled prebuilt glide index invalid: ${result.reason}"
-                    )
-                    logQwertyGlidePrebuilt("Fallback to runtime glide dictionary build")
-                }
-            }
-        }
-        synchronized(this) {
-            qwertyGlideWarmupJob = job
-        }
-        job.start()
-    }
-
-    internal suspend fun awaitQwertyGlideWarmup() {
-        qwertyGlideWarmupJob?.join()
-    }
-
-    fun cancelQwertyGlideWarmup() {
-        qwertyGlideWarmupJob?.cancel()
-        qwertyGlideWarmupJob = null
-    }
-
-    fun releaseQwertyGlideResources() {
-        cancelQwertyGlideWarmup()
-        qwertyGlideDecoder = null
-        qwertyFallbackGlideDecoder = null
-        qwertyGlideDictionaryReady = false
-        qwertyGlideInputEnabled = false
-    }
-
-    fun invalidateQwertyGlideCache() {
-        qwertyGlideDecoder?.clearCache()
-        qwertyFallbackGlideDecoder?.clearCache()
-    }
-
-    private fun getOrCreateFallbackQwertyGlideDecoder(): QwertyGlideDecoder {
-        qwertyFallbackGlideDecoder?.let { return it }
-        return synchronized(this) {
-            qwertyFallbackGlideDecoder ?: createQwertyGlideDecoder(
-                entries = fallbackGlideDictionaryEntries(),
-                dictionaryReady = false
-            ).also { qwertyFallbackGlideDecoder = it }
-        }
-    }
-
-    private fun createQwertyGlideDecoder(
-        entries: Iterable<QwertyGlideDictionaryEntry>,
-        dictionaryReady: Boolean
-    ): QwertyGlideDecoder {
-        return createQwertyGlideDecoder(
-            provider = QwertyGlideIndexedDictionaryProvider(entries),
-            dictionaryReady = dictionaryReady,
-        )
-    }
-
-    private fun createQwertyGlideDecoder(
-        provider: QwertyGlideIndexedDictionaryProvider,
-        dictionaryReady: Boolean
-    ): QwertyGlideDecoder {
-        return QwertyGlideDecoder(
-            dictionaryProvider = provider,
-            options = QwertyGlideDecodeOptions(),
-            dictionaryReady = dictionaryReady,
-            metricsListener = ::logQwertyGlideMetrics
-        )
-    }
-
-    private fun logQwertyGlidePrebuilt(message: String) {
-        if (BuildConfig.DEBUG) {
-            Timber.d(message)
-        }
-    }
-
-    private fun logQwertyGlideMetrics(metrics: QwertyGlideDecodeMetrics) {
-        if (!BuildConfig.DEBUG) return
-        Timber.d(
-            "QWERTY glide decode: dictionary_ready=${metrics.dictionaryReady} " +
-                    "raw_bucket_candidate_count=${metrics.rawBucketCandidateCount} " +
-                    "prefilter_candidate_count=${metrics.prefilterCandidateCount} " +
-                    "full_score_candidate_count=${metrics.fullScoreCandidateCount} " +
-                    "rerank_candidate_count=${metrics.rerankCandidateCount} " +
-                    "decode_total_ms=${metrics.decodeTotalMs} prefilter_ms=${metrics.prefilterMs} " +
-                    "full_score_ms=${metrics.fullScoreMs} rerank_ms=${metrics.rerankMs} " +
-                    "cache_hit=${metrics.cacheHit}"
-        )
-    }
-
-    private fun fallbackGlideDictionaryEntries(): List<QwertyGlideDictionaryEntry> {
-        return listOf(
-            "hello", "good", "test", "word", "world", "keyboard", "android", "sumire",
-            "coffee", "letter", "people", "glide", "time", "home", "something"
-        ).map { word -> QwertyGlideDictionaryEntry(word, 6000) }
-    }
-
-    private fun buildGlideDictionaryEntries(): List<QwertyGlideDictionaryEntry> {
-        ensureDictionariesLoaded()
-        val entries = linkedMapOf<String, QwertyGlideDictionaryEntry>()
-        val readings = readingLOUDS.predictiveSearch(
-            prefix = "",
-            succinctBitVector = succinctBitVectorLBSReading
-        )
-        for (reading in readings) {
-            if (reading.length !in 2..24 || !reading.all { it in 'a'..'z' }) continue
-            val nodeIndex = readingLOUDS.getNodeIndex(
-                reading,
-                succinctBitVector = succinctBitVectorLBSReading
-            )
-            if (nodeIndex <= 0) continue
-            val termId = readingLOUDS.getTermId(
-                nodeIndex,
-                succinctBitVector = succinctBitVectorReadingIsLeaf
-            )
-            if (termId < 0) continue
-            val tokens = tokenArray.getListDictionaryByYomiTermId(
-                termId,
-                succinctBitVector = succinctBitVectorTokenArray
-            )
-            if (tokens.isEmpty()) {
-                entries.mergeGlideEntry(reading, 9000)
-            } else {
-                for (entry in tokens) {
-                    val word = when (entry.nodeId) {
-                        -1 -> reading
-                        else -> wordLOUDS.getLetter(
-                            entry.nodeId,
-                            succinctBitVector = succinctBitVectorLBSWord
-                        )
-                    }.lowercase()
-                    if (word.length in 2..24 && word.all { it in 'a'..'z' }) {
-                        entries.mergeGlideEntry(word, entry.wordCost.toInt())
-                    }
-                }
-            }
-        }
-        fallbackGlideDictionaryEntries().forEach { entry ->
-            entries.mergeGlideEntry(entry.word, entry.wordCost)
-        }
-        return entries.values.toList()
-    }
 
     fun getCandidates(
         input: String,
@@ -778,15 +369,4 @@ class EnglishEngine : QwertyGlideCandidateProvider {
         else -> 3
     }
 
-}
-
-private fun MutableMap<String, QwertyGlideDictionaryEntry>.mergeGlideEntry(
-    word: String,
-    wordCost: Int
-) {
-    val normalizedWord = word.lowercase()
-    val current = this[normalizedWord]
-    if (current == null || wordCost < current.wordCost) {
-        this[normalizedWord] = QwertyGlideDictionaryEntry(normalizedWord, wordCost)
-    }
 }
