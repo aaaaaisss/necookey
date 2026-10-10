@@ -70,4 +70,56 @@
         android:name="com.kazumaproject.markdownhelperkeyboard.ng_word.ui.NgWordFragment"
         android:label="@string/ng_word_fragment_title"
         tools:layout="@layout/fragment_ng_word" />
+    <fragment
+        android:id="@+id/keyboardSettingFragment"
+        android:name="com.kazumaproject.markdownhelperkeyboard.setting_activity.ui.keyboard_size_setting.KeyboardSettingFragment"
+        android:label="@string/keyboard_size_setting_fragment_title"
+        tools:layout="@layout/fragment_keyboard_setting">
+        <action
+            android:id="@+id/action_keyboardSettingFragment_to_keyboardSizeDirectInputFragment"
+            app:destination="@id/keyboardSizeDirectInputFragment">
+            <argument
+                android:name="initialOrientation"
+                android:defaultValue="portrait" />
+        </action>
+    </fragment>
+    <fragment
+        android:id="@+id/keyboardEditorFragment"
+        android:name="com.kazumaproject.markdownhelperkeyboard.custom_keyboard.ui.KeyboardEditorFragment"
+        android:label="キーボードの編集">
+        <argument
+            android:name="layoutId"
+            android:defaultValue="-1L"
+            app:argType="long" />
+        <action
+            android:id="@+id/action_keyboardEditorFragment_to_keyEditorFragment"
+            app:destination="@id/keyEditorFragment" />
+    </fragment>
+    <fragment
+        android:id="@+id/keyEditorFragment"
+        android:name="com.kazumaproject.markdownhelperkeyboard.custom_keyboard.ui.KeyEditorFragment"
+        android:label="@string/key_editor_fragment_label" />
+    <fragment
+        android:id="@+id/keyboardListFragment"
+        android:name="com.kazumaproject.markdownhelperkeyboard.custom_keyboard.ui.KeyboardListFragment"
+        android:label="@string/custom_layout_fragment_title">
+        <action
+            android:id="@+id/action_keyboardListFragment_to_keyboardEditorFragment"
+            app:destination="@id/keyboardEditorFragment" />
+    </fragment>
+    <fragment
+        android:id="@+id/keyCandidateLetterSizeFragment"
+        android:name="com.kazumaproject.markdownhelperkeyboard.setting_activity.ui.key_candidate_letter_size.KeyCandidateLetterSizeFragment"
+        android:label="@string/fragment_key_candidate_letter_size_title"
+        tools:layout="@layout/fragment_key_candidate_letter_size" />
+    <fragment
+        android:id="@+id/keyboardSizeDirectInputFragment"
+        android:name="com.kazumaproject.markdownhelperkeyboard.setting_activity.ui.keyboard_size_direct_input.KeyboardSizeDirectInputFragment"
+        android:label="@string/keyboard_size_direct_input_title"
+        tools:layout="@layout/fragment_keyboard_size_direct_input">
+        <argument
+            android:name="initialOrientation"
+            android:defaultValue="portrait"
+            app:argType="string" />
+    </fragment>
 </navigation>

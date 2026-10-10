@@ -203,6 +203,18 @@ class MainPreferenceFragment : AsyncPreferenceFragment() {
     // ---- 辞書・学習 ----
 
     private fun bindDictionarySection() {
+        findPreference<Preference>("custom_keyboard_list_preference")?.setOnPreferenceClickListener {
+            navigateSafely(R.id.keyboardListFragment)
+            true
+        }
+        findPreference<Preference>("keyboard_screen_preference")?.setOnPreferenceClickListener {
+            navigateSafely(R.id.keyboardSettingFragment)
+            true
+        }
+        findPreference<Preference>("keyboard_key_letter_size_fragment_preference")?.setOnPreferenceClickListener {
+            navigateSafely(R.id.keyCandidateLetterSizeFragment)
+            true
+        }
         findPreference<Preference>("ng_word_list_preference")?.setOnPreferenceClickListener {
             navigateSafely(R.id.ngWordFragment)
             true

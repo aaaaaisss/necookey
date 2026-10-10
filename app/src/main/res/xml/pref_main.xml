@@ -4,6 +4,30 @@
     xmlns:app="http://schemas.android.com/apk/res-auto">
 
     <PreferenceCategory
+        android:title="@string/category_title_keyboard"
+        app:iconSpaceReserved="false">
+
+        <Preference
+            android:key="custom_keyboard_list_preference"
+            android:summary="@string/custom_keyboard_list_preference_summary"
+            android:title="@string/custom_layout_fragment_title"
+            app:iconSpaceReserved="false" />
+
+        <Preference
+            android:key="keyboard_screen_preference"
+            android:summary="@string/keyboard_screen_preference_summary"
+            android:title="@string/keyboard_screen_size_preference_title"
+            app:iconSpaceReserved="false" />
+
+        <Preference
+            android:key="keyboard_key_letter_size_fragment_preference"
+            android:summary="@string/key_candidate_letter_size_preference_summary"
+            android:title="@string/key_candidate_letter_size_preference_title"
+            app:iconSpaceReserved="false" />
+
+    </PreferenceCategory>
+
+    <PreferenceCategory
         android:title="@string/settings_section_input"
         app:iconSpaceReserved="false">
 

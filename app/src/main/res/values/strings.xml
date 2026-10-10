@@ -283,6 +283,7 @@
     <string name="learn_dictionary_fragment_title">学習辞書</string>
     <string name="open_source_fragment_label">オープンソースライブラリ</string>
     <string name="key_editor_fragment_label">キーの編集</string>
+    <string name="custom_keyboard_list_preference_summary">入力に使うキーボードの追加・編集・並べ替え</string>
     <string name="custom_keyboard_fragment_label">カスタムキーボード</string>
     <string name="key_size_position_button_text_right">右寄せ</string>
     <string name="key_size_position_button_text_left">左寄せ</string>
