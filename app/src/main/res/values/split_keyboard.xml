@@ -1,12 +1,12 @@
 <resources>
-    <string name="split_keyboard_title">Split keyboard</string>
-    <string name="split_keyboard_main">Main keyboard</string>
-    <string name="split_keyboard_sub">Sub keyboard</string>
-    <string name="split_keyboard_custom">Custom layout</string>
-    <string name="split_keyboard_candidates">Candidate placement</string>
-    <string name="split_keyboard_both">Both keyboards</string>
-    <string name="split_keyboard_main_only">Main only</string>
-    <string name="split_keyboard_sub_only">Sub only</string>
-    <string name="split_keyboard_summary">Two movable keyboards with shared input and candidates</string>
-    <string name="split_keyboard_edit_placement">Edit icon placement</string>
+    <string name="split_keyboard_title">分割キーボード</string>
+    <string name="split_keyboard_main">メインキーボード</string>
+    <string name="split_keyboard_sub">サブキーボード</string>
+    <string name="split_keyboard_custom">カスタムレイアウト</string>
+    <string name="split_keyboard_candidates">変換候補欄の表示</string>
+    <string name="split_keyboard_both">メインとサブ</string>
+    <string name="split_keyboard_main_only">メインのみ</string>
+    <string name="split_keyboard_sub_only">サブのみ</string>
+    <string name="split_keyboard_summary">２つのキーボードを自由に配置し、入力と変換候補を共有します</string>
+    <string name="split_keyboard_edit_placement">編集アイコンの表示</string>
 </resources>

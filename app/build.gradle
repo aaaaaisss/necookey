@@ -45,6 +45,8 @@ android {
         versionCode 821
         versionName "1.7.128"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+        // Japanese-only UI: the app's default resources are Japanese; drop library translations.
+        resourceConfigurations += ["ja"]
 
         // -PnecookeyAbi=arm64-v8a (comma-separated) restricts the packaged native ABIs.
         // A normal project property: android.injected.* flags make AGP build a testOnly APK.
