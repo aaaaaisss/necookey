@@ -81,7 +81,7 @@ class KeyboardSizeEditorRegressionTest {
 
     @Test
     fun returningFromNumericInputRestoresTheLogicalCanvasForBothEditors() {
-        listOf(R.id.keyboardSettingFragment, R.id.keyboardSizeLandscapeFragment).forEach { destination ->
+        listOf(R.id.keyboardSettingFragment).forEach { destination ->
             val root = openEditor(destination)
             val viewport = root.findViewById<KeyboardPreviewViewport>(R.id.keyboard_preview_viewport)
             val width = viewport.logicalCanvasWidth
@@ -101,32 +101,10 @@ class KeyboardSizeEditorRegressionTest {
         }
     }
 
-    @Test
-    fun scaledHeightDragSavesOnlyTheLandscapeTenKeyHeightWithoutWaitingForLayout() {
-        AppPreference.keyboard_height_landscape = 220
-        AppPreference.keyboard_vertical_margin_bottom_landscape = 0
-        val root = openEditor(R.id.keyboardSizeLandscapeFragment)
-        val before = sizePreferences()
-        val viewport = root.findViewById<KeyboardPreviewViewport>(R.id.keyboard_preview_viewport)
-        val keyboard = root.findViewById<View>(R.id.keyboard_container)
-        val handle = root.findViewById<View>(R.id.handle_top)
-        val initialHeight = keyboard.layoutParams.height
-        val density = root.resources.displayMetrics.density
-        val distance = 20f
-        val expected = ((initialHeight + (distance / viewport.scale).roundToInt()) / density).roundToInt()
-
-        touch(handle, MotionEvent.ACTION_DOWN, 100f, 100f)
-        touch(handle, MotionEvent.ACTION_MOVE, 100f, 100f - distance)
-        touch(handle, MotionEvent.ACTION_UP, 100f, 100f - distance)
-
-        assertEquals(expected, AppPreference.keyboard_height_landscape)
-        assertEquals(before + ("keyboard_height_landscape_preference" to expected), sizePreferences())
-    }
-
     private fun assertReadOnlyOperations() {
         val before = sizePreferences()
         val originalOrientation = activity.requestedOrientation
-        listOf(R.id.keyboardSettingFragment, R.id.keyboardSizeLandscapeFragment).forEach { destination ->
+        listOf(R.id.keyboardSettingFragment).forEach { destination ->
             val root = openEditor(destination)
             listOf(R.id.tenkey_tooltip_button, R.id.qwerty_tooltip_button).forEach { pageButton ->
                 root.findViewById<View>(pageButton).performClick()

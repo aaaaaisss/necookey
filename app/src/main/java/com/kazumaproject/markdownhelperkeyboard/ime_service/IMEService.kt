@@ -928,13 +928,10 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
     private lateinit var runtimeInputSharedPreferences: SharedPreferences
     private var runtimeInputPreferenceListenerRegistered = false
     private val runtimeInputPreferenceKeys = setOf(
-        AppPreference.LIVE_CONVERSION_CANDIDATE_YOMI_SIZE_KEY,
         AppPreference.INLINE_SUGGESTION_ENABLED_KEY,
         AppPreference.STABILIZE_CANDIDATE_STRIP_HEIGHT_KEY,
         AppPreference.FLICK_SENSITIVITY_KEY,
-        AppPreference.FLICK_THRESHOLD_SHAPE_KEY,
         AppPreference.TFBI_DIAGONAL_RECOGNITION_MODE_KEY,
-        AppPreference.FLICK_EDITOR_PREVIEW_KEY,
         AppPreference.TENKEY_KEYMAP_GUIDE_JAPANESE_KEY,
         AppPreference.TENKEY_KEYMAP_GUIDE_ENGLISH_KEY,
         AppPreference.TENKEY_KEYMAP_GUIDE_NUMBER_KEY,
@@ -947,10 +944,8 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         AppPreference.CUSTOM_KEYBOARD_INPUT_IN_EMPTY_AREAS_KEY,
         AppPreference.CUSTOM_DIRECT_INPUT_REPLACE_COMPOSING_KEY,
         AppPreference.LONG_PRESS_TIMEOUT_KEY,
-        AppPreference.INDEPENDENT_MULTI_TOUCH_KEY,
         AppPreference.DELETE_LONG_PRESS_CONVERSION_BEHAVIOR_KEY,
         AppPreference.VIBRATION_KEY,
-        AppPreference.VIBRATION_TIMING_KEY,
         AppPreference.KEY_SOUND_KEY,
         AppPreference.KEY_SOUND_VOLUME_PERCENT_KEY,
         AppPreference.FLICK_TFBI_POPUP_PRESENTATION_KEY,
@@ -6472,21 +6467,8 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
     }
 
 
-    override fun onEvaluateFullscreenMode(): Boolean {
-        if (splitController != null || keyboardOrder.getOrNull(currentKeyboardOrder) == KeyboardType.SPLIT) return false
-        val deviceDefault = resources.getBoolean(R.bool.config_allow_fullscreen_mode)
-        val isFullscreenModeAllowed =
-            appPreference.isFullscreenModeAllowed(defaultValue = deviceDefault)
-        val imeOptions = currentInputEditorInfo?.imeOptions ?: 0
-
-        // Keep treating NO_EXTRACT_UI as NO_FULLSCREEN. Android's framework does not
-        // reliably support the former without the latter.
-        return FullscreenModePolicy.shouldUseFullscreenMode(
-            frameworkRequestsFullscreen = super.onEvaluateFullscreenMode(),
-            fullscreenModeAllowed = isFullscreenModeAllowed,
-            imeOptions = imeOptions,
-        )
-    }
+    // necookey never uses the fullscreen (extract) editor; the setting was removed in S3.
+    override fun onEvaluateFullscreenMode(): Boolean = false
 
     /**
      * FloatingDockViewを非表示にします。
@@ -21690,7 +21672,7 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
 
     private fun toggleLiveConversionFromShortcut() {
         val next = isLiveConversionEnable != true
-        appPreference.live_conversion_preference = next
+
         isLiveConversionEnable = next
         val shouldShowLiveConversionCandidateYomi =
             next && showLiveConversionCandidateYomi
@@ -21726,7 +21708,7 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         disableKeyboardLayoutEditMode(updateSurface = false)
 
         val next = isKeyboardFloatingMode != true
-        appPreference.is_floating_mode = next
+
         _keyboardFloatingMode.update { next }
     }
 

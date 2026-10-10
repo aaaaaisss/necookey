@@ -97,21 +97,6 @@ class AppPreferenceFlickGuideTest {
     }
 
     @Test
-    fun flickThresholdShape_defaultsToRadialAndRejectsUnknownValues() {
-        assertEquals(
-            FlickThresholdShape.Radial.preferenceValue,
-            AppPreference.flick_threshold_shape_preference
-        )
-
-        AppPreference.flick_threshold_shape_preference = "unknown"
-
-        assertEquals(
-            FlickThresholdShape.Radial.preferenceValue,
-            AppPreference.flick_threshold_shape_preference
-        )
-    }
-
-    @Test
     fun tfbiDiagonalMode_defaultsToLegacyAndPersistsStable() {
         assertEquals(
             TfbiDiagonalRecognitionMode.LEGACY,

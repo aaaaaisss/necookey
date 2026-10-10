@@ -81,12 +81,10 @@ object AppPreference {
     const val PREDICTION_LOOKAHEAD_CHARACTER_COUNT_DEFAULT =
         PredictionConfig.DEFAULT_LOOKAHEAD_CHARACTER_COUNT
     const val FLICK_SENSITIVITY_KEY = "flick_sensitivity_preference"
-    const val FLICK_THRESHOLD_SHAPE_KEY = "flick_threshold_shape_preference"
     const val TFBI_DIAGONAL_RECOGNITION_MODE_KEY = "tfbi_diagonal_recognition_mode_preference"
     const val FLICK_TFBI_POPUP_PRESENTATION_KEY = "flick_tfbi_popup_presentation_preference"
     const val FLICK_TFBI_FLICK_START_POSITION_KEY =
         "flick_tfbi_flick_start_position_preference"
-    const val FLICK_EDITOR_PREVIEW_KEY = "flick_editor_preview_preference"
     const val TENKEY_KEYMAP_GUIDE_JAPANESE_KEY = "tenkey_keymap_guide"
     const val TENKEY_KEYMAP_GUIDE_ENGLISH_KEY = "tenkey_keymap_guide_english"
     const val TENKEY_KEYMAP_GUIDE_NUMBER_KEY = "tenkey_keymap_guide_number"
@@ -101,12 +99,10 @@ object AppPreference {
     const val CUSTOM_KEYMAP_GUIDE_KEY = "flick_keymap_guide"
     const val CUSTOM_KEYBOARD_INPUT_IN_EMPTY_AREAS_KEY =
         "custom_keyboard_input_in_empty_areas_preference"
-    const val INDEPENDENT_MULTI_TOUCH_KEY = "independent_multi_touch_preference"
     const val LONG_PRESS_TIMEOUT_KEY = "long_press_timeout_preference"
     const val DELETE_LONG_PRESS_CONVERSION_BEHAVIOR_KEY =
         "delete_long_press_conversion_behavior"
     const val VIBRATION_KEY = "vibration_preference"
-    const val VIBRATION_TIMING_KEY = "vibration_timing"
     const val KEY_SOUND_KEY = "key_sound_preference"
     const val KEY_SOUND_VOLUME_PERCENT_KEY = "key_sound_volume_percent_preference"
     const val ALLOW_FULLSCREEN_MODE_KEY = "allow_fullscreen_mode_preference"
@@ -145,12 +141,7 @@ object AppPreference {
     )
 
     private val CLIPBOARD_HISTORY_ENABLE = Pair("clipboard_history_preference", false)
-    private val TIME_SAME_PRONOUNCE_TYPING = Pair("time_same_pronounce_typing_preference", 1000)
     private val FLICK_SENSITIVITY = Pair(FLICK_SENSITIVITY_KEY, 100)
-    private val FLICK_THRESHOLD_SHAPE = Pair(
-        FLICK_THRESHOLD_SHAPE_KEY,
-        FlickThresholdShape.Radial.preferenceValue
-    )
     private val TFBI_DIAGONAL_RECOGNITION_MODE = Pair(
         TFBI_DIAGONAL_RECOGNITION_MODE_KEY,
         TfbiDiagonalRecognitionMode.LEGACY.preferenceValue
@@ -159,17 +150,12 @@ object AppPreference {
     private val DELETE_LONG_PRESS_CONVERSION_BEHAVIOR =
         Pair(DELETE_LONG_PRESS_CONVERSION_BEHAVIOR_KEY, "deferred")
     private val VIBRATION_PREFERENCE = Pair(VIBRATION_KEY, true)
-    private val VIBRATION_TIMING_PREFERENCE = Pair(VIBRATION_TIMING_KEY, "both")
     private val KEY_SOUND_PREFERENCE = Pair(KEY_SOUND_KEY, false)
     private val KEY_SOUND_VOLUME_PERCENT_PREFERENCE =
         Pair(KEY_SOUND_VOLUME_PERCENT_KEY, 0)
     private val INLINE_SUGGESTION_ENABLED_PREFERENCE =
         Pair(INLINE_SUGGESTION_ENABLED_KEY, true)
     private val LEARN_DICTIONARY_PREFERENCE = Pair("learn_dictionary_preference", true)
-    private val INCOGNITO_MODE_DETECTION_PREFERENCE =
-        Pair("incognito_mode_detection_preference", true)
-    private val SHOW_LEARNED_CANDIDATES_IN_INCOGNITO_PREFERENCE =
-        Pair("show_learned_candidates_in_incognito_preference", true)
     private val USER_DICTIONARY_PREFERENCE = Pair("user_dictionary_preference", true)
     private val USER_DICTIONARY_PREFIX_PREFERENCE = Pair("user_dictionary_prefix_match_number", 2)
     private val USER_TEMPLATE_PREFERENCE = Pair("user_template_preference", true)
@@ -228,10 +214,6 @@ object AppPreference {
     private val MOZCUT_WEB = Pair("mozc_ut_web_preference", false)
 
     private val SWITCH_QWERTY_PASSWORD = Pair("switch_qwerty_keyboard_password_preference", false)
-    private val LANDSCAPE_FORCE_QWERTY_PREFERENCE =
-        Pair("landscape_force_qwerty_preference", false)
-    private val LANDSCAPE_FORCE_QWERTY_ROMAJI_PREFERENCE =
-        Pair("landscape_force_qwerty_romaji_preference", false)
 
     private val TENKEY_SWITCH_QWERTY_PREFERENCE =
         Pair("tenkey_kana_english_qwerty_preference", false)
@@ -356,7 +338,6 @@ object AppPreference {
     private val QWERTY_VARIATION_POPUP_TEXT_SIZE_SP =
         Pair("qwerty_variation_popup_text_size_sp_preference", 28.0f)
 
-    private val CANDIDATE_IN_PASSWORD = Pair("hide_candidate_password_preference", true)
 
     private val CANDIDATE_IN_PASSWORD_COMPOSE = Pair("password_compose_preference", false)
 
@@ -370,7 +351,6 @@ object AppPreference {
     private val KEYBOARD_POSITION = Pair("keyboard_position_preference", true)
     private val KEYBOARD_VERTICAL_MARGIN_BOTTOM =
         Pair("keyboard_vertical_margin_bottom_preference", 0)
-    private val KEYBOARD_FLOATING_PREFERENCE = Pair("keyboard_floating_preference", false)
     private val QWERTY_KEYBOARD_HEIGHT = Pair("qwerty_keyboard_height_preference", 220)
     private val QWERTY_KEYBOARD_WIDTH = Pair("qwerty_keyboard_width_preference", 100)
     private val QWERTY_KEYBOARD_VERTICAL_MARGIN_BOTTOM =
@@ -396,24 +376,16 @@ object AppPreference {
     private val CANDIDATE_VIEW_EMPTY_HEIGHT_DP_LANDSCAPE =
         Pair("candidate_view_empty_height_dp_landscape_preference", 60)
 
-    private val FLICK_INPUT_ONLY = Pair("flick_input_only_preference", false)
-    private val FLICK_EDITOR_PREVIEW = Pair(FLICK_EDITOR_PREVIEW_KEY, false)
     private val OMISSION_SEARCH = Pair("omission_search_preference", false)
     private val UNDO_ENABLE = Pair("undo_enable_preference", false)
     private val SPACE_HANKAKU_ENABLE = Pair("space_key_preference", false)
     private val CUSTOM_DIRECT_MODE_SPACE_HANKAKU_ENABLE =
         Pair("custom_direct_mode_space_hankaku_preference", true)
-    private val LIVE_CONVERSION_ENABLE = Pair("live_conversion_preference", false)
-    private val LIVE_CONVERSION_START_LENGTH = Pair("live_conversion_start_length_preference", 1)
-    const val LIVE_CONVERSION_CANDIDATE_YOMI_MODE_KEY = "live_conversion_candidate_yomi_mode_preference"
     const val CANDIDATE_YOMI_MODE_WHOLE = "whole"
-    const val CANDIDATE_YOMI_MODE_RUBY = "ruby"
-    const val LIVE_CONVERSION_CANDIDATE_YOMI_SIZE_KEY = "live_conversion_candidate_yomi_size_preference"
     const val DEFAULT_LIVE_CONVERSION_CANDIDATE_YOMI_SIZE = 14
+    const val CANDIDATE_YOMI_MODE_RUBY = "ruby"
     const val MIN_LIVE_CONVERSION_CANDIDATE_YOMI_SIZE = 1
     const val MAX_LIVE_CONVERSION_CANDIDATE_YOMI_SIZE = 24
-    private val LIVE_CONVERSION_CANDIDATE_YOMI =
-        Pair("live_conversion_candidate_yomi_preference", false)
     private const val OLD_SUMIRE_PREFERENCE_KEY = "sumire_keyboard_input_type_preference"
     private const val NEW_SUMIRE_STYLE_KEY = "sumire_keyboard_style_preference"
     private const val NEW_SUMIRE_METHOD_KEY = "sumire_input_method_preference"
@@ -469,12 +441,7 @@ object AppPreference {
     private val CANDIDATE_COLUMN_LANDSCAPE_PREFERENCE =
         Pair("candidate_column_landscape_preference", "1")
 
-    private val CANDIDATE_TAB_PREFERENCE = Pair("candidate_tab_visibility_preference", false)
 
-    private val SHORTCUT_TOOLBAR_VISIBILITY_PREFERENCE =
-        Pair("shortcut_toolbar_visibility_preference", false)
-    private val SHORTCUT_TOOLBAR_INTEGRATED_IN_SUGGESTION_PREFERENCE =
-        Pair("shortcut_toolbar_integrated_in_suggestion_preference", false)
     private val SHORTCUT_TOOLBAR_HEIGHT_DP_PREFERENCE =
         Pair("shortcut_toolbar_height_dp_preference", SHORTCUT_TOOLBAR_HEIGHT_DEFAULT_DP)
     private val SHORTCUT_TOOLBAR_ICON_SIZE_DP_PREFERENCE =
@@ -516,8 +483,6 @@ object AppPreference {
     private val CUSTOM_THEME_BORDER_COLOR = Pair("theme_custom_border_color", Color.BLACK)
 
     private val DELETE_KEY_LEFT_FLICK_PREFERENCE = Pair("delete_key_flick_left_preference", true)
-    private val DELETE_KEY_UP_FLICK_PREFERENCE = Pair("delete_key_flick_up_preference", false)
-    private val DELETE_KEY_DOWN_FLICK_PREFERENCE = Pair("delete_key_flick_down_preference", false)
     private val DEFAULT_CURSOR_MOVE_AFTER_COMMIT_TARGET_PAIRS = listOf(
         "()",
         "[]",
@@ -636,8 +601,6 @@ object AppPreference {
     private val CLIPBOARD_UNPINNED_RETENTION_HOURS_PREFERENCE =
         Pair("clipboard_unpinned_retention_hours_preference", 1)
 
-    private val ROUND_KEYBOARD_CORNER_PREFERENCE =
-        Pair("round_corner_keyboard_preference", false)
 
     private val KEYBOARD_CORNER_RADIUS_DP_PREFERENCE =
         Pair("keyboard_corner_radius_dp_preference", 32)
@@ -811,8 +774,6 @@ object AppPreference {
     private val ZENZ_MODEL_URI_PREFERENCE = Pair("zenz_model_uri_preference", "")
     private val SUMINAGASHI_INK_EFFECT_ENABLE =
         Pair("suminagashi_ink_effect_preference", false)
-    private val KEYBOARD_TOUCH_EFFECT_TYPE =
-        Pair("keyboard_touch_effect_type_preference", KeyboardTouchEffectType.NONE)
     private val KEYBOARD_TOUCH_EFFECT_QUALITY =
         Pair("keyboard_touch_effect_quality_preference", KeyboardTouchEffectQuality.HIGH)
     private val SUMINAGASHI_INK_COLOR_MODE =
@@ -1531,17 +1492,7 @@ object AppPreference {
             it.putBoolean(SWITCH_QWERTY_PASSWORD.first, value ?: false)
         }
 
-    var landscape_force_qwerty_preference: Boolean
-        get() = preferences.getBoolean(
-            LANDSCAPE_FORCE_QWERTY_PREFERENCE.first,
-            LANDSCAPE_FORCE_QWERTY_PREFERENCE.second
-        )
-        set(value) = preferences.edit {
-            it.putBoolean(LANDSCAPE_FORCE_QWERTY_PREFERENCE.first, value)
-        }
-
-    fun isFullscreenModeAllowed(defaultValue: Boolean): Boolean =
-        preferences.getBoolean(ALLOW_FULLSCREEN_MODE_KEY, defaultValue)
+    val landscape_force_qwerty_preference: Boolean get() = false // S3: hardcoded, setting removed
 
     var inline_suggestion_enabled_preference: Boolean
         get() = preferences.getBoolean(
@@ -1552,14 +1503,7 @@ object AppPreference {
             it.putBoolean(INLINE_SUGGESTION_ENABLED_PREFERENCE.first, value)
         }
 
-    var landscape_force_qwerty_romaji_preference: Boolean
-        get() = preferences.getBoolean(
-            LANDSCAPE_FORCE_QWERTY_ROMAJI_PREFERENCE.first,
-            LANDSCAPE_FORCE_QWERTY_ROMAJI_PREFERENCE.second
-        )
-        set(value) = preferences.edit {
-            it.putBoolean(LANDSCAPE_FORCE_QWERTY_ROMAJI_PREFERENCE.first, value)
-        }
+    val landscape_force_qwerty_romaji_preference: Boolean get() = false // S3: hardcoded, setting removed
 
     var qwerty_enable_flick_up_preference: Boolean?
         get() = preferences.getBoolean(
@@ -1635,13 +1579,7 @@ object AppPreference {
             it.putInt(KEY_POPUP_TEXT_COLOR.first, value)
         }
 
-    var show_candidates_password: Boolean?
-        get() = preferences.getBoolean(
-            CANDIDATE_IN_PASSWORD.first, CANDIDATE_IN_PASSWORD.second
-        )
-        set(value) = preferences.edit {
-            it.putBoolean(CANDIDATE_IN_PASSWORD.first, value ?: true)
-        }
+    val show_candidates_password: Boolean? get() = true // S3: hardcoded, setting removed
 
     var show_candidates_password_compose: Boolean?
         get() = preferences.getBoolean(
@@ -1747,13 +1685,7 @@ object AppPreference {
             it.putBoolean(NG_WORD_ENABLE_PREFERENCE.first, value ?: true)
         }
 
-    var vibration_timing_preference: String?
-        get() = preferences.getString(
-            VIBRATION_TIMING_PREFERENCE.first, VIBRATION_TIMING_PREFERENCE.second
-        )
-        set(value) = preferences.edit {
-            it.putString(VIBRATION_TIMING_PREFERENCE.first, value ?: "both")
-        }
+    val vibration_timing_preference: String? get() = "both" // S3: hardcoded, setting removed
 
     var key_sound_preference: Boolean?
         get() = preferences.getBoolean(KEY_SOUND_PREFERENCE.first, KEY_SOUND_PREFERENCE.second)
@@ -1778,17 +1710,7 @@ object AppPreference {
             it.putInt(FLICK_SENSITIVITY.first, value ?: 100)
         }
 
-    var flick_threshold_shape_preference: String
-        get() = preferences.getString(
-            FLICK_THRESHOLD_SHAPE.first,
-            FLICK_THRESHOLD_SHAPE.second
-        ) ?: FLICK_THRESHOLD_SHAPE.second
-        set(value) = preferences.edit {
-            it.putString(
-                FLICK_THRESHOLD_SHAPE.first,
-                FlickThresholdShape.fromPreferenceValue(value).preferenceValue
-            )
-        }
+    val flick_threshold_shape_preference: String get() = "radial" // S3: hardcoded, setting removed
 
     var tfbi_diagonal_recognition_mode_preference: TfbiDiagonalRecognitionMode
         get() = TfbiDiagonalRecognitionMode.fromPreferenceValue(
@@ -1813,9 +1735,7 @@ object AppPreference {
             )
         }
 
-    var independent_multi_touch_preference: Boolean
-        get() = preferences.getBoolean(INDEPENDENT_MULTI_TOUCH_KEY, false)
-        set(value) = preferences.edit { it.putBoolean(INDEPENDENT_MULTI_TOUCH_KEY, value) }
+    val independent_multi_touch_preference: Boolean get() = false // S3: hardcoded, setting removed
 
     var long_press_timeout_preference: Int?
         get() = preferences.getInt(
@@ -2179,23 +2099,9 @@ object AppPreference {
             it.putBoolean(LEARN_DICTIONARY_PREFERENCE.first, value ?: true)
         }
 
-    var incognito_mode_detection_preference: Boolean
-        get() = preferences.getBoolean(
-            INCOGNITO_MODE_DETECTION_PREFERENCE.first,
-            INCOGNITO_MODE_DETECTION_PREFERENCE.second
-        )
-        set(value) = preferences.edit {
-            it.putBoolean(INCOGNITO_MODE_DETECTION_PREFERENCE.first, value)
-        }
+    val incognito_mode_detection_preference: Boolean get() = true // S3: hardcoded, setting removed
 
-    var show_learned_candidates_in_incognito_preference: Boolean
-        get() = preferences.getBoolean(
-            SHOW_LEARNED_CANDIDATES_IN_INCOGNITO_PREFERENCE.first,
-            SHOW_LEARNED_CANDIDATES_IN_INCOGNITO_PREFERENCE.second
-        )
-        set(value) = preferences.edit {
-            it.putBoolean(SHOW_LEARNED_CANDIDATES_IN_INCOGNITO_PREFERENCE.first, value)
-        }
+    val show_learned_candidates_in_incognito_preference: Boolean get() = true // S3: hardcoded, setting removed
 
     var user_dictionary_preference: Boolean?
         get() = preferences.getBoolean(
@@ -2293,13 +2199,7 @@ object AppPreference {
             it.putBoolean(ZERO_QUERY_SUGGESTION_PREFERENCE.first, value)
         }
 
-    var time_same_pronounce_typing_preference: Int?
-        get() = preferences.getInt(
-            TIME_SAME_PRONOUNCE_TYPING.first, TIME_SAME_PRONOUNCE_TYPING.second
-        )
-        set(value) = preferences.edit {
-            it.putInt(TIME_SAME_PRONOUNCE_TYPING.first, value ?: 1000)
-        }
+    val time_same_pronounce_typing_preference: Int? get() = 1000 // S3: hardcoded, setting removed
 
     var mozc_ut_person_names_preference: Boolean?
         get() = preferences.getBoolean(MOZCUT_PERSON_NAME.first, MOZCUT_PERSON_NAME.second)
@@ -2485,28 +2385,11 @@ object AppPreference {
             )
         }
 
-    var flick_input_only_preference: Boolean?
-        get() = preferences.getBoolean(FLICK_INPUT_ONLY.first, FLICK_INPUT_ONLY.second)
-        set(value) = preferences.edit {
-            it.putBoolean(FLICK_INPUT_ONLY.first, value ?: false)
-        }
+    val flick_input_only_preference: Boolean? get() = false // S3: hardcoded, setting removed
 
-    var flick_editor_preview_preference: Boolean
-        get() = preferences.getBoolean(
-            FLICK_EDITOR_PREVIEW.first,
-            FLICK_EDITOR_PREVIEW.second
-        )
-        set(value) = preferences.edit {
-            it.putBoolean(FLICK_EDITOR_PREVIEW.first, value)
-        }
+    val flick_editor_preview_preference: Boolean get() = false // S3: hardcoded, setting removed
 
-    var flick_editor_preview_delay_ms: Int
-        get() = FlickPreviewDelaySettings.normalize(
-            preferences.getInt(FlickPreviewDelaySettings.KEY, 0)
-        )
-        set(value) = preferences.edit {
-            it.putInt(FlickPreviewDelaySettings.KEY, FlickPreviewDelaySettings.normalize(value))
-        }
+    val flick_editor_preview_delay_ms: Int get() = 0 // S3: hardcoded, setting removed
 
     var undo_enable_preference: Boolean?
         get() = preferences.getBoolean(UNDO_ENABLE.first, UNDO_ENABLE.second)
@@ -2556,53 +2439,15 @@ object AppPreference {
             )
         }
 
-    var live_conversion_preference: Boolean?
-        get() = preferences.getBoolean(LIVE_CONVERSION_ENABLE.first, LIVE_CONVERSION_ENABLE.second)
-        set(value) = preferences.edit {
-            it.putBoolean(LIVE_CONVERSION_ENABLE.first, value ?: false)
-        }
+    val live_conversion_preference: Boolean? get() = false // S3: hardcoded, setting removed
 
-    var live_conversion_start_length_preference: Int?
-        get() = preferences.getInt(
-            LIVE_CONVERSION_START_LENGTH.first,
-            LIVE_CONVERSION_START_LENGTH.second
-        )
-        set(value) = preferences.edit {
-            it.putInt(
-                LIVE_CONVERSION_START_LENGTH.first,
-                value ?: LIVE_CONVERSION_START_LENGTH.second
-            )
-        }
+    val live_conversion_start_length_preference: Int? get() = 1 // S3: hardcoded, setting removed
 
-    var live_conversion_candidate_yomi_preference: Boolean?
-        get() = preferences.getBoolean(
-            LIVE_CONVERSION_CANDIDATE_YOMI.first,
-            LIVE_CONVERSION_CANDIDATE_YOMI.second
-        )
-        set(value) = preferences.edit {
-            it.putBoolean(
-                LIVE_CONVERSION_CANDIDATE_YOMI.first,
-                value ?: LIVE_CONVERSION_CANDIDATE_YOMI.second
-            )
-        }
+    val live_conversion_candidate_yomi_preference: Boolean? get() = false // S3: hardcoded, setting removed
 
-    var live_conversion_candidate_yomi_mode: String
-        get() = preferences.getString(
-            LIVE_CONVERSION_CANDIDATE_YOMI_MODE_KEY, CANDIDATE_YOMI_MODE_WHOLE
-        ).let { if (it == CANDIDATE_YOMI_MODE_RUBY) it else CANDIDATE_YOMI_MODE_WHOLE }
-        set(value) = preferences.edit {
-            it.putString(LIVE_CONVERSION_CANDIDATE_YOMI_MODE_KEY,
-                if (value == CANDIDATE_YOMI_MODE_RUBY) value else CANDIDATE_YOMI_MODE_WHOLE)
-        }
+    val live_conversion_candidate_yomi_mode: String get() = CANDIDATE_YOMI_MODE_WHOLE // S3: hardcoded, setting removed
 
-    var live_conversion_candidate_yomi_size: Int
-        get() = preferences.getInt(
-            LIVE_CONVERSION_CANDIDATE_YOMI_SIZE_KEY, DEFAULT_LIVE_CONVERSION_CANDIDATE_YOMI_SIZE
-        ).coerceIn(MIN_LIVE_CONVERSION_CANDIDATE_YOMI_SIZE, MAX_LIVE_CONVERSION_CANDIDATE_YOMI_SIZE)
-        set(value) = preferences.edit {
-            it.putInt(LIVE_CONVERSION_CANDIDATE_YOMI_SIZE_KEY,
-                value.coerceIn(MIN_LIVE_CONVERSION_CANDIDATE_YOMI_SIZE, MAX_LIVE_CONVERSION_CANDIDATE_YOMI_SIZE))
-        }
+    val live_conversion_candidate_yomi_size: Int get() = DEFAULT_LIVE_CONVERSION_CANDIDATE_YOMI_SIZE // S3: hardcoded, setting removed
 
     var delete_key_high_light_preference: Boolean?
         get() = preferences.getBoolean(DELETE_KEY_HIGH_LIGHT.first, DELETE_KEY_HIGH_LIGHT.second)
@@ -2693,13 +2538,7 @@ object AppPreference {
             it.putString(NEW_SUMIRE_METHOD_KEY, value)
         }
 
-    var is_floating_mode: Boolean?
-        get() = preferences.getBoolean(
-            KEYBOARD_FLOATING_PREFERENCE.first, KEYBOARD_FLOATING_PREFERENCE.second
-        )
-        set(value) = preferences.edit {
-            it.putBoolean(KEYBOARD_FLOATING_PREFERENCE.first, value ?: false)
-        }
+    val is_floating_mode: Boolean? get() = false // S3: hardcoded, setting removed
 
     var keyboard_floating_position_x: Int
         get() = preferences.getInt(
@@ -2744,14 +2583,7 @@ object AppPreference {
             it.putString(CANDIDATE_COLUMN_PREFERENCE.first, value)
         }
 
-    var candidate_column_landscape_preference: String
-        get() = preferences.getString(
-            CANDIDATE_COLUMN_LANDSCAPE_PREFERENCE.first,
-            CANDIDATE_COLUMN_LANDSCAPE_PREFERENCE.second
-        ) ?: "1"
-        set(value) = preferences.edit {
-            it.putString(CANDIDATE_COLUMN_LANDSCAPE_PREFERENCE.first, value)
-        }
+    val candidate_column_landscape_preference: String get() = "1" // S3: hardcoded, setting removed
 
     internal fun migrateCandidateHeightDefaultsIfNeeded() {
         if (preferences.getInt(
@@ -3039,31 +2871,11 @@ object AppPreference {
         }
     }
 
-    var candidate_tab_preference: Boolean
-        get() = preferences.getBoolean(
-            CANDIDATE_TAB_PREFERENCE.first, CANDIDATE_TAB_PREFERENCE.second
-        )
-        set(value) = preferences.edit {
-            it.putBoolean(CANDIDATE_TAB_PREFERENCE.first, value)
-        }
+    val candidate_tab_preference: Boolean get() = false // S3: hardcoded, setting removed
 
-    var shortcut_toolbar_visibility_preference: Boolean
-        get() = preferences.getBoolean(
-            SHORTCUT_TOOLBAR_VISIBILITY_PREFERENCE.first,
-            SHORTCUT_TOOLBAR_VISIBILITY_PREFERENCE.second
-        )
-        set(value) = preferences.edit {
-            it.putBoolean(SHORTCUT_TOOLBAR_VISIBILITY_PREFERENCE.first, value)
-        }
+    val shortcut_toolbar_visibility_preference: Boolean get() = false // S3: hardcoded, setting removed
 
-    var shortcut_toolbar_integrated_in_suggestion_preference: Boolean
-        get() = preferences.getBoolean(
-            SHORTCUT_TOOLBAR_INTEGRATED_IN_SUGGESTION_PREFERENCE.first,
-            SHORTCUT_TOOLBAR_INTEGRATED_IN_SUGGESTION_PREFERENCE.second
-        )
-        set(value) = preferences.edit {
-            it.putBoolean(SHORTCUT_TOOLBAR_INTEGRATED_IN_SUGGESTION_PREFERENCE.first, value)
-        }
+    val shortcut_toolbar_integrated_in_suggestion_preference: Boolean get() = false // S3: hardcoded, setting removed
 
     var stabilize_candidate_strip_height_preference: Boolean
         get() = preferences.getBoolean(STABILIZE_CANDIDATE_STRIP_HEIGHT_KEY, false)
@@ -3240,23 +3052,9 @@ object AppPreference {
             it.putBoolean(DELETE_KEY_LEFT_FLICK_PREFERENCE.first, value)
         }
 
-    var delete_key_up_flick_preference: Boolean
-        get() = preferences.getBoolean(
-            DELETE_KEY_UP_FLICK_PREFERENCE.first,
-            DELETE_KEY_UP_FLICK_PREFERENCE.second
-        )
-        set(value) = preferences.edit {
-            it.putBoolean(DELETE_KEY_UP_FLICK_PREFERENCE.first, value)
-        }
+    val delete_key_up_flick_preference: Boolean get() = false // S3: hardcoded, setting removed
 
-    var delete_key_down_flick_preference: Boolean
-        get() = preferences.getBoolean(
-            DELETE_KEY_DOWN_FLICK_PREFERENCE.first,
-            DELETE_KEY_DOWN_FLICK_PREFERENCE.second
-        )
-        set(value) = preferences.edit {
-            it.putBoolean(DELETE_KEY_DOWN_FLICK_PREFERENCE.first, value)
-        }
+    val delete_key_down_flick_preference: Boolean get() = false // S3: hardcoded, setting removed
 
     var cursor_move_after_commit_target_pairs_preference: List<String>
         get() {
@@ -3605,14 +3403,7 @@ object AppPreference {
             it.putInt(CLIPBOARD_UNPINNED_RETENTION_HOURS_PREFERENCE.first, value.coerceIn(1, 72))
         }
 
-    var keyboard_corner_round_preference: Boolean
-        get() = preferences.getBoolean(
-            ROUND_KEYBOARD_CORNER_PREFERENCE.first,
-            ROUND_KEYBOARD_CORNER_PREFERENCE.second
-        )
-        set(value) = preferences.edit {
-            it.putBoolean(ROUND_KEYBOARD_CORNER_PREFERENCE.first, value)
-        }
+    val keyboard_corner_round_preference: Boolean get() = false // S3: hardcoded, setting removed
 
     var keyboard_corner_radius_dp_preference: Int
         get() = preferences.getInt(
@@ -4320,29 +4111,7 @@ object AppPreference {
             it.putBoolean(SUMINAGASHI_INK_EFFECT_ENABLE.first, value)
         }
 
-    var keyboard_touch_effect_type_preference: String
-        get() {
-            if (!preferences.contains(KEYBOARD_TOUCH_EFFECT_TYPE.first)) {
-                return if (suminagashi_ink_effect_preference) {
-                    KeyboardTouchEffectType.LIQUID_INK
-                } else {
-                    KeyboardTouchEffectType.NONE
-                }
-            }
-            val value = preferences.getString(
-                KEYBOARD_TOUCH_EFFECT_TYPE.first,
-                KEYBOARD_TOUCH_EFFECT_TYPE.second
-            )
-            return KeyboardTouchEffectType.normalize(value)
-        }
-        set(value) = preferences.edit {
-            val normalized = KeyboardTouchEffectType.normalize(value)
-            it.putString(KEYBOARD_TOUCH_EFFECT_TYPE.first, normalized)
-            it.putBoolean(
-                SUMINAGASHI_INK_EFFECT_ENABLE.first,
-                normalized == KeyboardTouchEffectType.LIQUID_INK
-            )
-        }
+    val keyboard_touch_effect_type_preference: String get() = KeyboardTouchEffectType.NONE // S3: hardcoded, setting removed
 
     var keyboard_touch_effect_quality_preference: String
         get() {

@@ -11,7 +11,6 @@ class SharedActionBarNavigationContractTest {
     fun fragmentTeardownDoesNotOverrideTheDestinationUpIndicator() {
         listOf(
             "ui/keyboard_size_setting/KeyboardSizeSettingFragment.kt",
-            "ui/keyboard_size_landscape_setting/KeyboardSizeLandscapeFragment.kt",
         ).forEach { relativePath ->
             val source = mainFile(relativePath).readText()
             val onDestroyViewBody = source.substringAfter("override fun onDestroyView()")
@@ -30,9 +29,7 @@ class SharedActionBarNavigationContractTest {
 
         assertTrue(source.contains("private val destinationsWithOwnToolbar = setOf("))
         assertTrue(source.contains("R.id.candidateViewHeightSettingFragment"))
-        assertTrue(source.contains("R.id.candidateHeightLandscapeSettingFragment"))
         assertTrue(source.contains("R.id.candidateHeightDefaultsFragment"))
-        assertTrue(source.contains("R.id.shortcutToolbarSizeSettingFragment"))
         assertTrue(source.contains("private val destinationsWithoutSharedActionBar"))
         assertTrue(source.contains("destinationsWithOwnToolbar + R.id.enableKeyboardFragment"))
         assertTrue(source.contains("updateSharedActionBarVisibility(destination.id)"))
@@ -83,9 +80,7 @@ class SharedActionBarNavigationContractTest {
     fun customToolbarFragmentsDoNotToggleTheSharedActionBar() {
         listOf(
             "ui/candidate_view_height_setting/CandidateViewHeightSettingFragment.kt",
-            "ui/candidate_view_height_landscape_setting/CandidateHeightLandscapeSettingFragment.kt",
             "ui/candidate_view_height_setting/CandidateHeightDefaultsFragment.kt",
-            "ui/shortcut_toolbar_size/ShortcutToolbarSizeSettingFragment.kt",
         ).forEach { relativePath ->
             val source = mainFile(relativePath).readText()
 

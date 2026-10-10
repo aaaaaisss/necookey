@@ -78,14 +78,11 @@ class MainActivity : AppCompatActivity() {
 
     private val destinationsWithoutBottomNavigation = setOf(
         R.id.candidateViewHeightSettingFragment,
-        R.id.candidateHeightLandscapeSettingFragment,
         R.id.candidateHeightDefaultsFragment,
     )
     private val destinationsWithOwnToolbar = setOf(
         R.id.candidateViewHeightSettingFragment,
-        R.id.candidateHeightLandscapeSettingFragment,
         R.id.candidateHeightDefaultsFragment,
-        R.id.shortcutToolbarSizeSettingFragment,
     )
     private val destinationsWithoutSharedActionBar =
         destinationsWithOwnToolbar + R.id.enableKeyboardFragment

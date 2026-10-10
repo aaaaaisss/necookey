@@ -74,15 +74,6 @@
                 android:defaultValue="portrait" />
         </action>
     </fragment>
-    <fragment
-        android:id="@+id/keyboardSelectionFragment"
-        android:name="com.kazumaproject.markdownhelperkeyboard.setting_activity.ui.keyboard_selection.KeyboardSelectionFragment"
-        android:label="@string/keyboard_selection_fragment_title"
-        tools:layout="@layout/fragment_keyboard_selection">
-        <action
-            android:id="@+id/action_keyboardSelectionFragment_to_keyboardListFragment"
-            app:destination="@id/keyboardListFragment" />
-    </fragment>
 
     <fragment
         android:id="@+id/navigation_user_dictionary"
@@ -122,23 +113,6 @@
         android:name="com.kazumaproject.markdownhelperkeyboard.clipboard_history.ui.ClipboardHistoryFragment"
         android:label="@string/clipboard_fragment_title" />
     <fragment
-        android:id="@+id/romajiMapFragment"
-        android:name="com.kazumaproject.markdownhelperkeyboard.custom_romaji.ui.RomajiMapFragment"
-        android:label="@string/romaji_conversion_map_fragment_title">
-        <action
-            android:id="@+id/action_romajiMapFragment_to_romajiMapDetailFragment"
-            app:destination="@id/romajiMapDetailFragment" />
-    </fragment>
-    <fragment
-        android:id="@+id/romajiMapDetailFragment"
-        android:name="com.kazumaproject.markdownhelperkeyboard.custom_romaji.ui.RomajiMapDetailFragment"
-        android:label="@string/romaji_map_fragment_title"
-        tools:layout="@layout/fragment_romaji_map_detail">
-        <argument
-            android:name="mapId"
-            app:argType="long" />
-    </fragment>
-    <fragment
         android:id="@+id/ngWordFragment"
         android:name="com.kazumaproject.markdownhelperkeyboard.ng_word.ui.NgWordFragment"
         android:label="@string/ng_word_fragment_title" />
@@ -163,19 +137,6 @@
             app:argType="boolean" />
     </fragment>
     <fragment
-        android:id="@+id/keyboardSizeLandscapeFragment"
-        android:name="com.kazumaproject.markdownhelperkeyboard.setting_activity.ui.keyboard_size_landscape_setting.KeyboardSizeLandscapeFragment"
-        android:label="@string/keyboard_size_landscape_title"
-        tools:layout="@layout/fragment_keyboardsize_landscape">
-        <action
-            android:id="@+id/action_keyboardSizeLandscapeFragment_to_keyboardSizeDirectInputFragment"
-            app:destination="@id/keyboardSizeDirectInputFragment">
-            <argument
-                android:name="initialOrientation"
-                android:defaultValue="landscape" />
-        </action>
-    </fragment>
-    <fragment
         android:id="@+id/keyboardSizeDirectInputFragment"
         android:name="com.kazumaproject.markdownhelperkeyboard.setting_activity.ui.keyboard_size_direct_input.KeyboardSizeDirectInputFragment"
         android:label="@string/keyboard_size_direct_input_title"
@@ -185,15 +146,6 @@
             android:defaultValue="portrait"
             app:argType="string" />
     </fragment>
-    <fragment
-        android:id="@+id/candidateHeightLandscapeSettingFragment"
-        android:name="com.kazumaproject.markdownhelperkeyboard.setting_activity.ui.candidate_view_height_landscape_setting.CandidateHeightLandscapeSettingFragment"
-        android:label="@string/candidate_height_landscape_preference_title"
-        tools:layout="@layout/fragment_candidate_height_landscape_setting" />
-    <fragment
-        android:id="@+id/candidateTabOrderFragment"
-        android:name="com.kazumaproject.markdownhelperkeyboard.setting_activity.ui.candidate_tab_order.ui.CandidateTabOrderFragment"
-        android:label="@string/candidate_tab_order_preference_title" />
     <fragment
         android:id="@+id/candidateOrderOverrideFragment"
         android:name="com.kazumaproject.markdownhelperkeyboard.candidate_order.ui.CandidateOrderOverrideFragment"
@@ -222,15 +174,6 @@
         android:name="com.kazumaproject.markdownhelperkeyboard.setting_activity.ui.enable_keyboard_setting.EnableKeyboardFragment"
         android:label="@string/welcome_title"
         tools:layout="@layout/fragment_enable_keyboard" />
-    <fragment
-        android:id="@+id/shortcutSettingFragment"
-        android:name="com.kazumaproject.markdownhelperkeyboard.short_cut.ui.ShortcutSettingFragment"
-        android:label="@string/shortcutsettingfragment" />
-    <fragment
-        android:id="@+id/shortcutToolbarSizeSettingFragment"
-        android:name="com.kazumaproject.markdownhelperkeyboard.setting_activity.ui.shortcut_toolbar_size.ShortcutToolbarSizeSettingFragment"
-        android:label="@string/shortcut_toolbar_size_title"
-        tools:layout="@layout/fragment_shortcut_toolbar_size_setting" />
     <fragment
         android:id="@+id/systemUserDictionaryBuilderFragment"
         android:name="com.kazumaproject.markdownhelperkeyboard.system_user_dictionary.ui.SystemUserDictionaryBuilderFragment"
