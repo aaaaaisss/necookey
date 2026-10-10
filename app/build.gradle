@@ -9,6 +9,7 @@ plugins {
 android {
     namespace 'com.kazumaproject.markdownhelperkeyboard'
     compileSdk 36
+    ndkVersion "29.0.14206865"
 
     def localProperties = new Properties()
     def localPropertiesFile = rootProject.file("local.properties")
@@ -115,9 +116,9 @@ android {
         }
         release {
             def releaseSigning = signingConfigs.findByName("release")
-            if (releaseSigning?.storeFile) {
-                signingConfig releaseSigning
-            }
+            // Without a local release keystore (CI), sign with the committed CI key so the
+            // nightly release-type APK installs as an update over earlier CI builds.
+            signingConfig releaseSigning?.storeFile ? releaseSigning : signingConfigs.necookeyCi
             minifyEnabled true
             shrinkResources true
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'

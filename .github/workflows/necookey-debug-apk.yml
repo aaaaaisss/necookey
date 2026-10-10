@@ -1,6 +1,7 @@
 name: necookey debug APK
 
-# One variant only: fullStandard debug, arm64-v8a. No lint, no release, no other flavors.
+# One variant only: fullStandard release (R8 + shrinkResources, signed with keystore/necookey-ci.jks),
+# arm64-v8a. No lint, no other flavors. (Workflow name kept for tooling.)
 on:
   push:
     branches: [sumire-fork, main]
@@ -45,6 +46,7 @@ env:
     -PnecookeyAbi=arm64-v8a
     -PzenzDebugNativeAbis=arm64-v8a
     -PzenzDebugOptimizedNative=true
+    -PzenzReleaseNativeAbis=arm64-v8a
 
 jobs:
   build:
@@ -121,8 +123,8 @@ jobs:
           path: .zenz-model-cache
           key: zenz-model-v2-4f5423f0fad41a73b1242eb96fe5c12ae4fdca83-Q5_K_M
 
-      - name: Build fullStandard debug APK (arm64-v8a)
-        run: ./gradlew :app:assembleFullStandardDebug $GRADLE_FLAGS
+      - name: Build fullStandard release APK (arm64-v8a)
+        run: ./gradlew :app:assembleFullStandardRelease $GRADLE_FLAGS
 
       - name: JVM unit tests (touched modules only)
         if: steps.changes.outputs.app == 'true' || steps.changes.outputs.core == 'true' || steps.changes.outputs.custom_keyboard == 'true' || steps.changes.outputs.zenz == 'true'
@@ -139,7 +141,7 @@ jobs:
       - name: Locate APK and verify no INTERNET permission
         id: apk
         run: |
-          APK=$(find app/build -name '*.apk' -path '*fullStandard*' -path '*debug*' | grep -v androidTest | head -1)
+          APK=$(find app/build -name '*.apk' -path '*fullStandard*' -path '*release*' | grep -v androidTest | head -1)
           if [ -z "$APK" ]; then echo "APK not found"; find app/build -name '*.apk'; exit 1; fi
           echo "path=$APK" >> "$GITHUB_OUTPUT"
           AAPT=$(ls "$ANDROID_HOME"/build-tools/*/aapt2 | sort -V | tail -1)
@@ -156,7 +158,7 @@ jobs:
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: necookey-fullStandard-debug-arm64
+          name: necookey-fullStandard-release-arm64
           path: ${{ steps.apk.outputs.path }}
           if-no-files-found: error
           retention-days: 14

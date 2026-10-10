@@ -53,3 +53,17 @@
 # Legacy data compatibility: Pair fields may still appear in old JSON payloads.
 -keep class kotlin.Pair { *; }
 
+
+# necookey: keep class/member names (readable crash traces; Gson/enum names stored in prefs and
+# backups stay stable across builds). R8 still removes unused code and optimizes.
+-dontobfuscate
+# Gson (de)serializes these reflectively: keep their fields so R8 does not drop "unread" ones.
+-keepclassmembers enum * { <fields>; }
+-keep class com.kazumaproject.markdownhelperkeyboard.dictionary_override.DictionaryOverrideMetadata { *; }
+-keep class com.kazumaproject.markdownhelperkeyboard.repository.TextMacroBackup { *; }
+-keep class com.kazumaproject.markdownhelperkeyboard.repository.TextMacroBackupEntry { *; }
+-keep class com.kazumaproject.markdownhelperkeyboard.setting_activity.circular_slot.CircularSlotActionSetting { *; }
+-keep class com.kazumaproject.markdownhelperkeyboard.clipboard_history.dto.** { *; }
+# JNI: zenz bridge entry points (native methods + their classes).
+-keepclasseswithmembernames,includedescriptorclasses class * { native <methods>; }
+-keep class com.kazumaproject.zenz.** { *; }
