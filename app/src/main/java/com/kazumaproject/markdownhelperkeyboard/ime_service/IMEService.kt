@@ -27,15 +27,11 @@ import android.media.AudioManager
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
-import android.os.CombinedVibration
 import android.os.Handler
 import android.os.Looper
 import android.os.Process
 import android.os.ResultReceiver
 import android.os.SystemClock
-import android.os.VibrationEffect
-import android.os.Vibrator
-import android.os.VibratorManager
 import android.speech.RecognitionListener
 import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
@@ -273,8 +269,6 @@ import com.kazumaproject.markdownhelperkeyboard.ime_service.extensions.getQWERTY
 import com.kazumaproject.markdownhelperkeyboard.ime_service.extensions.isAllEnglishLetters
 import com.kazumaproject.markdownhelperkeyboard.ime_service.extensions.isAllHiraganaWithSymbols
 import com.kazumaproject.markdownhelperkeyboard.ime_service.extensions.isPassword
-import com.kazumaproject.markdownhelperkeyboard.ime_service.feedback.VibrationFeedbackMoment
-import com.kazumaproject.markdownhelperkeyboard.ime_service.feedback.VibrationTimingPolicy
 import com.kazumaproject.markdownhelperkeyboard.ime_service.floating_view.BubbleTextView
 import com.kazumaproject.markdownhelperkeyboard.ime_service.floating_view.FloatingDockListener
 import com.kazumaproject.markdownhelperkeyboard.ime_service.floating_view.FloatingDockView
@@ -930,11 +924,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         AppPreference.CUSTOM_KEYMAP_GUIDE_KEY,
         AppPreference.CUSTOM_KEYBOARD_INPUT_IN_EMPTY_AREAS_KEY,
         AppPreference.CUSTOM_DIRECT_INPUT_REPLACE_COMPOSING_KEY,
-        AppPreference.LONG_PRESS_TIMEOUT_KEY,
-        AppPreference.DELETE_LONG_PRESS_CONVERSION_BEHAVIOR_KEY,
-        AppPreference.VIBRATION_KEY,
-        AppPreference.KEY_SOUND_KEY,
-        AppPreference.KEY_SOUND_VOLUME_PERCENT_KEY,
         AppPreference.FLICK_TFBI_POPUP_PRESENTATION_KEY,
         AppPreference.FLICK_TFBI_FLICK_START_POSITION_KEY,
     )
@@ -1768,10 +1757,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
     private var qwertyShowKeymapSymbolsPreference: Boolean? = false
     private var qwertyRomajiShiftConversionPreference: Boolean? = false
     private var showCandidateInPasswordPreference: Boolean? = true
-    private var isVibration: Boolean? = true
-    private var vibrationTimingStr: String? = "both"
-    private var isKeySoundEnabled: Boolean? = false
-    private var keySoundVolumePercent: Int? = 0
     private var mozcUTPersonName: Boolean? = false
     private var mozcUTPlaces: Boolean? = false
     private var mozcUTWiki: Boolean? = false
@@ -3522,11 +3507,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
             DeleteLongPressConversionBehavior.fromPreferenceValue(
                 appPreference.delete_long_press_conversion_behavior
             )
-        isVibration = appPreference.vibration_preference ?: true
-        vibrationTimingStr = appPreference.vibration_timing_preference ?: "both"
-        isKeySoundEnabled = appPreference.key_sound_preference ?: false
-        keySoundVolumePercent =
-            (appPreference.key_sound_volume_percent_preference ?: 0).coerceIn(0, 100)
         tenkeyKeymapGuideSettings = ModeKeymapGuideSettings(
             japanese = appPreference.tenkey_keymap_guide_layout ?: false,
             english = appPreference.tenkey_keymap_guide_english,
@@ -3778,10 +3758,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         customDirectInputReplaceComposingPreference =
             preferences.customDirectInputReplaceComposingPreference
         userDictionaryPrefixMatchNumber = preferences.userDictionaryPrefixMatchNumber
-        isVibration = preferences.isVibration
-        vibrationTimingStr = preferences.vibrationTimingStr
-        isKeySoundEnabled = preferences.isKeySoundEnabled
-        keySoundVolumePercent = preferences.keySoundVolumePercent
         sumireInputKeyType = preferences.sumireInputKeyType
         sumireInputKeyLayoutType = preferences.sumireInputKeyLayoutType
         sumireInputStyle = preferences.sumireInputStyle
@@ -5540,7 +5516,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
                                 }
 
                                 GestureType.Down -> {
-                                    handleKeyPressFeedback(getKeySoundType(key))
                                 }
 
                                 GestureType.Tap -> {
@@ -5983,9 +5958,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         qwertyShowKutoutenButtonsPreference = null
         qwertyShowKeymapSymbolsPreference = null
         showCandidateInPasswordPreference = null
-        isVibration = null
-        isKeySoundEnabled = null
-        keySoundVolumePercent = null
         tenkeyHeightPreferenceValue = null
         tenkeyWidthPreferenceValue = null
         qwertyHeightPreferenceValue = null
@@ -6046,7 +6018,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         customThemeCandidateEmptyPopupTextColor = null
         customThemeShortcutIconColor = null
 
-        vibrationTimingStr = null
         mozcUTPersonName = null
         romajiConverter = null
         mozcUTPlaces = null
@@ -10274,7 +10245,7 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
                     val suggestionList = suggestionAdapter?.suggestions ?: emptyList()
                     when (gestureType) {
                         GestureType.Null -> Unit
-                        GestureType.Down -> handleKeyPressFeedback(getKeySoundType(key))
+                        GestureType.Down -> Unit
                         GestureType.Tap -> handleTapAndFlickFloating(
                             key = key,
                             char = char,
@@ -10416,7 +10387,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
                         }
 
                         GestureType.Down -> {
-                            handleKeyPressFeedback(getKeySoundType(key))
                         }
 
                         GestureType.Tap -> {
@@ -10642,7 +10612,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
                         }
 
                         GestureType.Down -> {
-                            handleKeyPressFeedback(getKeySoundType(key))
                         }
 
                         GestureType.Tap -> {
@@ -10714,7 +10683,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         mainView: MainLayoutBinding
     ) {
         if (isKeyboardLayoutEditModeActive()) return
-        handleKeyReleaseFeedback()
         if (deletedBuffer.isNotEmpty() && !selectMode.value && key != Key.SideKeyDelete) {
             clearDeletedBuffer()
             refreshEditHistoryUi()
@@ -10846,7 +10814,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
             }
 
             Key.SideKeySymbol -> {
-                vibrate()
                 _keyboardSymbolViewState.value = SymbolKeyboardState(
                     isShown = !_keyboardSymbolViewState.value.isShown
                 )
@@ -10903,7 +10870,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         floatingKeyboardLayoutBinding: FloatingKeyboardLayoutBinding
     ) {
         if (isKeyboardLayoutEditModeActive()) return
-        handleKeyReleaseFeedback()
         if (deletedBuffer.isNotEmpty() && !selectMode.value && key != Key.SideKeyDelete) {
             clearDeletedBuffer()
             refreshEditHistoryUi()
@@ -11038,7 +11004,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
             }
 
             Key.SideKeySymbol -> {
-                vibrate()
                 _keyboardSymbolViewState.value = SymbolKeyboardState(
                     isShown = !_keyboardSymbolViewState.value.isShown
                 )
@@ -13555,7 +13520,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
                 activateSplitView(flickView)
                 if (isKeyboardLayoutEditModeActive()) return
                 if (action == KeyAction.DoNothing) return
-                handleKeyPressFeedback(getKeySoundType(action))
             }
 
             override fun onLongPressActionCanceled(action: KeyAction) {
@@ -13569,7 +13533,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
                 if (isKeyboardLayoutEditModeActive()) return
                 finishCustomToggleForAction()
                 if (action != KeyAction.DoNothing) {
-                    vibrate()
                     clearDeleteBufferWithView()
                 }
                 Timber.d("onActionLongPress: $action")
@@ -13853,7 +13816,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
             override fun onFlickDirectionChanged(direction: FlickDirection) {
                 activateSplitView(flickView)
                 if (isKeyboardLayoutEditModeActive()) return
-                vibrate()
                 Timber.d("onFlickDirectionChanged: $direction")
             }
 
@@ -13862,7 +13824,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
                 if (isKeyboardLayoutEditModeActive()) return
                 finishCustomToggleForAction()
                 Timber.d("onFlickActionLongPress: $action")
-                if (action != KeyAction.DoNothing) vibrate()
                 when (action) {
                     KeyAction.DoNothing -> Unit
                     KeyAction.Backspace -> {}
@@ -14002,7 +13963,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
             override fun onFlickActionUpAfterLongPress(action: KeyAction, isFlick: Boolean) {
                 activateSplitView(flickView)
                 if (isKeyboardLayoutEditModeActive()) return
-                if (action != KeyAction.DoNothing) handleKeyReleaseFeedback()
                 Timber.d("onFlickActionUpAfterLongPress: $action $isFlick")
                 when (action) {
                     KeyAction.DoNothing -> Unit
@@ -14281,7 +14241,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
             override fun onToggleText(keyIdentity: String, values: List<String>) {
                 activateSplitView(flickView)
                 if (isKeyboardLayoutEditModeActive()) return
-                handleKeyReleaseFeedback()
                 clearDeleteBufferWithView()
                 val isDirect = isCustomToggleDirectInput()
                 if (customToggleWasDirect != isDirect) {
@@ -14302,7 +14261,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
                 activateSplitView(flickView)
                 if (isKeyboardLayoutEditModeActive()) return
                 finishCustomToggleForAction()
-                if (action != KeyAction.DoNothing) handleKeyReleaseFeedback()
 
                 Timber.d("onAction: $action $isFlick")
                 if (!shouldPreserveDeleteHistoryForAction(action)) {
@@ -15354,7 +15312,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
     }
 
     private fun handleClipboardHistoryItemAction(item: ClipboardItem, action: ClipboardItemAction) {
-        vibrate()
         when (action) {
             ClipboardItemAction.PASTE -> pasteClipboardHistoryItem(item)
             ClipboardItemAction.PIN -> updateClipboardHistoryPin(item, isPinned = true)
@@ -19748,7 +19705,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
             adapter.setOnItemClickListener { candidate, position ->
                 val insertString = inputString.value
                 val currentInputMode: InputMode = currentTenkeyInputMode(mainView)
-                vibrate()
                 setCandidateClick(
                     candidate = candidate,
                     insertString = insertString,
@@ -19868,7 +19824,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
                 toggleInlineSuggestionSurface()
             }
             adapter.setOnZeroQueryCandidateClickListener { candidate ->
-                vibrate()
                 commitZeroQueryCandidate(candidate)
             }
             adapter.setOnZeroQueryCloseClickListener {
@@ -19879,7 +19834,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
             adapter.setOnItemClickListener { candidate, position ->
                 val insertString = inputString.value
                 if (insertString.isEmpty()) return@setOnItemClickListener
-                vibrate()
                 setCandidateClick(
                     candidate = candidate,
                     insertString = insertString,
@@ -19906,7 +19860,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
             adapter.setOnItemClickListener { candidate, position ->
                 val insertString = inputString.value
                 val currentInputMode: InputMode = currentTenkeyInputMode(mainView)
-                vibrate()
                 setCandidateClick(
                     candidate = candidate,
                     insertString = insertString,
@@ -20166,7 +20119,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
             return
         }
 
-        vibrate()
         closeViewsThatConflictWithKeyboardLayoutEdit()
 
         val target = KeyboardLayoutEditTarget.from(qwertyMode.value)
@@ -20893,7 +20845,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
             }
 
             ShortcutType.EMOJI -> {
-                vibrate()
                 _keyboardSymbolViewState.value = SymbolKeyboardState(
                     isShown = !_keyboardSymbolViewState.value.isShown
                 )
@@ -20959,7 +20910,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
             }
 
             ShortcutType.CLIP_BOARD -> {
-                vibrate()
                 _keyboardSymbolViewState.value = SymbolKeyboardState(
                     isShown = true,
                     mode = SymbolMode.CLIPBOARD
@@ -20996,7 +20946,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
             setOnReturnToTenKeyButtonClickListener(object : ReturnToTenKeyButtonClickListener {
                 override fun onClick() {
                     activateSplitView(symbolView)
-                    vibrate()
                     _keyboardSymbolViewState.value = SymbolKeyboardState(
                         isShown = !_keyboardSymbolViewState.value.isShown
                     )
@@ -21008,7 +20957,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
                 override fun onClick() {
                     activateSplitView(symbolView)
                     if (!deleteKeyLongKeyPressed.get()) {
-                        vibrate()
                         sendDownUpKeyEvents(KeyEvent.KEYCODE_DEL)
                     }
                     stopDeleteLongPress()
@@ -21033,7 +20981,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
             setOnSymbolRecyclerViewItemClickListener(object : SymbolRecyclerViewItemClickListener {
                 override fun onClick(symbol: ClickedSymbol) {
                     activateSplitView(symbolView)
-                    vibrate()
                     commitText(symbol.symbol, 1)
                     CoroutineScope(Dispatchers.IO).launch {
                         clickedSymbolRepository.insert(
@@ -21046,7 +20993,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
                 SymbolRecyclerViewItemLongClickListener {
                 override fun onLongClick(symbol: ClickedSymbol, position: Int) {
                     activateSplitView(symbolView)
-                    vibrate()
                     CoroutineScope(Dispatchers.IO).launch {
                         clickedSymbolRepository.delete(
                             mode = symbol.mode, symbol = symbol.symbol
@@ -21078,7 +21024,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
             setOnReturnToTenKeyButtonClickListener(object : ReturnToTenKeyButtonClickListener {
                 override fun onClick() {
                     activateSplitView(symbolView)
-                    vibrate()
                     _keyboardSymbolViewState.value = SymbolKeyboardState(
                         isShown = !_keyboardSymbolViewState.value.isShown
                     )
@@ -21090,7 +21035,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
                 override fun onClick() {
                     activateSplitView(symbolView)
                     if (!deleteKeyLongKeyPressed.get()) {
-                        vibrate()
                         sendDownUpKeyEvents(KeyEvent.KEYCODE_DEL)
                     }
                     stopDeleteLongPress()
@@ -21115,7 +21059,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
             setOnSymbolRecyclerViewItemClickListener(object : SymbolRecyclerViewItemClickListener {
                 override fun onClick(symbol: ClickedSymbol) {
                     activateSplitView(symbolView)
-                    vibrate()
                     commitText(symbol.symbol, 1)
                     CoroutineScope(Dispatchers.IO).launch {
                         clickedSymbolRepository.insert(
@@ -21128,7 +21071,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
                 SymbolRecyclerViewItemLongClickListener {
                 override fun onLongClick(symbol: ClickedSymbol, position: Int) {
                     activateSplitView(symbolView)
-                    vibrate()
                     CoroutineScope(Dispatchers.IO).launch {
                         clickedSymbolRepository.delete(
                             mode = symbol.mode, symbol = symbol.symbol
@@ -21269,7 +21211,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
                     spaceFlickEnabled && !isSpaceKeyLongPressed &&
                     !shouldSuppressSpaceConvertTapAfterLongPress()
                 ) {
-                    handleKeyReleaseFeedback()
                     handleSpaceKeyClickInQWERTY(
                         inputString.value, mainView,
                         suggestionAdapter?.suggestions ?: emptyList(),
@@ -21284,7 +21225,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
                     activateSplitView(qwertyView)
                     if (isKeyboardLayoutEditModeActive()) return
                     Timber.d("Pressed Key: $qwertyKey")
-                    handleKeyPressFeedback(getKeySoundType(qwertyKey))
                     if (qwertyKey != QWERTYKey.QWERTYKeyDelete) {
                         stopDeleteLongPress()
                     }
@@ -21296,7 +21236,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
                     activateSplitView(qwertyView)
                     if (isKeyboardLayoutEditModeActive()) return
                     Timber.d("onReleasedQWERTYKey: $qwertyKey")
-                    handleKeyReleaseFeedback()
                     val insertString = inputString.value
                     val sb = StringBuilder()
                     val suggestionList = suggestionAdapter?.suggestions ?: emptyList()
@@ -21708,7 +21647,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
                     activateSplitView(qwertyView)
                     if (isKeyboardLayoutEditModeActive()) return
                     Timber.d("onFlickUPQWERTYKey: $qwertyKey, $tap, $variations")
-                    handleKeyReleaseFeedback()
                     val insertString = inputString.value
                     val sb = StringBuilder()
 
@@ -21745,7 +21683,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
                     activateSplitView(qwertyView)
                     if (isKeyboardLayoutEditModeActive()) return
                     Timber.d("onFlickDownQWERTYKey: $qwertyKey, $character")
-                    handleKeyReleaseFeedback()
                     if (qwertyKey != QWERTYKey.QWERTYKeyDelete) {
                         clearDeletedBuffer()
                         refreshEditHistoryUi()
@@ -27560,87 +27497,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         }
     }
 
-    private val vibratorManager by lazy {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as VibratorManager
-        } else null
-    }
-    private val vibrator by lazy {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) {
-            getSystemService(Context.VIBRATOR_SERVICE) as? Vibrator
-        } else null
-    }
-    private val audioManager by lazy {
-        getSystemService(Context.AUDIO_SERVICE) as AudioManager
-    }
-
-    private enum class KeySoundType {
-        STANDARD,
-        DELETE,
-        ENTER
-    }
-
-    private fun vibrate() {
-        if (isKeyboardLayoutEditModeActive()) return
-        if (isVibration == false) return
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            val vibrationEffect = VibrationEffect.createPredefined(VibrationEffect.EFFECT_TICK)
-            val combinedVibration = CombinedVibration.createParallel(vibrationEffect)
-            vibratorManager?.vibrate(combinedVibration)
-        } else {
-            vibrator?.vibrate(2)
-        }
-    }
-
-    private fun handleKeyPressFeedback(keySoundType: KeySoundType) {
-        if (isKeyboardLayoutEditModeActive()) return
-        if (shouldVibrateForKeyMoment(VibrationFeedbackMoment.PRESS)) vibrate()
-        playKeySound(keySoundType)
-    }
-
-    private fun handleKeyReleaseFeedback() {
-        if (isKeyboardLayoutEditModeActive()) return
-        if (shouldVibrateForKeyMoment(VibrationFeedbackMoment.RELEASE)) vibrate()
-    }
-
-    private fun shouldVibrateForKeyMoment(moment: VibrationFeedbackMoment): Boolean {
-        return VibrationTimingPolicy.shouldVibrate(vibrationTimingStr, moment)
-    }
-
-    private fun playKeySound(keySoundType: KeySoundType) {
-        if (isKeySoundEnabled != true) return
-        if (audioManager.ringerMode != AudioManager.RINGER_MODE_NORMAL) return
-
-        val effectType = when (keySoundType) {
-            KeySoundType.STANDARD -> AudioManager.FX_KEYPRESS_STANDARD
-            KeySoundType.DELETE -> AudioManager.FX_KEYPRESS_DELETE
-            KeySoundType.ENTER -> AudioManager.FX_KEYPRESS_RETURN
-        }
-        val volumePercent = (keySoundVolumePercent ?: 0).coerceIn(0, 100)
-
-        if (volumePercent == 0) {
-            audioManager.playSoundEffect(effectType)
-        } else {
-            audioManager.playSoundEffect(effectType, volumePercent / 100f)
-        }
-    }
-
-    private fun getKeySoundType(key: Key): KeySoundType {
-        return when (key) {
-            Key.SideKeyDelete -> KeySoundType.DELETE
-            Key.SideKeyEnter -> KeySoundType.ENTER
-            else -> KeySoundType.STANDARD
-        }
-    }
-
-    private fun getKeySoundType(qwertyKey: QWERTYKey): KeySoundType {
-        return when (qwertyKey) {
-            QWERTYKey.QWERTYKeyDelete -> KeySoundType.DELETE
-            QWERTYKey.QWERTYKeyReturn -> KeySoundType.ENTER
-            else -> KeySoundType.STANDARD
-        }
-    }
-
     private fun toggleEmojiKeyboard() {
         _keyboardSymbolViewState.value = SymbolKeyboardState(
             isShown = !_keyboardSymbolViewState.value.isShown
@@ -27649,23 +27505,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         finishComposingText()
         setComposingText("", 0)
         _inputString.update { "" }
-    }
-
-    private fun getKeySoundType(action: KeyAction): KeySoundType {
-        return when (action) {
-            KeyAction.Delete,
-            KeyAction.Backspace,
-            KeyAction.DeleteUntilSymbol,
-            KeyAction.DeleteAfterCursorUntilSymbol,
-            KeyAction.DeleteAfterCursor,
-            KeyAction.UndoLastDelete -> KeySoundType.DELETE
-
-            KeyAction.Enter,
-            KeyAction.NewLine,
-            KeyAction.Confirm -> KeySoundType.ENTER
-
-            else -> KeySoundType.STANDARD
-        }
     }
 
     private fun isDevicePhysicalKeyboard(device: InputDevice?): Boolean {
