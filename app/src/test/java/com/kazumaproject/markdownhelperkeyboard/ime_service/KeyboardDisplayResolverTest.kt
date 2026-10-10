@@ -9,18 +9,6 @@ import org.junit.Test
 class KeyboardDisplayResolverTest {
 
     @Test
-    fun customOnlyOrderRequestedTenkeyResolvesCustom() {
-        val resolution = resolveKeyboardDisplay(
-            requested = KeyboardType.TENKEY,
-            keyboardOrder = listOf(KeyboardType.CUSTOM)
-        )
-
-        assertEquals(KeyboardType.CUSTOM, resolution.resolvedKeyboard)
-        assertEquals(0, resolution.resolvedIndex)
-        assertTrue(resolution.requestedMissingFromOrder)
-    }
-
-    @Test
     fun customOnlyOrderNullRequestResolvesCustom() {
         val resolution = resolveKeyboardDisplay(
             requested = null,
@@ -57,71 +45,13 @@ class KeyboardDisplayResolverTest {
     }
 
     @Test
-    fun multiKeyboardOrderRequestedCustomStaysCustom() {
-        val resolution = resolveKeyboardDisplay(
-            requested = KeyboardType.CUSTOM,
-            keyboardOrder = listOf(
-                KeyboardType.TENKEY,
-                KeyboardType.CUSTOM,
-                KeyboardType.QWERTY
-            )
-        )
-
-        assertEquals(KeyboardType.CUSTOM, resolution.resolvedKeyboard)
-        assertEquals(1, resolution.resolvedIndex)
-    }
-
-    @Test
-    fun multiKeyboardOrderRequestedQwertyStaysQwerty() {
-        val resolution = resolveKeyboardDisplay(
-            requested = KeyboardType.QWERTY,
-            keyboardOrder = listOf(
-                KeyboardType.TENKEY,
-                KeyboardType.CUSTOM,
-                KeyboardType.QWERTY
-            )
-        )
-
-        assertEquals(KeyboardType.QWERTY, resolution.resolvedKeyboard)
-        assertEquals(2, resolution.resolvedIndex)
-    }
-
-    @Test
-    fun requestedGojuonStaysGojuonAndKeepsItsIndex() {
-        val resolution = resolveKeyboardDisplay(
-            requested = KeyboardType.GOJUON,
-            keyboardOrder = listOf(
-                KeyboardType.QWERTY,
-                KeyboardType.GOJUON,
-                KeyboardType.TENKEY,
-            ),
-        )
-
-        assertEquals(KeyboardType.GOJUON, resolution.resolvedKeyboard)
-        assertEquals(1, resolution.resolvedIndex)
-    }
-
-    @Test
-    fun customOnlyOrderInvalidRestoredKeyboardNormalizesToCustomIndex() {
-        val resolution = resolveKeyboardDisplay(
-            requested = KeyboardType.TENKEY,
-            keyboardOrder = listOf(KeyboardType.CUSTOM),
-            savedPosition = 0
-        )
-
-        assertEquals(KeyboardType.CUSTOM, resolution.resolvedKeyboard)
-        assertEquals(0, resolution.resolvedIndex)
-        assertEquals(KeyboardType.CUSTOM, resolution.keyboardOrder[resolution.resolvedIndex!!])
-    }
-
-    @Test
-    fun emptyOrderFallsBackToTenkey() {
+    fun emptyOrderFallsBackToCustom() {
         val resolution = resolveKeyboardDisplay(
             requested = KeyboardType.CUSTOM,
             keyboardOrder = emptyList()
         )
 
-        assertEquals(KeyboardType.TENKEY, resolution.resolvedKeyboard)
+        assertEquals(KeyboardType.CUSTOM, resolution.resolvedKeyboard)
         assertNull(resolution.resolvedIndex)
         assertTrue(resolution.usedEmptyOrderFallback)
     }

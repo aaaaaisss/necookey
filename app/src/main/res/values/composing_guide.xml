@@ -1,31 +1,30 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <item name="composing_guide_root" type="id" />
-    <string name="composing_guide_title">Floating candidate panel</string>
-    <string name="composing_guide_summary">Move the candidate area, including tabs, clipboard, autofill and shortcuts, into a floating panel.</string>
-    <string name="composing_guide_reset">Reset guide position and size</string>
-    <string name="composing_guide_move">Drag to move guide</string>
-    <string name="composing_guide_short_title">Candidates</string>
-    <string name="composing_guide_edit">Edit guide</string>
-    <string name="composing_guide_done">Finish editing guide</string>
-    <string name="composing_guide_empty">Your composing text appears here</string>
-    <string name="composing_guide_text_size">Text size</string>
-    <string name="composing_guide_resize_left">Resize left edge</string>
-    <string name="composing_guide_resize_top">Resize top edge</string>
-    <string name="composing_guide_resize_right">Resize right edge</string>
-    <string name="composing_guide_resize_bottom">Resize bottom edge</string>
-    <string name="composing_guide_show_composing">Show composing text</string>
-    <string name="composing_guide_scroll_direction">Candidate scrolling</string>
-    <string-array name="composing_guide_scroll_labels"><item>Horizontal scroll</item><item>Wrap and scroll vertically</item></string-array>
-    <string-array name="composing_guide_scroll_values"><item>horizontal</item><item>vertical</item></string-array>
-    <string name="composing_guide_show_live_reading">Show reading during live conversion</string>
+    <string name="composing_guide_title">候補欄のフロート表示</string>
+    <string name="composing_guide_summary">候補タブ・クリップボード・自動入力・ショートカットを含む候補欄全体をフロートで表示します。</string>
+    <string name="composing_guide_reset">ガイドの位置とサイズをリセット</string>
+    <string name="composing_guide_move">ドラッグしてガイドを移動</string>
+    <string name="composing_guide_short_title">候補</string>
+    <string name="composing_guide_edit">ガイドを編集</string>
+    <string name="composing_guide_done">ガイドの編集を完了</string>
+    <string name="composing_guide_empty">入力するとここに表示</string>
+    <string name="composing_guide_text_size">文字サイズ</string>
+    <string name="composing_guide_resize_left">左辺のサイズを変更</string>
+    <string name="composing_guide_resize_top">上辺のサイズを変更</string>
+    <string name="composing_guide_resize_right">右辺のサイズを変更</string>
+    <string name="composing_guide_resize_bottom">下辺のサイズを変更</string>
+    <string name="composing_guide_show_composing">未確定文字を表示</string>
+    <string name="composing_guide_scroll_direction">候補のスクロール方向</string>
+    <string-array name="composing_guide_scroll_labels"><item>横スクロール</item><item>折り返し・縦スクロール</item></string-array>
+    <string name="composing_guide_show_live_reading">ライブ変換時の読みを表示</string>
     <item name="composing_guide_composing_text" type="id" />
     <item name="composing_guide_reading_text" type="id" />
-    <string name="composing_guide_text_title">Floating composing text</string>
-    <string name="composing_guide_display_mode">Display when both are enabled</string>
-    <string name="composing_guide_text_reset">Reset composing text position and size</string>
-    <string name="composing_guide_candidates_reset">Reset candidate panel position and size</string>
-    <string name="composing_guide_integrated_reset">Reset combined panel position and size</string>
-    <string-array name="composing_guide_display_labels"><item>Combined</item><item>Separate</item></string-array>
+    <string name="composing_guide_text_title">未確定文字のフロート表示</string>
+    <string name="composing_guide_display_mode">両方有効時の表示方法</string>
+    <string name="composing_guide_text_reset">未確定文字フロートの位置とサイズをリセット</string>
+    <string name="composing_guide_candidates_reset">候補欄フロートの位置とサイズをリセット</string>
+    <string name="composing_guide_integrated_reset">統合フロートの位置とサイズをリセット</string>
+    <string-array name="composing_guide_display_labels"><item>統合表示</item><item>分離表示</item></string-array>
     <string-array name="composing_guide_display_values"><item>integrated</item><item>separate</item></string-array>
 </resources>

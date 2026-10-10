@@ -21,24 +21,6 @@ enum class ShortcutType(
         com.kazumaproject.core.R.drawable.book_3_24px,
         description = "定型文"
     ),
-    FLOATING_LEARN_DICTIONARY(
-        "floating_learn_dictionary",
-        com.kazumaproject.markdownhelperkeyboard.R.drawable.floating_learn_dictionary,
-        activeIconResId = com.kazumaproject.markdownhelperkeyboard.R.drawable.floating_learn_dictionary_active,
-        description = "学習辞書フロート"
-    ),
-    FLOATING_USER_DICTIONARY(
-        "floating_user_dictionary",
-        com.kazumaproject.markdownhelperkeyboard.R.drawable.floating_user_dictionary,
-        activeIconResId = com.kazumaproject.markdownhelperkeyboard.R.drawable.floating_user_dictionary_active,
-        description = "ユーザー辞書フロート"
-    ),
-    FLOATING_USER_TEMPLATE(
-        "floating_user_template",
-        com.kazumaproject.markdownhelperkeyboard.R.drawable.floating_user_template,
-        activeIconResId = com.kazumaproject.markdownhelperkeyboard.R.drawable.floating_user_template_active,
-        description = "定型文フロート"
-    ),
     TEXT_MACRO(
         "text_macro",
         com.kazumaproject.core.R.drawable.book_3_24px,
@@ -54,12 +36,6 @@ enum class ShortcutType(
         com.kazumaproject.core.R.drawable.keyboard_24px,
         activeIconResId = com.kazumaproject.core.R.drawable.baseline_check_24,
         description = "キーボード調整"
-    ),
-    KEYBOARD_FLOATING_TOGGLE(
-        "keyboard_floating_toggle",
-        com.kazumaproject.core.R.drawable.keyboard_floating_24px,
-        activeIconResId = com.kazumaproject.core.R.drawable.keyboard_normal_24px,
-        description = "フローティング切替"
     ),
     INPUT_BEHAVIOR_TOGGLE(
         "input_behavior_toggle",

@@ -1,7 +1,7 @@
 package com.kazumaproject.markdownhelperkeyboard.ime_service.flick_preview
 
 import com.kazumaproject.core.domain.flick.FlickTextSelection
-import com.kazumaproject.tenkey.extensions.getNextInputChar
+import com.kazumaproject.core.domain.extensions.getNextInputChar
 
 internal data class FlickMutationSnapshot(
     val baseInput: String,

@@ -73,7 +73,6 @@ jobs:
         run: >-
           ./gradlew
           :app:testFullStandardDebugUnitTest
-          :gojuon_keyboard:testDebugUnitTest
           :app:assembleFullStandardDebug
           :app:assembleFullStandardDebugAndroidTest
           --stacktrace
@@ -89,7 +88,6 @@ jobs:
             app/build/outputs/apk/fullStandard/debug/
             app/build/outputs/apk/androidTest/fullStandard/debug/
             app/build/reports/tests/
-            gojuon_keyboard/build/reports/tests/
           if-no-files-found: warn
           retention-days: 14
 

@@ -17,13 +17,11 @@ import com.kazumaproject.core.ui.skin.KeyboardSkinRegistry
 import com.kazumaproject.markdownhelperkeyboard.R
 import com.kazumaproject.markdownhelperkeyboard.converter.candidate.Candidate
 import com.kazumaproject.markdownhelperkeyboard.databinding.MainLayoutBinding
-import com.kazumaproject.markdownhelperkeyboard.ime_service.adapters.FloatingCandidateListAdapter
 import com.kazumaproject.markdownhelperkeyboard.ime_service.adapters.ShortcutAdapter
 import com.kazumaproject.markdownhelperkeyboard.ime_service.adapters.SuggestionAdapter
 import com.kazumaproject.markdownhelperkeyboard.ime_service.candidate.CandidateStripContent
 import com.kazumaproject.markdownhelperkeyboard.ime_service.candidate.InlineSuggestionToggle
 import com.kazumaproject.markdownhelperkeyboard.ime_service.composing_guide.CandidatePanelColors
-import com.kazumaproject.markdownhelperkeyboard.ime_service.composing_guide.CandidateSurfaceHost
 import com.kazumaproject.markdownhelperkeyboard.ime_service.state.CandidateTab
 import com.kazumaproject.markdownhelperkeyboard.setting_activity.AppPreference
 import com.kazumaproject.markdownhelperkeyboard.short_cut.ShortcutType
@@ -55,7 +53,6 @@ class IMEServiceCupertinoCandidateAppearanceTest {
             set("suggestionAdapter", adapter)
             set("suggestionAdapterFull", fullAdapter)
             set("shortcutAdapter", shortcuts)
-            set("listAdapter", FloatingCandidateListAdapter(10))
             set("candidateTabOrder", CandidateTab.entries.toList())
         }
 
@@ -137,35 +134,6 @@ class IMEServiceCupertinoCandidateAppearanceTest {
             assertEquals(originalRipple, layout.tabRippleColor)
             assertSame("The transparent Classic indicator must not survive theme restoration",
                 originalIndicator, layout.tabSelectedIndicator)
-        } finally { fixture.close() }
-    }
-
-    @Test fun floatingCandidateTabsAreRestyledAfterRebuildAndReturnToDockedClassic() {
-        val fixture = Fixture()
-        try {
-            fixture.set("keyboardSkinId", KeyboardSkinId.CUPERTINO_CLASSIC)
-            fixture.call("setTabsToTabLayout", true)
-            val binding = fixture.binding
-            val host = CandidateSurfaceHost(binding.shortcutToolbarRecyclerview,
-                binding.candidateTabLayout, binding.suggestionViewParent,
-                binding.suggestionRecyclerView, binding.candidatesRowView)
-            host.setColors(CandidatePanelColors.resolve(fixture.context, cupertinoClassic = true))
-            host.attach(LinearLayout(fixture.context))
-            fixture.set("candidateSurfaceHost", host)
-            repeat(2) {
-                fixture.call("setTabsToTabLayout", true)
-                repeat(binding.candidateTabLayout.tabCount) { index ->
-                    assertTrue(binding.candidateTabLayout.getTabAt(index)!!.customView!!.background is StateListDrawable)
-                }
-            }
-            host.detach()
-            fixture.set("candidateSurfaceHost", null)
-            fixture.call("applyCandidateAppearance")
-            val strip = binding.candidateTabLayout.getChildAt(0) as ViewGroup
-            repeat(strip.childCount) { index ->
-                assertNull(binding.candidateTabLayout.getTabAt(index)!!.customView)
-                assertTrue(strip.getChildAt(index).background is StateListDrawable)
-            }
         } finally { fixture.close() }
     }
 

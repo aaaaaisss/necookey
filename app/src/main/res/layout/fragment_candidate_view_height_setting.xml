@@ -137,26 +137,8 @@
                     android:layout_gravity="bottom"
                     android:background="@color/keyboard_bg">
 
-                    <com.kazumaproject.tenkey.TenKey
-                        android:id="@+id/candidate_height_setting_tenkey_preview"
-                        android:layout_width="match_parent"
-                        android:layout_height="match_parent" />
 
-                    <com.kazumaproject.gojuon_keyboard.GojuonKeyboardView
-                        android:id="@+id/candidate_height_setting_gojuon_preview"
-                        android:layout_width="match_parent"
-                        android:layout_height="match_parent"
-                        android:clickable="false"
-                        android:focusable="false"
-                        android:visibility="gone" />
 
-                    <com.kazumaproject.qwerty_keyboard.ui.QWERTYKeyboardView
-                        android:id="@+id/candidate_height_setting_qwerty_preview"
-                        android:layout_width="match_parent"
-                        android:layout_height="match_parent"
-                        android:clickable="false"
-                        android:focusable="false"
-                        android:visibility="gone" />
 
                     <com.kazumaproject.custom_keyboard.view.FlickKeyboardView
                         android:id="@+id/candidate_height_setting_flick_preview"

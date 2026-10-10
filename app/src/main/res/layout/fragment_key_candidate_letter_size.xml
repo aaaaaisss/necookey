@@ -72,7 +72,7 @@
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent" />
 
-    <com.kazumaproject.tenkey.TenKey
+    <com.kazumaproject.custom_keyboard.view.FlickKeyboardView
         android:id="@+id/tenkey_letter_size_preview"
         android:layout_width="0dp"
         android:layout_height="280dp"

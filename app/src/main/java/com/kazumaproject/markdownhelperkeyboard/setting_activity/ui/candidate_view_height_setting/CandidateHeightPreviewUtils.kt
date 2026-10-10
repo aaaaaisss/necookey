@@ -30,7 +30,6 @@ import com.kazumaproject.custom_keyboard.data.KeyboardLayout
 import com.kazumaproject.custom_keyboard.layout.KeyboardDefaultLayouts
 import com.kazumaproject.custom_keyboard.view.FlickKeyboardView
 import com.kazumaproject.custom_keyboard.view.KeyHitTestMode
-import com.kazumaproject.gojuon_keyboard.GojuonKeyboardView
 import com.kazumaproject.markdownhelperkeyboard.ime_service.resolveInitialCustomKeyboardSelection
 import com.kazumaproject.markdownhelperkeyboard.ime_service.state.KeyboardType
 import com.kazumaproject.markdownhelperkeyboard.repository.KeyboardRepository
@@ -41,8 +40,6 @@ import com.kazumaproject.markdownhelperkeyboard.sumire_special_key.SumireSpecial
 import com.kazumaproject.markdownhelperkeyboard.sumire_special_key.SumireSpecialKeyActionResolver
 import com.kazumaproject.markdownhelperkeyboard.sumire_special_key.SumireSpecialKeyPlacementOverrideApplier
 import com.kazumaproject.markdownhelperkeyboard.sumire_special_key.SumireSpecialKeyRepository
-import com.kazumaproject.qwerty_keyboard.ui.QWERTYKeyboardView
-import com.kazumaproject.tenkey.TenKey
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
@@ -132,9 +129,6 @@ internal class CandidateHeightPreviewGridSpacingDecoration(
 
 internal data class CandidateKeyboardPreviewViews(
     val container: FrameLayout,
-    val tenKey: TenKey,
-    val gojuon: GojuonKeyboardView,
-    val qwerty: QWERTYKeyboardView,
     val flick: FlickKeyboardView
 )
 
@@ -147,7 +141,7 @@ internal fun renderCandidateKeyboardPreview(
     isLandscape: Boolean,
     onPreviewLayoutChanged: () -> Unit
 ) {
-    val previewKeyboardType = appPreference.keyboard_order.firstOrNull() ?: KeyboardType.TENKEY
+    val previewKeyboardType = KeyboardType.CUSTOM
     applyCandidateKeyboardPreviewLayout(
         fragment = fragment,
         appPreference = appPreference,
@@ -157,9 +151,6 @@ internal fun renderCandidateKeyboardPreview(
     )
     onPreviewLayoutChanged()
 
-    views.tenKey.isVisible = false
-    views.gojuon.isVisible = false
-    views.qwerty.isVisible = false
     views.flick.isVisible = false
 
     when (previewKeyboardType) {
@@ -178,21 +169,13 @@ internal fun renderCandidateKeyboardPreview(
                 }
                 views.flick.clearSumireSpecialKeyActionResolver()
                 if (customLayout == null) {
-                    val fallbackType =
-                        appPreference.keyboard_order.firstOrNull { it != KeyboardType.CUSTOM }
-                    if (fallbackType != null) {
-                        renderNonCustomKeyboardPreviewType(
-                            fragment = fragment,
-                            appPreference = appPreference,
-                            sumireSpecialKeyRepository = sumireSpecialKeyRepository,
-                            views = views,
-                            type = fallbackType,
-                            isLandscape = isLandscape,
-                            onPreviewLayoutChanged = onPreviewLayoutChanged
+                    // No custom layout stored yet: preview the default layout that the IME inserts.
+                    views.flick.setKeyboard(
+                        applyDeleteKeyFlickPreferences(
+                            appPreference,
+                            KeyboardDefaultLayouts.createFlickKanaTemplateLayout(isDefaultKey = true)
                         )
-                    } else {
-                        views.flick.isVisible = false
-                    }
+                    )
                     return@launch
                 }
                 val finalLayout = applyDeleteKeyFlickPreferences(appPreference, customLayout.layout)
@@ -207,101 +190,6 @@ internal fun renderCandidateKeyboardPreview(
             }
         }
 
-        else -> {
-            renderNonCustomKeyboardPreviewType(
-                fragment = fragment,
-                appPreference = appPreference,
-                sumireSpecialKeyRepository = sumireSpecialKeyRepository,
-                views = views,
-                type = previewKeyboardType,
-                isLandscape = isLandscape,
-                onPreviewLayoutChanged = onPreviewLayoutChanged
-            )
-        }
-    }
-}
-
-private fun renderNonCustomKeyboardPreviewType(
-    fragment: Fragment,
-    appPreference: AppPreference,
-    sumireSpecialKeyRepository: SumireSpecialKeyRepository,
-    views: CandidateKeyboardPreviewViews,
-    type: KeyboardType,
-    isLandscape: Boolean,
-    onPreviewLayoutChanged: () -> Unit
-) {
-    applyCandidateKeyboardPreviewLayout(
-        fragment = fragment,
-        appPreference = appPreference,
-        container = views.container,
-        type = type,
-        isLandscape = isLandscape
-    )
-    onPreviewLayoutChanged()
-
-    views.tenKey.isVisible = false
-    views.gojuon.isVisible = false
-    views.qwerty.isVisible = false
-    views.flick.isVisible = false
-
-    when (type) {
-        KeyboardType.TENKEY, KeyboardType.SPLIT -> {
-            views.tenKey.isVisible = true
-            configureTenKeyPreview(fragment.requireContext(), appPreference, views.tenKey)
-        }
-
-        KeyboardType.GOJUON -> {
-            views.gojuon.isVisible = true
-            configureGojuonPreview(fragment.requireContext(), appPreference, views.gojuon)
-        }
-
-        KeyboardType.QWERTY,
-        KeyboardType.ROMAJI -> {
-            views.qwerty.isVisible = true
-            configureQwertyPreview(
-                context = fragment.requireContext(),
-                appPreference = appPreference,
-                qwertyView = views.qwerty,
-                isRomaji = type == KeyboardType.ROMAJI
-            )
-        }
-
-        KeyboardType.SUMIRE -> {
-            views.flick.isVisible = true
-            configureFlickKeyboardPreview(
-                context = fragment.requireContext(),
-                appPreference = appPreference,
-                flickView = views.flick,
-                guideEnabled = appPreference.sumire_keymap_guide_japanese,
-                allowMultiCharacterGuideLabels = true
-            )
-            fragment.viewLifecycleOwner.lifecycleScope.launch {
-                val layoutType = appPreference.sumire_input_method
-                val inputMode = KeyboardInputMode.HIRAGANA
-                val actionOverrides = withContext(Dispatchers.IO) {
-                    sumireSpecialKeyRepository.observeAllActionOverrides().first()
-                }
-                val placementOverrides = withContext(Dispatchers.IO) {
-                    sumireSpecialKeyRepository.observeAllPlacementOverrides().first()
-                }
-                val layout = createPreviewSumireKeyboardLayout(
-                    context = fragment.requireContext(),
-                    appPreference = appPreference,
-                    inputMode = inputMode,
-                    layoutType = layoutType,
-                    actionOverrides = actionOverrides,
-                    placementOverrides = placementOverrides
-                )
-                views.flick.setSumireSpecialKeyActionResolver(
-                    resolver = SumireSpecialKeyActionResolver(actionOverrides)::resolve,
-                    layoutType = layoutType,
-                    inputMode = inputMode.name
-                )
-                views.flick.setKeyboard(layout, KeyHitTestMode.NEAREST_KEY)
-            }
-        }
-
-        KeyboardType.CUSTOM -> Unit
     }
 }
 
@@ -392,8 +280,7 @@ private fun previewKeyboardLayoutConfig(
     type: KeyboardType,
     isLandscape: Boolean
 ): PreviewKeyboardLayoutConfig {
-    val useQwertySize = type == KeyboardType.QWERTY || type == KeyboardType.ROMAJI
-    return if (useQwertySize) {
+    return if (false) {
         PreviewKeyboardLayoutConfig(
             heightDp = if (isLandscape) {
                 appPreference.qwerty_keyboard_height_landscape ?: 220
@@ -460,183 +347,6 @@ private fun previewKeyboardLayoutConfig(
             }
         )
     }
-}
-
-private fun configureTenKeyPreview(
-    context: Context,
-    appPreference: AppPreference,
-    tenKey: TenKey
-) {
-    tenKey.applyKeyboardTheme(
-        themeMode = appPreference.theme_mode,
-        currentNightMode = currentNightMode(context),
-        isDynamicColorEnabled = DynamicColors.isDynamicColorAvailable(),
-        customBgColor = appPreference.custom_theme_bg_color,
-        customKeyColor = appPreference.custom_theme_key_color,
-        customSpecialKeyColor = appPreference.custom_theme_special_key_color,
-        customKeyTextColor = appPreference.custom_theme_key_text_color,
-        customSpecialKeyTextColor = appPreference.custom_theme_special_key_text_color,
-        liquidGlassEnable = appPreference.liquid_glass_preference,
-        customBorderEnable = appPreference.custom_theme_border_enable,
-        customBorderColor = appPreference.custom_theme_border_color,
-        liquidGlassKeyAlphaEnable = appPreference.liquid_glass_key_alpha,
-        borderWidth = appPreference.custom_theme_border_width
-    )
-    tenKey.setFlickSensitivityValue(appPreference.flick_sensitivity_preference ?: 100)
-    tenKey.setFlickThresholdShape(
-        FlickThresholdShape.fromPreferenceValue(appPreference.flick_threshold_shape_preference)
-    )
-    tenKey.setLongPressTimeout((appPreference.long_press_timeout_preference ?: 300).toLong())
-    tenKey.applyPopupViewStyle(
-        PopupViewStyle(
-            sizeScalePercent = appPreference.tenkey_popup_size_scale_percent ?: 100,
-            textSizeSp = appPreference.tenkey_popup_text_size_sp ?: 28.0f
-        )
-    )
-    tenKey.setUseThreeStateKeyboard(
-        appPreference.tenkey_use_three_state_keyboard_preference,
-        appPreference.tenkey_number_symbol_key_gap_preference,
-    )
-    tenKey.setUseQwertyNumberWhenThreeStateOff(
-        appPreference.tenkey_switch_number_to_qwerty_number_preference
-    )
-    tenKey.setKeyLetterSize((appPreference.key_letter_size ?: 0.0f) + 17f)
-    tenKey.setKeyLetterSizeDelta((appPreference.key_letter_size ?: 0.0f).toInt())
-    tenKey.setKeySizeScale(
-        appPreference.tenkey_key_width_scale_percent ?: 100,
-        appPreference.tenkey_key_height_scale_percent ?: 100
-    )
-    tenKey.setLanguageEnableKeyState(appPreference.tenkey_show_language_button_preference)
-    tenKey.setFlickGuideEnabled(
-        japaneseEnabled = appPreference.tenkey_keymap_guide_layout ?: false,
-        englishEnabled = appPreference.tenkey_keymap_guide_english,
-        numberEnabled = appPreference.tenkey_keymap_guide_number
-    )
-    tenKey.setOnQwertyNumberModeRequestedListener(null)
-    tenKey.setOnFlickListener(object : FlickListener {
-        override fun onFlick(gestureType: GestureType, key: Key, char: Char?) = Unit
-    })
-    tenKey.setOnLongPressListener(object : LongPressListener {
-        override fun onLongPress(key: Key) = Unit
-    })
-    tenKey.isClickable = false
-    tenKey.isFocusable = false
-    tenKey.setOnTouchListener { _, _ -> true }
-}
-
-private fun configureGojuonPreview(
-    context: Context,
-    appPreference: AppPreference,
-    gojuon: GojuonKeyboardView,
-) {
-    gojuon.applyKeyboardTheme(
-        themeMode = appPreference.theme_mode,
-        currentNightMode = currentNightMode(context),
-        isDynamicColorEnabled = DynamicColors.isDynamicColorAvailable(),
-        customBgColor = appPreference.custom_theme_bg_color,
-        customKeyColor = appPreference.custom_theme_key_color,
-        customSpecialKeyColor = appPreference.custom_theme_special_key_color,
-        customKeyTextColor = appPreference.custom_theme_key_text_color,
-        customSpecialKeyTextColor = appPreference.custom_theme_special_key_text_color,
-        liquidGlassEnable = appPreference.liquid_glass_preference,
-        customBorderEnable = appPreference.custom_theme_border_enable,
-        customBorderColor = appPreference.custom_theme_border_color,
-        liquidGlassKeyAlphaEnable = appPreference.liquid_glass_key_alpha,
-        borderWidth = appPreference.custom_theme_border_width,
-    )
-    gojuon.setFlickSensitivityValue(appPreference.flick_sensitivity_preference ?: 100)
-    gojuon.setFlickThresholdShape(
-        FlickThresholdShape.fromPreferenceValue(appPreference.flick_threshold_shape_preference)
-    )
-    gojuon.setLongPressTimeout((appPreference.long_press_timeout_preference ?: 300).toLong())
-    gojuon.setOnFlickListener(object : FlickListener {
-        override fun onFlick(gestureType: GestureType, key: Key, char: Char?) = Unit
-    })
-    gojuon.setOnLongPressListener(object : LongPressListener {
-        override fun onLongPress(key: Key) = Unit
-    })
-    gojuon.isClickable = false
-    gojuon.isFocusable = false
-    gojuon.setOnTouchListener { _, _ -> true }
-    gojuon.resetLayout()
-}
-
-private fun configureQwertyPreview(
-    context: Context,
-    appPreference: AppPreference,
-    qwertyView: QWERTYKeyboardView,
-    isRomaji: Boolean
-) {
-    qwertyView.applyKeyboardTheme(
-        themeMode = appPreference.theme_mode,
-        currentNightMode = currentNightMode(context),
-        isDynamicColorEnabled = DynamicColors.isDynamicColorAvailable(),
-        customBgColor = appPreference.custom_theme_bg_color,
-        customKeyColor = appPreference.custom_theme_key_color,
-        customSpecialKeyColor = appPreference.custom_theme_special_key_color,
-        customKeyTextColor = appPreference.custom_theme_key_text_color,
-        customSpecialKeyTextColor = appPreference.custom_theme_special_key_text_color,
-        liquidGlassEnable = appPreference.liquid_glass_preference,
-        customBorderEnable = appPreference.custom_theme_border_enable,
-        customBorderColor = appPreference.custom_theme_border_color,
-        liquidGlassKeyAlphaEnable = appPreference.liquid_glass_key_alpha,
-        borderWidth = appPreference.custom_theme_border_width
-    )
-    qwertyView.setLongPressTimeout((appPreference.long_press_timeout_preference ?: 300).toLong())
-    qwertyView.applyPopupViewStyleSet(
-        QwertyPopupViewStyleSet(
-            keyPreview = PopupViewStyle(
-                sizeScalePercent = appPreference.qwerty_key_preview_popup_size_scale_percent ?: 100,
-                textSizeSp = appPreference.qwerty_key_preview_popup_text_size_sp ?: 28.0f
-            ),
-            variation = PopupViewStyle(
-                sizeScalePercent = appPreference.qwerty_variation_popup_size_scale_percent ?: 100,
-                textSizeSp = appPreference.qwerty_variation_popup_text_size_sp ?: 22.0f
-            )
-        )
-    )
-    qwertyView.setSpecialKeyVisibility(
-        showCursors = appPreference.qwerty_show_cursor_buttons ?: false,
-        showSwitchKey = appPreference.qwerty_show_ime_button ?: true,
-        showKutouten = appPreference.qwerty_show_kutouten_buttons ?: false,
-        showEmojiKey = appPreference.qwerty_show_emoji_button ?: false
-    )
-    qwertyView.setRomajiEnglishSwitchKeyTextWithStyle(true)
-    qwertyView.updateSymbolKeymapState(appPreference.qwerty_show_keymap_symbols ?: false)
-    qwertyView.updateNumberKeyState(appPreference.qwerty_show_number_buttons ?: false)
-    qwertyView.setPopUpViewState(appPreference.qwerty_show_popup_window ?: true)
-    qwertyView.setFlickUpDetectionEnabled(appPreference.qwerty_enable_flick_up_preference ?: false)
-    qwertyView.setFlickDownDetectionEnabled(appPreference.qwerty_enable_flick_down_preference ?: false)
-    qwertyView.setNumberKeyFlickUpChars(appPreference.getQwertyNumberKeyFlickUpChars())
-    qwertyView.setNumberKeyFlickDownChars(appPreference.getQwertyNumberKeyFlickDownChars())
-    qwertyView.setNumberSwitchKeyTextStyle(
-        excludeNumber = appPreference.qwerty_switch_number_key_without_number_preference
-    )
-    qwertyView.setSwitchNumberLayoutKeyVisibility(false)
-    qwertyView.setDeleteLeftFlickEnabled(appPreference.delete_key_left_flick_preference)
-    qwertyView.setDeleteUpFlickEnabled(appPreference.delete_key_up_flick_preference)
-    qwertyView.setDeleteDownFlickEnabled(appPreference.delete_key_down_flick_preference)
-    qwertyView.setKeyMargins(
-        verticalDp = appPreference.qwerty_key_vertical_margin ?: 5.0f,
-        horizontalGapDp = appPreference.qwerty_key_horizontal_gap ?: 2.0f,
-        indentLargeDp = appPreference.qwerty_key_indent_large ?: 23.0f,
-        indentSmallDp = appPreference.qwerty_key_indent_small ?: 9.0f,
-        sideMarginDp = appPreference.qwerty_key_side_margin ?: 4.0f,
-        textSizeSp = appPreference.qwerty_key_text_size ?: 18.0f,
-        symbolKeymapTextSizeSp = appPreference.qwerty_symbol_keymap_text_size ?: 9.0f,
-        specialTextSizeSp = appPreference.qwerty_special_key_text_size ?: 12.0f,
-        specialIconSizeDp = appPreference.qwerty_special_key_icon_size ?: 18.0f
-    )
-    if (isRomaji) {
-        qwertyView.setRomajiKeyboard(context.getString(com.kazumaproject.core.R.string.return_japanese))
-        qwertyView.setRomajiEnglishSwitchKeyVisibility(true)
-    } else {
-        qwertyView.resetQWERTYKeyboard(context.getString(com.kazumaproject.core.R.string.return_english))
-        qwertyView.setRomajiEnglishSwitchKeyVisibility(false)
-    }
-    qwertyView.isClickable = false
-    qwertyView.isFocusable = false
-    qwertyView.setOnTouchListener { _, _ -> true }
 }
 
 private fun configureFlickKeyboardPreview(
@@ -762,47 +472,6 @@ private suspend fun loadPreviewCustomKeyboardLayout(
         } else {
             convertedLayout.isDirectMode
         }
-    )
-}
-
-private fun createPreviewSumireKeyboardLayout(
-    context: Context,
-    appPreference: AppPreference,
-    inputMode: KeyboardInputMode,
-    layoutType: String,
-    actionOverrides: List<com.kazumaproject.markdownhelperkeyboard.sumire_special_key.database.SumireSpecialKeyActionOverrideEntity>,
-    placementOverrides: List<com.kazumaproject.markdownhelperkeyboard.sumire_special_key.database.SumireSpecialKeyPlacementOverrideEntity>
-): KeyboardLayout {
-    val dynamicStates = mapOf(
-        "enter_key" to 0,
-        "dakuten_toggle_key" to 0,
-        "katakana_toggle_key" to 0,
-        "space_convert_key" to 0
-    )
-    val baseLayout = KeyboardDefaultLayouts.createFinalLayout(
-        mode = inputMode,
-        dynamicKeyStates = dynamicStates,
-        inputLayoutType = layoutType,
-        inputStyle = appPreference.sumire_keyboard_style,
-        deleteKeyFlickSettings = currentDeleteKeyFlickSettings(appPreference)
-    )
-    val circularLayout = CircularSlotActionApplier.apply(
-        layout = baseLayout,
-        mode = inputMode,
-        settings = appPreference.getCircularSlotActionSettings()
-    )
-    val displayLayout = SumireSpecialKeyActionDisplayOverrideApplier.apply(
-        layout = circularLayout,
-        layoutType = layoutType,
-        inputMode = inputMode.name,
-        overrides = actionOverrides,
-        displayMetadata = sumireSpecialKeyActionDisplayMetadata(context)
-    )
-    return SumireSpecialKeyPlacementOverrideApplier.apply(
-        layout = displayLayout,
-        layoutType = layoutType,
-        inputMode = inputMode.name,
-        overrides = placementOverrides
     )
 }
 

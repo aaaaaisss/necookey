@@ -1,33 +1,18 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:app="http://schemas.android.com/apk/res-auto"
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/setting_root"
     android:layout_width="match_parent"
-    android:layout_height="match_parent"
-    android:orientation="vertical">
+    android:layout_height="match_parent">
 
-    <com.google.android.material.tabs.TabLayout
-        android:id="@+id/setting_tab_layout"
+    <androidx.fragment.app.FragmentContainerView
+        android:id="@+id/setting_container"
         android:layout_width="match_parent"
-        android:layout_height="?attr/actionBarSize"
-        app:tabMode="scrollable" />
+        android:layout_height="match_parent" />
 
-    <!-- 中央に ProgressBar を重ねるコンテナ -->
-    <FrameLayout
-        android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:layout_weight="1">
-
-        <androidx.viewpager2.widget.ViewPager2
-            android:id="@+id/setting_view_pager"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent" />
-
-        <ProgressBar
-            android:id="@+id/setting_progress_bar"
-            android:layout_width="64dp"
-            android:layout_height="64dp"
-            android:layout_gravity="center"
-            android:visibility="gone" />
-    </FrameLayout>
-
-</LinearLayout>
+    <ProgressBar
+        android:id="@+id/setting_progress_bar"
+        android:layout_width="64dp"
+        android:layout_height="64dp"
+        android:layout_gravity="center"
+        android:visibility="gone" />
+</FrameLayout>

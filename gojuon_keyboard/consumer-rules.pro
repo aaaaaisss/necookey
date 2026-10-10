@@ -1,2 +1,0 @@
--keep class com.kazumaproject.gojuon_keyboard.** { *; }
--keep interface com.kazumaproject.gojuon_keyboard.** { *; }

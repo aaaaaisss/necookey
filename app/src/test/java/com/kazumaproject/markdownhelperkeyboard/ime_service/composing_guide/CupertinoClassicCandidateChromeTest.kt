@@ -5,7 +5,6 @@ import android.view.View
 import android.view.ViewGroup
 import androidx.test.core.app.ApplicationProvider
 import com.google.android.material.tabs.TabLayout
-import com.kazumaproject.tenkey.view.SideKeySymbolModeContainerView
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotSame
 import org.junit.Assert.assertTrue
@@ -91,31 +90,4 @@ class CupertinoClassicCandidateChromeTest {
                 intArrayOf(android.R.attr.state_selected), android.graphics.Color.TRANSPARENT))
     }
 
-    @Test fun tenkeyNumberAndSymbolButtonsHaveGapOnlyWhenThreeStateIsDisabled() {
-        val view = SideKeySymbolModeContainerView(context)
-        val numberParams = view.getChildAt(0).layoutParams as android.widget.LinearLayout.LayoutParams
-        val symbolParams = view.getChildAt(1).layoutParams as android.widget.LinearLayout.LayoutParams
-        val expectedGapPx = (4 * context.resources.displayMetrics.density).toInt()
-
-        assertEquals(View.GONE, view.getChildAt(0).visibility)
-        assertEquals(0, symbolParams.marginStart)
-
-        view.setUseThreeStateKeyboard(false, 9)
-        assertEquals(View.VISIBLE, view.getChildAt(0).visibility)
-        assertEquals((9 * context.resources.displayMetrics.density).toInt(), symbolParams.marginStart)
-        assertEquals(1f, numberParams.weight, 0f)
-
-        view.setUseThreeStateKeyboard(false, 0)
-        assertEquals(0, symbolParams.marginStart)
-
-        view.setUseThreeStateKeyboard(false)
-        assertEquals(expectedGapPx, symbolParams.marginStart)
-
-        view.setUseThreeStateKeyboard(false, 24)
-        assertEquals((16 * context.resources.displayMetrics.density).toInt(), symbolParams.marginStart)
-
-        view.setUseThreeStateKeyboard(true)
-        assertEquals(View.GONE, view.getChildAt(0).visibility)
-        assertEquals(0, symbolParams.marginStart)
-    }
 }

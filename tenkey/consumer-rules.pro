@@ -1,2 +1,0 @@
--keep class com.kazumaproject.tenkey.** { *; }
--keep interface com.kazumaproject.tenkey.** { *; }

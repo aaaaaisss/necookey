@@ -1,2 +1,0 @@
--keep class com.kazumaproject.qwerty_keyboard.** { *; }
--keep interface com.kazumaproject.qwerty_keyboard.** { *; }

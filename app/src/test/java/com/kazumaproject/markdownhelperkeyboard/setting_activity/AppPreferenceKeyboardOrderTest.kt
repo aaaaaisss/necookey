@@ -27,47 +27,17 @@ class AppPreferenceKeyboardOrderTest {
     }
 
     @Test
-    fun freshInstallDefaultsToCustomThenTenKeyAndQwerty() {
-        assertEquals(
-            listOf(KeyboardType.CUSTOM, KeyboardType.TENKEY, KeyboardType.QWERTY),
-            AppPreference.keyboard_order
-        )
+    fun freshInstallUsesOnlyTheCustomKeyboard() {
+        assertEquals(listOf(KeyboardType.CUSTOM), AppPreference.keyboard_order)
     }
 
     @Test
-    @Config(qualifiers = "sw600dp")
-    fun freshTabletInstallDefaultsToCustomThenGojuonAndQwerty() {
-        assertEquals(
-            listOf(KeyboardType.CUSTOM, KeyboardType.GOJUON, KeyboardType.QWERTY),
-            AppPreference.keyboard_order,
-        )
-    }
-
-    @Test
-    fun savedKeyboardOrderIsPreserved() {
-        AppPreference.keyboard_order = listOf(KeyboardType.SUMIRE, KeyboardType.ROMAJI)
-
-        assertEquals(
-            listOf(KeyboardType.SUMIRE, KeyboardType.ROMAJI),
-            AppPreference.keyboard_order
-        )
-    }
-
-    @Test
-    fun savedGojuonOrderIsParsedWithoutFallingBackToTenkey() {
-        AppPreference.keyboard_order = listOf(KeyboardType.GOJUON, KeyboardType.CUSTOM)
-
-        assertEquals(
-            listOf(KeyboardType.GOJUON, KeyboardType.CUSTOM),
-            AppPreference.keyboard_order,
-        )
-    }
-    @Test
-    fun splitKeyboardRoundTripsInTheUserSelectedPosition() {
-        val order = listOf(KeyboardType.CUSTOM, KeyboardType.SPLIT, KeyboardType.TENKEY)
-        AppPreference.keyboard_order = order
+    fun legacyStoredOrderWithRemovedKeyboardsResolvesToCustomOnly() {
+        preferences.edit()
+            .putString("keyboard_order_preference", "[\"TENKEY\",\"QWERTY\",\"CUSTOM\"]")
+            .commit()
         AppPreference.init(context)
-        assertEquals(order, AppPreference.keyboard_order)
-    }
 
+        assertEquals(listOf(KeyboardType.CUSTOM), AppPreference.keyboard_order)
+    }
 }

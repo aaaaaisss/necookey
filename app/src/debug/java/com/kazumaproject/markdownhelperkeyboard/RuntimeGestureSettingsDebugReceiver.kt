@@ -36,17 +36,7 @@ class RuntimeGestureSettingsDebugReceiver : BroadcastReceiver() {
             changed += "sensitivity=$sensitivity"
         }
 
-        if (intent.hasExtra(EXTRA_LONG_PRESS_TIMEOUT_MILLIS)) {
-            val timeoutMillis = intent.getLongExtra(
-                EXTRA_LONG_PRESS_TIMEOUT_MILLIS,
-                RuntimeGestureSettings.DEFAULT_LONG_PRESS_TIMEOUT_MILLIS
-            ).coerceIn(
-                RuntimeGestureSettings.MIN_LONG_PRESS_TIMEOUT_MILLIS,
-                RuntimeGestureSettings.MAX_LONG_PRESS_TIMEOUT_MILLIS
-            )
-            editor.putInt(AppPreference.LONG_PRESS_TIMEOUT_KEY, timeoutMillis.toInt())
-            changed += "longPress=${timeoutMillis}ms"
-        }
+        // Long-press timeout is fixed at 300 ms (setting removed); EXTRA_LONG_PRESS_TIMEOUT_MILLIS is ignored.
 
         check(editor.commit()) { "Failed to persist debug runtime gesture settings" }
         Log.i(TAG, "Published existing preferences: ${changed.joinToString()}")

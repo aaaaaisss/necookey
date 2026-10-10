@@ -15,13 +15,11 @@ class ShortcutActiveStateResolverTest {
     fun directCommitMarksInputBehaviorToggleActiveAndPreservesExistingActiveTypes() {
         val activeTypes = resolveShortcutActiveTypes(
             keyboardLayoutEditActive = true,
-            keyboardFloatingActive = true,
             inputBehavior = ResolvedInputBehavior.DIRECT_COMMIT,
             liveConversionEnabled = false,
         )
 
         assertTrue(ShortcutType.KEYBOARD_LAYOUT_EDIT in activeTypes)
-        assertTrue(ShortcutType.KEYBOARD_FLOATING_TOGGLE in activeTypes)
         assertTrue(ShortcutType.INPUT_BEHAVIOR_TOGGLE in activeTypes)
     }
 
@@ -29,7 +27,6 @@ class ShortcutActiveStateResolverTest {
     fun composingTextDoesNotMarkInputBehaviorToggleActive() {
         val activeTypes = resolveShortcutActiveTypes(
             keyboardLayoutEditActive = false,
-            keyboardFloatingActive = false,
             inputBehavior = ResolvedInputBehavior.COMPOSING_TEXT,
             liveConversionEnabled = false,
         )
@@ -49,7 +46,6 @@ class ShortcutActiveStateResolverTest {
     fun liveConversionDisabledDoesNotMarkLiveConversionToggleActive() {
         val activeTypes = resolveShortcutActiveTypes(
             keyboardLayoutEditActive = false,
-            keyboardFloatingActive = false,
             inputBehavior = ResolvedInputBehavior.COMPOSING_TEXT,
             liveConversionEnabled = false,
         )
@@ -61,7 +57,6 @@ class ShortcutActiveStateResolverTest {
     fun liveConversionEnabledMarksLiveConversionToggleActive() {
         val activeTypes = resolveShortcutActiveTypes(
             keyboardLayoutEditActive = false,
-            keyboardFloatingActive = false,
             inputBehavior = ResolvedInputBehavior.COMPOSING_TEXT,
             liveConversionEnabled = true,
         )
@@ -73,13 +68,11 @@ class ShortcutActiveStateResolverTest {
     fun liveConversionActivePreservesOtherActiveTypes() {
         val activeTypes = resolveShortcutActiveTypes(
             keyboardLayoutEditActive = true,
-            keyboardFloatingActive = true,
             inputBehavior = ResolvedInputBehavior.DIRECT_COMMIT,
             liveConversionEnabled = true,
         )
 
         assertTrue(ShortcutType.KEYBOARD_LAYOUT_EDIT in activeTypes)
-        assertTrue(ShortcutType.KEYBOARD_FLOATING_TOGGLE in activeTypes)
         assertTrue(ShortcutType.INPUT_BEHAVIOR_TOGGLE in activeTypes)
         assertTrue(ShortcutType.LIVE_CONVERSION_TOGGLE in activeTypes)
     }
@@ -103,7 +96,6 @@ class ShortcutActiveStateResolverTest {
     fun learningPauseIsActiveOnlyWhilePaused() {
         val activeTypes = resolveShortcutActiveTypes(
             keyboardLayoutEditActive = false,
-            keyboardFloatingActive = false,
             inputBehavior = ResolvedInputBehavior.COMPOSING_TEXT,
             liveConversionEnabled = false,
             learningPaused = true,

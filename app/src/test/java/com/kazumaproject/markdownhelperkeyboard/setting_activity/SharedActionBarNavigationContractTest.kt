@@ -8,22 +8,6 @@ import java.io.File
 class SharedActionBarNavigationContractTest {
 
     @Test
-    fun fragmentTeardownDoesNotOverrideTheDestinationUpIndicator() {
-        listOf(
-            "ui/keyboard_size_setting/KeyboardSizeSettingFragment.kt",
-        ).forEach { relativePath ->
-            val source = mainFile(relativePath).readText()
-            val onDestroyViewBody = source.substringAfter("override fun onDestroyView()")
-                .substringBeforeLast("\n}")
-
-            assertFalse(
-                "$relativePath must not overwrite the shared ActionBar during teardown",
-                onDestroyViewBody.contains("supportActionBar"),
-            )
-        }
-    }
-
-    @Test
     fun mainActivityOwnsSharedActionBarVisibilityForEveryHiddenHeaderDestination() {
         val source = mainFile("MainActivity.kt").readText()
 

@@ -15,11 +15,8 @@ dependencyResolutionManagement {
 rootProject.name = "MarkdownHelperKeyboard"
 include ':app'
 include ':flexbox'
-include ':tenkey'
 include ':symbol_keyboard'
 include ':core'
-include ':gojuon_keyboard'
-include ':qwerty_keyboard'
 include ':custom_keyboard'
 include ':zenz'
 

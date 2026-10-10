@@ -8,7 +8,6 @@ import android.view.inputmethod.BaseInputConnection
 import androidx.preference.PreferenceManager
 import androidx.test.core.app.ApplicationProvider
 import com.kazumaproject.core.domain.state.TenKeyQWERTYMode
-import com.kazumaproject.markdownhelperkeyboard.ime_service.adapters.FloatingCandidateListAdapter
 import com.kazumaproject.markdownhelperkeyboard.ime_service.flick_preview.ComposingTextArbiter
 import com.kazumaproject.markdownhelperkeyboard.ime_service.input_behavior.ResolvedInputBehavior
 import com.kazumaproject.markdownhelperkeyboard.ime_service.state.InputTypeForIME
@@ -52,7 +51,6 @@ class CustomDirectInputTransitionTest {
         doReturn(editor).`when`(it).getCurrentInputConnection()
         ReflectionHelpers.callInstanceMethod<Unit>(it, "attachBaseContext",
             ClassParameter.from(Context::class.java, context))
-        ReflectionHelpers.setField(it, "listAdapter", mock(FloatingCandidateListAdapter::class.java))
         ReflectionHelpers.setField(it, "currentInputType", InputTypeForIME.Text)
         ReflectionHelpers.setField(it, "currentInputBehavior", ResolvedInputBehavior.COMPOSING_TEXT)
         ReflectionHelpers.getField<MutableStateFlow<TenKeyQWERTYMode>>(it, "_tenKeyQWERTYMode").value =
@@ -154,20 +152,6 @@ class CustomDirectInputTransitionTest {
         setReplacePreference(true)
         setReplacePreference(false)
         compose("かな")
-        switchLayout(direct = true)
-        assertCompositionFinished()
-        typeDirect("A")
-        assertEquals("かなA", editor.editable.toString())
-    }
-
-    @Test
-    fun replacementDoesNotAffectOtherDirectInputModes() {
-        setReplacePreference(true)
-        compose("かな")
-        ReflectionHelpers.getField<MutableStateFlow<TenKeyQWERTYMode>>(
-            service, "_tenKeyQWERTYMode"
-        ).value = TenKeyQWERTYMode.TenKeyQWERTY
-        ReflectionHelpers.setField(service, "currentInputType", InputTypeForIME.TypeNull)
         switchLayout(direct = true)
         assertCompositionFinished()
         typeDirect("A")

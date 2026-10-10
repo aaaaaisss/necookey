@@ -149,4 +149,8 @@
 
 
 
+    <string-array name="ng_word_match_mode_entries">
+        <item>@string/ng_word_match_mode_partial</item>
+        <item>@string/ng_word_match_mode_exact</item>
+    </string-array>
 </resources>

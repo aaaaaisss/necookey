@@ -39,7 +39,6 @@ import com.kazumaproject.markdownhelperkeyboard.converter.trace.PenaltyTrace
 import com.kazumaproject.markdownhelperkeyboard.dictionary_override.DictionaryBinaryReader
 import com.kazumaproject.markdownhelperkeyboard.dictionary_override.DictionaryCategory
 import com.kazumaproject.markdownhelperkeyboard.dictionary_override.DictionaryCategoryLoadState
-import com.kazumaproject.markdownhelperkeyboard.dictionary_override.DictionaryCompatibilityValidator
 import com.kazumaproject.markdownhelperkeyboard.dictionary_override.DictionaryFileKey
 import com.kazumaproject.markdownhelperkeyboard.dictionary_override.DictionaryFileRole
 import com.kazumaproject.markdownhelperkeyboard.dictionary_override.DictionaryFileSpecs
@@ -442,13 +441,8 @@ class KanaKanjiEngine {
     fun applyDictionaryOverrideState(context: Context) {
         val reader = dictionaryReader(context)
         val appContext = context.applicationContext
-        val store = DictionaryOverrideStore(appContext, DictionaryOverrideValidator())
-        DictionaryCompatibilityValidator(
-            DictionarySourceResolver(
-                appContext,
-                store
-            )
-        ).requireActiveStateCompatible()
+        // Only bundled dictionaries are loaded (external overrides were removed), so the
+        // former cross-file compatibility check (which read the raw bundled sources) is gone.
         val newConnectionMatrix = reader.loadConnectionMatrix(DictionaryFileKey.CONNECTION_ID)
         val newSystem = loadTripleDictionary(reader, DictionaryCategory.SYSTEM)
         val newSingleKanji = loadTripleDictionary(reader, DictionaryCategory.SINGLE_KANJI)
