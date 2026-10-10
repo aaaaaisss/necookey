@@ -24,11 +24,15 @@ data class LearningFragment(
  * Learning happens at bunsetsu level: every learnable fragment becomes its own entry. Phrase
  * entries (several fragments joined, including the whole commit) are only written when their
  * reading is at most [MAX_PHRASE_READING_LENGTH] characters, so long sentences never become a
- * single learned word.
+ * single learned word. Phrase entries are also only written while the fragments are a
+ * consistent, gap-free prefix of the original reading; otherwise a phrase could pair the full
+ * reading with only part of the output.
  */
 class ConversionLearningSession {
     private var originalReading: String? = null
     private val fragments = mutableListOf<LearningFragment>()
+    private val consumedReading = StringBuilder()
+    private var consistent = true
 
     val isActive: Boolean
         get() = originalReading != null
@@ -40,7 +44,10 @@ class ConversionLearningSession {
     }
 
     fun record(fragment: LearningFragment) {
-        if (originalReading == null || fragment.reading.isEmpty() || fragment.output.isEmpty()) return
+        val reading = originalReading ?: return
+        if (fragment.reading.isEmpty() || fragment.output.isEmpty()) return
+        consumedReading.append(fragment.reading)
+        if (!reading.startsWith(consumedReading)) consistent = false
         fragments += fragment
     }
 
@@ -53,6 +60,8 @@ class ConversionLearningSession {
         cancel()
         if (reading.isNullOrEmpty() || recorded.isEmpty()) return emptyList()
 
+        val isConsistent = consistent && recorded.joinToString(separator = "") { it.reading } == reading
+
         val learnable = recorded.filter {
             (learnFirstCandidate || it.explicitlySelected || it.candidateIndex != 0) &&
                 (!it.unsplitWhole || it.reading.length <= MAX_PHRASE_READING_LENGTH)
@@ -62,6 +71,8 @@ class ConversionLearningSession {
         val segmentEntries = learnable.map { fragment ->
             fragment.toEntity(timestamp = timestamp, isPhrase = false)
         }
+        if (!isConsistent) return segmentEntries.distinctBy { it.input to it.out }
+
         val cumulativePhraseEntries = recorded.indices.drop(1).mapNotNull { lastIndex ->
             val phraseFragments = recorded.take(lastIndex + 1)
             val phraseReading = phraseFragments.joinToString(separator = "") { it.reading }
@@ -103,6 +114,8 @@ class ConversionLearningSession {
     fun cancel() {
         originalReading = null
         fragments.clear()
+        consumedReading.setLength(0)
+        consistent = true
     }
 
     private fun LearningFragment.toEntity(timestamp: Long, isPhrase: Boolean) = LearnEntity(

@@ -202,6 +202,7 @@ import com.kazumaproject.markdownhelperkeyboard.converter.candidatebar.TwoRowCan
 import com.kazumaproject.markdownhelperkeyboard.converter.candidatebar.ZenzBunsetsuReselector
 import com.kazumaproject.markdownhelperkeyboard.learning.session.BunsetsuLearningSplitter
 import com.kazumaproject.markdownhelperkeyboard.learning.session.LearnedBunsetsu
+import com.kazumaproject.markdownhelperkeyboard.learning.session.LearningReadingGuard
 import com.kazumaproject.markdownhelperkeyboard.converter.candidatebar.ZenzSpanScorer
 import com.kazumaproject.markdownhelperkeyboard.converter.candidate.CANDIDATE_TYPE_ERA
 import com.kazumaproject.markdownhelperkeyboard.converter.candidate.CANDIDATE_TYPE_CALCULATION
@@ -2253,6 +2254,10 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
     private val necookeyZenzReselector = ZenzBunsetsuReselector(necookeyCandidateBarConfig)
     private var necookeyZenzJob: Job? = null
     /** Bunsetsu analysis + paths of the latest two-row conversion; used to learn per bunsetsu. */
+    /** Reading the visible two-row top row was built for (it is not hidden while stale). */
+    private var necookeyTopRowInput: String = ""
+    /** Set only while a top-row candidate commit is being processed; see [recordCandidateLearning]. */
+    private var learningCandidateListInput: String? = null
     @Volatile
     private var necookeyLearningAnalysis: BunsetsuAnalysis? = null
     @Volatile
@@ -23273,13 +23278,15 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
                 commitQwertyGlideCandidate(candidate)
                 return
             }
-            processCandidate(
-                candidate = candidate,
-                insertString = insertString,
-                currentInputMode = currentInputMode,
-                position = position,
-                explicitlySelected = true,
-            )
+            withTopRowLearningInput(insertString) {
+                processCandidate(
+                    candidate = candidate,
+                    insertString = insertString,
+                    currentInputMode = currentInputMode,
+                    position = position,
+                    explicitlySelected = true,
+                )
+            }
             setCursorLeftAfterCommitPair(candidate.string)
         }
         resetFlagsSuggestionClick()
@@ -24022,7 +24029,9 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
     private fun commitCurrentHenkanForNewInput(currentInputMode: InputMode) {
         if (!isHenkan.get()) return
 
-        recordCurrentHenkanCandidateLearning(currentInputMode)
+        withTopRowLearningInput(inputString.value) {
+            recordCurrentHenkanCandidateLearning(currentInputMode)
+        }
         val currentHenkanText = resolveCurrentHenkanCommitText()
         suppressedSelectionCleanupCount += 1
 
@@ -24224,6 +24233,24 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         commitText(candidateString, 1)
     }
 
+    /**
+     * Runs a commit of a candidate taken from the main candidate strip. With the two-row bar the
+     * strip keeps showing the previous reading's candidates until the new result is published, so
+     * the reading the list was built for is handed to the learning guard.
+     */
+    private inline fun withTopRowLearningInput(insertString: String, block: () -> Unit) {
+        learningCandidateListInput = if (shouldUseNecookeyTwoRowBar() && insertString.isNotEmpty()) {
+            necookeyTopRowInput
+        } else {
+            null
+        }
+        try {
+            block()
+        } finally {
+            learningCandidateListInput = null
+        }
+    }
+
     private fun isLearningWriteEnabled(): Boolean =
         isLearnDictionaryMode == true && !isPrivateMode && !learningPausedForSession && dictionaryInputConnection == null
 
@@ -24238,6 +24265,18 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         explicitlySelected: Boolean,
     ) {
         if (currentInputMode != InputMode.ModeJapanese || !isLearningWriteEnabled()) {
+            conversionLearningSession.cancel()
+            return
+        }
+        if (!LearningReadingGuard.candidateMatchesReading(
+                candidate = candidate,
+                reading = segmentReading,
+                candidateInput = learningCandidateListInput,
+            )
+        ) {
+            // The candidate was built for another reading (stale list after a same-length edit
+            // such as a dakuten toggle). Learning it would pair this reading with that output.
+            Timber.d("learning skipped: candidate %s does not belong to %s", candidate.string, segmentReading)
             conversionLearningSession.cancel()
             return
         }
@@ -24761,13 +24800,15 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
             nextSuggestion.sourceId?.let(::executeTextMacro)
             return
         }
-        processCandidate(
-            candidate = nextSuggestion,
-            insertString = insertString,
-            currentInputMode = currentInputMode,
-            position = index,
-            explicitlySelected = true,
-        )
+        withTopRowLearningInput(insertString) {
+            processCandidate(
+                candidate = nextSuggestion,
+                insertString = insertString,
+                currentInputMode = currentInputMode,
+                position = index,
+                explicitlySelected = true,
+            )
+        }
         clearSuggestionStateAfterCommit()
         resetFlagsEnterKey()
         consumePendingZeroQueryAfterCommit()
@@ -25607,6 +25648,7 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         withContext(Dispatchers.Main.immediate) {
             if (!shouldApplyCandidateResult(insertString, token)) return@withContext
             necookeyPredictionRowInput = insertString
+            necookeyTopRowInput = insertString
             necookeyPredictionRowCandidates = bar.predictions
         }
         if (!suppressSuggestions) {

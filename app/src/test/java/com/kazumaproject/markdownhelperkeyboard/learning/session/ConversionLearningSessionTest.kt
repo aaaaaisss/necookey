@@ -126,6 +126,33 @@ class ConversionLearningSessionTest {
         assertEquals(listOf("きょうは" to "今日は"), entries.map { it.input to it.out })
     }
 
+    @Test
+    fun fragmentsThatDoNotSpellOriginalReadingNeverProduceWholeEntry() {
+        // A tail edited after a partial commit: the original reading is stale.
+        val session = ConversionLearningSession()
+        session.beginIfNeeded("きょうはいい")
+        session.record(fragment("きょう", "今日", index = 1))
+        session.record(fragment("はいいてんき", "は良い天気", index = 1))
+
+        val entries = session.finish(learnFirstCandidate = false)
+
+        assertTrue(entries.any { it.input == "きょう" && it.out == "今日" })
+        assertTrue(entries.none { it.input == "きょうはいい" })
+        assertTrue(entries.none { it.isPhrase })
+    }
+
+    @Test
+    fun missingFragmentNeverPairsFullReadingWithPartialOutput() {
+        val session = ConversionLearningSession()
+        session.beginIfNeeded("きょうはいい")
+        session.record(fragment("きょう", "今日", index = 1))
+        // "はいい" was committed through a path that did not record a fragment.
+
+        val entries = session.finish(learnFirstCandidate = false)
+
+        assertEquals(listOf("きょう" to "今日"), entries.map { it.input to it.out })
+    }
+
     private fun fragment(reading: String, output: String, index: Int) = LearningFragment(
         reading = reading,
         output = output,
