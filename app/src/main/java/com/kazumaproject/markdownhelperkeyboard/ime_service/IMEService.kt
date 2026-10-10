@@ -1260,7 +1260,8 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
             return false
         }
         if (isCurrentInputTypePasswordOrEmailForZeroQuery()) return false
-        if (isCustomLayoutPickerShownForCandidateStrip()) return false
+        // Custom layout picker is only a fallback for the empty strip; the resolver already
+        // prefers zero-query (next-word) suggestions over it, so it must not block them here.
         if (isSelectionActionsShownForCandidateStrip()) return false
         if (editorTextSelected) {
             return false

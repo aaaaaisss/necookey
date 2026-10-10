@@ -77,3 +77,5 @@
 - ec166d1 ようこそ画面削除・後続語バグ修正・旧予測設定 UI 削除。`:app:compileFullStandardDebugKotlin` と `:app:compileFullStandardDebugUnitTestKotlin` 成功（ローカルでは Hilt/KSP の増分キャッシュに削除済み Fragment が残り失敗したため、ksp 出力を消して --no-build-cache で再確認）
 - 5dcbbb0 ホーム（状態カード・試し入力・カテゴリ一覧）、カテゴリ別サブ画面、ボトムナビ廃止。`:app:compileFullStandardDebugKotlin` 成功
 
+
+- 後続語がカスタムキーボード一覧に置き換わる不具合: カスタム配列使用中は `canShowZeroQueryAfterCommit` が `isCustomLayoutPickerShownForCandidateStrip()` で false を返し後続語検索自体をしていなかった。この判定を削除（Resolver は元々後続語を一覧より優先、後続語なしなら従来通り一覧）。`:app:compileFullStandardDebugKotlin` 成功。
