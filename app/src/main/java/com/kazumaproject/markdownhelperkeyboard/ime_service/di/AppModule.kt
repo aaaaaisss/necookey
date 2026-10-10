@@ -638,12 +638,8 @@ object AppModule {
             "system_ngram_dictionary_enable_preference",
             true,
         )
-        val customNgramEnabled = preferences.getBoolean(
-            "custom_ngram_dictionary_enable_preference",
-            true,
-        )
         SystemNgramRuntime.initialize(context, systemNgramEnabled)
-        ngramRuleScorerManager.setEnabled(customNgramEnabled)
+        ngramRuleScorerManager.setEnabled(false) // custom n-gram rules: settings removed in S3.5
         val findPath = FindPath(
             ngramRuleScorerProvider = ngramRuleScorerManager::currentScorer,
             systemNgramDictionaryProvider = SystemNgramRuntime::current,

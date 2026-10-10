@@ -50,6 +50,9 @@ class DictionaryLearnFragment : Fragment() {
     @Inject
     lateinit var learnRepository: LearnRepository
 
+    @Inject
+    lateinit var nextWordRepository: com.kazumaproject.markdownhelperkeyboard.learning.nextword.NextWordRepository
+
     private lateinit var learnDictionaryAdapter: LearnDictionaryAdapter
     private var allLearnItems: List<Pair<String, List<LearnEntity>>> = emptyList()
     private var learnSearchQuery: String = ""
@@ -474,6 +477,8 @@ class DictionaryLearnFragment : Fragment() {
 
     private suspend fun deleteAll() {
         learnRepository.deleteAll()
+        // "Delete all learning" also clears following-word (後続語) learning.
+        nextWordRepository.deleteAll()
     }
 
     override fun onDestroyView() {

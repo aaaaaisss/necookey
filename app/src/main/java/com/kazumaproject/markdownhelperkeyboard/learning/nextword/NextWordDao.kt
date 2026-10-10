@@ -46,4 +46,13 @@ interface NextWordDao {
 
     @Query("DELETE FROM next_word_table")
     suspend fun deleteAll()
+
+    @Query("SELECT COUNT(*) FROM next_word_table")
+    suspend fun count(): Int
+
+    @Query("SELECT * FROM next_word_table ORDER BY lastUsedAt DESC LIMIT :limit")
+    suspend fun recent(limit: Int): List<NextWordEntity>
+
+    @Query("DELETE FROM next_word_table WHERE id = :id")
+    suspend fun deleteById(id: Int): Int
 }

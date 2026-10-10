@@ -98,10 +98,6 @@
         android:name="com.kazumaproject.markdownhelperkeyboard.clipboard_history.ui.ClipboardHistoryFragment"
         android:label="@string/clipboard_fragment_title" />
     <fragment
-        android:id="@+id/ngWordFragment"
-        android:name="com.kazumaproject.markdownhelperkeyboard.ng_word.ui.NgWordFragment"
-        android:label="@string/ng_word_fragment_title" />
-    <fragment
         android:id="@+id/keyCandidateLetterSizeFragment"
         android:name="com.kazumaproject.markdownhelperkeyboard.setting_activity.ui.key_candidate_letter_size.KeyCandidateLetterSizeFragment"
         android:label="@string/fragment_key_candidate_letter_size_title"
@@ -132,47 +128,14 @@
             app:argType="string" />
     </fragment>
     <fragment
-        android:id="@+id/candidateOrderOverrideFragment"
-        android:name="com.kazumaproject.markdownhelperkeyboard.candidate_order.ui.CandidateOrderOverrideFragment"
-        android:label="@string/candidate_order_override_fragment_title"
-        tools:layout="@layout/fragment_candidate_order_override" />
-    <fragment
-        android:id="@+id/customZeroQueryDictionaryFragment"
-        android:name="com.kazumaproject.markdownhelperkeyboard.zeroquery.custom.ui.CustomZeroQueryDictionaryFragment"
-        android:label="@string/custom_zero_query_dictionary_title"
-        tools:layout="@layout/fragment_custom_zero_query_dictionary">
-        <action
-            android:id="@+id/action_customZeroQueryDictionaryFragment_to_customZeroQueryGroupFragment"
-            app:destination="@id/customZeroQueryGroupFragment" />
-    </fragment>
-    <fragment
-        android:id="@+id/customZeroQueryGroupFragment"
-        android:name="com.kazumaproject.markdownhelperkeyboard.zeroquery.custom.ui.CustomZeroQueryGroupFragment"
-        android:label="@string/custom_zero_query_group_title"
-        tools:layout="@layout/fragment_custom_zero_query_group">
-        <argument
-            android:name="lookupKey"
-            app:argType="string" />
-    </fragment>
-    <fragment
         android:id="@+id/enableKeyboardFragment"
         android:name="com.kazumaproject.markdownhelperkeyboard.setting_activity.ui.enable_keyboard_setting.EnableKeyboardFragment"
         android:label="@string/welcome_title"
         tools:layout="@layout/fragment_enable_keyboard" />
     <fragment
-        android:id="@+id/systemUserDictionaryBuilderFragment"
-        android:name="com.kazumaproject.markdownhelperkeyboard.system_user_dictionary.ui.SystemUserDictionaryBuilderFragment"
-        android:label="@string/system_user_dictionary_builder_title"
-        tools:layout="@layout/fragment_system_user_dictionary_builder" />
-    <fragment
         android:id="@+id/externalDictionarySettingsFragment"
         android:name="com.kazumaproject.markdownhelperkeyboard.setting_activity.ui.external_dictionary.ExternalDictionarySettingsFragment"
         android:label="@string/external_dictionary_settings_title" />
-    <fragment
-        android:id="@+id/ngramRuleFragment"
-        android:name="com.kazumaproject.markdownhelperkeyboard.ngram_rule.ui.NgramRuleFragment"
-        android:label="@string/n_gram_rule_preference_title"
-        tools:layout="@layout/fragment_ngram_rule" />
     <fragment
         android:id="@+id/deleteKeyFlickTargetsFragment"
         android:name="com.kazumaproject.markdownhelperkeyboard.delete_key_flick.ui.DeleteKeyFlickTargetsFragment"

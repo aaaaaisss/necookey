@@ -42,8 +42,6 @@ internal object CustomThemeColorPreferenceKeys {
 
 object AppPreference {
 
-    const val PRESERVE_DICTIONARY_WORD_WHITESPACE_KEY =
-        "preserve_dictionary_word_whitespace_preference"
 
     internal const val GOJUON_KEYBOARD_TYPE_MIGRATION_KEY =
         "gojuon_keyboard_type_migrated_v1"
@@ -139,21 +137,9 @@ object AppPreference {
     private val LEARN_DICTIONARY_PREFERENCE = Pair("learn_dictionary_preference", true)
     private val USER_DICTIONARY_PREFERENCE = Pair("user_dictionary_preference", true)
     private val USER_DICTIONARY_PREFIX_PREFERENCE = Pair("user_dictionary_prefix_match_number", 2)
-    private val USER_TEMPLATE_PREFERENCE = Pair("user_template_preference", true)
-    private val TEXT_MACRO_CANDIDATE_PREFERENCE = Pair("text_macro_candidate_preference", true)
     private val SYSTEM_NGRAM_DICTIONARY_ENABLE_PREFERENCE =
         Pair("system_ngram_dictionary_enable_preference", true)
-    private val CUSTOM_NGRAM_DICTIONARY_ENABLE_PREFERENCE =
-        Pair("custom_ngram_dictionary_enable_preference", true)
-    private val SHOW_DICTIONARY_CANDIDATE_LABELS_PREFERENCE =
-        Pair("show_dictionary_candidate_labels_preference", false)
-    private val SUPPRESS_HENTAIGANA_CANDIDATES_PREFERENCE =
-        Pair("suppress_hentaigana_candidates_preference", false)
-    private val ZERO_QUERY_SUGGESTION_PREFERENCE =
-        Pair("zero_query_suggestion_preference", false)
-    private val NG_WORD_ENABLE_PREFERENCE = Pair("ng_word_enable_preference", true)
     private val N_BEST_PREFERENCE = Pair("n_best_preference", 4)
-    private val CONVERSION_BEAM_WIDTH_PREFERENCE = Pair("conversion_beam_width_preference", 20)
     private val INCREMENTAL_CONVERSION_SESSION_PREFERENCE =
         Pair("incremental_conversion_session_preference", false)
     private val JAPANESE_PREDICTION_ENABLE_PREFERENCE =
@@ -184,8 +170,6 @@ object AppPreference {
         Pair("emoji_candidate_enable_preference", true)
     private val EMOTICON_CANDIDATE_ENABLE_PREFERENCE =
         Pair("emoticon_candidate_enable_preference", true)
-    private val CANDIDATE_ORDER_OVERRIDE_ENABLE =
-        Pair("candidate_order_override_enable_preference", false)
     private val MOZCUT_PERSON_NAME = Pair("mozc_ut_person_name_preference", false)
     private val MOZCUT_PLACES = Pair("mozc_ut_places_preference", false)
     private val MOZCUT_WIKI = Pair("mozc_ut_wiki_preference", false)
@@ -362,6 +346,8 @@ object AppPreference {
         Pair("custom_direct_mode_space_hankaku_preference", true)
     const val CANDIDATE_YOMI_MODE_WHOLE = "whole"
     const val DEFAULT_LIVE_CONVERSION_CANDIDATE_YOMI_SIZE = 14
+    const val PRESERVE_DICTIONARY_WORD_WHITESPACE_KEY =
+        "preserve_dictionary_word_whitespace_preference"
     const val CANDIDATE_YOMI_MODE_RUBY = "ruby"
     const val MIN_LIVE_CONVERSION_CANDIDATE_YOMI_SIZE = 1
     const val MAX_LIVE_CONVERSION_CANDIDATE_YOMI_SIZE = 24
@@ -1641,13 +1627,7 @@ object AppPreference {
             it.putBoolean(VIBRATION_PREFERENCE.first, value ?: true)
         }
 
-    var ng_word_preference: Boolean?
-        get() = preferences.getBoolean(
-            NG_WORD_ENABLE_PREFERENCE.first, NG_WORD_ENABLE_PREFERENCE.second
-        )
-        set(value) = preferences.edit {
-            it.putBoolean(NG_WORD_ENABLE_PREFERENCE.first, value ?: true)
-        }
+    val ng_word_preference: Boolean? get() = false // S3: hardcoded, setting removed
 
     val vibration_timing_preference: String? get() = "both" // S3: hardcoded, setting removed
 
@@ -1726,14 +1706,7 @@ object AppPreference {
             it.putInt(N_BEST_PREFERENCE.first, value ?: 4)
         }
 
-    var conversion_beam_width_preference: Int
-        get() = preferences.getInt(
-            CONVERSION_BEAM_WIDTH_PREFERENCE.first,
-            CONVERSION_BEAM_WIDTH_PREFERENCE.second,
-        ).coerceIn(1, 100)
-        set(value) = preferences.edit {
-            it.putInt(CONVERSION_BEAM_WIDTH_PREFERENCE.first, value.coerceIn(1, 100))
-        }
+    val conversion_beam_width_preference: Int get() = 20 // S3: hardcoded, setting removed
 
     var incremental_conversion_session_preference: Boolean
         get() = preferences.getBoolean(
@@ -1906,14 +1879,7 @@ object AppPreference {
             it.putBoolean(EMOTICON_CANDIDATE_ENABLE_PREFERENCE.first, value)
         }
 
-    var candidate_order_override_enable_preference: Boolean?
-        get() = preferences.getBoolean(
-            CANDIDATE_ORDER_OVERRIDE_ENABLE.first,
-            CANDIDATE_ORDER_OVERRIDE_ENABLE.second
-        )
-        set(value) = preferences.edit {
-            it.putBoolean(CANDIDATE_ORDER_OVERRIDE_ENABLE.first, value ?: false)
-        }
+    val candidate_order_override_enable_preference: Boolean? get() = false // S3: hardcoded, setting removed
 
     var learn_dictionary_preference: Boolean?
         get() = preferences.getBoolean(
@@ -1955,22 +1921,9 @@ object AppPreference {
             )
         }
 
-    var user_template_preference: Boolean?
-        get() = preferences.getBoolean(
-            USER_TEMPLATE_PREFERENCE.first, USER_TEMPLATE_PREFERENCE.second
-        )
-        set(value) = preferences.edit {
-            it.putBoolean(USER_TEMPLATE_PREFERENCE.first, value ?: true)
-        }
+    val user_template_preference: Boolean? get() = true // S3: hardcoded, setting removed
 
-    var text_macro_candidate_preference: Boolean
-        get() = preferences.getBoolean(
-            TEXT_MACRO_CANDIDATE_PREFERENCE.first,
-            TEXT_MACRO_CANDIDATE_PREFERENCE.second,
-        )
-        set(value) = preferences.edit {
-            it.putBoolean(TEXT_MACRO_CANDIDATE_PREFERENCE.first, value)
-        }
+    val text_macro_candidate_preference: Boolean get() = true // S3: hardcoded, setting removed
 
     var system_ngram_dictionary_enable_preference: Boolean
         get() = preferences.getBoolean(
@@ -1981,14 +1934,7 @@ object AppPreference {
             it.putBoolean(SYSTEM_NGRAM_DICTIONARY_ENABLE_PREFERENCE.first, value)
         }
 
-    var custom_ngram_dictionary_enable_preference: Boolean
-        get() = preferences.getBoolean(
-            CUSTOM_NGRAM_DICTIONARY_ENABLE_PREFERENCE.first,
-            CUSTOM_NGRAM_DICTIONARY_ENABLE_PREFERENCE.second,
-        )
-        set(value) = preferences.edit {
-            it.putBoolean(CUSTOM_NGRAM_DICTIONARY_ENABLE_PREFERENCE.first, value)
-        }
+    val custom_ngram_dictionary_enable_preference: Boolean get() = false // S3: hardcoded, setting removed
 
     var preserve_dictionary_word_whitespace_preference: Boolean
         get() = preferences.getBoolean(PRESERVE_DICTIONARY_WORD_WHITESPACE_KEY, false)
@@ -1996,32 +1942,11 @@ object AppPreference {
             it.putBoolean(PRESERVE_DICTIONARY_WORD_WHITESPACE_KEY, value)
         }
 
-    var show_dictionary_candidate_labels_preference: Boolean
-        get() = preferences.getBoolean(
-            SHOW_DICTIONARY_CANDIDATE_LABELS_PREFERENCE.first,
-            SHOW_DICTIONARY_CANDIDATE_LABELS_PREFERENCE.second,
-        )
-        set(value) = preferences.edit {
-            it.putBoolean(SHOW_DICTIONARY_CANDIDATE_LABELS_PREFERENCE.first, value)
-        }
+    val show_dictionary_candidate_labels_preference: Boolean get() = false // S3: hardcoded, setting removed
 
-    var suppress_hentaigana_candidates_preference: Boolean
-        get() = preferences.getBoolean(
-            SUPPRESS_HENTAIGANA_CANDIDATES_PREFERENCE.first,
-            SUPPRESS_HENTAIGANA_CANDIDATES_PREFERENCE.second,
-        )
-        set(value) = preferences.edit {
-            it.putBoolean(SUPPRESS_HENTAIGANA_CANDIDATES_PREFERENCE.first, value)
-        }
+    val suppress_hentaigana_candidates_preference: Boolean get() = false // S3: hardcoded, setting removed
 
-    var zero_query_suggestion_preference: Boolean
-        get() = preferences.getBoolean(
-            ZERO_QUERY_SUGGESTION_PREFERENCE.first,
-            ZERO_QUERY_SUGGESTION_PREFERENCE.second
-        )
-        set(value) = preferences.edit {
-            it.putBoolean(ZERO_QUERY_SUGGESTION_PREFERENCE.first, value)
-        }
+    val zero_query_suggestion_preference: Boolean get() = false // S3: hardcoded, setting removed
 
     val time_same_pronounce_typing_preference: Int? get() = 1000 // S3: hardcoded, setting removed
 
