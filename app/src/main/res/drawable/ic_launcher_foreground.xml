@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- necookey launcher foreground, generated from assets/necookey-icon.svg (white background removed,
+     art scaled into the adaptive-icon safe zone). -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="1254"
+    android:viewportHeight="1254">
+    <group android:translateX="98.6" android:translateY="46.7" android:scaleX="0.8440" android:scaleY="0.8440">
+        <path android:fillColor="#FF9EA3" android:pathData="M335,490 C322,440 322,370 350,340 C380,330 430,360 465,390 C468,395 465,400 460,402 C420,425 370,460 340,490 Z"/>
+        <path android:fillColor="#FF9EA3" android:pathData="M917,490 C930,440 930,370 904,340 C874,330 824,360 789,390 C786,395 789,400 794,402 C834,425 884,460 917,490 Z"/>
+        <path android:fillColor="#363640" android:pathData="M402,632 a73,73 0 1,0 146,0 a73,73 0 1,0 -146,0 Z"/>
+        <path android:fillColor="#FFFFFF" android:pathData="M468,600 a22,22 0 1,0 44,0 a22,22 0 1,0 -44,0 Z"/>
+        <path android:fillColor="#363640" android:pathData="M704,632 a73,73 0 1,0 146,0 a73,73 0 1,0 -146,0 Z"/>
+        <path android:fillColor="#FFFFFF" android:pathData="M738,600 a22,22 0 1,0 44,0 a22,22 0 1,0 -44,0 Z"/>
+        <path android:fillColor="#C5C7D2" android:pathData="M305,772 Q370,858 447,752 L806,752 Q878,858 948,772 C1000,820 1042,880 1042,935 C1042,1000 990,1045 940,1045 L315,1045 C260,1045 210,1000 210,935 C210,880 250,810 305,772 Z"/>
+        <path android:fillColor="#B8BAC5" android:pathData="M210,935 C210,985 250,990 315,990 L940,990 C1000,990 1042,980 1042,935 C1042,1000 990,1045 940,1045 L315,1045 C260,1045 210,1000 210,935 Z"/>
+    </group>
+</vector>
