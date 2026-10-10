@@ -81,3 +81,5 @@
 - 後続語がカスタムキーボード一覧に置き換わる不具合: カスタム配列使用中は `canShowZeroQueryAfterCommit` が `isCustomLayoutPickerShownForCandidateStrip()` で false を返し後続語検索自体をしていなかった。この判定を削除（Resolver は元々後続語を一覧より優先、後続語なしなら従来通り一覧）。`:app:compileFullStandardDebugKotlin` 成功。
 
 - 4b363df 候補欄のキーボード一覧表示を廃止（custom_keyboard_suggestion を false 固定、isCustomLayoutPickerShownForCandidateStrip を常に false）。コンパイル未確認・実機未確認。
+
+- f09a935 Zenzai方式を追加：ConstrainedPathSearch（prefix制約付きViterbi）、KanaKanjiEngine.getConstrainedBestCandidate、Session.queryConstrained、IMEService.runZenzaiDecoding（candidateEvaluate使用、最大3回、zenzaiCarryで制約引継ぎ）。結果は並び替え後の先頭に昇格。発動条件は既存zenz並び替えと同じ。コンパイル成功・実機未確認。後続語のzenz並び替えは未着手。
