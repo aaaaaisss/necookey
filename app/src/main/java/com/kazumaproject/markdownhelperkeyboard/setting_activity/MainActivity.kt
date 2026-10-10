@@ -19,10 +19,7 @@ import androidx.navigation.NavController
 import androidx.navigation.NavOptions
 import androidx.navigation.fragment.NavHostFragment
 import androidx.navigation.ui.AppBarConfiguration
-import androidx.navigation.ui.NavigationUI
 import androidx.navigation.ui.setupActionBarWithNavController
-import androidx.navigation.ui.setupWithNavController
-import com.google.android.material.bottomnavigation.BottomNavigationView
 import com.google.android.material.color.DynamicColors
 import com.google.android.material.color.DynamicColorsOptions
 import com.kazumaproject.markdownhelperkeyboard.local_font.LocalFontRepository
@@ -51,7 +48,6 @@ class MainActivity : AppCompatActivity() {
     private lateinit var appPreference: AppPreference
     private lateinit var binding: ActivityMainBinding
     private lateinit var mainNavController: NavController
-    private var bottomNavigationView: BottomNavigationView? = null
     private var currentDestinationId: Int? = null
     private var restoredNavHost: NavHostFragment? = null
     private var deferredFragmentManagerState: Bundle? = null
@@ -76,10 +72,6 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private val destinationsWithoutBottomNavigation = setOf(
-        R.id.candidateViewHeightSettingFragment,
-        R.id.candidateHeightDefaultsFragment,
-    )
     private val destinationsWithOwnToolbar = setOf(
         R.id.candidateViewHeightSettingFragment,
         R.id.candidateHeightDefaultsFragment,
@@ -212,28 +204,15 @@ class MainActivity : AppCompatActivity() {
         mainNavController = findMainNavController()
         val navController = mainNavController
         installNavigationGraph(navController)
-        val appBarConfiguration = AppBarConfiguration(
-            setOf(
-                R.id.settingMainFragment,
-                R.id.navigation_learn_dictionary,
-                R.id.navigation_user_dictionary,
-            )
-        )
+        // ボトムナビゲーションは廃止。トップレベルは設定ホームのみで、他はすべて戻る矢印付き。
+        val appBarConfiguration = AppBarConfiguration(setOf(R.id.settingMainFragment))
         setupActionBarWithNavController(navController, appBarConfiguration)
         if (dynamicColorsAvailable) {
             themedBackground(com.google.android.material.R.attr.colorSurfaceContainer)
                 ?.let { supportActionBar?.setBackgroundDrawable(it) }
         }
-        updateBottomNavigationVisibility(navController)
         navController.addOnDestinationChangedListener { _, destination, _ ->
             currentDestinationId = destination.id
-            if (destination.id == R.id.settingMainFragment) {
-                bottomNavigationView
-                    ?.menu
-                    ?.findItem(R.id.settingMainFragment)
-                    ?.isChecked = true
-            }
-            updateBottomNavigationVisibility(navController)
             updateSharedActionBarVisibility(destination.id)
             invalidateOptionsMenu()
         }
@@ -342,49 +321,6 @@ class MainActivity : AppCompatActivity() {
         val graph = navController.navInflater.inflate(R.navigation.mobile_navigation)
         graph.setStartDestination(R.id.settingMainFragment)
         navController.graph = graph
-    }
-
-    private fun updateBottomNavigationVisibility(navController: NavController) {
-        ensureBottomNavigation(navController)
-        binding.navViewContainer.visibility =
-            if (navController.currentDestination?.id in destinationsWithoutBottomNavigation) {
-                View.GONE
-            } else {
-                View.VISIBLE
-            }
-    }
-
-    private fun ensureBottomNavigation(navController: NavController): BottomNavigationView {
-        bottomNavigationView?.let { return it }
-        val navView = layoutInflater.inflate(
-            R.layout.view_legacy_bottom_navigation,
-            binding.navViewContainer,
-            false,
-        ) as BottomNavigationView
-        binding.navViewContainer.addView(navView)
-        setupBottomNavigation(navView, navController)
-        bottomNavigationView = navView
-        return navView
-    }
-
-    private fun setupBottomNavigation(
-        navView: BottomNavigationView,
-        navController: NavController,
-    ) {
-        navView.setupWithNavController(navController)
-        navView.setOnItemSelectedListener { item ->
-            if (item.itemId == R.id.settingMainFragment) {
-                navigateToSettingHome(navController)
-                true
-            } else {
-                NavigationUI.onNavDestinationSelected(item, navController)
-            }
-        }
-        navView.setOnItemReselectedListener { item ->
-            if (item.itemId == R.id.settingMainFragment) {
-                navigateToSettingHome(navController)
-            }
-        }
     }
 
     private fun navigateToSettingHome(navController: NavController): Boolean {

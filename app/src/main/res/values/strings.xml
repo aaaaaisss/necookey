@@ -924,4 +924,33 @@
     <string name="zenz_model_source_default">デフォルト（アプリ内蔵）</string>
     <string name="zenz_model_source_pick">モデルファイルを選択する</string>
     <string name="zenz_model_source_selected">選択中: %1$s</string>
+
+    <!-- 設定ホーム（UI 再設計） -->
+    <string name="home_category_keyboard">キーボード</string>
+    <string name="home_category_keyboard_summary">配列の編集・位置とサイズ・文字サイズ・キー操作</string>
+    <string name="home_category_conversion">変換・予測</string>
+    <string name="home_category_conversion_summary">候補の表示・予測・入力ミス補正</string>
+    <string name="home_category_dictionary">辞書・学習</string>
+    <string name="home_category_dictionary_summary">学習辞書・ユーザー辞書・NGワード</string>
+    <string name="home_category_zenz">zenz</string>
+    <string name="home_category_zenz_summary">AI 変換モデルと再ランキング</string>
+    <string name="home_category_symbol_clipboard">クリップボード・記号</string>
+    <string name="home_category_symbol_clipboard_summary">履歴・プレビュー・記号/絵文字</string>
+    <string name="home_category_backup">バックアップ</string>
+    <string name="home_category_backup_summary">設定の書き出し・読み込み</string>
+    <string name="home_category_about">アプリについて</string>
+    <string name="home_category_about_summary">バージョン・オープンソースライセンス</string>
+    <string name="home_settings_header">設定</string>
+    <string name="home_dictionary_manage_category">辞書の管理</string>
+    <string name="home_learn_dictionary_summary">学習した単語の確認・削除</string>
+    <string name="home_user_dictionary_summary">単語の登録・編集</string>
+    <string name="home_status_ready_title">necookey は使用中です</string>
+    <string name="home_status_ready_message">キーボードは有効で、現在の入力方法として選択されています。</string>
+    <string name="home_status_not_selected_title">入力方法として選択されていません</string>
+    <string name="home_status_not_selected_message">キーボードは有効です。「切り替える」から necookey を選んでください。</string>
+    <string name="home_status_disabled_title">キーボードが有効になっていません</string>
+    <string name="home_status_disabled_message">システム設定で necookey を有効にしてから、入力方法として選択してください。</string>
+    <string name="home_status_enable_button">有効にする</string>
+    <string name="home_status_switch_button">切り替える</string>
+    <string name="home_try_input_hint">ここで試し入力</string>
 </resources>

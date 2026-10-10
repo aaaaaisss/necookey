@@ -29,8 +29,9 @@ import java.io.OutputStreamWriter
 import javax.inject.Inject
 
 /**
- * necookey の設定画面。以前の 共通 / zenz / 変換エンジン / 辞書 タブを 1 画面のセクションに統合したもの
- * (res/xml/pref_main.xml)。
+ * necookey の設定カテゴリ画面 (res/xml/pref_main.xml)。
+ * 設定ホーム ([SettingMainFragment]) から rootKey = screen_* で開かれ、そのカテゴリの項目だけを表示する。
+ * 他カテゴリの項目は findPreference が null を返すので bind* は何もしない。
  */
 @AndroidEntryPoint
 class MainPreferenceFragment : AsyncPreferenceFragment() {
@@ -107,6 +108,7 @@ class MainPreferenceFragment : AsyncPreferenceFragment() {
         syncDefaultEmojiSkinTonePreference()
         updateCursorMoveTargetPairsSummary()
         refreshNextWordSummary()
+        syncZenzBunsetsuGateEnabled()
     }
 
     override fun onDestroyView() {
@@ -213,6 +215,14 @@ class MainPreferenceFragment : AsyncPreferenceFragment() {
         }
         findPreference<Preference>("keyboard_key_letter_size_fragment_preference")?.setOnPreferenceClickListener {
             navigateSafely(R.id.keyCandidateLetterSizeFragment)
+            true
+        }
+        findPreference<Preference>("home_learn_dictionary_preference")?.setOnPreferenceClickListener {
+            navigateSafely(R.id.navigation_learn_dictionary)
+            true
+        }
+        findPreference<Preference>("home_user_dictionary_preference")?.setOnPreferenceClickListener {
+            navigateSafely(R.id.navigation_user_dictionary)
             true
         }
         findPreference<Preference>("ng_word_list_preference")?.setOnPreferenceClickListener {
@@ -327,6 +337,14 @@ class MainPreferenceFragment : AsyncPreferenceFragment() {
             true
         }
         updateZenzModelSummary()
+        syncZenzBunsetsuGateEnabled()
+    }
+
+    // 文節ゲートは「2段候補バー」(変換・予測カテゴリ) に依存する。別画面にあるため XML の
+    // android:dependency ではなくコードで有効/無効を切り替える。
+    private fun syncZenzBunsetsuGateEnabled() {
+        findPreference<Preference>("necookey_zenz_bunsetsu_gate_preference")?.isEnabled =
+            appPreference.necookey_two_row_candidate_bar_preference
     }
 
     private fun showZenzModelSelectDialog() {
@@ -452,7 +470,10 @@ class MainPreferenceFragment : AsyncPreferenceFragment() {
         Toast.makeText(requireContext(), msg, Toast.LENGTH_SHORT).show()
     }
 
-    private companion object {
-        const val NEXT_WORD_VIEW_LIMIT = 300
+    companion object {
+        private const val NEXT_WORD_VIEW_LIMIT = 300
+
+        /** ナビゲーション引数: ツールバーに出すカテゴリ名（mobile_navigation.xml の label="{title}"）。 */
+        const val ARG_TITLE = "title"
     }
 }

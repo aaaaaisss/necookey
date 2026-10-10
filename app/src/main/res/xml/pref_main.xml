@@ -1,8 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- necookey の設定画面（1画面・セクション構成）。タブは廃止。 -->
+<!-- necookey の設定。ホーム画面の各カテゴリが下の PreferenceScreen(key=screen_*) を rootKey として開く。 -->
 <androidx.preference.PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto">
 
+    <PreferenceScreen
+        android:key="screen_keyboard"
+        android:title="@string/home_category_keyboard"
+        app:iconSpaceReserved="false">
     <PreferenceCategory
         android:title="@string/category_title_keyboard"
         app:iconSpaceReserved="false">
@@ -103,7 +107,12 @@
             android:title="@string/type_null_input_behavior_title" />
 
     </PreferenceCategory>
+    </PreferenceScreen>
 
+    <PreferenceScreen
+        android:key="screen_conversion"
+        android:title="@string/home_category_conversion"
+        app:iconSpaceReserved="false">
     <PreferenceCategory
         android:title="@string/settings_section_candidates"
         app:iconSpaceReserved="false">
@@ -348,6 +357,29 @@
             app:summary="@string/omission_search_preference_offset_score_preference_summary" />
 
     </PreferenceCategory>
+    </PreferenceScreen>
+
+    <PreferenceScreen
+        android:key="screen_dictionary"
+        android:title="@string/home_category_dictionary"
+        app:iconSpaceReserved="false">
+    <PreferenceCategory
+        android:title="@string/home_dictionary_manage_category"
+        app:iconSpaceReserved="false">
+
+        <Preference
+            android:key="home_learn_dictionary_preference"
+            android:summary="@string/home_learn_dictionary_summary"
+            android:title="@string/learn_dictionary_fragment_title"
+            app:iconSpaceReserved="false" />
+
+        <Preference
+            android:key="home_user_dictionary_preference"
+            android:summary="@string/home_user_dictionary_summary"
+            android:title="@string/user_dictionary_title"
+            app:iconSpaceReserved="false" />
+
+    </PreferenceCategory>
 
     <PreferenceCategory
         android:title="@string/settings_section_dictionary"
@@ -459,14 +491,18 @@
             app:iconSpaceReserved="false" />
 
     </PreferenceCategory>
+    </PreferenceScreen>
 
+    <PreferenceScreen
+        android:key="screen_zenz"
+        android:title="@string/home_category_zenz"
+        app:iconSpaceReserved="false">
     <PreferenceCategory
         android:key="zenz_category"
         android:title="zenz"
         app:iconSpaceReserved="false">
 
         <SwitchPreferenceCompat
-            android:dependency="necookey_two_row_candidate_bar_preference"
             android:key="necookey_zenz_bunsetsu_gate_preference"
             android:title="@string/necookey_zenz_bunsetsu_gate_title"
             app:defaultValue="true"
@@ -525,7 +561,12 @@
             app:summary="@string/zenz_diagnostics_entry_summary" />
 
     </PreferenceCategory>
+    </PreferenceScreen>
 
+    <PreferenceScreen
+        android:key="screen_symbol_clipboard"
+        android:title="@string/home_category_symbol_clipboard"
+        app:iconSpaceReserved="false">
     <PreferenceCategory
         android:title="@string/category_symbol_keyboard_title"
         app:iconSpaceReserved="false">
@@ -589,7 +630,12 @@
             app:summary="@string/pref_clipboard_unpinned_retention_hours_summary" />
 
     </PreferenceCategory>
+    </PreferenceScreen>
 
+    <PreferenceScreen
+        android:key="screen_backup"
+        android:title="@string/home_category_backup"
+        app:iconSpaceReserved="false">
     <PreferenceCategory
         android:title="@string/back_up"
         app:iconSpaceReserved="false">
@@ -605,7 +651,12 @@
             android:title="@string/pref_backup_import_title" />
 
     </PreferenceCategory>
+    </PreferenceScreen>
 
+    <PreferenceScreen
+        android:key="screen_about"
+        android:title="@string/home_category_about"
+        app:iconSpaceReserved="false">
     <PreferenceCategory
         android:title="@string/category_about_app_title"
         app:iconSpaceReserved="false">
@@ -619,5 +670,6 @@
             android:title="@string/app_version_title" />
 
     </PreferenceCategory>
+    </PreferenceScreen>
 
 </androidx.preference.PreferenceScreen>

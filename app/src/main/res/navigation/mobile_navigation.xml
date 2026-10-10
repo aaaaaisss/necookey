@@ -11,6 +11,16 @@
         android:label="@string/setting_fragment_title"
         tools:layout="@layout/fragment_setting_main" />
 
+    <!-- 設定カテゴリ画面。PreferenceFragmentCompat.ARG_PREFERENCE_ROOT（未宣言の引数としてバンドルで渡す）に pref_main.xml の screen_* を指定する。 -->
+    <fragment
+        android:id="@+id/categorySettingsFragment"
+        android:name="com.kazumaproject.markdownhelperkeyboard.setting_activity.ui.setting.MainPreferenceFragment"
+        android:label="{title}">
+        <argument
+            android:name="title"
+            app:argType="string" />
+    </fragment>
+
     <fragment
         android:id="@+id/zenzDiagnosticsFragment"
         android:name="com.kazumaproject.markdownhelperkeyboard.setting_activity.ui.setting.ZenzDiagnosticsFragment"
