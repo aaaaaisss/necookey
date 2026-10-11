@@ -4325,6 +4325,26 @@ class KanaKanjiEngine {
     }
 
 
+    /** 読み完全一致の絵文字（確定後の後続語スロット用）。[readings] の順に、重複を除いて [limit] 件まで。 */
+    fun emojiForExactReadings(readings: List<String>, limit: Int): List<String> {
+        if (limit <= 0 || !::emojiYomiTrie.isInitialized) return emptyList()
+        val result = LinkedHashSet<String>()
+        for (yomi in readings) {
+            val nodeIndex = emojiYomiTrie.getNodeIndex(yomi, emojiSuccinctBitVectorLBSYomi)
+            if (nodeIndex < 0) continue
+            val termId = emojiYomiTrie.getTermIdShortArray(nodeIndex, emojiSuccinctBitVectorIsLeafYomi)
+            if (termId < 0) continue
+            for (entry in emojiTokenArray.getListDictionaryByYomiTermIdShortArray(
+                termId, emojiSuccinctBitVectorTokenArray
+            )) {
+                if (entry.nodeId < 0) continue
+                result.add(emojiTangoTrie.getLetterShortArray(entry.nodeId, emojiSuccinctBitVectorTangoLBS))
+                if (result.size >= limit) return result.toList()
+            }
+        }
+        return result.toList()
+    }
+
     fun getSymbolEmojiCandidates(): List<Emoji> = emojiTokenArray.getNodeIds().map { nodeId ->
         emojiTangoTrie.getLetterShortArray(nodeId, emojiSuccinctBitVectorTangoLBS)
     }.distinct().map { symbol ->

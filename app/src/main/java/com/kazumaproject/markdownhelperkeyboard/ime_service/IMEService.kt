@@ -188,6 +188,7 @@ import com.kazumaproject.markdownhelperkeyboard.converter.candidatebar.BunsetsuA
 import com.kazumaproject.markdownhelperkeyboard.converter.candidatebar.BunsetsuAnalyzer
 import com.kazumaproject.markdownhelperkeyboard.converter.candidatebar.BunsetsuRangeEditor
 import com.kazumaproject.markdownhelperkeyboard.converter.candidatebar.NecookeyCandidateBarConfig
+import com.kazumaproject.markdownhelperkeyboard.converter.candidatebar.NextWordExtras
 import com.kazumaproject.markdownhelperkeyboard.converter.candidatebar.NextWordZenzReranker
 import com.kazumaproject.markdownhelperkeyboard.converter.candidatebar.TwoRowCandidateBar
 import com.kazumaproject.markdownhelperkeyboard.converter.candidatebar.TwoRowCandidateBarPlanner
@@ -705,6 +706,7 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
     private var currentCandidateStripFullCandidates: List<Candidate> = emptyList()
     private var currentCandidateStripContent: CandidateStripContent = CandidateStripContent.Empty
     private var pendingZeroQueryKeyAfterCommit: String? = null
+    private var pendingZeroQueryReadingAfterCommit: String = ""
     private var zeroQueryCandidates: List<Candidate> = emptyList()
     private var zeroQueryVisible: Boolean = false
     private var zeroQuerySelectionUpdateSuppressCount: Int = 0
@@ -1169,9 +1171,10 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         return isNotEmpty() && all { isSelectionActionCandidate(it) }
     }
 
-    private fun rememberZeroQueryKeyAfterCommit(committedText: String) {
+    private fun rememberZeroQueryKeyAfterCommit(committedText: String, reading: String = "") {
         if (committedText.isBlank()) return
         pendingZeroQueryKeyAfterCommit = committedText
+        pendingZeroQueryReadingAfterCommit = reading
     }
 
     private fun cancelZeroQueryLookup() {
@@ -1285,7 +1288,9 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
 
     private fun consumePendingZeroQueryAfterCommit() {
         val key = pendingZeroQueryKeyAfterCommit ?: return
+        val committedReading = pendingZeroQueryReadingAfterCommit
         pendingZeroQueryKeyAfterCommit = null
+        pendingZeroQueryReadingAfterCommit = ""
         cancelZeroQueryLookup()
 
         if (!canShowZeroQueryAfterCommit(key)) {
@@ -1318,22 +1323,28 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
             }
                 .filter { it.string.isNotBlank() }
                 .distinctBy { it.string }
+            val emoji = if (currentInputType !in passwordTypes) {
+                withContext(Dispatchers.Default) { contextEmojiCandidates(committedReading, candidates) }
+            } else {
+                emptyList()
+            }
 
             if (!canShowZeroQueryAfterCommit(key)) {
                 clearZeroQueryShownState(refresh = true)
                 return@launch
             }
-            if (candidates.isEmpty()) {
+            if (candidates.isEmpty() && emoji.isEmpty()) {
                 clearZeroQueryShownState(refresh = true)
                 return@launch
             }
 
-            zeroQueryCandidates = candidates
+            val shown = NextWordExtras.initial(candidates, emoji)
+            zeroQueryCandidates = shown
             zeroQueryVisible = true
             zeroQuerySelectionUpdateSuppressCount += 1
             zeroQueryLookupJob = null
             refreshCandidateStripContent(candidatesShown = false)
-            launchZeroQueryZenzRerank(key, zenzLeftContext, candidates)
+            launchZeroQueryZenzRerank(key, zenzLeftContext, candidates, emoji, shown)
         }
     }
 
@@ -1342,11 +1353,13 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         key: String,
         leftContext: String,
         candidates: List<Candidate>,
+        emoji: List<Candidate>,
+        shown: List<Candidate>,
     ) {
         zeroQueryZenzJob?.cancel()
         val left = leftContext.takeLast(necookeyCandidateBarConfig.maxLeftContextChars)
-        if (left.isBlank() || candidates.size < 2) return
-        val head = candidates.take(NextWordZenzReranker.TOP_K)
+        if (left.isBlank() || shown.size < 2) return
+        val head = NextWordExtras.scoringTargets(candidates, emoji)
         zeroQueryZenzJob = scope.launch {
             val scores = try {
                 withContext(Dispatchers.Default) {
@@ -1369,9 +1382,9 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
                 Timber.w(e, "zenz next-word rerank failed")
                 null
             } ?: return@launch
-            val reranked = NextWordZenzReranker.rerank(head, scores) + candidates.drop(head.size)
-            if (!zeroQueryVisible || zeroQueryCandidates != candidates ||
-                !canShowZeroQueryAfterCommit(key) || reranked == candidates
+            val reranked = NextWordExtras.rerank(candidates, emoji, scores)
+            if (!zeroQueryVisible || zeroQueryCandidates != shown ||
+                !canShowZeroQueryAfterCommit(key) || reranked == shown
             ) {
                 return@launch
             }
@@ -1380,6 +1393,29 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
             zeroQueryZenzJob = null
             refreshCandidateStripContent(candidatesShown = false)
         }
+    }
+
+    /** 確定した読みのキーワードに一致する絵文字（zenz 採点用に [NextWordExtras.EMOJI_POOL] 件まで）。 */
+    private fun contextEmojiCandidates(reading: String, base: List<Candidate>): List<Candidate> {
+        if (reading.isBlank() || !::kanaKanjiEngine.isInitialized) return emptyList()
+        val symbols = try {
+            kanaKanjiEngine.emojiForExactReadings(
+                NextWordExtras.emojiKeys(reading),
+                NextWordExtras.EMOJI_POOL + base.size,
+            )
+        } catch (e: Exception) {
+            Timber.w(e, "context emoji lookup failed")
+            emptyList()
+        }
+        return NextWordExtras.emojiPool(base, symbols.map { symbol ->
+            Candidate(
+                string = symbol,
+                type = CONTEXT_EMOJI_CANDIDATE_TYPE,
+                length = 0u,
+                score = 0,
+                yomi = "",
+            )
+        })
     }
 
     /**
@@ -2009,6 +2045,7 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
     companion object {
         /** Learned following word (後続語) from the next-word table. */
         const val CANDIDATE_TYPE_NEXT_WORD: Byte = 53
+        private const val CONTEXT_EMOJI_CANDIDATE_TYPE: Byte = 11
         /** zenz の文脈長。左文脈 40 字 + 読み 32 字 + 候補で十分収まる。 */
         private const val ZENZ_N_CTX = 256
         private const val NEXT_WORD_CANDIDATE_LIMIT = 6
@@ -12611,7 +12648,7 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
             )
         }
         if (shouldRememberZeroQuery) {
-            rememberZeroQueryKeyAfterCommit(commitString)
+            rememberZeroQueryKeyAfterCommit(commitString, session.rawInput)
         }
         beginBatchEdit()
         try {
@@ -14188,7 +14225,7 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
             preserveBunsetsuReconversionDraftOnNextProcessInput = true
         }
         if (shouldRememberZeroQuery) {
-            rememberZeroQueryKeyAfterCommit(committedText)
+            rememberZeroQueryKeyAfterCommit(committedText, session.rawInput)
         }
 
         beginBatchEdit()
@@ -14748,7 +14785,7 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
             )
         }
         if (candidateString.isNotBlank() && stringInTail.get().isEmpty()) {
-            rememberZeroQueryKeyAfterCommit(candidateString)
+            rememberZeroQueryKeyAfterCommit(candidateString, reading)
         }
         _inputString.update { "" }
         commitText(candidateString, 1)
@@ -14946,7 +14983,7 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
             )
         }
         if (candidateString.isNotBlank() && stringInTail.get().isEmpty()) {
-            rememberZeroQueryKeyAfterCommit(candidateString)
+            rememberZeroQueryKeyAfterCommit(candidateString, insertString)
         }
         _inputString.update { "" }
         commitText(candidateString, 1)
