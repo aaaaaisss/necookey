@@ -307,6 +307,7 @@ import com.kazumaproject.markdownhelperkeyboard.ime_service.state.CandidateTab
 import com.kazumaproject.markdownhelperkeyboard.ime_service.state.InputTypeForIME
 import com.kazumaproject.markdownhelperkeyboard.ime_service.state.KeyboardType
 import com.kazumaproject.markdownhelperkeyboard.learning.database.LearnEntity
+import com.kazumaproject.markdownhelperkeyboard.learning.nextword.NextWordEntity
 import com.kazumaproject.markdownhelperkeyboard.learning.nextword.NextWordPolicy
 import com.kazumaproject.markdownhelperkeyboard.learning.nextword.NextWordRepository
 import com.kazumaproject.markdownhelperkeyboard.learning.session.ConversionLearningSession
@@ -1580,6 +1581,12 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
     private fun persistZeroQueryNextWord(candidate: Candidate, leftBefore: String?, shownKey: String) {
         val previous = lastLearnedBunsetsuOutput
         lastLearnedBunsetsuOutput = candidate.string.takeIf { it.isNotBlank() }
+        val revert = if (isLearningWriteEnabled() && candidate.string.isNotEmpty()) {
+            LearningRevert(candidate.string, previous)
+        } else {
+            null
+        }
+        setPendingLearningRevert(revert)
         if (leftBefore == null || !isLearningWriteEnabled()) return
         val reading = zeroQueryCandidateReading(candidate) ?: return
         val preceding = previous?.takeIf { it.isNotBlank() && leftBefore.endsWith(it) }
@@ -1591,15 +1598,17 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
             timestamp = System.currentTimeMillis(),
         )
         if (pairs.isEmpty()) return
-        ioScope.launch {
+        val job = ioScope.launch {
             try {
-                nextWordRepository.record(pairs)
+                val recorded = nextWordRepository.record(pairs)
+                revert?.nextWords = recorded
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
                 Timber.e(e, "Saving tapped next word failed")
             }
         }
+        revert?.jobs?.add(job)
     }
 
     private suspend fun applyFirstSuggestionOnMainIfCurrent(
@@ -2287,6 +2296,24 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
     private var learningSessionLeftContext: String? = null
     /** Output of the last bunsetsu learned; the context of the next commit's first bunsetsu. */
     private var lastLearnedBunsetsuOutput: String? = null
+
+    /**
+     * 直前の確定で書いた学習（取り消し用）。確定直後（カーソルがそのまま・入力なし）の後退で書く前に戻す。
+     * 書き込みは裏で走るので、取り消しは [jobs] の終了を待ってから行う。
+     */
+    private class LearningRevert(
+        val committedText: String,
+        val previousBunsetsuOutput: String?,
+    ) {
+        val jobs: MutableList<Job> = java.util.Collections.synchronizedList(ArrayList())
+        @Volatile var learned: List<Pair<LearnEntity, LearnEntity?>> = emptyList()
+        @Volatile var nextWords: List<Pair<NextWordEntity, NextWordEntity?>> = emptyList()
+    }
+
+    private var pendingLearningRevert: LearningRevert? = null
+
+    /** 確定後に最初に報告されたカーソル位置。ここから動いたら取り消しの対象から外す。 */
+    private var learningRevertAnchor: Int = -1
 
     /** Reading the visible two-row top row was built for (it is not hidden while stale). */
     private var necookeyTopRowInput: String = ""
@@ -5303,6 +5330,7 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
             horizontalCursorSelectionRevision.incrementAndGet()
         }
         forwardDeleteCoordinator.onSelectionChanged(newSelStart, newSelEnd)
+        observeSelectionForLearningRevert(newSelStart, newSelEnd)
         invalidateCustomToggleStateForSelection(newSelStart, newSelEnd)
         // Skip if composing text is active
         if (candidatesStart != -1 || candidatesEnd != -1) {
@@ -15346,25 +15374,82 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         val entries = conversionLearningSession.finish(
             learnFirstCandidate = learnFirstCandidateDictionaryPreference == true,
         )
-        persistNextWords(sessionLeftContext, fragments)
+        val committedText = fragments.joinToString(separator = "") { it.output }
+        val revert = if (committedText.isNotEmpty() && isLearningWriteEnabled()) {
+            LearningRevert(committedText, lastLearnedBunsetsuOutput)
+        } else {
+            null
+        }
+        setPendingLearningRevert(revert)
+        persistNextWords(sessionLeftContext, fragments, revert)
         if (entries.isEmpty()) return
         val allowMixedSymbolsAndNumbers = learnDictionaryAllowMixedSymbolsNumbersPreference
-        ioScope.launch {
+        val job = ioScope.launch {
             try {
-                learnRepository.upsertLearnedDataBatch(
+                val previous = learnRepository.upsertLearnedDataBatchReturningPrevious(
                     learnDataList = entries,
                     allowJapaneseWithSymbolsAndNumbers = allowMixedSymbolsAndNumbers,
                 )
+                revert?.learned = previous
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
                 Timber.e(e, "Saving conversion learning session failed")
             }
         }
+        revert?.jobs?.add(job)
+    }
+
+    private fun setPendingLearningRevert(revert: LearningRevert?) {
+        pendingLearningRevert = revert
+        learningRevertAnchor = -1
+    }
+
+    /** 確定後にカーソルが動いた・入力が始まった・範囲選択になったら、学習の取り消し対象から外す。 */
+    private fun observeSelectionForLearningRevert(newSelStart: Int, newSelEnd: Int) {
+        if (pendingLearningRevert == null) return
+        if (inputString.value.isNotEmpty() || newSelStart != newSelEnd) {
+            setPendingLearningRevert(null)
+        } else if (learningRevertAnchor < 0) {
+            learningRevertAnchor = newSelStart
+        } else if (newSelStart != learningRevertAnchor) {
+            setPendingLearningRevert(null)
+        }
+    }
+
+    /**
+     * 確定直後（ほかの入力・カーソル移動なし）の後退: その確定で増やした学習（学習辞書・後続語）を書く前に戻す。
+     * カーソルの直前が確定した文字列そのものでなければ何もしない。後退そのもの（1 文字削除）は呼び出し側が続けて行う。
+     */
+    private fun revertLearningOnImmediateBackspace() {
+        val revert = pendingLearningRevert ?: return
+        setPendingLearningRevert(null)
+        if (editorTextSelected || inputString.value.isNotEmpty() || stringInTail.get().isNotEmpty()) return
+        val before = currentInputConnection
+            ?.getTextBeforeCursor(revert.committedText.length, 0)
+            ?.toString()
+        if (before != revert.committedText) return
+        lastLearnedBunsetsuOutput = revert.previousBunsetsuOutput
+        Timber.d("learning reverted by immediate backspace: %s", revert.committedText)
+        ioScope.launch {
+            try {
+                revert.jobs.toList().forEach { it.join() }
+                learnRepository.revertLearnedData(revert.learned)
+                nextWordRepository.revert(revert.nextWords)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                Timber.e(e, "Reverting learning failed")
+            }
+        }
     }
 
     /** Learns (preceding bunsetsu -> next bunsetsu) pairs; never runs in private mode. */
-    private fun persistNextWords(leftContext: String?, fragments: List<LearningFragment>) {
+    private fun persistNextWords(
+        leftContext: String?,
+        fragments: List<LearningFragment>,
+        revert: LearningRevert? = null,
+    ) {
         val previous = lastLearnedBunsetsuOutput
         lastLearnedBunsetsuOutput = fragments.lastOrNull()?.output
         if (fragments.isEmpty() || !isLearningWriteEnabled()) return
@@ -15375,15 +15460,17 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
             timestamp = System.currentTimeMillis(),
         )
         if (pairs.isEmpty()) return
-        ioScope.launch {
+        val job = ioScope.launch {
             try {
-                nextWordRepository.record(pairs)
+                val previous = nextWordRepository.record(pairs)
+                revert?.nextWords = previous
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
                 Timber.e(e, "Saving next words failed")
             }
         }
+        revert?.jobs?.add(job)
     }
 
     private fun resetAllFlags() {
@@ -17528,6 +17615,8 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
 
             else -> {
                 if (stringInTail.get().isNotEmpty()) return
+                // 確定直後の後退は、その確定の学習を取り消す（Mozc の revert と同じ）。
+                if (!selectMode.value) revertLearningOnImmediateBackspace()
                 if (!selectMode.value) {
                     val beforeChar = captureDeletedTextFromConnection(currentInputConnection)
                     if (beforeChar.isNotEmpty()) {

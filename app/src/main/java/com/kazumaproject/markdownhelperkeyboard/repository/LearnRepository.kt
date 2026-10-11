@@ -82,6 +82,31 @@ class LearnRepository @Inject constructor(
         invalidateConversionSnapshot()
     }
 
+    /** [upsertLearnedDataBatch] と同じ。書く前の行を返す（確定直後の後退で [revertLearnedData] に渡す）。 */
+    suspend fun upsertLearnedDataBatchReturningPrevious(
+        learnDataList: List<LearnEntity>,
+        allowJapaneseWithSymbolsAndNumbers: Boolean,
+    ): List<Pair<LearnEntity, LearnEntity?>> {
+        val eligibleEntries = learnDataList.filter { entry ->
+            LearningEligibilityPolicy.isEligible(
+                input = entry.input,
+                output = entry.out,
+                allowJapaneseWithSymbolsAndNumbers = allowJapaneseWithSymbolsAndNumbers,
+            )
+        }
+        if (eligibleEntries.isEmpty()) return emptyList()
+        val previous = learnDao.upsertLearningEntriesReturningPrevious(eligibleEntries)
+        invalidateConversionSnapshot()
+        return previous
+    }
+
+    /** 確定直後の後退: その確定で書いた学習を書く前に戻す。 */
+    suspend fun revertLearnedData(previous: List<Pair<LearnEntity, LearnEntity?>>) {
+        if (previous.isEmpty()) return
+        learnDao.revertLearningEntries(previous)
+        invalidateConversionSnapshot()
+    }
+
     /**
      * Calls the DAO to perform a predictive search for entries starting with the given prefix.
      *

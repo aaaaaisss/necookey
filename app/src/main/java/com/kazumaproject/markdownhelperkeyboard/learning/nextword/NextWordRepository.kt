@@ -11,13 +11,21 @@ class NextWordRepository @Inject constructor(
     /** 前回の件数確認からの記録回数（件数上限の確認はたまにだけ）。 */
     private val recordsSincePrune = AtomicInteger(PRUNE_EVERY)
 
-    suspend fun record(entries: List<NextWordEntity>) {
-        if (entries.isEmpty()) return
-        dao.upsertAll(entries)
+    /** 記録して、書く前の行を返す（確定直後の後退で [revert] に渡す）。 */
+    suspend fun record(entries: List<NextWordEntity>): List<Pair<NextWordEntity, NextWordEntity?>> {
+        if (entries.isEmpty()) return emptyList()
+        val previous = dao.upsertAllReturningPrevious(entries)
         if (recordsSincePrune.incrementAndGet() >= PRUNE_EVERY) {
             recordsSincePrune.set(0)
             if (dao.count() > NextWordPolicy.MAX_ENTRIES) dao.pruneOldest(NextWordPolicy.MAX_ENTRIES)
         }
+        return previous
+    }
+
+    /** 確定直後の後退: その確定で書いた後続語を書く前に戻す。 */
+    suspend fun revert(previous: List<Pair<NextWordEntity, NextWordEntity?>>) {
+        if (previous.isEmpty()) return
+        dao.revert(previous)
     }
 
     /** Learned following words for [leftContext] whose reading starts with [readingPrefix]. */

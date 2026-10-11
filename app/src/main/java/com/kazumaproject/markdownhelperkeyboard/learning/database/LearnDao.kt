@@ -132,6 +132,31 @@ interface LearnDao {
         }
     }
 
+    /**
+     * [upsertLearningEntries] と同じ書き込みをして、書く前の行（新しく入った行は null）を返す。
+     * 確定直後の後退で学習を取り消すのに使う（[revertLearningEntries]）。
+     */
+    @Transaction
+    suspend fun upsertLearningEntriesReturningPrevious(
+        learnDataList: List<LearnEntity>,
+    ): List<Pair<LearnEntity, LearnEntity?>> {
+        val previous = learnDataList.map { it to findByInputAndOutput(it.input, it.out) }
+        upsertLearningEntries(learnDataList)
+        return previous
+    }
+
+    /** [upsertLearningEntriesReturningPrevious] の前の状態に戻す（新しく入った行は消す）。 */
+    @Transaction
+    suspend fun revertLearningEntries(previous: List<Pair<LearnEntity, LearnEntity?>>) {
+        previous.forEach { (incoming, before) ->
+            if (before == null) {
+                deleteByInputAndOutput(incoming.input, incoming.out)
+            } else {
+                updateLearnedData(before)
+            }
+        }
+    }
+
     @Delete
     suspend fun delete(learnData: LearnEntity)
 
