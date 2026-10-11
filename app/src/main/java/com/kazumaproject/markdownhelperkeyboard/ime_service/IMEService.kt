@@ -342,6 +342,7 @@ import com.kazumaproject.markdownhelperkeyboard.sumire_special_key.database.Sumi
 import com.kazumaproject.markdownhelperkeyboard.variant.AppVariantConfig
 import com.kazumaproject.markdownhelperkeyboard.zeroquery.AndroidZeroQueryAssetReader
 import com.kazumaproject.markdownhelperkeyboard.zeroquery.LazyZeroQueryProvider
+import com.kazumaproject.markdownhelperkeyboard.zeroquery.ZERO_QUERY_CANDIDATE_TYPE
 import com.kazumaproject.markdownhelperkeyboard.zeroquery.ZeroQueryLookupUseCase
 import com.kazumaproject.markdownhelperkeyboard.zeroquery.ZeroQueryProvider
 import com.kazumaproject.markdownhelperkeyboard.zenz.runtime.ZenzRuntimeClient
@@ -1328,38 +1329,51 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
             } else {
                 emptyList()
             }
+            val functionWords = NextWordExtras.withoutBase(
+                candidates,
+                NextWordExtras.functionWordsAfter(key).map { word ->
+                    Candidate(
+                        string = word,
+                        type = ZERO_QUERY_CANDIDATE_TYPE,
+                        length = word.length.toUByte(),
+                        score = 0,
+                        yomi = word,
+                    )
+                },
+            )
 
             if (!canShowZeroQueryAfterCommit(key)) {
                 clearZeroQueryShownState(refresh = true)
                 return@launch
             }
-            if (candidates.isEmpty() && emoji.isEmpty()) {
+            if (candidates.isEmpty() && emoji.isEmpty() && functionWords.isEmpty()) {
                 clearZeroQueryShownState(refresh = true)
                 return@launch
             }
 
-            val shown = NextWordExtras.initial(candidates, emoji)
+            val shown = NextWordExtras.initial(candidates, emoji, functionWords)
             zeroQueryCandidates = shown
             zeroQueryVisible = true
             zeroQuerySelectionUpdateSuppressCount += 1
             zeroQueryLookupJob = null
             refreshCandidateStripContent(candidatesShown = false)
-            launchZeroQueryZenzRerank(key, zenzLeftContext, candidates, emoji, shown)
+            launchZeroQueryZenzRerank(key, zenzLeftContext, candidates, emoji, functionWords, shown)
         }
     }
 
-    /** 後続語の上位 [NextWordZenzReranker.TOP_K] 件を左文脈つきで zenz が 1 回採点し、並べ替える。 */
+    /** 後続語の上位 [NextWordZenzReranker.TOP_K] 件＋助詞・句読点＋文脈絵文字を左文脈つきで zenz が 1 回採点し、並べ替える。 */
     private fun launchZeroQueryZenzRerank(
         key: String,
         leftContext: String,
         candidates: List<Candidate>,
         emoji: List<Candidate>,
+        functionWords: List<Candidate>,
         shown: List<Candidate>,
     ) {
         zeroQueryZenzJob?.cancel()
         val left = leftContext.takeLast(necookeyCandidateBarConfig.maxLeftContextChars)
         if (left.isBlank() || shown.size < 2) return
-        val head = NextWordExtras.scoringTargets(candidates, emoji)
+        val head = NextWordExtras.scoringTargets(candidates, emoji, functionWords)
         zeroQueryZenzJob = scope.launch {
             val scores = try {
                 withContext(Dispatchers.Default) {
@@ -1382,7 +1396,7 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
                 Timber.w(e, "zenz next-word rerank failed")
                 null
             } ?: return@launch
-            val reranked = NextWordExtras.rerank(candidates, emoji, scores)
+            val reranked = NextWordExtras.rerank(candidates, emoji, scores, functionWords)
             if (!zeroQueryVisible || zeroQueryCandidates != shown ||
                 !canShowZeroQueryAfterCommit(key) || reranked == shown
             ) {
