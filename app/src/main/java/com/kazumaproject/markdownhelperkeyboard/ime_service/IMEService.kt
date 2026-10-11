@@ -187,6 +187,7 @@ import com.kazumaproject.markdownhelperkeyboard.converter.candidatebar.BunsetsuA
 import com.kazumaproject.markdownhelperkeyboard.converter.candidatebar.BunsetsuAnalyzer
 import com.kazumaproject.markdownhelperkeyboard.converter.candidatebar.BunsetsuRangeEditor
 import com.kazumaproject.markdownhelperkeyboard.converter.candidatebar.NecookeyCandidateBarConfig
+import com.kazumaproject.markdownhelperkeyboard.converter.candidatebar.NextWordZenzReranker
 import com.kazumaproject.markdownhelperkeyboard.converter.candidatebar.TwoRowCandidateBar
 import com.kazumaproject.markdownhelperkeyboard.converter.candidatebar.TwoRowCandidateBarPlanner
 import com.kazumaproject.markdownhelperkeyboard.learning.session.BunsetsuLearningSplitter
@@ -716,6 +717,8 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
     private var zeroQueryVisible: Boolean = false
     private var zeroQuerySelectionUpdateSuppressCount: Int = 0
     private var zeroQueryLookupJob: Job? = null
+    /** 後続語候補の zenz 並べ替え（1 推論・非同期、入力・再確定でキャンセル）。 */
+    private var zeroQueryZenzJob: Job? = null
     private val zeroQueryProviderHolder = LazyZeroQueryProvider {
         ZeroQueryProvider(AndroidZeroQueryAssetReader(assets))
     }
@@ -1183,6 +1186,8 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
     private fun cancelZeroQueryLookup() {
         zeroQueryLookupJob?.cancel()
         zeroQueryLookupJob = null
+        zeroQueryZenzJob?.cancel()
+        zeroQueryZenzJob = null
     }
 
     private fun clearZeroQueryShownState(refresh: Boolean = true) {
@@ -1304,6 +1309,17 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         } else {
             ""
         }
+        val zenzLeftContext = if (
+            necookeyZenzGateEnabled() && currentInputType !in passwordTypes
+        ) {
+            leftContext.ifEmpty {
+                currentInputConnection
+                    ?.getTextBeforeCursor(necookeyCandidateBarConfig.maxLeftContextChars, 0)
+                    ?.toString().orEmpty()
+            }
+        } else {
+            ""
+        }
         zeroQueryLookupJob = scope.launch {
             val candidates = withContext(Dispatchers.IO) {
                 val learned = if (learnedEnabled) learnedFollowingWords(key, leftContext) else emptyList()
@@ -1325,6 +1341,52 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
             zeroQueryVisible = true
             zeroQuerySelectionUpdateSuppressCount += 1
             zeroQueryLookupJob = null
+            refreshCandidateStripContent(candidatesShown = false)
+            launchZeroQueryZenzRerank(key, zenzLeftContext, candidates)
+        }
+    }
+
+    /** 後続語の上位 [NextWordZenzReranker.TOP_K] 件を左文脈つきで zenz が 1 回採点し、並べ替える。 */
+    private fun launchZeroQueryZenzRerank(
+        key: String,
+        leftContext: String,
+        candidates: List<Candidate>,
+    ) {
+        zeroQueryZenzJob?.cancel()
+        val left = leftContext.takeLast(necookeyCandidateBarConfig.maxLeftContextChars)
+        if (left.isBlank() || candidates.size < 2) return
+        val head = candidates.take(NextWordZenzReranker.TOP_K)
+        zeroQueryZenzJob = scope.launch {
+            val scores = try {
+                withContext(Dispatchers.Default) {
+                    val config = resolveZenzRuntimeConfig() ?: return@withContext null
+                    zenzRuntimeClient.score(
+                        config = config,
+                        profile = "",
+                        topic = "",
+                        style = "",
+                        preference = "",
+                        leftContext = left,
+                        rightContext = "",
+                        input = "",
+                        candidates = head.map { it.string }.toTypedArray(),
+                    )
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                Timber.w(e, "zenz next-word rerank failed")
+                null
+            } ?: return@launch
+            val reranked = NextWordZenzReranker.rerank(head, scores) + candidates.drop(head.size)
+            if (!zeroQueryVisible || zeroQueryCandidates != candidates ||
+                !canShowZeroQueryAfterCommit(key) || reranked == candidates
+            ) {
+                return@launch
+            }
+            Timber.d("zenz next-word rerank: %s -> %s", head.map { it.string }, reranked.take(head.size).map { it.string })
+            zeroQueryCandidates = reranked
+            zeroQueryZenzJob = null
             refreshCandidateStripContent(candidatesShown = false)
         }
     }
@@ -10507,6 +10569,8 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
     private fun beginZenzRerankRequest(): Long {
         zenzRerankJob?.cancel()
         zenzRerankJob = null
+        zeroQueryZenzJob?.cancel()
+        zeroQueryZenzJob = null
         zenzRerankRequestToken += 1L
         return zenzRerankRequestToken
     }
