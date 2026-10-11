@@ -121,4 +121,12 @@ class ContextEmojiSelectorTest {
         assertTrue(fresh.missingPriors("m").isEmpty())
         assertEquals(-7f, fresh.prior("大爆笑")!!, 0f)
     }
+
+    @Test
+    fun plainMatchesOnlyLookAtTheCurrentSentence() {
+        val sel = ContextEmojiSelector(entries)
+        assertEquals(listOf("☕"), sel.plainMatches("ビール飲んだ。今からコーヒー").map { it.emoji })
+        assertEquals(listOf("☕"), sel.plainMatches("今からコーヒー。").map { it.emoji })
+        assertTrue(sel.plainMatches("ビール飲んだ。\n次の話").isEmpty())
+    }
 }

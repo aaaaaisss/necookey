@@ -8,8 +8,9 @@ class ZeroQueryLookupUseCase(
     suspend fun lookup(key: String): List<Candidate> {
         if (key.isBlank()) return emptyList()
 
-        val bundledCandidates = bundledProviderHolder.getIfEnabled(enabled = true)
-            ?.lookup(key)
+        val provider = bundledProviderHolder.getIfEnabled(enabled = true)
+        val bundledCandidates = provider
+            ?.let { p -> ZeroQueryBackoff.firstHit(key) { p.lookup(it) } }
             ?.map { it.toCandidate() }
             .orEmpty()
 

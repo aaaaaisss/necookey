@@ -49,4 +49,11 @@ class NextWordExtrasTest {
         val base = listOf(c("a"), c("b"))
         assertEquals(NextWordExtras.initial(base), NextWordExtras.rerank(base, floatArrayOf(-1f), emptyList(), 1, listOf(e("E") to 0)))
     }
+
+    @Test
+    fun placeEmojiPutsFirstAfterTopWordAndRestAfterSecond() {
+        val out = NextWordExtras.placeEmoji(listOf(c("a"), c("b"), c("c")), listOf(e("E1"), e("E2")))
+        assertEquals(listOf("a", "E1", "b", "E2", "c"), out.map { it.string })
+        assertEquals(listOf("a"), NextWordExtras.placeEmoji(listOf(c("a")), emptyList()).map { it.string })
+    }
 }

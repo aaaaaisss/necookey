@@ -87,6 +87,22 @@ class ContextEmojiSelector(entries: List<MoodEmoji>) {
         }.sortedByDescending { it.second }.map { it.first }
     }
 
+    /**
+     * zenz なしで出す絵文字: 今の文（最後の句点・改行より後ろ）にキーワードが出てきたもの、新しい順に [limit] 件。
+     * 前の文の語で反応しないよう文で区切る。
+     */
+    fun plainMatches(leftContext: String, limit: Int = 2): List<MoodEmoji> {
+        val sentence = leftContext.takeLast(MATCH_WINDOW)
+            .substringAfterLast('\n')
+            .let { s ->
+                // 末尾の句読点は今の文の終わりなので、その手前の区切りから見る。
+                val body = s.trimEnd('。', '！', '？', '!', '?', '、', ' ', '　')
+                val cut = body.indexOfLast { it in "。！？!?" }
+                if (cut >= 0) body.substring(cut + 1) else body
+            }
+        return matchesIn(sentence).take(limit)
+    }
+
     val size: Int get() = all.size
 
     /** 今回の確定で採点するキーワード（[POOL] 件まで、重複なし）。呼ぶたびに巡回位置が進む。 */

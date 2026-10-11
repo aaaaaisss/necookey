@@ -185,6 +185,7 @@ import com.kazumaproject.markdownhelperkeyboard.clipboard_history.database.ItemT
 import com.kazumaproject.markdownhelperkeyboard.converter.candidate.BunsetsuCandidateResult
 import com.kazumaproject.markdownhelperkeyboard.converter.candidatebar.ZenzaiConstraint
 import com.kazumaproject.markdownhelperkeyboard.converter.candidatebar.NextWordCarry
+import com.kazumaproject.markdownhelperkeyboard.converter.candidatebar.ZenzaiScheduler
 import com.kazumaproject.markdownhelperkeyboard.converter.candidatebar.BunsetsuAnalysis
 import com.kazumaproject.markdownhelperkeyboard.converter.candidatebar.BunsetsuAnalyzer
 import com.kazumaproject.markdownhelperkeyboard.converter.candidatebar.BunsetsuRangeEditor
@@ -1323,6 +1324,14 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         } else {
             ""
         }
+        val plainEmojiContext = if (zenzLeftContext.isEmpty() && currentInputType !in passwordTypes) {
+            leftContext.ifEmpty {
+                currentInputConnection?.getTextBeforeCursor(ContextEmojiSelector.MATCH_WINDOW, 0)
+                    ?.toString().orEmpty()
+            }
+        } else {
+            ""
+        }
         zeroQueryLookupJob = scope.launch {
             val candidates = withContext(Dispatchers.IO) {
                 val learned = if (learnedEnabled) learnedFollowingWords(key, leftContext) else emptyList()
@@ -1352,12 +1361,27 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
                 clearZeroQueryShownState(refresh = true)
                 return@launch
             }
-            if (candidates.isEmpty() && functionWords.isEmpty()) {
+
+            // zenz を使わないときは、今の文に出てきた語の絵文字をそのまま出す（PMI 採点なし）。
+            val plainEmoji = if (zenzLeftContext.isBlank() && plainEmojiContext.isNotBlank()) {
+                withContext(Dispatchers.Default) { contextEmojiSelector.plainMatches(plainEmojiContext) }
+                    .map { e ->
+                        Candidate(
+                            string = e.emoji,
+                            type = CONTEXT_EMOJI_CANDIDATE_TYPE,
+                            length = 0u,
+                            score = 0,
+                            yomi = "",
+                        )
+                    }
+            } else {
+                emptyList()
+            }
+            if (candidates.isEmpty() && functionWords.isEmpty() && plainEmoji.isEmpty()) {
                 clearZeroQueryShownState(refresh = true)
                 return@launch
             }
-
-            val shown = NextWordExtras.initial(candidates, functionWords)
+            val shown = NextWordExtras.placeEmoji(NextWordExtras.initial(candidates, functionWords), plainEmoji)
             zeroQueryCandidates = shown
             carriedNextWords = shown
             carriedNextWordsKey = key
@@ -2185,11 +2209,8 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         /** 文脈絵文字の事前スコア（モデルごとに一度だけ計算）の保存先。 */
         private const val CONTEXT_EMOJI_PRIOR_FILE = "context_emoji_priors.tsv"
 
-        /** 入力が止まってから追加で Zenzai 判定するまでの時間。 */
-        private const val ZENZAI_IDLE_RECHECK_DELAY_MS = 350L
-
-        /** 入力停止後の追加判定の上限（打鍵時の 1 回と合わせて最大 3 回）。 */
-        private const val ZENZAI_IDLE_RECHECK_MAX = 2
+        /** 手が止まった後、FIX で直した結果を続けて判定する上限（最初の 1 回と合わせて最大 4 回）。 */
+        private const val ZENZAI_PAUSE_RECHECK_MAX = 3
 
         /** zenz の文脈長。左文脈 40 字 + 読み 32 字 + 候補で十分収まる。 */
         private const val ZENZ_N_CTX = 256
@@ -2302,6 +2323,13 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
     // necookey: two-row candidate bar + Zenzai (zenz verifies Sumire's draft, one inference per key).
     private val necookeyCandidateBarConfig = NecookeyCandidateBarConfig.DEFAULT
     private var necookeyZenzJob: Job? = null
+
+    /** Zenzai をいつ始めるか（打鍵リズムに合わせて、手が止まったら）。 */
+    private val zenzaiScheduler = ZenzaiScheduler()
+
+    /** 長く打ち続けたときに待たずに始めた推論。読みが伸びるだけなら中断しない（直しを次へ引き継ぐ）。 */
+    private var necookeyZenzForcedJob: Job? = null
+    private var necookeyZenzForcedInput: String? = null
     /** Zenzai cache key of [necookeyZenzJob]; a repeat request for the same key keeps the running job. */
     private var necookeyZenzJobKey: String? = null
     private var necookeyZenzJobInput: String? = null
@@ -16183,10 +16211,23 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         )
         publishNecookeyTwoRowBar(insertString, bar, token, applyLiveConversion = true)
 
+        zenzaiScheduler.onInput(insertString, SystemClock.uptimeMillis())
         // Keep a running inference for exactly this context/reading/draft; anything else is superseded.
         val keepRunning = cacheKey != null && necookeyZenzJobKey == cacheKey && necookeyZenzJob?.isActive == true
+        // 待たずに始めた推論は、読みが伸びただけなら最後まで走らせる（その直しを次の推論が引き継ぐ）。
+        val forcedJob = necookeyZenzForcedJob?.takeIf { it.isActive }
+        val forcedInput = necookeyZenzForcedInput
+        val forcedContinues = forcedJob != null && forcedInput != null &&
+            context != null && insertString.startsWith(forcedInput)
+        if (forcedJob != null && !forcedContinues) {
+            forcedJob.cancel()
+        }
+        if (!forcedContinues) {
+            necookeyZenzForcedJob = null
+            necookeyZenzForcedInput = null
+        }
         if (!keepRunning) {
-            necookeyZenzJob?.cancel()
+            if (!(forcedContinues && necookeyZenzJob === forcedJob)) necookeyZenzJob?.cancel()
             necookeyZenzJob = null
             necookeyZenzJobKey = null
         }
@@ -16203,6 +16244,7 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
                 conversion = conversion,
                 predictions = barPredictions,
                 token = token,
+                awaitBefore = if (forcedContinues) forcedJob else null,
             )
         }
     }
@@ -16216,11 +16258,23 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         conversion: List<Candidate>,
         predictions: List<Candidate>,
         token: CandidateRequestToken,
+        awaitBefore: Job? = null,
     ) {
         necookeyZenzJob = scope.launch {
             var shown: Candidate? = null
             fun stillCurrent(): Boolean =
                 necookeyZenzJobKey == cacheKey && shouldApplyCandidateResult(insertString)
+            // 打鍵が続くうちは始めない（次の打鍵でキャンセルされ、推論は走らない）。手が止まったら始める。
+            awaitBefore?.join()
+            val forced = zenzaiScheduler.isForced()
+            if (!forced) delay(zenzaiScheduler.startDelayMs())
+            if (!stillCurrent()) return@launch
+            zenzaiScheduler.onInferenceStarted()
+            val self = coroutineContext[Job]
+            if (forced) {
+                necookeyZenzForcedJob = self
+                necookeyZenzForcedInput = insertString
+            }
             suspend fun show(top: Candidate) {
                 if (!stillCurrent()) return
                 if (!shouldUseNecookeyTwoRowBar()) return
@@ -16280,12 +16334,11 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
             }
             remember(outcome)
             show(outcome.top)
-            // 入力が止まったら、直した結果を同じ読みでもう一度判定する（PASS か上限まで）。打鍵で即キャンセル。
-            // 1 打鍵 1 推論のままだと、最後の FIX で直した結果が未確認で残るため。
+            // 手が止まった後なので、直した結果を同じ読みで続けて判定する（PASS か上限まで）。打鍵で即キャンセル。
+            // 待たずに始めた推論（打鍵中）は 1 回で止め、続きは手が止まったときの推論に任せる。
             var last: ZenzaiOutcome = outcome
             var rounds = 0
-            while (last.unverifiedFix && rounds < ZENZAI_IDLE_RECHECK_MAX) {
-                delay(ZENZAI_IDLE_RECHECK_DELAY_MS)
+            while (!forced && last.unverifiedFix && rounds < ZENZAI_PAUSE_RECHECK_MAX) {
                 if (!stillCurrent()) return@launch
                 rounds++
                 val next = try {

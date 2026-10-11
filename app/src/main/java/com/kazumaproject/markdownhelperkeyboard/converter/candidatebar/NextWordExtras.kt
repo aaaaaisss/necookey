@@ -69,6 +69,17 @@ object NextWordExtras {
      * zenz 採点前の並び: base 先頭 [KEEP_BASE] 件 → 助詞・句読点 [MAX_FUNCTION_WORDS] 件 → 残りの base。
      * 文脈絵文字は zenz の採点後にだけ出す。
      */
+    /**
+     * zenz を使わないときの文脈絵文字の置き方: 1 個目は先頭の後続語の直後、残りは 2 番目の直後
+     * （zenz あり時の [rerank] と同じ位置）。
+     */
+    fun placeEmoji(shown: List<Candidate>, emoji: List<Candidate>): List<Candidate> {
+        if (emoji.isEmpty()) return shown
+        val strings = emoji.mapTo(HashSet()) { it.string }
+        val rest = shown.filter { it.string !in strings }
+        return rest.take(1) + emoji.take(1) + rest.drop(1).take(1) + emoji.drop(1) + rest.drop(2)
+    }
+
     fun initial(base: List<Candidate>, functionWords: List<Candidate> = emptyList()): List<Candidate> {
         if (functionWords.isEmpty()) return base
         return base.take(KEEP_BASE) + functionWords.take(MAX_FUNCTION_WORDS) + base.drop(KEEP_BASE)

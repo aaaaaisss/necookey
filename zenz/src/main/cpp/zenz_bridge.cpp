@@ -20,6 +20,10 @@ static const llama_vocab *g_vocab = nullptr;
 
 // ランタイム設定用パラメータ（Kotlin から変更可能）
 static int g_param_n_ctx = 512;
+/** KV sequences: 0 = candidate evaluation, 1 = next-word scoring. */
+static constexpr int ZENZ_N_SEQ = 2;
+static constexpr llama_seq_id ZENZ_SCORE_SEQ = 1;
+
 static int g_param_n_threads = 4;
 static int g_param_n_threads_batch = 4;
 static int g_param_n_batch = 512;
@@ -688,7 +692,12 @@ static llama_context *ensure_session_context_locked() {
     destroy_session_context_locked();
 
     llama_context_params cparams = llama_context_default_params();
-    cparams.n_ctx = config.n_ctx;
+    // necookey: 2 sequences share one KV cache. seq 0 is the per-keystroke candidate
+    // evaluation (its prefix is reused across keystrokes); seq 1 is next-word scoring.
+    // Scoring used to clear the whole cache, so the first keystroke after every commit
+    // re-decoded the entire prompt. Each sequence still gets the full n_ctx.
+    cparams.n_ctx = config.n_ctx * ZENZ_N_SEQ;
+    cparams.n_seq_max = ZENZ_N_SEQ;
     cparams.n_threads = config.n_threads;
     cparams.n_threads_batch = config.n_threads_batch;
     cparams.n_batch = config.n_batch;
@@ -1119,8 +1128,11 @@ static bool prefill_prompt_prefix_locked(
         llama_context *ctx,
         const std::vector<llama_token> &prompt_tokens
 ) {
-    llama_kv_cache_clear(ctx);
-    invalidate_eval_cache_locked();
+    // Only the scoring sequence is reset; the evaluation cache (seq 0) stays valid.
+    if (!llama_kv_cache_seq_rm(ctx, ZENZ_SCORE_SEQ, -1, -1)) {
+        llama_kv_cache_clear(ctx);
+        invalidate_eval_cache_locked();
+    }
 
     if (prompt_tokens.size() <= 1) {
         return true;
@@ -1132,7 +1144,7 @@ static bool prefill_prompt_prefix_locked(
         batch.token[batch.n_tokens] = prompt_tokens[i];
         batch.pos[batch.n_tokens] = (llama_pos) i;
         batch.n_seq_id[batch.n_tokens] = 1;
-        batch.seq_id[batch.n_tokens][0] = 0;
+        batch.seq_id[batch.n_tokens][0] = ZENZ_SCORE_SEQ;
         batch.logits[batch.n_tokens] = 0;
         batch.n_tokens++;
     }
@@ -1162,7 +1174,7 @@ static float score_candidate_avg_logprob_reuse_prompt_locked(
     }
 
     const llama_pos suffix_start = (llama_pos) (prompt_tokens.size() - 1);
-    llama_kv_cache_seq_rm(ctx, 0, suffix_start, -1);
+    llama_kv_cache_seq_rm(ctx, ZENZ_SCORE_SEQ, suffix_start, -1);
 
     const int32_t cap = (int32_t) (1 + candidate_tokens.size());
     llama_batch batch = llama_batch_init(cap, 0, 1);
@@ -1170,7 +1182,7 @@ static float score_candidate_avg_logprob_reuse_prompt_locked(
     batch.token[batch.n_tokens] = prompt_tokens.back();
     batch.pos[batch.n_tokens] = suffix_start;
     batch.n_seq_id[batch.n_tokens] = 1;
-    batch.seq_id[batch.n_tokens][0] = 0;
+    batch.seq_id[batch.n_tokens][0] = ZENZ_SCORE_SEQ;
     batch.logits[batch.n_tokens] = 1;
     batch.n_tokens++;
 
@@ -1178,7 +1190,7 @@ static float score_candidate_avg_logprob_reuse_prompt_locked(
         batch.token[batch.n_tokens] = candidate_tokens[i];
         batch.pos[batch.n_tokens] = suffix_start + 1 + (llama_pos) i;
         batch.n_seq_id[batch.n_tokens] = 1;
-        batch.seq_id[batch.n_tokens][0] = 0;
+        batch.seq_id[batch.n_tokens][0] = ZENZ_SCORE_SEQ;
         batch.logits[batch.n_tokens] = 1;
         batch.n_tokens++;
     }
