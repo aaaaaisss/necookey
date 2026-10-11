@@ -1406,8 +1406,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
             } else {
                 NextWordExtras.withoutBase(candidates, asCandidates(NextWordExtras.functionWordsAfter(key)))
             }
-                },
-            )
 
             if (!canShowZeroQueryAfterCommit(key)) {
                 clearZeroQueryShownState(refresh = true)
