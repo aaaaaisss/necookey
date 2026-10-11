@@ -8,6 +8,7 @@ import com.kazumaproject.markdownhelperkeyboard.converter.bitset.SuccinctBitVect
 import java.io.FileInputStream
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
+import java.nio.ShortBuffer
 import java.nio.channels.FileChannel
 import java.util.BitSet
 
@@ -116,8 +117,8 @@ object CompactSystemDictionaryReader {
                 termIds = readPackedIntArray(),
             )
             val tokenArray = TokenArray.fromPacked(
-                posTableIndices = readShortArray(),
-                wordCosts = readShortArray(),
+                posTableIndices = readShortBuffer(),
+                wordCosts = readShortBuffer(),
                 nodeIds = readPackedIntArray(),
                 bitvector = readBitSet(),
                 leftIds = readShortArray(),
@@ -157,8 +158,16 @@ object CompactSystemDictionaryReader {
             val size = readInt()
             val minimum = readInt()
             val bitWidth = readInt()
-            val words = readLongArray()
+            // 語列はマップ領域をそのまま参照する（ヒープに複写しない）。
+            val wordCount = readSizedCount(Long.SIZE_BYTES)
+            val words = take(wordCount * Long.SIZE_BYTES).asLongBuffer()
             return PackedIntArray.fromEncoded(size, minimum, bitWidth, words)
+        }
+
+        /** マップ領域のビュー（ヒープに複写しない）。 */
+        fun readShortBuffer(): ShortBuffer {
+            val size = readSizedCount(Short.SIZE_BYTES)
+            return take(size * Short.SIZE_BYTES).asShortBuffer()
         }
 
         fun readShortArray(): ShortArray {

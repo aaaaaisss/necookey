@@ -14,12 +14,14 @@ import java.io.ObjectInput
 import java.io.ObjectInputStream
 import java.io.ObjectOutputStream
 import java.text.Normalizer
+import java.nio.ShortBuffer
 import java.util.BitSet
 import com.kazumaproject.Louds.LOUDS
 
 class TokenArray {
-    private var posTableIndexList: ShortArray = shortArrayOf()
-    private var wordCostList: ShortArray = shortArrayOf()
+    // 圧縮辞書ではメモリマップ領域のビュー（ヒープに複写しない）。
+    private var posTableIndexList: ShortBuffer = ShortBuffer.allocate(0)
+    private var wordCostList: ShortBuffer = ShortBuffer.allocate(0)
     private var nodeIdList: IntArray = intArrayOf()
     private var packedNodeIds: PackedIntArray? = null
     private val posTableIndexListTemp: MutableList<Short> = arrayListOf()
@@ -36,17 +38,17 @@ class TokenArray {
         return packedNodeIds?.toIntArray() ?: nodeIdList
     }
 
-    fun getPosTableIndices(): ShortArray = posTableIndexList.copyOf()
+    fun getPosTableIndices(): ShortArray = posTableIndexList.toShortArray()
 
-    fun getWordCosts(): ShortArray = wordCostList.copyOf()
+    fun getWordCosts(): ShortArray = wordCostList.toShortArray()
 
     private fun nodeIdAt(index: Int): Int = packedNodeIds?.get(index) ?: nodeIdList[index]
 
     fun maxPosTableIndex(): Int =
-        posTableIndexList.maxOrNull()?.toInt() ?: -1
+        posTableIndexList.toShortArray().maxOrNull()?.toInt() ?: -1
 
     fun minPosTableIndex(): Int =
-        posTableIndexList.minOrNull()?.toInt() ?: 0
+        posTableIndexList.toShortArray().minOrNull()?.toInt() ?: 0
 
     fun getListDictionaryByYomiTermId(
         nodeId: Int,
@@ -232,8 +234,8 @@ class TokenArray {
     ): TokenArray {
         objectInput.apply {
             try {
-                posTableIndexList = readObject() as ShortArray
-                wordCostList = readObject() as ShortArray
+                posTableIndexList = ShortBuffer.wrap(readObject() as ShortArray)
+                wordCostList = ShortBuffer.wrap(readObject() as ShortArray)
                 val loadedNodeIds = readObject() as IntArray
                 if (loadedNodeIds.size >= PACKED_NODE_ID_THRESHOLD) {
                     packedNodeIds = PackedIntArray.from(loadedNodeIds)
@@ -273,8 +275,8 @@ class TokenArray {
             }
         }
 
-        posTableIndexList = posTableIndices.toShortArray()
-        wordCostList = wordCosts.toShortArray()
+        posTableIndexList = ShortBuffer.wrap(posTableIndices.toShortArray())
+        wordCostList = ShortBuffer.wrap(wordCosts.toShortArray())
         nodeIdList = nodeIds.toIntArray()
         packedNodeIds = null
         bitvector = bits.toBitSet()
@@ -297,8 +299,8 @@ class TokenArray {
 
     fun writeExternalNotCompress(out: ObjectOutput) {
         out.apply {
-            writeObject(posTableIndexList)
-            writeObject(wordCostList)
+            writeObject(posTableIndexList.toShortArray())
+            writeObject(wordCostList.toShortArray())
             writeObject(packedNodeIds?.toIntArray() ?: nodeIdList)
             writeObject(bitvector)
             flush()
@@ -422,26 +424,29 @@ class TokenArray {
         return isNotEmpty() && all { it in 'ァ'..'ヶ' || it == 'ー' }
     }
 
+    private fun ShortBuffer.toShortArray(): ShortArray =
+        ShortArray(capacity()).also { duplicate().apply { clear() }.get(it) }
+
     companion object {
         private const val PACKED_NODE_ID_THRESHOLD = 500_000
 
         fun fromPacked(
-            posTableIndices: ShortArray,
-            wordCosts: ShortArray,
+            posTableIndices: ShortBuffer,
+            wordCosts: ShortBuffer,
             nodeIds: PackedIntArray,
             bitvector: BitSet,
             leftIds: ShortArray,
             rightIds: ShortArray,
         ): TokenArray {
-            require(posTableIndices.size == wordCosts.size) {
-                "Token POS/cost size mismatch: ${posTableIndices.size} != ${wordCosts.size}"
+            require(posTableIndices.remaining() == wordCosts.remaining()) {
+                "Token POS/cost size mismatch: ${posTableIndices.remaining()} != ${wordCosts.remaining()}"
             }
-            require(posTableIndices.size == nodeIds.size) {
-                "Token/node size mismatch: ${posTableIndices.size} != ${nodeIds.size}"
+            require(posTableIndices.remaining() == nodeIds.size) {
+                "Token/node size mismatch: ${posTableIndices.remaining()} != ${nodeIds.size}"
             }
             return TokenArray().apply {
-                posTableIndexList = posTableIndices
-                wordCostList = wordCosts
+                posTableIndexList = posTableIndices.slice()
+                wordCostList = wordCosts.slice()
                 nodeIdList = intArrayOf()
                 packedNodeIds = nodeIds
                 this.bitvector = bitvector

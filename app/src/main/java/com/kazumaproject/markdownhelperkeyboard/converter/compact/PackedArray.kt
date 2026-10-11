@@ -1,11 +1,16 @@
 package com.kazumaproject.markdownhelperkeyboard.converter.compact
 
-/** Exact fixed-width storage for integer arrays whose value range is narrower than 32 bits. */
+import java.nio.LongBuffer
+
+/**
+ * Exact fixed-width storage for integer arrays whose value range is narrower than 32 bits.
+ * [words] may be a view on a memory-mapped dictionary (absolute reads only, never copied to heap).
+ */
 class PackedIntArray private constructor(
     val size: Int,
     private val minimum: Int,
     private val bitWidth: Int,
-    private val words: LongArray,
+    private val words: LongBuffer,
 ) {
     operator fun get(index: Int): Int {
         require(index in 0 until size) { "PackedIntArray index out of bounds: $index/$size" }
@@ -13,9 +18,9 @@ class PackedIntArray private constructor(
         val bitIndex = index.toLong() * bitWidth
         val wordIndex = (bitIndex ushr 6).toInt()
         val shift = (bitIndex and 63L).toInt()
-        var encoded = words[wordIndex] ushr shift
+        var encoded = words.get(wordIndex) ushr shift
         if (shift + bitWidth > Long.SIZE_BITS) {
-            encoded = encoded or (words[wordIndex + 1] shl (Long.SIZE_BITS - shift))
+            encoded = encoded or (words.get(wordIndex + 1) shl (Long.SIZE_BITS - shift))
         }
         return (encoded and mask(bitWidth)).toInt() + minimum
     }
@@ -28,6 +33,14 @@ class PackedIntArray private constructor(
             minimum: Int,
             bitWidth: Int,
             words: LongArray,
+        ): PackedIntArray = fromEncoded(size, minimum, bitWidth, LongBuffer.wrap(words))
+
+        /** [words] は読み出し専用ビュー（メモリマップ領域）でよい。位置 0 から [LongBuffer.remaining] 語。 */
+        fun fromEncoded(
+            size: Int,
+            minimum: Int,
+            bitWidth: Int,
+            words: LongBuffer,
         ): PackedIntArray {
             require(size >= 0) { "PackedIntArray size must be non-negative: $size" }
             require(bitWidth in 0..Int.SIZE_BITS) {
@@ -38,10 +51,10 @@ class PackedIntArray private constructor(
             } else {
                 ((size.toLong() * bitWidth + Long.SIZE_BITS - 1) / Long.SIZE_BITS).toInt()
             }
-            require(words.size == expectedWordCount) {
-                "PackedIntArray word count mismatch: ${words.size} != $expectedWordCount"
+            require(words.remaining() == expectedWordCount) {
+                "PackedIntArray word count mismatch: ${words.remaining()} != $expectedWordCount"
             }
-            return PackedIntArray(size, minimum, bitWidth, words)
+            return PackedIntArray(size, minimum, bitWidth, words.slice())
         }
 
         fun from(values: IntArray): PackedIntArray {
@@ -82,7 +95,7 @@ class PackedIntArray private constructor(
                     }
                 }
             }
-            return PackedIntArray(size, minimum, bitWidth, words)
+            return PackedIntArray(size, minimum, bitWidth, LongBuffer.wrap(words))
         }
 
         private fun mask(bitWidth: Int): Long =
