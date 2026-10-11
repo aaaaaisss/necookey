@@ -1065,6 +1065,7 @@ class KanaKanjiEngine {
     suspend fun getConstrainedBestCandidate(
         input: String,
         prefix: String,
+        exact: Boolean = false,
         mozcUtPersonName: Boolean?,
         mozcUTPlaces: Boolean?,
         mozcUTWiki: Boolean?,
@@ -1136,6 +1137,7 @@ class KanaKanjiEngine {
             connectionMatrix = connectionMatrixSnapshot().costTable,
             prefix = prefix,
             cancellationCheck = { conversionContext.ensureActive() },
+            exact = exact,
         ) ?: return null
         return Candidate(
             string = result.surface,

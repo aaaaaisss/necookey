@@ -33,6 +33,7 @@ object ConstrainedPathSearch {
         connectionMatrix: ConnectionMatrix.CostTable,
         prefix: String,
         cancellationCheck: () -> Unit = {},
+        exact: Boolean = false,
     ): Result? {
         if (length <= 0) return null
         val p = prefix.length
@@ -56,7 +57,7 @@ object ConstrainedPathSearch {
                     for (k in 0..p) {
                         val base = prevStates.cost[k]
                         if (base == Int.MAX_VALUE) continue
-                        val nk = advance(prefix, k, surface)
+                        val nk = advance(prefix, k, surface, exact)
                         if (nk < 0) continue
                         val c = base + node.adjustedScore + edge
                         val s = states ?: States(p + 1).also { states = it }
@@ -112,10 +113,12 @@ object ConstrainedPathSearch {
     }
 
     /** prefix の k 文字目まで一致済みの状態から surface を足したときの一致長。不一致なら -1。 */
-    private fun advance(prefix: String, k: Int, surface: String): Int {
+    private fun advance(prefix: String, k: Int, surface: String, exact: Boolean = false): Int {
         val p = prefix.length
-        if (k >= p) return p
+        // exact: 表層全体が prefix と完全一致する経路だけ（zenz の WHOLE 判定＝そこで文が終わる）
+        if (k >= p) return if (exact) -1 else p
         val remaining = p - k
+        if (exact && surface.length > remaining) return -1
         return if (surface.length >= remaining) {
             if (surface.regionMatches(0, prefix, k, remaining)) p else -1
         } else {

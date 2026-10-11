@@ -15,10 +15,21 @@ data class MoodEmoji(val emoji: String, val keyword: String, val group: String)
 class ContextEmojiSelector(entries: List<MoodEmoji>) {
     companion object {
         /** 1 回の確定で zenz に採点させるキーワード数。 */
-        const val POOL = 8
+        const val POOL = 10
 
         /** [POOL] のうち直近に選ばれた絵文字の枠。 */
         const val MAX_HOT = 3
+
+        /** [POOL] のうち左文脈にキーワード（またはその語幹）が出てきた絵文字の枠。 */
+        const val MAX_MATCHED = 4
+
+        /** 左文脈に出てきたキーワードの絵文字は、PMI がこれより高ければ出す（通常の [MIN_PMI] より緩い）。 */
+        const val MIN_PMI_MATCHED = -1.0f
+
+        /** キーワード照合に使う左文脈の末尾文字数。 */
+        const val MATCH_WINDOW = 40
+
+        private val SINGLE_CHAR_KEYS = setOf("犬", "猫", "雨", "雪", "桜", "月", "草", "星")
 
         /** 表示する絵文字の上限。 */
         const val MAX_SHOWN = 3
@@ -28,6 +39,12 @@ class ContextEmojiSelector(entries: List<MoodEmoji>) {
 
         /** 事前スコアを 1 回で計算する上限（後続語採点と mutex を取り合わないよう小分け）。 */
         const val PRIOR_BATCH = 24
+
+        /** 事前スコア計算を続ける最大回数（150 語 / 24 件 ≒ 7 回）。 */
+        const val MAX_PRIOR_ROUNDS = 10
+
+        /** 事前スコア計算の 1 回ごとの間隔（変換の推論に割り込みすぎない）。 */
+        const val PRIOR_ROUND_DELAY_MS = 400L
 
         /** emoji_mood.tsv（emoji TAB keyword TAB group、# はコメント）を読む。 */
         fun parse(text: String): List<MoodEmoji> = text.lineSequence()
@@ -47,15 +64,42 @@ class ContextEmojiSelector(entries: List<MoodEmoji>) {
     private val hot = ArrayDeque<MoodEmoji>()
     private val priors = HashMap<String, Float>()
     private var priorModel: String? = null
+    private var matched: Set<MoodEmoji> = emptySet()
+
+    /** 送り仮名を落とした語幹（美味しい→美味、頑張る→頑張）。2 文字未満になるなら元の語。 */
+    private fun stem(keyword: String): String {
+        val trimmed = keyword.trimEnd { it in '\u3041'..'\u309F' }
+        return if (trimmed.length >= 1 && trimmed != keyword && trimmed.any { it !in '\u3041'..'\u309F' }) trimmed else keyword
+    }
+
+    private val stems: Map<MoodEmoji, String> by lazy { all.associateWith { stem(it.keyword) } }
+
+    /** 左文脈 [leftContext] の末尾にキーワード（語幹）が現れる絵文字（新しく出たものほど先）。 */
+    fun matchesIn(leftContext: String): List<MoodEmoji> {
+        if (leftContext.isBlank()) return emptyList()
+        val window = leftContext.takeLast(MATCH_WINDOW)
+        return all.mapNotNull { e ->
+            val key = stems[e] ?: e.keyword
+            // 1 文字の語は誤反応が多い（下さい→👇 など）ので、意味のはっきりした名詞だけ照合する。
+            if (key.length < 2 && key !in SINGLE_CHAR_KEYS) return@mapNotNull null
+            val at = window.lastIndexOf(key)
+            if (at < 0) null else e to at
+        }.sortedByDescending { it.second }.map { it.first }
+    }
 
     val size: Int get() = all.size
 
     /** 今回の確定で採点するキーワード（[POOL] 件まで、重複なし）。呼ぶたびに巡回位置が進む。 */
     @Synchronized
-    fun prefilter(): List<MoodEmoji> {
+    fun prefilter(leftContext: String = ""): List<MoodEmoji> {
         if (groups.isEmpty()) return emptyList()
         val out = LinkedHashMap<String, MoodEmoji>()
-        hot.take(MAX_HOT).forEach { out[it.keyword] = it }
+        // 1. 左文脈に出てきた語の絵文字（文脈に直結するので最優先）
+        val hit = matchesIn(leftContext).take(MAX_MATCHED)
+        matched = hit.toSet()
+        hit.forEach { out[it.keyword] = it }
+        // 2. 直近に選ばれた絵文字
+        hot.take(MAX_HOT).forEach { out.putIfAbsent(it.keyword, it) }
         val hotGroups = out.values.mapTo(HashSet()) { it.group }
         var visited = 0
         while (out.size < POOL && visited < groups.size) {
@@ -103,7 +147,8 @@ class ContextEmojiSelector(entries: List<MoodEmoji>) {
             val prior = priors[targets[i].keyword] ?: return@mapNotNull null
             if (!scores[i].isFinite()) return@mapNotNull null
             val pmi = scores[i] - prior
-            if (pmi > MIN_PMI) i to pmi else null
+            val threshold = if (targets[i] in matched) MIN_PMI_MATCHED else MIN_PMI
+            if (pmi > threshold) i to pmi else null
         }.sortedWith(compareByDescending<Pair<Int, Float>> { it.second }.thenBy { it.first })
             .take(MAX_SHOWN)
             .map { it.first }

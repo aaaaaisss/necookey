@@ -114,11 +114,16 @@ class KanaKanjiConversionSession(
     }
 
     /** Zenzai 用の制約付きドラフト探索。セッションの逐次状態は変更しない。 */
-    suspend fun queryConstrained(request: KanaKanjiQueryRequest, prefix: String): Candidate? =
+    suspend fun queryConstrained(
+        request: KanaKanjiQueryRequest,
+        prefix: String,
+        exact: Boolean = false,
+    ): Candidate? =
         mutex.withLock {
             engine.getConstrainedBestCandidate(
                 input = request.input,
                 prefix = prefix,
+                exact = exact,
                 mozcUtPersonName = request.mozcUtPersonName,
                 mozcUTPlaces = request.mozcUtPlaces,
                 mozcUTWiki = request.mozcUtWiki,

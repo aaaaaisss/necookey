@@ -36,13 +36,13 @@ class ContextEmojiSelectorTest {
     fun prefilterTakesPoolFromDistinctGroupsAndRotates() {
         val sel = ContextEmojiSelector(entries)
         val first = sel.prefilter()
-        assertEquals(ContextEmojiSelector.POOL, first.size)
+        assertEquals(minOf(ContextEmojiSelector.POOL, entries.map { it.group }.distinct().size), first.size)
         assertEquals(first.size, first.map { it.group }.distinct().size)
         val second = sel.prefilter()
         val seen = (first + second).map { it.keyword }.toSet()
         // two commits cover every group and start on second members
         assertTrue(entries.map { it.group }.toSet().all { g -> (first + second).any { it.group == g } })
-        assertTrue(seen.size > ContextEmojiSelector.POOL)
+        assertTrue(seen.size > first.size)
     }
 
     @Test
@@ -91,5 +91,22 @@ class ContextEmojiSelectorTest {
         assertEquals("コーヒー", again.first())
         assertTrue(again.size <= ContextEmojiSelector.PRIOR_BATCH)
         assertEquals(null, sel.prior("大爆笑"))
+    }
+
+    @Test
+    fun prefilterPutsKeywordsFoundInLeftContextFirst() {
+        val sel = ContextEmojiSelector(entries)
+        val pool = sel.prefilter("昨日は友達とビールを飲んで大爆笑した")
+        assertEquals(listOf("大爆笑", "ビール"), pool.take(2).map { it.keyword })
+    }
+
+    @Test
+    fun matchedKeywordPassesWithSlightlyNegativePmi() {
+        val sel = ContextEmojiSelector(entries)
+        withPriors(sel, -10f)
+        val pool = sel.prefilter("ビール")
+        val scores = FloatArray(pool.size) { -20f }
+        scores[0] = -10.5f // ビール: PMI -0.5（文脈に出た語なので出す）
+        assertEquals(listOf(0), sel.rank(pool, scores))
     }
 }

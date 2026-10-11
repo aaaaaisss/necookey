@@ -1325,7 +1325,7 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
                 .filter { it.string.isNotBlank() }
                 .distinctBy { it.string }
             val emojiTargets = if (zenzLeftContext.isNotBlank()) {
-                withContext(Dispatchers.Default) { contextEmojiSelector.prefilter() }
+                withContext(Dispatchers.Default) { contextEmojiSelector.prefilter(zenzLeftContext) }
             } else {
                 emptyList()
             }
@@ -1427,15 +1427,34 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
                 zeroQueryCandidates = reranked
                 refreshCandidateStripContent(candidatesShown = false)
             }
-            model?.let { fillContextEmojiPriors(it, emojiTargets) }
             zeroQueryZenzJob = null
+            model?.let { launchContextEmojiPriorFill(it, emojiTargets) }
         }
     }
 
-    /** 文脈絵文字キーワードの空文脈スコア（PMI の事前）を [ContextEmojiSelector.PRIOR_BATCH] 件ずつ計算してキャッシュ。 */
-    private suspend fun fillContextEmojiPriors(model: String, first: List<MoodEmoji>) {
+    private var contextEmojiPriorJob: Job? = null
+
+    /**
+     * 事前スコアの計算は打鍵で取り消されない別ジョブで、未計算がなくなるまで小分けに続ける。
+     * 以前は後続語採点と同じジョブの末尾で 24 件ずつ計算しており、確定直後に打ち始めると
+     * 毎回取り消されて事前スコアが揃わず、絵文字がほとんど出なかった。
+     */
+    private fun launchContextEmojiPriorFill(model: String, first: List<MoodEmoji>) {
+        if (contextEmojiPriorJob?.isActive == true) return
+        contextEmojiPriorJob = scope.launch {
+            var batch = first
+            repeat(ContextEmojiSelector.MAX_PRIOR_ROUNDS) {
+                if (!fillContextEmojiPriors(model, batch)) return@launch
+                batch = emptyList()
+                delay(ContextEmojiSelector.PRIOR_ROUND_DELAY_MS)
+            }
+        }
+    }
+
+    /** 文脈絵文字キーワードの空文脈スコア（PMI の事前）を [ContextEmojiSelector.PRIOR_BATCH] 件ずつ計算してキャッシュ。続きがあれば true。 */
+    private suspend fun fillContextEmojiPriors(model: String, first: List<MoodEmoji>): Boolean {
         val keywords = contextEmojiSelector.missingPriors(model, first)
-        if (keywords.isEmpty()) return
+        if (keywords.isEmpty()) return false
         try {
             val priors = withContext(Dispatchers.Default) {
                 val config = resolveZenzRuntimeConfig() ?: return@withContext null
@@ -1451,12 +1470,14 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
                     input = "",
                     candidates = keywords.toTypedArray(),
                 )
-            } ?: return
+            } ?: return false
             contextEmojiSelector.putPriors(model, keywords, priors)
+            return true
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
             Timber.w(e, "zenz context emoji prior failed")
+            return false
         }
     }
 
@@ -10870,12 +10891,24 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         }
 
         var top = draft
-        var fixRejected = false
-        if (verdict.startsWith("FIX:")) {
-            val fix = verdict.removePrefix("FIX:")
-            if (fix.isNotEmpty() && fix != prefix && !draft.string.startsWith(fix)) {
+        // zenz が「この変換で良い」と判定した（PASS）ときだけ [z] を付ける。
+        // 以前は WHOLE や「同じ制約が再び出た（直せなかった）」も同意扱いで [z] が付いていた。
+        var agreed = verdict.startsWith("PASS")
+        val whole = verdict.startsWith("WHOLE:")
+        if (verdict.startsWith("FIX:") || whole) {
+            // FIX: その prefix で始まる経路を再探索。WHOLE: zenz がそこで文を終えたい
+            // （= 表層全体がその文字列）ので完全一致で再探索（azooKey の hasEOS 制約に相当）。
+            val fix = verdict.substringAfter(':')
+            if (fix.isEmpty() || fix == draft.string) {
+                agreed = whole && fix == draft.string
+            } else if (fix == prefix && !whole) {
+                // 同じ制約が続けて出た = 辞書の経路では直せない。azooKey 同様に制約を捨てる。
+                constraint = null
+            } else if (!whole && draft.string.startsWith(fix)) {
+                // 既に満たしている（トークン境界のずれ）。判定は同意ではない。
+            } else {
                 val corrected = withContext(Dispatchers.Default) {
-                    session.queryConstrained(request, fix)
+                    session.queryConstrained(request, fix, exact = whole)
                 }
                 val fixed = corrected?.let {
                     ZenzaiConstraint.from(context.leftContext, insertString, fix, it.conversionSegments)
@@ -10885,14 +10918,14 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
                 ) {
                     top = corrected.copy(zenzAdjusted = true)
                     constraint = fixed
-                } else if (corrected != null && fixed != null) {
-                    // 直すとユーザー辞書の語が消える: FIX を採らない（印も付けない）。
-                    fixRejected = true
+                } else if (corrected == null) {
+                    // 制約を満たす経路がない: azooKey 同様に制約は捨てる（直前のドラフトを使う）。
+                    constraint = null
                 }
+                // 直すとユーザー辞書の語が消える場合は FIX を採らない（印も付けない）。
             }
         }
-        // zenz が評価した（推論・判定キャッシュ再利用）が直さなかった変換には [z] を付ける。
-        if (!verdict.startsWith("ERROR") && !top.zenzAdjusted && !fixRejected) {
+        if (agreed && !top.zenzAdjusted) {
             top = top.copy(zenzChecked = true)
         }
         zenzaiCarry = constraint
