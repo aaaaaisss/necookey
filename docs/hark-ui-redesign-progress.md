@@ -110,3 +110,5 @@
 - c684eef 英語 reading/token/word を app/dictionary-src/english へ（english.compact.kdict の生成入力のみ）。実行時フォールバック削除。
 - 見送り: LOUDS BitSet + rank 索引の mmap 化（java.util.BitSet が 11 ファイル・95 箇所に配線、rank は探索の最内ループで ART の DirectByteBuffer 読みは配列より遅い。182ce82 の端末計測待ち）。
 - 要端末確認: 採点候補が最大 10+21+5 件に増えた後続語 rerank の遅延、絵文字/助詞の並び。
+
+- 6980d7b 設定UI刷新：4カテゴリ＋詳細設定（入れ子PreferenceScreenはonNavigateToScreenで同Fragmentを開く）、角丸カード装飾、ホーム2列タイル、UT辞書スイッチ（ut_*_enabled_preference）。コンパイル成功・実機未確認。
