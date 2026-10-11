@@ -10772,6 +10772,8 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
                 }
             }
         }
+        // zenz が評価した（推論・判定キャッシュ再利用）が直さなかった変換には [z] を付ける。
+        if (!verdict.startsWith("ERROR") && !top.zenzAdjusted) top = top.copy(zenzChecked = true)
         zenzaiCarry = constraint
         Timber.d(
             "zenzai: input=[%s] draft=[%s] verdict=[%s] top=[%s] constraint=[%s/%s] inferred=%s",
@@ -10792,7 +10794,10 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
     private fun promoteZenzaiCandidate(candidates: List<Candidate>, top: Candidate?): List<Candidate> {
         if (top == null) return candidates
         val index = candidates.indexOfFirst { it.string == top.string }
-        if (index == 0) return candidates
+        if (index == 0) {
+            // 同じ候補でも [z]/[Z] の印を反映するため差し替える。
+            return if (candidates[0] == top) candidates else listOf(top) + candidates.drop(1)
+        }
         val result = candidates.toMutableList()
         if (index > 0) result.removeAt(index)
         result.add(0, top)
@@ -15901,8 +15906,10 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
             suspend fun show(top: Candidate) {
                 if (inputString.value != insertString || !shouldApplyCandidateResult(insertString, token)) return
                 if (!shouldUseNecookeyTwoRowBar()) return
-                val override = top.takeIf { it.string != sumireTop.string }
-                if (override?.string == shown?.string) return
+                val override = top.takeIf {
+                    it.string != sumireTop.string || it.zenzChecked || it.zenzAdjusted
+                }
+                if (override == shown) return
                 val bar = TwoRowCandidateBarPlanner.plan(
                     input = insertString,
                     conversionCandidates = conversion,
@@ -15939,7 +15946,7 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
             }
             synchronized(necookeyZenzOverrideCache) {
                 necookeyZenzOverrideCache[cacheKey] =
-                    (outcome.top.takeIf { outcome.changed }) to zenzaiCarry
+                    (outcome.top.takeIf { outcome.changed || it.zenzChecked || it.zenzAdjusted }) to zenzaiCarry
             }
             show(outcome.top)
         }

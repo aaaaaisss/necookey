@@ -829,6 +829,7 @@
     <string name="necookey_zenz_bunsetsu_gate_title">zenz で変換を補正（Zenzai）</string>
     <string name="necookey_zenz_bunsetsu_gate_summary">入力ごとに辞書の第一候補を端末内の zenz が 1 回だけ確認し、違うと判断した位置から辞書で探し直します。確定後の後続語候補も zenz で並べ替えます。</string>
     <string name="candidate_badge_zenz_gate">[Z]</string>
+    <string name="candidate_badge_zenz_checked">[z]</string>
     <string name="zenz_diagnostics_title">zenz 診断</string>
     <string name="zenz_diagnostics_entry_summary">ゲートの状態と直近の端末内採点結果を確認します。</string>
     <string name="zenz_diagnostics_gate_enabled">文節ゲート：有効</string>
