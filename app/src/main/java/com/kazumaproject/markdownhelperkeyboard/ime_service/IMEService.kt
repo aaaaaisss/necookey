@@ -364,6 +364,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
@@ -18717,7 +18718,8 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
                 ?.takeIf { cachedZenzModelSource == modelSource && File(it).isFile }
                 ?.let { return@withLock it }
 
-            val resolvedPath = withContext(Dispatchers.IO) {
+            // Not cancelled by a superseded keystroke: the next request would otherwise redo the copy.
+            val resolvedPath = withContext(Dispatchers.IO + NonCancellable) {
                 resolveZenzModelPath(modelSource)
             }
             cachedZenzModelSource = modelSource
@@ -18738,10 +18740,16 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
 
         fun ensureDefaultModelCopied(): File {
             if (!defaultDestFile.exists()) {
+                // Copy to a temp file and rename, so an interrupted copy never leaves a truncated model.
+                val temporary = File(filesDir, "$defaultAssetFileName.tmp")
                 assets.open(defaultAssetFileName).use { input ->
-                    FileOutputStream(defaultDestFile).use { output ->
+                    FileOutputStream(temporary).use { output ->
                         input.copyTo(output)
                     }
+                }
+                if (!temporary.renameTo(defaultDestFile)) {
+                    temporary.delete()
+                    error("Could not install the default Zenz model.")
                 }
             }
             return defaultDestFile
