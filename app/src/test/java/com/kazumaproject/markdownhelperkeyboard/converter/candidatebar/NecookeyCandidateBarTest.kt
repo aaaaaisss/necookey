@@ -152,6 +152,19 @@ class NecookeyCandidateBarTest {
     }
 
     @Test
+    fun firstBunsetsuFollowsZenzAcceptedPathSegments() {
+        val a = analysis()
+        val override = cand("今日歯晴れ", 0).copy(
+            zenzAdjusted = true,
+            conversionSegments = listOf(seg(0, 3, "今日"), seg(3, 6, "歯晴れ")),
+        )
+        val bar = TwoRowCandidateBarPlanner.plan(input, conversionList, a, override, emptyList())
+        assertEquals("今日歯晴れ", bar.primary!!.string)
+        // first bunsetsu = [0,3) of the accepted path, not Sumire's [0,4)
+        assertEquals(listOf("今日は晴れ", "今日"), bar.firstBunsetsuAlternatives.map { it.string })
+    }
+
+    @Test
     fun learnedCandidateFirstWinsOverZenz() {
         val learned = cand("今日葉晴れ", 100, type = 34)
         val a = analysis()

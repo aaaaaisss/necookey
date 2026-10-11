@@ -10935,6 +10935,7 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
                 ) return
                 val reranked = promoteZenzaiCandidate(baseCandidates, top)
                 if (reranked == baseCandidates) return
+                withContext(Dispatchers.Main.immediate) { adoptZenzaiBunsetsuPath(insertString, top) }
                 updateDisplayedCandidates(
                     insertString = insertString,
                     candidates = reranked,
@@ -12058,6 +12059,26 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
             }
 
         return sanitizeSplitPositions(input, candidatePattern)
+    }
+
+    /**
+     * Zenzai が採用した（FIX 制約で再探索した）経路を文節区切りの基準にする。矢印での文節伸縮・
+     * 文節変換は Sumire の元の最良経路ではなく、この経路の conversionSegments に従う。
+     */
+    private fun adoptZenzaiBunsetsuPath(input: String, accepted: Candidate) {
+        if (!accepted.zenzAdjusted || accepted.length.toInt() != input.length) return
+        val segments = accepted.conversionSegments
+        if (segments.isEmpty() || segments.last().inputEnd != input.length) return
+        val splits = sanitizeSplitPositions(input, segments.map { it.inputEnd }.dropLast(1))
+        bunsetsuPositionList = splits
+        bunsetsuSplitPatterns = (listOf(splits) + bunsetsuSplitPatterns).distinct()
+        val snapshot = latestBunsetsuConversionSnapshot?.takeIf { it.input == input } ?: return
+        latestBunsetsuConversionSnapshot = snapshot.copy(
+            candidates = listOf(accepted) + snapshot.candidates.filter { it.string != accepted.string },
+            paths = snapshot.paths + (accepted.string to segments),
+            splitPatterns = (listOf(splits) + snapshot.splitPatterns).distinct(),
+            initialSplitPositions = splits,
+        )
     }
 
     private fun updateBunsetsuStateAfterCandidateMerge(
@@ -16163,6 +16184,7 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
             necookeyPredictionRowInput = insertString
             necookeyTopRowInput = insertString
             necookeyPredictionRowCandidates = bar.predictions
+            bar.primary?.let { adoptZenzaiBunsetsuPath(insertString, it) }
         }
         if (!suppressSuggestions) {
             updateSuggestionAdaptersOnMain(

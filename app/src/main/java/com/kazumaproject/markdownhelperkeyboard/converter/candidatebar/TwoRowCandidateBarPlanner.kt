@@ -68,10 +68,20 @@ object TwoRowCandidateBarPlanner {
             alternatives += sumirePrimary
         }
 
-        val firstEnd = analysis?.takeIf { it.hasMultipleBunsetsu }?.firstBunsetsuEnd
+        // The first bunsetsu follows the accepted path: a zenz-corrected primary carries its own
+        // segmentation, which may put the first boundary elsewhere than Sumire's analysis.
+        val sumireFirstEnd = analysis?.takeIf { it.hasMultipleBunsetsu }?.firstBunsetsuEnd
+        val acceptedSegments = primary?.takeIf { it === primaryOverride }?.conversionSegments.orEmpty()
+        val firstEnd = if (acceptedSegments.isNotEmpty()) {
+            acceptedSegments.first().inputEnd.takeIf { acceptedSegments.size > 1 }
+        } else {
+            sumireFirstEnd
+        }
         if (analysis != null && firstEnd != null && firstEnd in 1 until input.length) {
             // 1) Bunsetsu-level alternatives from Sumire's N-best paths (same [0, firstEnd) range).
-            for (alt in analysis.slots.first().alternatives) {
+            val slotAlternatives =
+                if (firstEnd == sumireFirstEnd) analysis.slots.first().alternatives else emptyList()
+            for (alt in slotAlternatives) {
                 if (alt.output.isEmpty() || !shownTop.add(alt.output)) continue
                 alternatives += Candidate(
                     string = alt.output,
