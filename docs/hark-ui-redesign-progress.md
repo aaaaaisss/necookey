@@ -102,3 +102,11 @@
 - ユーザー報告（2026-10-11）: 設定アプリ起動時のフリーズは解消。
 - 7afcc7e Zenzai の印: [Z]=zenz が直した、[z]=zenz が評価して同意（判定キャッシュ再利用を含む）、印なし=zenz が動かなかった。
 - ユーザー辞書・学習の語を zenz から保護: 原因はスコアではなく（posScore はそのまま単語コストで 1 が最強、既定 4000）、Zenzai の FIX 制約付き再探索がユーザー辞書の語（例 杏里）を置き換えていたこと。登録語と読み範囲・出力が一致する文節を消す FIX/引き継ぎ制約は採らない。文節情報のないユーザー辞書・学習候補では zenz を回さない。ユーザー辞書候補は読み完全一致を先頭に。
+
+## 2026-10-11 夕方（絵文字辞書・確定後の絵文字/助詞・英語アセット）
+- 14f1a08 絵文字読み辞書を CLDR ja 注釈（annotations + annotationsDerived）＋ sen-ltd/emoji-search-jp（MIT、口語タグ cost 5900）から再生成。漢字キーワードはシステム辞書逆引きで読み付け（同形異音は旧辞書の読みを優先）、読めないものは除外。Emoji 15.1 まで・肌色除外・FE0F 正規化、1,898 字 / 8,836 読み。生成手順 tools/emoji_dict/README.md、MIT 表記 assets/licenses/emoji_dictionary_NOTICE.txt。
+- 4f5732f 確定後の後続語スロットに文脈絵文字（≤3）: 確定読みの末尾/先頭キーワードで完全一致検索 → 既存の後続語 zenz 採点 1 回に同梱。先頭 2 件は学習済み後続語のまま。
+- 0a2feca 助詞・助動詞・句読点 21 語を同じ採点で上位 3 件だけ表示（句読点直後は出さない）。zenz 無効時は固定順。
+- c684eef 英語 reading/token/word を app/dictionary-src/english へ（english.compact.kdict の生成入力のみ）。実行時フォールバック削除。
+- 見送り: LOUDS BitSet + rank 索引の mmap 化（java.util.BitSet が 11 ファイル・95 箇所に配線、rank は探索の最内ループで ART の DirectByteBuffer 読みは配列より遅い。182ce82 の端末計測待ち）。
+- 要端末確認: 採点候補が最大 10+21+5 件に増えた後続語 rerank の遅延、絵文字/助詞の並び。
