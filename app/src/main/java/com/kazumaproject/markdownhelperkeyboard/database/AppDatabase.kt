@@ -6,8 +6,6 @@ import androidx.room.TypeConverters
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 import com.kazumaproject.data.clicked_symbol.ClickedSymbol
-import com.kazumaproject.markdownhelperkeyboard.candidate_order.database.CandidateOrderOverrideDao
-import com.kazumaproject.markdownhelperkeyboard.candidate_order.database.CandidateOrderOverrideEntity
 import com.kazumaproject.markdownhelperkeyboard.clicked_symbol.database.ClickedSymbolDao
 import com.kazumaproject.markdownhelperkeyboard.clipboard_history.database.ClipboardHistoryDao
 import com.kazumaproject.markdownhelperkeyboard.clipboard_history.database.ClipboardHistoryItem
@@ -31,29 +29,21 @@ import com.kazumaproject.markdownhelperkeyboard.learning.nextword.NextWordDao
 import com.kazumaproject.markdownhelperkeyboard.learning.nextword.NextWordEntity
 import com.kazumaproject.markdownhelperkeyboard.learning.database.LearnDao
 import com.kazumaproject.markdownhelperkeyboard.learning.database.LearnEntity
-import com.kazumaproject.markdownhelperkeyboard.ngram_rule.database.NgramRuleDao
-import com.kazumaproject.markdownhelperkeyboard.ngram_rule.database.NgramRuleEntity
 import com.kazumaproject.markdownhelperkeyboard.ng_word.database.NgWord
 import com.kazumaproject.markdownhelperkeyboard.ng_word.database.NgWordDao
 import com.kazumaproject.markdownhelperkeyboard.ng_word.database.NgWordMatchModeConverter
-import com.kazumaproject.markdownhelperkeyboard.physical_keyboard.shortcut.database.PhysicalKeyboardShortcutDao
-import com.kazumaproject.markdownhelperkeyboard.physical_keyboard.shortcut.database.PhysicalKeyboardShortcutItem
 import com.kazumaproject.markdownhelperkeyboard.short_cut.data.ShortcutItem
 import com.kazumaproject.markdownhelperkeyboard.short_cut.database.ShortcutDao
 import com.kazumaproject.markdownhelperkeyboard.sumire_special_key.database.SumireSpecialKeyActionOverrideDao
 import com.kazumaproject.markdownhelperkeyboard.sumire_special_key.database.SumireSpecialKeyActionOverrideEntity
 import com.kazumaproject.markdownhelperkeyboard.sumire_special_key.database.SumireSpecialKeyPlacementOverrideDao
 import com.kazumaproject.markdownhelperkeyboard.sumire_special_key.database.SumireSpecialKeyPlacementOverrideEntity
-import com.kazumaproject.markdownhelperkeyboard.system_user_dictionary.database.SystemUserDictionaryDao
-import com.kazumaproject.markdownhelperkeyboard.system_user_dictionary.database.SystemUserDictionaryEntry
 import com.kazumaproject.markdownhelperkeyboard.text_macro.database.TextMacro
 import com.kazumaproject.markdownhelperkeyboard.text_macro.database.TextMacroDao
 import com.kazumaproject.markdownhelperkeyboard.user_dictionary.database.UserWord
 import com.kazumaproject.markdownhelperkeyboard.user_dictionary.database.UserWordDao
 import com.kazumaproject.markdownhelperkeyboard.user_template.database.UserTemplate
 import com.kazumaproject.markdownhelperkeyboard.user_template.database.UserTemplateDao
-import com.kazumaproject.markdownhelperkeyboard.zeroquery.custom.CustomZeroQueryDao
-import com.kazumaproject.markdownhelperkeyboard.zeroquery.custom.CustomZeroQueryEntry
 
 @Database(
     entities = [
@@ -72,19 +62,14 @@ import com.kazumaproject.markdownhelperkeyboard.zeroquery.custom.CustomZeroQuery
         RomajiMapEntity::class,
         NgWord::class,
         ShortcutItem::class,
-        SystemUserDictionaryEntry::class,
-        NgramRuleEntity::class,
         DeleteKeyFlickDeleteTarget::class,
-        PhysicalKeyboardShortcutItem::class,
         SpacerDefinition::class,
-        CandidateOrderOverrideEntity::class,
         SumireSpecialKeyActionOverrideEntity::class,
         SumireSpecialKeyPlacementOverrideEntity::class,
-        CustomZeroQueryEntry::class,
         TextMacro::class,
         NextWordEntity::class,
     ],
-    version = 50,
+    version = 51,
     exportSchema = false
 )
 @TypeConverters(
@@ -105,14 +90,9 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun romajiMapDao(): RomajiMapDao
     abstract fun ngWordDao(): NgWordDao
     abstract fun shortcutDao(): ShortcutDao
-    abstract fun systemUserDictionaryDao(): SystemUserDictionaryDao
-    abstract fun ngramRuleDao(): NgramRuleDao
     abstract fun deleteKeyFlickDeleteTargetDao(): DeleteKeyFlickDeleteTargetDao
-    abstract fun physicalKeyboardShortcutDao(): PhysicalKeyboardShortcutDao
-    abstract fun candidateOrderOverrideDao(): CandidateOrderOverrideDao
     abstract fun sumireSpecialKeyActionOverrideDao(): SumireSpecialKeyActionOverrideDao
     abstract fun sumireSpecialKeyPlacementOverrideDao(): SumireSpecialKeyPlacementOverrideDao
-    abstract fun customZeroQueryDao(): CustomZeroQueryDao
     abstract fun textMacroDao(): TextMacroDao
 
     companion object {
@@ -1238,6 +1218,25 @@ abstract class AppDatabase : RoomDatabase() {
                     "CREATE UNIQUE INDEX IF NOT EXISTS `index_next_word_table_context_reading_output` " +
                         "ON `next_word_table` (`context`, `reading`, `output`)"
                 )
+            }
+        }
+
+        /**
+         * necookey: 設定・機能を削除した表を捨てる（候補順序の上書き、カスタム n-gram、カスタムゼロクエリ、
+         * システムユーザー辞書ビルダー、物理キーボードショートカット）。学習・後続語・ユーザー辞書・NG ワード・
+         * クリップボード・カスタムキーボード・定型文/テキストマクロ等は触らない。
+         */
+        val DROPPED_TABLES_50_51 = listOf(
+            "candidate_order_override",
+            "ngram_rule",
+            "custom_zero_query_entries",
+            "system_user_dictionary_entry",
+            "physical_keyboard_shortcut_items",
+        )
+
+        val MIGRATION_50_51 = object : Migration(50, 51) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                DROPPED_TABLES_50_51.forEach { db.execSQL("DROP TABLE IF EXISTS `$it`") }
             }
         }
 

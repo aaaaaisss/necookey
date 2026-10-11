@@ -310,10 +310,8 @@ import com.kazumaproject.markdownhelperkeyboard.learning.session.LearningFragmen
 import com.kazumaproject.markdownhelperkeyboard.ng_word.NgWordMatcher
 import com.kazumaproject.markdownhelperkeyboard.ng_word.database.NgWord
 import com.kazumaproject.markdownhelperkeyboard.ng_word.database.NgWordMatchMode
-import com.kazumaproject.markdownhelperkeyboard.repository.CandidateOrderOverrideRepository
 import com.kazumaproject.markdownhelperkeyboard.repository.ClickedSymbolRepository
 import com.kazumaproject.markdownhelperkeyboard.repository.ClipboardHistoryRepository
-import com.kazumaproject.markdownhelperkeyboard.repository.CustomZeroQueryRepository
 import com.kazumaproject.markdownhelperkeyboard.repository.DeleteKeyFlickDeleteTargetRepository
 import com.kazumaproject.markdownhelperkeyboard.repository.KeyboardRepository
 import com.kazumaproject.markdownhelperkeyboard.repository.LearnRepository
@@ -330,7 +328,6 @@ import com.kazumaproject.markdownhelperkeyboard.text_macro.ExpandedMacro
 import com.kazumaproject.markdownhelperkeyboard.text_macro.TextMacroInputConnectionExecutor
 import com.kazumaproject.markdownhelperkeyboard.setting_activity.AppPreference
 import com.kazumaproject.markdownhelperkeyboard.setting_activity.ui.keyboard_selection.getKeyboardDisplayName
-import com.kazumaproject.markdownhelperkeyboard.ngram_rule.NgramRuleScorerManager
 import com.kazumaproject.markdownhelperkeyboard.setting_activity.MainActivity
 import com.kazumaproject.markdownhelperkeyboard.setting_activity.circular_slot.CircularSlotActionApplier
 import com.kazumaproject.markdownhelperkeyboard.short_cut.ShortcutType
@@ -505,8 +502,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
     private lateinit var kanaKanjiEngine: KanaKanjiEngine
     private val kanaKanjiEngineReady = CompletableDeferred<KanaKanjiEngine>()
 
-    @Inject
-    lateinit var ngramRuleScorerManager: NgramRuleScorerManager
 
     @Inject
     lateinit var dictionarySourceResolver: DictionarySourceResolver
@@ -535,11 +530,7 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
     @Inject
     lateinit var textMacroRepository: TextMacroRepository
 
-    @Inject
-    lateinit var candidateOrderOverrideRepository: CandidateOrderOverrideRepository
 
-    @Inject
-    lateinit var customZeroQueryRepository: CustomZeroQueryRepository
 
     @Inject
     lateinit var clickedSymbolRepository: ClickedSymbolRepository
@@ -725,7 +716,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
     }
     private val zeroQueryLookupUseCase: ZeroQueryLookupUseCase by lazy {
         ZeroQueryLookupUseCase(
-            customZeroQueryRepository = customZeroQueryRepository,
             bundledProviderHolder = zeroQueryProviderHolder,
         )
     }
@@ -2381,7 +2371,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
 
         observeDeleteKeyFlickTargets()
         observeSumireSpecialKeyOverrides()
-        observeCandidateOrderOverrideSnapshot()
 
         suggestionAdapter = SuggestionAdapter().apply {
             onListUpdated = {
@@ -2510,14 +2499,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
                         renderCurrentKeyboardStateOnActiveSurface()
                     }
                 }
-            }
-        }
-    }
-
-    private fun observeCandidateOrderOverrideSnapshot() {
-        ioScope.launch {
-            candidateOrderOverrideRepository.observeAll().collectLatest {
-                // Snapshot updates are handled inside the repository.
             }
         }
     }
@@ -2731,9 +2712,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
             this,
             appPreference.system_ngram_dictionary_enable_preference,
         )
-        ngramRuleScorerManager.setEnabled(
-            appPreference.custom_ngram_dictionary_enable_preference,
-        )
     }
 
     /**
@@ -2877,7 +2855,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         isUserTemplateEnable = preferences.isUserTemplateEnable
         isTextMacroCandidateEnable = preferences.isTextMacroCandidateEnable
         SystemNgramRuntime.setEnabled(this, preferences.systemNgramDictionaryEnabled)
-        ngramRuleScorerManager.setEnabled(preferences.customNgramDictionaryEnabled)
         listOfNotNull(suggestionAdapter, suggestionAdapterFull).forEach { adapter ->
             adapter.setShowDictionaryCandidateLabels(preferences.showDictionaryCandidateLabels)
         }
@@ -12029,14 +12006,7 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
             it.length.toInt() == input.length &&
                 !NgWordMatcher.matchesAny(input, it.string, ngWords)
         }.withoutHentaiganaCandidatesIfNeeded().distinctBy { it.string }
-        val orderedCandidates = if (appPreference.candidate_order_override_enable_preference == true) {
-            candidateOrderOverrideRepository.applyOrderFromSnapshot(
-                input = input,
-                candidates = candidates,
-                candidateSegmentsByString = result.candidateSegmentsByString,
-            )
-        } else candidates
-        return result.copy(candidates = orderedCandidates)
+        return result.copy(candidates = candidates)
     }
 
     private suspend fun loadCandidatesForBunsetsuSegment(
@@ -16508,21 +16478,7 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
                 candidates = candidates,
             )
         }
-        return if (appPreference.candidate_order_override_enable_preference == true) {
-            if (candidateSegmentsByString.isNotEmpty()) {
-                latestCandidateSegmentInput = input
-                latestCandidateSegmentsByString = candidateSegmentsByString
-            }
-            measureDebugStage("IMEService.candidateOrderOverride") {
-                candidateOrderOverrideRepository.applyOrderFromSnapshot(
-                    input = input,
-                    candidates = promotedCandidates,
-                    candidateSegmentsByString = candidateSegmentsByString,
-                )
-            }
-        } else {
-            promotedCandidates
-        }
+        return promotedCandidates
     }
 
     /**

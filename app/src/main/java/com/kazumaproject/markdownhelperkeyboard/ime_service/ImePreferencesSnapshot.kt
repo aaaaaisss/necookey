@@ -80,7 +80,6 @@ data class ImePreferencesSnapshot(
     val isUserTemplateEnable: Boolean,
     val isTextMacroCandidateEnable: Boolean,
     val systemNgramDictionaryEnabled: Boolean,
-    val customNgramDictionaryEnabled: Boolean,
     val showDictionaryCandidateLabels: Boolean,
     val suppressHentaiganaCandidates: Boolean,
     val zeroQuerySuggestionPreference: Boolean,
@@ -375,8 +374,6 @@ data class ImePreferencesSnapshot(
                 isTextMacroCandidateEnable = appPreference.text_macro_candidate_preference,
                 systemNgramDictionaryEnabled =
                     appPreference.system_ngram_dictionary_enable_preference,
-                customNgramDictionaryEnabled =
-                    appPreference.custom_ngram_dictionary_enable_preference,
                 showDictionaryCandidateLabels =
                     appPreference.show_dictionary_candidate_labels_preference,
                 suppressHentaiganaCandidates =

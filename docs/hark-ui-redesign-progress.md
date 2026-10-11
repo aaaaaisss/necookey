@@ -92,3 +92,11 @@
 - 0d5398b 後続語: 確定後のゼロクエリ候補上位 10 件を左文脈つきで zenz score 1 回（非同期、入力・次の変換でキャンセル）。空の読みでの採点は学習分布外なので削除はせず、元順位ペナルティ 0.15 nats/位 つきの並べ替えのみ（NextWordZenzReranker）。
 - 推論回数: 1 キー入力あたり最大 1 回（判定キャッシュヒット時 0 回）。後続語は確定ごとに 1 回。
 - 未確認: 実機（体感速度・FIX の質）。量子化は Q5_K_M のまま。
+
+## 2026-10-11 後半（Zenzai 制約・APK サイズ・mmap・Room 整理）
+
+- 7e33a76 Zenzai の引き継ぎ FIX 制約に読み範囲を持たせた（ZenzaiConstraint）。読みが先頭一致しなくなったら（後退・途中編集・濁点切替）一致している文節境界まで縮め、なければ捨てる。左文脈が変わる・拗音/促音/長音の手前で切れる・読みが空（確定・全消去・モード切替）でも捨てる。制約付き再探索の結果は同じ読み範囲で制約表層を出している場合だけ表示。1 キー 1 推論の設計は変更なし。
+- 06b8a91 system/*.dat.zip（約 11MB）と connectionId.dat.zip（約 1.9MB）を app/dictionary-src に移し、圧縮辞書・圧縮連接表の生成入力だけにした。実行時のフォールバックは削除（圧縮版が読めなければログ＋例外）。夜間版 APK 55,334,948 バイト（前 81,283,338）。英語の reading/token.dat.zip は残置（S4 で英語を判断）。
+- 182ce82 システム圧縮辞書の詰め込み配列（ラベル・termId・nodeId）と品詞・コスト（short）をメモリマップ領域のビューから直接読む（ヒープ約 15MB 減）。LOUDS のビット列と rank 索引（約 3.5MB）は複写のまま。要実機確認: 変換速度。
+- Room v51: 削除済み機能の表（candidate_order_override, ngram_rule, custom_zero_query_entries, system_user_dictionary_entry, physical_keyboard_shortcut_items）を MIGRATION_50_51 で DROP。関連コード・レイアウト・文字列・テストも削除。delete_key_flick（左フリック削除の設定が残存）、ローマ字表・Sumire 特殊キー（S4 まで）、shortcut 表（候補欄コードが型を使用）は残す。
+- ユーザー報告（2026-10-11）: 設定アプリ起動時のフリーズは解消。

@@ -1734,7 +1734,6 @@ object AppPreference {
             it.putBoolean(EMOTICON_CANDIDATE_ENABLE_PREFERENCE.first, value)
         }
 
-    val candidate_order_override_enable_preference: Boolean? get() = false // S3: hardcoded, setting removed
 
     var learn_dictionary_preference: Boolean?
         get() = preferences.getBoolean(
@@ -1789,7 +1788,6 @@ object AppPreference {
             it.putBoolean(SYSTEM_NGRAM_DICTIONARY_ENABLE_PREFERENCE.first, value)
         }
 
-    val custom_ngram_dictionary_enable_preference: Boolean get() = false // S3: hardcoded, setting removed
 
     var preserve_dictionary_word_whitespace_preference: Boolean
         get() = preferences.getBoolean(PRESERVE_DICTIONARY_WORD_WHITESPACE_KEY, false)

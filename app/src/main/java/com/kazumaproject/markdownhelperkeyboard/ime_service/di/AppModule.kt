@@ -8,7 +8,6 @@ import androidx.preference.PreferenceManager
 import com.kazumaproject.Louds.LOUDS
 import com.kazumaproject.Louds.with_term_id.LOUDSWithTermId
 import com.kazumaproject.dictionary.TokenArray
-import com.kazumaproject.markdownhelperkeyboard.candidate_order.database.CandidateOrderOverrideDao
 import com.kazumaproject.markdownhelperkeyboard.clicked_symbol.database.ClickedSymbolDao
 import com.kazumaproject.markdownhelperkeyboard.clipboard_history.database.ClipboardHistoryDao
 import com.kazumaproject.markdownhelperkeyboard.converter.bitset.SuccinctBitVector
@@ -63,6 +62,7 @@ import com.kazumaproject.markdownhelperkeyboard.database.AppDatabase.Companion.M
 import com.kazumaproject.markdownhelperkeyboard.database.AppDatabase.Companion.MIGRATION_47_48
 import com.kazumaproject.markdownhelperkeyboard.database.AppDatabase.Companion.MIGRATION_48_49
 import com.kazumaproject.markdownhelperkeyboard.database.AppDatabase.Companion.MIGRATION_49_50
+import com.kazumaproject.markdownhelperkeyboard.database.AppDatabase.Companion.MIGRATION_50_51
 import com.kazumaproject.markdownhelperkeyboard.database.AppDatabase.Companion.MIGRATION_46_47
 import com.kazumaproject.markdownhelperkeyboard.database.AppDatabase.Companion.MIGRATION_2_3
 import com.kazumaproject.markdownhelperkeyboard.database.AppDatabase.Companion.MIGRATION_3_4
@@ -83,19 +83,14 @@ import com.kazumaproject.markdownhelperkeyboard.ime_service.models.PressedKeySta
 import com.kazumaproject.markdownhelperkeyboard.learning.database.LearnDao
 import com.kazumaproject.markdownhelperkeyboard.learning.nextword.NextWordDao
 import com.kazumaproject.markdownhelperkeyboard.ng_word.database.NgWordDao
-import com.kazumaproject.markdownhelperkeyboard.ngram_rule.NgramRuleScorerManager
-import com.kazumaproject.markdownhelperkeyboard.ngram_rule.database.NgramRuleDao
-import com.kazumaproject.markdownhelperkeyboard.physical_keyboard.shortcut.database.PhysicalKeyboardShortcutDao
 import com.kazumaproject.markdownhelperkeyboard.repository.RomajiMapRepository
 import com.kazumaproject.markdownhelperkeyboard.setting_activity.AppPreference
 import com.kazumaproject.markdownhelperkeyboard.short_cut.database.ShortcutDao
 import com.kazumaproject.markdownhelperkeyboard.sumire_special_key.database.SumireSpecialKeyActionOverrideDao
 import com.kazumaproject.markdownhelperkeyboard.sumire_special_key.database.SumireSpecialKeyPlacementOverrideDao
-import com.kazumaproject.markdownhelperkeyboard.system_user_dictionary.database.SystemUserDictionaryDao
 import com.kazumaproject.markdownhelperkeyboard.text_macro.database.TextMacroDao
 import com.kazumaproject.markdownhelperkeyboard.user_dictionary.database.UserWordDao
 import com.kazumaproject.markdownhelperkeyboard.user_template.database.UserTemplateDao
-import com.kazumaproject.markdownhelperkeyboard.zeroquery.custom.CustomZeroQueryDao
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -170,6 +165,7 @@ object AppModule {
             MIGRATION_47_48,
             MIGRATION_48_49,
             MIGRATION_49_50,
+            MIGRATION_50_51,
         )
         .build()
 
@@ -217,29 +213,14 @@ object AppModule {
     @Provides
     fun providesShortCutDao(db: AppDatabase): ShortcutDao = db.shortcutDao()
 
-    @Singleton
-    @Provides
-    fun providesSystemUserDictionaryDao(db: AppDatabase): SystemUserDictionaryDao =
-        db.systemUserDictionaryDao()
 
-    @Singleton
-    @Provides
-    fun providesNgramRuleDao(db: AppDatabase): NgramRuleDao = db.ngramRuleDao()
 
     @Singleton
     @Provides
     fun providesDeleteKeyFlickDeleteTargetDao(db: AppDatabase): DeleteKeyFlickDeleteTargetDao =
         db.deleteKeyFlickDeleteTargetDao()
 
-    @Singleton
-    @Provides
-    fun providesPhysicalKeyboardShortcutDao(db: AppDatabase): PhysicalKeyboardShortcutDao =
-        db.physicalKeyboardShortcutDao()
 
-    @Singleton
-    @Provides
-    fun providesCandidateOrderOverrideDao(db: AppDatabase): CandidateOrderOverrideDao =
-        db.candidateOrderOverrideDao()
 
     @Singleton
     @Provides
@@ -253,10 +234,6 @@ object AppModule {
         db: AppDatabase
     ): SumireSpecialKeyPlacementOverrideDao = db.sumireSpecialKeyPlacementOverrideDao()
 
-    @Singleton
-    @Provides
-    fun providesCustomZeroQueryDao(db: AppDatabase): CustomZeroQueryDao =
-        db.customZeroQueryDao()
 
     @Singleton
     @Provides
@@ -627,7 +604,6 @@ object AppModule {
         @ReadingCorrectionSuccinctBitVectorTangoLBS readingCorrectionSuccinctBitVectorTangoLBS: SuccinctBitVector,
 
         englishEngine: EnglishEngine,
-        ngramRuleScorerManager: NgramRuleScorerManager,
         dictionaryBinaryReader: DictionaryBinaryReader,
         @ApplicationContext context: Context,
     ): KanaKanjiEngine {
@@ -639,9 +615,7 @@ object AppModule {
             true,
         )
         SystemNgramRuntime.initialize(context, systemNgramEnabled)
-        ngramRuleScorerManager.setEnabled(false) // custom n-gram rules: settings removed in S3.5
         val findPath = FindPath(
-            ngramRuleScorerProvider = ngramRuleScorerManager::currentScorer,
             systemNgramDictionaryProvider = SystemNgramRuntime::current,
         )
         val bundledMozcDictionaryActive =
