@@ -35,16 +35,6 @@ class ZenzaiSchedulerTest {
     }
 
     @Test
-    fun remainingPauseCountsFromLastKeystroke() {
-        val s = ZenzaiScheduler()
-        s.onInput("あ", 0)
-        s.onInput("あい", 150)
-        s.onInput("あいう", 300) // rhythm 150ms -> pause 195ms
-        assertEquals(95L, s.remainingPauseMs(400))
-        assertEquals(0L, s.remainingPauseMs(600))
-    }
-
-    @Test
     fun sameReadingRefreshIsNotAKeystroke() {
         val s = ZenzaiScheduler()
         s.onInput("あ", 0)

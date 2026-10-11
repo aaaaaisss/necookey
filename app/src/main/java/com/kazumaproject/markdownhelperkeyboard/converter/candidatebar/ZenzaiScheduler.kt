@@ -6,12 +6,11 @@ package com.kazumaproject.markdownhelperkeyboard.converter.candidatebar
  * 1 語を打つのに 5 打鍵以上かかるので、毎打鍵すぐ推論すると大半は次の打鍵で中断されて捨てられる
  * （中断までに使った CPU は無駄）。そこで:
  *
- * - 打鍵後すぐではなく、その人の打鍵間隔より少し長く入力が止まったら始める（[startDelayMs]）。
- *   打鍵が続けば推論は始まらず、手が止まった瞬間に 1 回だけ走る。止まった後は PASS まで続けて判定するので、
- *   見るときの候補の質は毎打鍵推論と同じ。
+ * - 短い読みは打鍵ごとにすぐ始め、次の打鍵でキャンセルする（推論が軽い）。
  * - 読みが [BACKGROUND_AFTER_CHARS] 文字を超えたら、打鍵中も裏で推論を回す（[runsInBackground]）。
  *   結果は変換欄に出さず、FIX の直しだけを次の推論へ引き継ぐ。推論中に来た打鍵では中断せず、
- *   終わったら最新の読みでもう一度走らせる。手が止まったときの仕上げは 1〜2 回で済み、表示が速い。
+ *   終わったら最新の読みでもう一度走らせる。その間に打鍵がなければ（手が止まっていれば）待たずに表示して仕上げる。
+ * - 待ち時間は置かない（2026-10-11、表示の遅れで押し間違えるため）。[startDelayMs] は打鍵リズムの記録用に残す。
  */
 class ZenzaiScheduler {
     companion object {
@@ -49,11 +48,6 @@ class ZenzaiScheduler {
 
     /** 打鍵中も裏で（待たず、後続の打鍵で中断せず、表示せずに）推論する読みか。 */
     fun runsInBackground(input: String): Boolean = input.length > BACKGROUND_AFTER_CHARS
-
-    /** 最後の打鍵から「手が止まった」とみなすまでの残り時間（[now] 時点）。 */
-    @Synchronized
-    fun remainingPauseMs(now: Long): Long =
-        if (lastKeyAt < 0) 0L else (startDelayMs() - (now - lastKeyAt)).coerceAtLeast(0L)
 
     /** 推論を始めるまでの待ち時間。 */
     @Synchronized

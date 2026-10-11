@@ -11158,8 +11158,7 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         } ?: return
         zenzaiScheduler.onInput(insertString, SystemClock.uptimeMillis())
         zenzRerankJob = scope.launch {
-            // 2 段バーと同じく、手が止まってから始める（打鍵が続けば次の打鍵でキャンセルされ推論しない）。
-            delay(zenzaiScheduler.startDelayMs())
+            // 待たずに始める（次の打鍵でキャンセル）。
             if (requestToken != zenzRerankRequestToken ||
                 !shouldApplyCandidateResult(insertString, candidateToken)
             ) return@launch
@@ -16344,11 +16343,10 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
             var shown: Candidate? = null
             fun stillCurrent(): Boolean =
                 necookeyZenzJobKey == cacheKey && shouldApplyCandidateResult(insertString)
-            // 短い読み: 打鍵が続くうちは始めない（次の打鍵でキャンセル）。手が止まったら始める。
-            // 長い読み: 裏の推論が終わり次第、最新の読みで待たずに始める（表示しない、打鍵で中断しない）。
+            // 待たずに始める。短い読みは次の打鍵でキャンセル（推論が軽い）。
+            // 長い読みは裏の推論が終わり次第、最新の読みで始める（途中経過は出さず、打鍵で中断しない）。
             awaitBefore?.join()
             val background = zenzaiScheduler.runsInBackground(insertString)
-            if (!background) delay(zenzaiScheduler.startDelayMs())
             if (!stillCurrent()) return@launch
             zenzaiScheduler.onInferenceStarted()
             val self = coroutineContext[Job]
@@ -16411,15 +16409,12 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
             recordZenzaiDiagnostics(outcome)
             if (!stillCurrent()) return@launch
             if (background) {
-                // 裏の推論の間に打鍵がなかった。ここからは普通の推論として、手が止まるのを待って表示・仕上げる。
-                // 待っている間の打鍵ではキャンセルされるよう、中断しない推論の印を外す。
+                // 裏の推論の間に打鍵がなかった（＝手が止まっている）。待たずにすぐ表示して仕上げる。
+                // 仕上げ中の打鍵ではキャンセルされるよう、中断しない推論の印を外す。
                 if (necookeyZenzForcedJob === self) {
                     necookeyZenzForcedJob = null
                     necookeyZenzForcedInput = null
                 }
-                val wait = zenzaiScheduler.remainingPauseMs(SystemClock.uptimeMillis())
-                if (wait > 0) delay(wait)
-                if (!stillCurrent()) return@launch
             }
             shown = null // a same-reading refresh may have repainted the bar since the provisional
             fun remember(result: ZenzaiOutcome) {
