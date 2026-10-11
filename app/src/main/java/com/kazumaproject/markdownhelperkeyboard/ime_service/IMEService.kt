@@ -183,6 +183,7 @@ import com.kazumaproject.markdownhelperkeyboard.R
 import com.kazumaproject.markdownhelperkeyboard.clipboard_history.database.ClipboardHistoryItem
 import com.kazumaproject.markdownhelperkeyboard.clipboard_history.database.ItemType
 import com.kazumaproject.markdownhelperkeyboard.converter.candidate.BunsetsuCandidateResult
+import com.kazumaproject.markdownhelperkeyboard.converter.candidatebar.ZenzaiConstraint
 import com.kazumaproject.markdownhelperkeyboard.converter.candidatebar.BunsetsuAnalysis
 import com.kazumaproject.markdownhelperkeyboard.converter.candidatebar.BunsetsuAnalyzer
 import com.kazumaproject.markdownhelperkeyboard.converter.candidatebar.BunsetsuRangeEditor
@@ -1859,7 +1860,7 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
     private var lastKanaKanjiQueryRequest: KanaKanjiQueryRequest? = null
     /** Zenzai: 直前の入力・左文脈と、そのとき得た FIX 制約（読みが伸びる間は引き継ぐ）。 */
     @Volatile
-    private var zenzaiCarry: ZenzaiCarry? = null
+    private var zenzaiCarry: ZenzaiConstraint? = null
     /** (文脈, 読み, ドラフト) -> zenz の判定。同じドラフトを二度推論しない。 */
     private val zenzaiVerdictCache = object : LinkedHashMap<String, String>(32, 0.75f, true) {
         override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, String>?): Boolean =
@@ -2155,9 +2156,9 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
     private var necookeyPredictionRowCandidates: List<Candidate> = emptyList()
     /** (文脈, 読み, sumire 最良) -> (zenzai の結果（変更なしは null）, 引き継ぐ制約)。 */
     private val necookeyZenzOverrideCache =
-        object : LinkedHashMap<String, Pair<Candidate?, ZenzaiCarry>>(16, 0.75f, true) {
+        object : LinkedHashMap<String, Pair<Candidate?, ZenzaiConstraint?>>(16, 0.75f, true) {
             override fun removeEldestEntry(
-                eldest: MutableMap.MutableEntry<String, Pair<Candidate?, ZenzaiCarry>>?,
+                eldest: MutableMap.MutableEntry<String, Pair<Candidate?, ZenzaiConstraint?>>?,
             ): Boolean = size > 32
         }
     @Volatile
@@ -10547,6 +10548,8 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
 
         launch {
             inputString.collect { string ->
+                // 確定・全消去・モード切替で読みが空になったら Zenzai の引き継ぎ制約も捨てる。
+                if (string.isEmpty()) zenzaiCarry = null
                 try {
                     measureDebugStage("IMEService.input.immediate") {
                         processInputString(string, mainView)
@@ -10692,8 +10695,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         }
     }
 
-    private data class ZenzaiCarry(val input: String, val leftContext: String, val prefix: String)
-
     private data class ZenzaiOutcome(
         val top: Candidate,
         val changed: Boolean,
@@ -10730,25 +10731,32 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         val request = lastKanaKanjiQueryRequest?.copy(input = insertString) ?: return null
         val config = withContext(Dispatchers.Default) { resolveZenzRuntimeConfig() } ?: return null
 
-        var prefix = zenzaiCarry
-            ?.takeIf {
-                it.prefix.isNotEmpty() && it.leftContext == context.leftContext &&
-                    insertString.length > it.input.length && insertString.startsWith(it.input)
-            }
-            ?.prefix
-            .orEmpty()
+        // 前回の制約は、その読みが今の読みの先頭に残っている範囲だけ引き継ぐ（後退・途中編集で縮める/捨てる）。
+        var constraint = zenzaiCarry?.carriedFor(insertString, context.leftContext)
         var draft = sumireTop
-        if (prefix.isNotEmpty() && !sumireTop.string.startsWith(prefix)) {
-            val constrained = withContext(Dispatchers.Default) {
-                session.queryConstrained(request, prefix)
+        if (constraint != null) {
+            val topSegments = sumireTop.conversionSegments.ifEmpty {
+                if (latestCandidateSegmentInput == insertString) {
+                    latestCandidateSegmentsByString[sumireTop.string].orEmpty()
+                } else {
+                    emptyList()
+                }
             }
-            if (constrained != null) {
-                draft = constrained.copy(zenzAdjusted = true)
-                onProvisional(draft)
-            } else {
-                prefix = ""
+            if (!constraint.isRealizedBy(topSegments)) {
+                val carried = constraint
+                val constrained = withContext(Dispatchers.Default) {
+                    session.queryConstrained(request, carried.surface)
+                }
+                // 表層が一致しても読みの範囲がずれた経路は制約として出さない。
+                if (constrained != null && carried.isRealizedBy(constrained.conversionSegments)) {
+                    draft = constrained.copy(zenzAdjusted = true)
+                    onProvisional(draft)
+                } else {
+                    constraint = null
+                }
             }
         }
+        val prefix = constraint?.surface.orEmpty()
 
         val key = zenzaiKey(context, insertString, draft.string)
         val cached = synchronized(zenzaiVerdictCache) { zenzaiVerdictCache[key] }
@@ -10778,16 +10786,19 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
                 val corrected = withContext(Dispatchers.Default) {
                     session.queryConstrained(request, fix)
                 }
-                if (corrected != null) {
+                val fixed = corrected?.let {
+                    ZenzaiConstraint.from(context.leftContext, insertString, fix, it.conversionSegments)
+                }
+                if (corrected != null && fixed != null) {
                     top = corrected.copy(zenzAdjusted = true)
-                    prefix = fix
+                    constraint = fixed
                 }
             }
         }
-        zenzaiCarry = ZenzaiCarry(insertString, context.leftContext, prefix)
+        zenzaiCarry = constraint
         Timber.d(
-            "zenzai: input=[%s] draft=[%s] verdict=[%s] top=[%s] prefix=[%s] inferred=%s",
-            insertString, draft.string, verdict, top.string, prefix, cached == null,
+            "zenzai: input=[%s] draft=[%s] verdict=[%s] top=[%s] constraint=[%s/%s] inferred=%s",
+            insertString, draft.string, verdict, top.string, constraint?.surface, constraint?.reading, cached == null,
         )
         return ZenzaiOutcome(
             top = top,
@@ -15956,11 +15967,9 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
             if (inputString.value != insertString || !shouldApplyCandidateResult(insertString, token)) {
                 return@launch
             }
-            zenzaiCarry?.let { carry ->
-                synchronized(necookeyZenzOverrideCache) {
-                    necookeyZenzOverrideCache[cacheKey] =
-                        (outcome.top.takeIf { outcome.changed }) to carry
-                }
+            synchronized(necookeyZenzOverrideCache) {
+                necookeyZenzOverrideCache[cacheKey] =
+                    (outcome.top.takeIf { outcome.changed }) to zenzaiCarry
             }
             show(outcome.top)
         }
