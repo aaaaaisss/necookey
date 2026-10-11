@@ -12,6 +12,7 @@ import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
@@ -100,8 +101,7 @@ class ZenzRuntimeClient @Inject constructor(
         input: String,
         maxTokens: Int,
     ): String = operationMutex.withLock {
-        val service = connect()
-        ensureInitializedLocked(service, config)
+        val service = connectAndInitializeLocked(config)
         val result = executeLocked(service, GENERATE_TIMEOUT_MS) { requestId, callback ->
             service.generate(
                 requestId,
@@ -131,8 +131,7 @@ class ZenzRuntimeClient @Inject constructor(
         input: String,
         candidate: String,
     ): String = operationMutex.withLock {
-        val service = connect()
-        ensureInitializedLocked(service, config)
+        val service = connectAndInitializeLocked(config)
         val result = executeLocked(service, GENERATE_TIMEOUT_MS) { requestId, callback ->
             service.evaluate(
                 requestId,
@@ -162,8 +161,7 @@ class ZenzRuntimeClient @Inject constructor(
         input: String?,
         candidates: Array<String>,
     ): FloatArray = operationMutex.withLock {
-        val service = connect()
-        ensureInitializedLocked(service, config)
+        val service = connectAndInitializeLocked(config)
         val result = executeLocked(service, GENERATE_TIMEOUT_MS) { requestId, callback ->
             service.score(
                 requestId,
@@ -211,6 +209,26 @@ class ZenzRuntimeClient @Inject constructor(
         if (shouldUnbind) {
             runCatching { context.unbindService(serviceConnection) }
         }
+    }
+
+    /**
+     * Bind + model load are shared by every later request, so they run to completion even when the
+     * keystroke that started them is superseded (cancelling them would leave each next keystroke
+     * restarting a cold load and zenz would silently never run). The next request waits on
+     * [operationMutex] for the load instead of skipping.
+     */
+    private suspend fun connectAndInitializeLocked(config: ZenzRuntimeConfig): IZenzRuntime =
+        withContext(NonCancellable) {
+            val service = connect()
+            ensureInitializedLocked(service, config)
+            service
+        }
+
+    /** True when the runtime is bound and the model for [config] is loaded (no load pending). */
+    fun isWarm(config: ZenzRuntimeConfig): Boolean {
+        val service = runtime ?: return false
+        val binder = service.asBinder()
+        return binder.isBinderAlive && initializedBinder === binder && initializedConfig == config
     }
 
     private suspend fun ensureInitializedLocked(
