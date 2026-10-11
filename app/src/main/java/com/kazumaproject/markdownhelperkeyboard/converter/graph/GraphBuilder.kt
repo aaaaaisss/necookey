@@ -1,5 +1,6 @@
 package com.kazumaproject.markdownhelperkeyboard.converter.graph
 
+import com.kazumaproject.markdownhelperkeyboard.learning.database.LearningScorePolicy
 import com.kazumaproject.Louds.LOUDS
 import com.kazumaproject.Louds.with_term_id.LOUDSWithTermId
 import com.kazumaproject.core.domain.extensions.hasNConsecutiveChars
@@ -599,6 +600,7 @@ class GraphBuilder {
                 mozcNodeType = MozcNodeType.EOS,
             )
         )
+        val learnedCostNow = System.currentTimeMillis()
         for (i in str.indices) {
             currentCoroutineContext().ensureActive()
             var subStrCache: String? = null
@@ -648,12 +650,20 @@ class GraphBuilder {
             if (learnedWords.isNotEmpty()) foundInAnyDictionary = true
             learnedWords.forEach { learnedWord ->
                 val endIndex = i + learnedWord.input.length
+                // 上限つき・古さで弱まる単語コスト（読み出し時に計算）。
+                val learnedCost = LearningScorePolicy.conversionCost(
+                    storedScore = learnedWord.score,
+                    usageCount = learnedWord.usageCount,
+                    lastUsedAt = learnedWord.lastUsedAt,
+                    readingLength = learnedWord.input.length,
+                    now = learnedCostNow,
+                )
                 val node = Node(
                     l = learnedWord.leftId ?: 1851.toShort(),
                     r = learnedWord.rightId ?: 1851.toShort(),
-                    score = learnedWord.score.toInt(),
-                    f = learnedWord.score.toInt(),
-                    g = learnedWord.score.toInt(),
+                    score = learnedCost,
+                    f = learnedCost,
+                    g = learnedCost,
                     tango = learnedWord.out,
                     yomiUsed = learnedWord.input,
                     len = learnedWord.input.length.toShort(),
