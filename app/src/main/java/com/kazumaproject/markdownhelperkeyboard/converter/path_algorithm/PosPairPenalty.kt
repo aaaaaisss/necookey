@@ -11,6 +11,21 @@ internal object PosPairPenalty {
     /** 読み 1 文字の数詞（よ→四, し→四, に→二…）を数の文脈以外で選ばせない。候補としては残る。 */
     const val ONE_KANA_NUMERAL_PENALTY = 3000
 
+    /**
+     * 動詞（自立）連用形の直後のサ変「する」（話し＋した → 話＋した / 話した を優先）。
+     * お＋連用形＋する（お待ちします）も同じ並びなので、文頭以外で前の前が「お/ご」でも区別できない点に注意（値は控えめ）。
+     */
+    const val RENYOU_SURU_PENALTY = 1000
+
+    // 動詞,自立,*,*,*,連用形,* の ID（id.def から生成）。
+    private val VERB_RENYOU_IDS: IntArray = intArrayOf(
+        596, 597, 615, 616, 626, 638, 644, 701, 702, 703, 704, 705, 706, 707, 717, 727, 735, 742,
+        783, 784, 785, 786, 796, 803, 829, 830, 831, 832, 842, 847, 856,
+    )
+    // 動詞,自立,*,*,サ変・スル,*,* (627..638)。
+    private const val SURU_FIRST = 627
+    private const val SURU_LAST = 638
+
     // 名詞,数,* (2043..2055) と 接頭詞,数接続 (2639..2642: 何・第…)。
     private const val NUMBER_FIRST = 2043
     private const val NUMBER_LAST = 2055
@@ -20,6 +35,9 @@ internal object PosPairPenalty {
     fun cost(prev: Node, node: Node): Int {
         var penalty = 0
         if (isOneKanaNumeral(node) && !isNumberContext(prev)) penalty += ONE_KANA_NUMERAL_PENALTY
+        if (node.l.toInt() in SURU_FIRST..SURU_LAST && VERB_RENYOU_IDS.binarySearch(prev.r.toInt()) >= 0) {
+            penalty += RENYOU_SURU_PENALTY
+        }
         return penalty
     }
 
