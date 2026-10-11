@@ -10,58 +10,42 @@ class NextWordExtrasTest {
     private fun e(s: String) = Candidate(string = s, type = 11, length = 0u, score = 0)
 
     @Test
-    fun emojiKeysPreferRecentWordsThenLeadingWords() {
-        val keys = NextWordExtras.emojiKeys("かわいいねこ")
-        assertEquals("かわいいねこ", keys.first())
-        assertTrue(keys.indexOf("ねこ") < keys.indexOf("かわいい"))
-        assertTrue("かわいい" in keys)
-        assertEquals(emptyList<String>(), NextWordExtras.emojiKeys("ね"))
+    fun initialShowsNoEmojiBeforeZenz() {
+        val out = NextWordExtras.initial(listOf(c("a"), c("b"), c("c")))
+        assertEquals(listOf("a", "b", "c"), out.map { it.string })
     }
 
     @Test
-    fun emojiPoolDropsDuplicatesOfBaseAndCaps() {
-        val pool = NextWordExtras.emojiPool(listOf(c("🐱")), (1..9).map { e("$it") } + e("🐱"))
-        assertEquals(NextWordExtras.EMOJI_POOL, pool.size)
-        assertTrue(pool.none { it.string == "🐱" })
-    }
-
-    @Test
-    fun initialKeepsBaseFirstAndShowsAtMostThreeEmoji() {
-        val out = NextWordExtras.initial(listOf(c("a"), c("b"), c("c")), (1..5).map { e("e$it") })
-        assertEquals(listOf("a", "b", "e1", "e2", "e3", "c"), out.map { it.string })
-    }
-
-    @Test
-    fun rerankKeepsTopBaseAndPicksBestEmojiByScore() {
+    fun rerankKeepsTopBaseAndMergesPickedEmoji() {
         val base = listOf(c("a"), c("b"), c("c"))
-        val emoji = listOf(e("e1"), e("e2"), e("e3"), e("e4"))
-        // only the first MAX_EMOJI emoji are scored; e3 best, e1 worst; base never dropped
-        val scores = floatArrayOf(-2f, -2f, -5f, -9f, -3f, -1f)
-        val out = NextWordExtras.rerank(base, emoji, scores).map { it.string }
+        // head a b c, then 4 emoji keywords; picked emoji are placed by their keyword score
+        val scores = floatArrayOf(-2f, -2f, -5f, -9f, -3f, -1f, -8f)
+        val out = NextWordExtras.rerank(base, scores, emptyList(), 4, listOf(e("E2") to 2, e("E1") to 1)).map { it.string }
         assertEquals(listOf("a", "b"), out.take(2))
-        assertEquals(listOf("e3", "e2", "e1"), out.filter { it.startsWith("e") })
+        assertEquals(listOf("E2", "E1"), out.filter { it.startsWith("E") })
         assertTrue(out.containsAll(listOf("a", "b", "c")))
-        assertEquals(6, out.size)
+        assertEquals(5, out.size)
     }
 
     @Test
     fun scoringTargetsCappedAtMaxScoredKeepingLearnedHead() {
         val base = (1..12).map { c("b$it") }
         val fw = NextWordExtras.FUNCTION_WORDS.map(::c)
-        val emoji = (1..5).map { e("e$it") }
-        val targets = NextWordExtras.scoringTargets(base, emoji, fw)
-        assertEquals(NextWordExtras.MAX_SCORED, targets.size)
-        assertEquals(base.take(8), targets.take(8))
-        assertEquals(NextWordExtras.FUNCTION_WORD_POOL, targets.count { it in fw })
-        assertEquals(NextWordExtras.MAX_EMOJI, targets.count { it in emoji })
+        val keywords = (1..ContextEmojiSelector.POOL).map { "k$it" }
+        val targets = NextWordExtras.scoringTargets(base, keywords, fw)
+        assertTrue(targets.size <= NextWordExtras.MAX_SCORED)
+        assertEquals(base.take(NextWordZenzReranker.TOP_K).map { it.string }, targets.take(NextWordZenzReranker.TOP_K))
+        assertEquals(NextWordExtras.FUNCTION_WORD_POOL, targets.count { t -> fw.any { it.string == t } })
+        assertEquals(keywords, targets.takeLast(keywords.size))
         val scores = FloatArray(targets.size) { -1f }
-        assertTrue(NextWordExtras.rerank(base, emoji, scores, fw).map { it.string }.containsAll(base.map { it.string }))
+        assertTrue(
+            NextWordExtras.rerank(base, scores, fw, keywords.size).map { it.string }.containsAll(base.map { it.string }),
+        )
     }
 
     @Test
     fun rerankWithBadScoresFallsBackToInitial() {
         val base = listOf(c("a"), c("b"))
-        val emoji = listOf(e("e1"))
-        assertEquals(NextWordExtras.initial(base, emoji), NextWordExtras.rerank(base, emoji, floatArrayOf(-1f)))
+        assertEquals(NextWordExtras.initial(base), NextWordExtras.rerank(base, floatArrayOf(-1f), emptyList(), 1, listOf(e("E") to 0)))
     }
 }

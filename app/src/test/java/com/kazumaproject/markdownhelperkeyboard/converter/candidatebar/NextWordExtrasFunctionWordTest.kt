@@ -23,7 +23,7 @@ class NextWordExtrasFunctionWordTest {
         val emoji = listOf(c("😀"))
         // head a..d, fw 、 。 は が を, emoji
         val scores = floatArrayOf(-3f, -3f, -3f, -3f, -9f, -1f, -2f, -0.5f, -8f, -4f)
-        val out = NextWordExtras.rerank(base, emoji, scores, fw).map { it.string }
+        val out = NextWordExtras.rerank(base, scores, fw, 1, listOf(emoji[0] to 0)).map { it.string }
         assertEquals(listOf("a", "b"), out.take(2))
         assertEquals(listOf("が", "。", "は"), out.filter { it in setOf("、", "。", "は", "が", "を") })
         assertTrue(out.containsAll(listOf("a", "b", "c", "d", "😀")))
@@ -32,7 +32,7 @@ class NextWordExtrasFunctionWordTest {
 
     @Test
     fun initialShowsAtMostThreeFunctionWordsAfterTopBase() {
-        val out = NextWordExtras.initial(listOf(c("a"), c("b"), c("c")), emptyList(), listOf("、", "。", "は", "が").map(::c))
+        val out = NextWordExtras.initial(listOf(c("a"), c("b"), c("c")), listOf("、", "。", "は", "が").map(::c))
         assertEquals(listOf("a", "b", "、", "。", "は", "c"), out.map { it.string })
     }
 }

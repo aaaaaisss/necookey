@@ -189,6 +189,8 @@ import com.kazumaproject.markdownhelperkeyboard.converter.candidatebar.BunsetsuA
 import com.kazumaproject.markdownhelperkeyboard.converter.candidatebar.BunsetsuRangeEditor
 import com.kazumaproject.markdownhelperkeyboard.converter.candidatebar.NecookeyCandidateBarConfig
 import com.kazumaproject.markdownhelperkeyboard.converter.candidatebar.NextWordExtras
+import com.kazumaproject.markdownhelperkeyboard.converter.candidatebar.ContextEmojiSelector
+import com.kazumaproject.markdownhelperkeyboard.converter.candidatebar.MoodEmoji
 import com.kazumaproject.markdownhelperkeyboard.converter.candidatebar.NextWordZenzReranker
 import com.kazumaproject.markdownhelperkeyboard.converter.candidatebar.TwoRowCandidateBar
 import com.kazumaproject.markdownhelperkeyboard.converter.candidatebar.TwoRowCandidateBarPlanner
@@ -709,7 +711,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
     private var currentCandidateStripFullCandidates: List<Candidate> = emptyList()
     private var currentCandidateStripContent: CandidateStripContent = CandidateStripContent.Empty
     private var pendingZeroQueryKeyAfterCommit: String? = null
-    private var pendingZeroQueryReadingAfterCommit: String = ""
     private var zeroQueryCandidates: List<Candidate> = emptyList()
     private var zeroQueryVisible: Boolean = false
     private var zeroQuerySelectionUpdateSuppressCount: Int = 0
@@ -1174,10 +1175,9 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         return isNotEmpty() && all { isSelectionActionCandidate(it) }
     }
 
-    private fun rememberZeroQueryKeyAfterCommit(committedText: String, reading: String = "") {
+    private fun rememberZeroQueryKeyAfterCommit(committedText: String) {
         if (committedText.isBlank()) return
         pendingZeroQueryKeyAfterCommit = committedText
-        pendingZeroQueryReadingAfterCommit = reading
     }
 
     private fun cancelZeroQueryLookup() {
@@ -1291,9 +1291,7 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
 
     private fun consumePendingZeroQueryAfterCommit() {
         val key = pendingZeroQueryKeyAfterCommit ?: return
-        val committedReading = pendingZeroQueryReadingAfterCommit
         pendingZeroQueryKeyAfterCommit = null
-        pendingZeroQueryReadingAfterCommit = ""
         cancelZeroQueryLookup()
 
         if (!canShowZeroQueryAfterCommit(key)) {
@@ -1326,8 +1324,8 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
             }
                 .filter { it.string.isNotBlank() }
                 .distinctBy { it.string }
-            val emoji = if (currentInputType !in passwordTypes) {
-                withContext(Dispatchers.Default) { contextEmojiCandidates(committedReading, candidates) }
+            val emojiTargets = if (zenzLeftContext.isNotBlank()) {
+                withContext(Dispatchers.Default) { contextEmojiSelector.prefilter() }
             } else {
                 emptyList()
             }
@@ -1348,38 +1346,44 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
                 clearZeroQueryShownState(refresh = true)
                 return@launch
             }
-            if (candidates.isEmpty() && emoji.isEmpty() && functionWords.isEmpty()) {
+            if (candidates.isEmpty() && functionWords.isEmpty()) {
                 clearZeroQueryShownState(refresh = true)
                 return@launch
             }
 
-            val shown = NextWordExtras.initial(candidates, emoji, functionWords)
+            val shown = NextWordExtras.initial(candidates, functionWords)
             zeroQueryCandidates = shown
             zeroQueryVisible = true
             zeroQuerySelectionUpdateSuppressCount += 1
             zeroQueryLookupJob = null
             refreshCandidateStripContent(candidatesShown = false)
-            launchZeroQueryZenzRerank(key, zenzLeftContext, candidates, emoji, functionWords, shown)
+            launchZeroQueryZenzRerank(key, zenzLeftContext, candidates, emojiTargets, functionWords, shown)
         }
     }
 
-    /** 後続語の上位 [NextWordZenzReranker.TOP_K] 件＋助詞・句読点＋文脈絵文字を左文脈つきで zenz が 1 回採点し、並べ替える。 */
+    /**
+     * 後続語の上位 [NextWordZenzReranker.TOP_K] 件＋助詞・句読点＋文脈絵文字キーワード（[ContextEmojiSelector.POOL] 件）を
+     * 左文脈つきで zenz が 1 回採点し、並べ替える。絵文字はキーワードの PMI（空文脈の事前スコアとの差）上位
+     * [ContextEmojiSelector.MAX_SHOWN] 件。採点後、未計算の事前スコアを小分けに空文脈で計算してキャッシュする。
+     */
     private fun launchZeroQueryZenzRerank(
         key: String,
         leftContext: String,
         candidates: List<Candidate>,
-        emoji: List<Candidate>,
+        emojiTargets: List<MoodEmoji>,
         functionWords: List<Candidate>,
         shown: List<Candidate>,
     ) {
         zeroQueryZenzJob?.cancel()
         val left = leftContext.takeLast(necookeyCandidateBarConfig.maxLeftContextChars)
         if (left.isBlank() || shown.size < 2) return
-        val head = NextWordExtras.scoringTargets(candidates, emoji, functionWords)
+        val head = NextWordExtras.scoringTargets(candidates, emojiTargets.map { it.keyword }, functionWords)
         zeroQueryZenzJob = scope.launch {
+            var model: String? = null
             val scores = try {
                 withContext(Dispatchers.Default) {
                     val config = resolveZenzRuntimeConfig() ?: return@withContext null
+                    model = config.modelPath
                     zenzRuntimeClient.score(
                         config = config,
                         profile = "",
@@ -1389,7 +1393,7 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
                         leftContext = left,
                         rightContext = "",
                         input = "",
-                        candidates = head.map { it.string }.toTypedArray(),
+                        candidates = head.toTypedArray(),
                     )
                 }
             } catch (e: CancellationException) {
@@ -1398,40 +1402,72 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
                 Timber.w(e, "zenz next-word rerank failed")
                 null
             } ?: return@launch
-            val reranked = NextWordExtras.rerank(candidates, emoji, scores, functionWords)
-            if (!zeroQueryVisible || zeroQueryCandidates != shown ||
-                !canShowZeroQueryAfterCommit(key) || reranked == shown
-            ) {
-                return@launch
+            val emoji = if (emojiTargets.isNotEmpty() && scores.size == head.size) {
+                val offset = head.size - emojiTargets.size
+                val seen = candidates.mapTo(HashSet()) { it.string }
+                contextEmojiSelector.rank(emojiTargets, scores.copyOfRange(offset, head.size))
+                    .filter { seen.add(emojiTargets[it].emoji) }
+                    .map { i ->
+                        Candidate(
+                            string = emojiTargets[i].emoji,
+                            type = CONTEXT_EMOJI_CANDIDATE_TYPE,
+                            length = 0u,
+                            score = 0,
+                            yomi = "",
+                        ) to i
+                    }
+            } else {
+                emptyList()
             }
-            Timber.d("zenz next-word rerank: %s -> %s", head.map { it.string }, reranked.take(head.size).map { it.string })
-            zeroQueryCandidates = reranked
+            val reranked = NextWordExtras.rerank(candidates, scores, functionWords, emojiTargets.size, emoji)
+            if (zeroQueryVisible && zeroQueryCandidates == shown &&
+                canShowZeroQueryAfterCommit(key) && reranked != shown
+            ) {
+                Timber.d("zenz next-word rerank: %s -> %s", head, reranked.take(head.size).map { it.string })
+                zeroQueryCandidates = reranked
+                refreshCandidateStripContent(candidatesShown = false)
+            }
+            model?.let { fillContextEmojiPriors(it, emojiTargets) }
             zeroQueryZenzJob = null
-            refreshCandidateStripContent(candidatesShown = false)
         }
     }
 
-    /** 確定した読みのキーワードに一致する絵文字（zenz 採点用に [NextWordExtras.EMOJI_POOL] 件まで）。 */
-    private fun contextEmojiCandidates(reading: String, base: List<Candidate>): List<Candidate> {
-        if (reading.isBlank() || !::kanaKanjiEngine.isInitialized) return emptyList()
-        val symbols = try {
-            kanaKanjiEngine.emojiForExactReadings(
-                NextWordExtras.emojiKeys(reading),
-                NextWordExtras.EMOJI_POOL + base.size,
-            )
+    /** 文脈絵文字キーワードの空文脈スコア（PMI の事前）を [ContextEmojiSelector.PRIOR_BATCH] 件ずつ計算してキャッシュ。 */
+    private suspend fun fillContextEmojiPriors(model: String, first: List<MoodEmoji>) {
+        val keywords = contextEmojiSelector.missingPriors(model, first)
+        if (keywords.isEmpty()) return
+        try {
+            val priors = withContext(Dispatchers.Default) {
+                val config = resolveZenzRuntimeConfig() ?: return@withContext null
+                if (config.modelPath != model) return@withContext null
+                zenzRuntimeClient.score(
+                    config = config,
+                    profile = "",
+                    topic = "",
+                    style = "",
+                    preference = "",
+                    leftContext = "",
+                    rightContext = "",
+                    input = "",
+                    candidates = keywords.toTypedArray(),
+                )
+            } ?: return
+            contextEmojiSelector.putPriors(model, keywords, priors)
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
-            Timber.w(e, "context emoji lookup failed")
-            emptyList()
+            Timber.w(e, "zenz context emoji prior failed")
         }
-        return NextWordExtras.emojiPool(base, symbols.map { symbol ->
-            Candidate(
-                string = symbol,
-                type = CONTEXT_EMOJI_CANDIDATE_TYPE,
-                length = 0u,
-                score = 0,
-                yomi = "",
-            )
-        })
+    }
+
+    private val contextEmojiSelector: ContextEmojiSelector by lazy {
+        val text = try {
+            assets.open("emoji/emoji_mood.tsv").bufferedReader().use { it.readText() }
+        } catch (e: Exception) {
+            Timber.w(e, "emoji_mood.tsv load failed")
+            ""
+        }
+        ContextEmojiSelector(ContextEmojiSelector.parse(text))
     }
 
     /**
@@ -12711,7 +12747,7 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
             )
         }
         if (shouldRememberZeroQuery) {
-            rememberZeroQueryKeyAfterCommit(commitString, session.rawInput)
+            rememberZeroQueryKeyAfterCommit(commitString)
         }
         beginBatchEdit()
         try {
@@ -14288,7 +14324,7 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
             preserveBunsetsuReconversionDraftOnNextProcessInput = true
         }
         if (shouldRememberZeroQuery) {
-            rememberZeroQueryKeyAfterCommit(committedText, session.rawInput)
+            rememberZeroQueryKeyAfterCommit(committedText)
         }
 
         beginBatchEdit()
@@ -14848,7 +14884,7 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
             )
         }
         if (candidateString.isNotBlank() && stringInTail.get().isEmpty()) {
-            rememberZeroQueryKeyAfterCommit(candidateString, reading)
+            rememberZeroQueryKeyAfterCommit(candidateString)
         }
         _inputString.update { "" }
         commitText(candidateString, 1)
@@ -15046,7 +15082,7 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
             )
         }
         if (candidateString.isNotBlank() && stringInTail.get().isEmpty()) {
-            rememberZeroQueryKeyAfterCommit(candidateString, insertString)
+            rememberZeroQueryKeyAfterCommit(candidateString)
         }
         _inputString.update { "" }
         commitText(candidateString, 1)

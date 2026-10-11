@@ -21,3 +21,12 @@ Regenerate (WORK = scratch dir with ja.xml, jaD.xml, emoji-test.txt, data.json):
     java -jar lt.jar dump /tmp/t /tmp/y /tmp/k > WORK/old.tsv
     python3 gen_emoji_tsv.py WORK WORK/emoji.tsv
     java -jar lt.jar build WORK/emoji.tsv app/src/main/assets/emoji/{tango,yomi,token}_emoji.dat
+
+## Context emoji list (`app/src/main/assets/emoji/emoji_mood.tsv`)
+
+~150 popular chat emoji with one Japanese keyword each (+ emoji-test.txt subgroup as mood group), used by the
+after-commit context emoji (`ContextEmojiSelector`: zenz scores the keywords as continuation of the left context,
+ranked by PMI against a cached empty-context prior). Selection = emoji-search-jp's 107 curated emoji + Unicode
+2019 emoji frequency ranking (`freq2019.txt`, from https://home.unicode.org/emoji/emoji-frequency/) until 150.
+
+    python3 gen_emoji_mood.py WORK app/src/main/assets/emoji/emoji_mood.tsv
