@@ -3,7 +3,7 @@ package com.kazumaproject.markdownhelperkeyboard.converter.candidatebar
 import com.kazumaproject.markdownhelperkeyboard.converter.candidate.Candidate
 
 /**
- * 確定後の後続語スロットに足す「おまけ」候補（助詞・助動詞・句読点と文脈絵文字 [ContextEmojiSelector]）。
+ * 確定後の後続語スロットに足す「おまけ」候補（助詞・助動詞・句読点）。
  *
  * 学習済み・ゼロクエリの後続語（base）を押し出さないよう、先頭 [KEEP_BASE] 件は常に base。
  * 並びは [NextWordZenzReranker] と同じ 1 回の zenz 採点（head + おまけを同じ配列で採点）で決める。
@@ -66,11 +66,10 @@ object NextWordExtras {
     }
 
     /** 採点する base 先頭件数: [MAX_SCORED] からおまけ分を引いた残り（[NextWordZenzReranker.TOP_K] まで）。 */
-    private fun headSize(base: List<Candidate>, emojiTargets: Int, functionWords: List<Candidate>): Int =
+    private fun headSize(base: List<Candidate>, functionWords: List<Candidate>): Int =
         minOf(
             base.size,
             NextWordZenzReranker.TOP_K,
-            // 絵文字キーワードは枠外（全キーワードを毎回採点するため、学習済み後続語の枠を削らない）。
             (MAX_SCORED - scoredFunctionWords(functionWords).size).coerceAtLeast(KEEP_BASE),
         )
 
@@ -83,53 +82,33 @@ object NextWordExtras {
     }
 
     /**
-     * zenz を使わないときの文脈絵文字の置き方: 1 個目は先頭の後続語の直後、残りは 2 番目の直後
-     * （zenz あり時の [rerank] と同じ位置）。
-     */
-    fun placeEmoji(shown: List<Candidate>, emoji: List<Candidate>): List<Candidate> {
-        if (emoji.isEmpty()) return shown
-        val strings = emoji.mapTo(HashSet()) { it.string }
-        val rest = shown.filter { it.string !in strings }
-        return rest.take(1) + emoji.take(1) + rest.drop(1).take(1) + emoji.drop(1) + rest.drop(2)
-    }
-
-    /**
      * zenz 採点前の並び: base 先頭 [KEEP_BASE] 件 → 助詞・句読点 [MAX_FUNCTION_WORDS] 件 → 残りの base。
-     * 文脈絵文字は zenz の採点後にだけ出す。
      */
     fun initial(base: List<Candidate>, functionWords: List<Candidate> = emptyList()): List<Candidate> {
         if (functionWords.isEmpty()) return base
         return base.take(KEEP_BASE) + functionWords.take(MAX_FUNCTION_WORDS) + base.drop(KEEP_BASE)
     }
 
-    /**
-     * zenz に渡す文字列（head＋助詞で [MAX_SCORED] 件まで）: head（学習済み base の上位）+
-     * 助詞・句読点 [FUNCTION_WORD_POOL] 件 + 文脈絵文字の全キーワード。
-     */
+    /** zenz に渡す文字列（合計 [MAX_SCORED] 件まで）: head（学習済み base の上位）+ 助詞・句読点 [FUNCTION_WORD_POOL] 件。 */
     fun scoringTargets(
         base: List<Candidate>,
-        emojiKeywords: List<String>,
         functionWords: List<Candidate> = emptyList(),
-    ): List<String> = base.take(headSize(base, emojiKeywords.size, functionWords)).map { it.string } +
-        scoredFunctionWords(functionWords).map { it.string } + emojiKeywords
+    ): List<String> = base.take(headSize(base, functionWords)).map { it.string } +
+        scoredFunctionWords(functionWords).map { it.string }
 
     /**
-     * [scores] は [scoringTargets] と同じ並び（末尾 [emojiTargets] 件が絵文字キーワード）。base の head は
-     * 従来どおり位置ペナルティつきで並べ替え、先頭 [KEEP_BASE] 件の後ろで head の残り・上位
-     * [MAX_FUNCTION_WORDS] 件の助詞・句読点・[emoji]（PMI で選んだ絵文字と、キーワードの位置
-     * = 絵文字キーワード内のインデックス）を同じ尺度（キーワードの生スコア）で混ぜる。
+     * [scores] は [scoringTargets] と同じ並び。base の head は位置ペナルティつきで並べ替え、先頭 [KEEP_BASE] 件の後ろで
+     * head の残りと上位 [MAX_FUNCTION_WORDS] 件の助詞・句読点を同じ尺度で混ぜる。
      */
     fun rerank(
         base: List<Candidate>,
         scores: FloatArray,
         allFunctionWords: List<Candidate> = emptyList(),
-        emojiTargets: Int = 0,
-        emoji: List<Pair<Candidate, Int>> = emptyList(),
         rankedFunctionWords: List<Candidate> = emptyList(),
     ): List<Candidate> {
-        val head = base.take(headSize(base, emojiTargets, allFunctionWords))
+        val head = base.take(headSize(base, allFunctionWords))
         val functionWords = scoredFunctionWords(allFunctionWords)
-        if (scores.size != head.size + functionWords.size + emojiTargets || scores.none { it.isFinite() }) {
+        if (scores.size != head.size + functionWords.size || scores.none { it.isFinite() }) {
             return initial(base, rankedFunctionWords.ifEmpty { functionWords })
         }
         val penalty = NextWordZenzReranker.POSITION_PENALTY
@@ -148,14 +127,7 @@ object NextWordExtras {
         val merged = window.sortedWith(
             compareByDescending<Slot> { it.fused }.thenBy { it.order },
         ).map { it.candidate }
-        // 絵文字は PMI で既に選別済み。キーワードの生スコアは語の長さ・種類で助詞より低く出やすく、
-        // 生スコアで混ぜると画面外に押し出されていた。1 個目は base の 1 位の直後、残りは base の 2 位の直後に固定する
-        // （一番押しやすい先頭は学習済みの後続語に残す）。
-        val picked = emoji.filter { it.second in 0 until emojiTargets }
-            .take(ContextEmojiSelector.MAX_SHOWN).map { it.first }
-        val tops = top.map { head[it] }
         // 接続コストで並べ済みの助詞・句読点（zenz で採点していない）は、採点前と同じく上位 2 件の後ろ。
-        return tops.take(1) + picked.take(1) + tops.drop(1) + picked.drop(1) +
-            rankedFunctionWords.take(MAX_FUNCTION_WORDS) + merged + base.drop(head.size)
+        return top.map { head[it] } + rankedFunctionWords.take(MAX_FUNCTION_WORDS) + merged + base.drop(head.size)
     }
 }

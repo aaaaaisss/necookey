@@ -191,8 +191,6 @@ import com.kazumaproject.markdownhelperkeyboard.converter.candidatebar.BunsetsuA
 import com.kazumaproject.markdownhelperkeyboard.converter.candidatebar.BunsetsuRangeEditor
 import com.kazumaproject.markdownhelperkeyboard.converter.candidatebar.NecookeyCandidateBarConfig
 import com.kazumaproject.markdownhelperkeyboard.converter.candidatebar.NextWordExtras
-import com.kazumaproject.markdownhelperkeyboard.converter.candidatebar.ContextEmojiSelector
-import com.kazumaproject.markdownhelperkeyboard.converter.candidatebar.MoodEmoji
 import com.kazumaproject.markdownhelperkeyboard.converter.candidatebar.NextWordZenzReranker
 import com.kazumaproject.markdownhelperkeyboard.converter.candidatebar.TwoRowCandidateBar
 import com.kazumaproject.markdownhelperkeyboard.converter.candidatebar.TwoRowCandidateBarPlanner
@@ -1366,14 +1364,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         } else {
             ""
         }
-        val plainEmojiContext = if (zenzLeftContext.isEmpty() && currentInputType !in passwordTypes) {
-            leftContext.ifEmpty {
-                currentInputConnection?.getTextBeforeCursor(ContextEmojiSelector.MATCH_WINDOW, 0)
-                    ?.toString().orEmpty()
-            }
-        } else {
-            ""
-        }
         zeroQueryLookupJob = scope.launch {
             val candidates = withContext(Dispatchers.IO) {
                 val learned = if (learnedEnabled) learnedFollowingWords(key, leftContext) else emptyList()
@@ -1381,11 +1371,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
             }
                 .filter { it.string.isNotBlank() }
                 .distinctBy { it.string }
-            val emojiTargets = if (zenzLeftContext.isNotBlank()) {
-                withContext(Dispatchers.Default) { contextEmojiSelector.prefilter(zenzLeftContext) }
-            } else {
-                emptyList()
-            }
             fun asCandidates(words: List<String>): List<Candidate> = words.map { word ->
                 Candidate(
                     string = word,
@@ -1412,29 +1397,11 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
                 return@launch
             }
 
-            // zenz を使わないときは、今の文に出てきた語の絵文字をそのまま出す（PMI 採点なし）。
-            val plainEmoji = if (zenzLeftContext.isBlank() && plainEmojiContext.isNotBlank()) {
-                withContext(Dispatchers.Default) { contextEmojiSelector.plainMatches(plainEmojiContext) }
-                    .map { e ->
-                        Candidate(
-                            string = e.emoji,
-                            type = CONTEXT_EMOJI_CANDIDATE_TYPE,
-                            length = 0u,
-                            score = 0,
-                            yomi = "",
-                        )
-                    }
-            } else {
-                emptyList()
-            }
-            if (candidates.isEmpty() && functionWords.isEmpty() && rankedFunctionWords.isEmpty() && plainEmoji.isEmpty()) {
+            if (candidates.isEmpty() && functionWords.isEmpty() && rankedFunctionWords.isEmpty()) {
                 clearZeroQueryShownState(refresh = true)
                 return@launch
             }
-            val shown = NextWordExtras.placeEmoji(
-                NextWordExtras.initial(candidates, rankedFunctionWords.ifEmpty { functionWords }),
-                plainEmoji,
-            )
+            val shown = NextWordExtras.initial(candidates, rankedFunctionWords.ifEmpty { functionWords })
             zeroQueryCandidates = shown
             carriedNextWords = shown
             carriedNextWordsKey = key
@@ -1442,20 +1409,17 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
             zeroQuerySelectionUpdateSuppressCount += 1
             zeroQueryLookupJob = null
             refreshCandidateStripContent(candidatesShown = false)
-            launchZeroQueryZenzRerank(key, zenzLeftContext, candidates, emojiTargets, functionWords, shown, rankedFunctionWords)
+            launchZeroQueryZenzRerank(key, zenzLeftContext, candidates, functionWords, shown, rankedFunctionWords)
         }
     }
 
     /**
-     * 後続語の上位 [NextWordZenzReranker.TOP_K] 件＋助詞・句読点＋文脈絵文字の全キーワードを
-     * 左文脈つきで zenz が 1 回採点し、並べ替える。絵文字は絵文字ごとに一番合ったキーワードの PMI（空文脈の事前スコアとの差）で比べた上位
-     * [ContextEmojiSelector.MAX_SHOWN] 件。採点後、未計算の事前スコアを小分けに空文脈で計算してキャッシュする。
+     * 後続語の上位 [NextWordZenzReranker.TOP_K] 件＋助詞・句読点を左文脈つきで zenz が 1 回採点し、並べ替える。
      */
     private fun launchZeroQueryZenzRerank(
         key: String,
         leftContext: String,
         candidates: List<Candidate>,
-        emojiTargets: List<MoodEmoji>,
         functionWords: List<Candidate>,
         shown: List<Candidate>,
         rankedFunctionWords: List<Candidate> = emptyList(),
@@ -1463,13 +1427,11 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         zeroQueryZenzJob?.cancel()
         val left = leftContext.takeLast(necookeyCandidateBarConfig.maxLeftContextChars)
         if (left.isBlank() || shown.size < 2) return
-        val head = NextWordExtras.scoringTargets(candidates, emojiTargets.map { it.keyword }, functionWords)
+        val head = NextWordExtras.scoringTargets(candidates, functionWords)
         zeroQueryZenzJob = scope.launch {
-            var model: String? = null
             val scores = try {
                 withContext(Dispatchers.Default) {
                     val config = resolveZenzRuntimeConfig() ?: return@withContext null
-                    model = config.modelPath
                     zenzRuntimeClient.score(
                         config = config,
                         profile = "",
@@ -1488,26 +1450,7 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
                 Timber.w(e, "zenz next-word rerank failed")
                 null
             } ?: return@launch
-            // 再起動直後でも保存済みの事前スコアで絵文字を選べるように、採点前に読み込む。
-            model?.let { loadContextEmojiPriors(it) }
-            val emoji = if (emojiTargets.isNotEmpty() && scores.size == head.size) {
-                val offset = head.size - emojiTargets.size
-                val seen = candidates.mapTo(HashSet()) { it.string }
-                contextEmojiSelector.rank(emojiTargets, scores.copyOfRange(offset, head.size))
-                    .filter { seen.add(emojiTargets[it].emoji) }
-                    .map { i ->
-                        Candidate(
-                            string = emojiTargets[i].emoji,
-                            type = CONTEXT_EMOJI_CANDIDATE_TYPE,
-                            length = 0u,
-                            score = 0,
-                            yomi = "",
-                        ) to i
-                    }
-            } else {
-                emptyList()
-            }
-            val reranked = NextWordExtras.rerank(candidates, scores, functionWords, emojiTargets.size, emoji, rankedFunctionWords)
+            val reranked = NextWordExtras.rerank(candidates, scores, functionWords, rankedFunctionWords)
             if (zeroQueryVisible && zeroQueryCandidates == shown &&
                 canShowZeroQueryAfterCommit(key) && reranked != shown
             ) {
@@ -1517,114 +1460,7 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
                 refreshCandidateStripContent(candidatesShown = false)
             }
             zeroQueryZenzJob = null
-            model?.let { launchContextEmojiPriorFill(it, emojiTargets) }
         }
-    }
-
-    private var contextEmojiPriorJob: Job? = null
-
-    /**
-     * 事前スコアの計算は打鍵で取り消されない別ジョブで、未計算がなくなるまで小分けに続ける。
-     * 以前は後続語採点と同じジョブの末尾で 24 件ずつ計算しており、確定直後に打ち始めると
-     * 毎回取り消されて事前スコアが揃わず、絵文字がほとんど出なかった。
-     */
-    private fun launchContextEmojiPriorFill(model: String, first: List<MoodEmoji>) {
-        if (contextEmojiPriorJob?.isActive == true) return
-        contextEmojiPriorJob = scope.launch {
-            var batch = first
-            repeat(ContextEmojiSelector.MAX_PRIOR_ROUNDS) {
-                if (!fillContextEmojiPriors(model, batch)) return@launch
-                batch = emptyList()
-                delay(ContextEmojiSelector.PRIOR_ROUND_DELAY_MS)
-            }
-        }
-    }
-
-    /** 文脈絵文字キーワードの空文脈スコア（PMI の事前）を [ContextEmojiSelector.PRIOR_BATCH] 件ずつ計算してキャッシュ。続きがあれば true。 */
-    private suspend fun fillContextEmojiPriors(model: String, first: List<MoodEmoji>): Boolean {
-        loadContextEmojiPriors(model)
-        val keywords = contextEmojiSelector.missingPriors(model, first)
-        if (keywords.isEmpty()) {
-            saveContextEmojiPriors(model)
-            return false
-        }
-        try {
-            val priors = withContext(Dispatchers.Default) {
-                val config = resolveZenzRuntimeConfig() ?: return@withContext null
-                if (config.modelPath != model) return@withContext null
-                zenzRuntimeClient.score(
-                    config = config,
-                    profile = "",
-                    topic = "",
-                    style = "",
-                    preference = "",
-                    leftContext = "",
-                    rightContext = "",
-                    input = "",
-                    candidates = keywords.toTypedArray(),
-                )
-            } ?: return false
-            contextEmojiSelector.putPriors(model, keywords, priors)
-            return true
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Exception) {
-            Timber.w(e, "zenz context emoji prior failed")
-            return false
-        }
-    }
-
-    /** 事前スコアを読み込み済みのモデル（ファイルは 1 プロセスで 1 回だけ読む）。 */
-    private var contextEmojiPriorsLoadedFor: String? = null
-    private var contextEmojiPriorsSavedFor: String? = null
-
-    /** 保存ファイルのモデル識別子: パスと大きさ・更新時刻（同じパスで別モデルに差し替えても読み違えない）。 */
-    private fun contextEmojiPriorModelId(model: String): String {
-        val f = File(model)
-        return "$model|${f.length()}|${f.lastModified()}"
-    }
-
-    private suspend fun loadContextEmojiPriors(model: String) {
-        if (contextEmojiPriorsLoadedFor == model) return
-        contextEmojiPriorsLoadedFor = model
-        withContext(Dispatchers.IO) {
-            try {
-                val file = File(filesDir, CONTEXT_EMOJI_PRIOR_FILE)
-                if (file.isFile) {
-                    contextEmojiSelector.importPriors(model, contextEmojiPriorModelId(model), file.readText())
-                }
-            } catch (e: Exception) {
-                Timber.w(e, "context emoji priors load failed")
-            }
-        }
-    }
-
-    /** 全件そろったら一度だけ保存する。 */
-    private suspend fun saveContextEmojiPriors(model: String) {
-        if (contextEmojiPriorsSavedFor == model) return
-        contextEmojiPriorsSavedFor = model
-        val id = contextEmojiPriorModelId(model)
-        val text = contextEmojiSelector.exportPriors(model, id) ?: return
-        withContext(Dispatchers.IO) {
-            try {
-                val file = File(filesDir, CONTEXT_EMOJI_PRIOR_FILE)
-                val tmp = File(filesDir, "$CONTEXT_EMOJI_PRIOR_FILE.tmp")
-                tmp.writeText(text)
-                if (!tmp.renameTo(file)) tmp.delete()
-            } catch (e: Exception) {
-                Timber.w(e, "context emoji priors save failed")
-            }
-        }
-    }
-
-    private val contextEmojiSelector: ContextEmojiSelector by lazy {
-        val text = try {
-            assets.open("emoji/emoji_mood.tsv").bufferedReader().use { it.readText() }
-        } catch (e: Exception) {
-            Timber.w(e, "emoji_mood.tsv load failed")
-            ""
-        }
-        ContextEmojiSelector(ContextEmojiSelector.parse(text))
     }
 
     /**
@@ -2259,9 +2095,7 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
     companion object {
         /** Learned following word (後続語) from the next-word table. */
         const val CANDIDATE_TYPE_NEXT_WORD: Byte = 53
-        private const val CONTEXT_EMOJI_CANDIDATE_TYPE: Byte = 11
         /** 文脈絵文字の事前スコア（モデルごとに一度だけ計算）の保存先。 */
-        private const val CONTEXT_EMOJI_PRIOR_FILE = "context_emoji_priors.tsv"
 
         /** 手が止まった後、FIX で直した結果を続けて判定する上限（最初の 1 回と合わせて最大 4 回）。 */
         private const val ZENZAI_PAUSE_RECHECK_MAX = 3
