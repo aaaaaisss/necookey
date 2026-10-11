@@ -42,6 +42,24 @@ struct ZenzSession {
 
 static ZenzSession g_session;
 
+// candidate_evaluate の KV キャッシュ再利用状態（g_session.mutex 保護）。
+// tokens: 現在 KV(seq 0) に入っているトークン列。
+// pred_*[i]: tokens[0..i-1] を文脈とした位置 i の予測（argmax と tokens[i] の対数確率）。
+struct EvalKvCache {
+    std::vector<llama_token> tokens;
+    std::vector<llama_token> pred_max;
+    std::vector<float> pred_logprob;
+    std::vector<char> pred_valid;
+};
+static EvalKvCache g_eval_cache;
+
+static void invalidate_eval_cache_locked() {
+    g_eval_cache.tokens.clear();
+    g_eval_cache.pred_max.clear();
+    g_eval_cache.pred_logprob.clear();
+    g_eval_cache.pred_valid.clear();
+}
+
 // 候補評価の結果タイプ
 enum class CandidateEvaluationResultType {
     ERROR,
@@ -653,6 +671,7 @@ static void destroy_session_context_locked() {
     llama_synchronize(g_session.ctx);
     llama_free(g_session.ctx);
     g_session.ctx = nullptr;
+    invalidate_eval_cache_locked();
     g_session.config = RuntimeConfig{0, 0, 0, 0};
 }
 
@@ -749,6 +768,7 @@ static ZenzGenerationResult pure_greedy_decoding(
         return no_zenz_result(ZenzGenerationTermination::DECODE_ERROR);
     }
     llama_kv_cache_clear(ctx);
+    invalidate_eval_cache_locked();
 
     AbortRequestState abort_state{request_seq};
     llama_set_abort_callback(ctx, abort_if_stale, &abort_state);
@@ -899,8 +919,6 @@ static CandidateEvaluationResult candidate_evaluate(
         LOGE("candidate_evaluate: failed to create context");
         return result;
     }
-    llama_kv_cache_clear(ctx);
-
     AbortRequestState abort_state{request_seq};
     llama_set_abort_callback(ctx, abort_if_stale, &abort_state);
 
@@ -928,28 +946,40 @@ static CandidateEvaluationResult candidate_evaluate(
         return result;
     }
 
-    // ★ 512固定だと長文で overflow するので必要量で確保
-    const int32_t cap = (int32_t) all_tokens.size();
-    llama_batch batch = llama_batch_init(cap, 0, 1);
-
-    // プロンプト部分: logits不要（最後のトークンを除く）
-    for (size_t i = 0; i + 1 < prompt_tokens.size(); ++i) {
-        batch.token[batch.n_tokens] = prompt_tokens[i];
-        batch.pos[batch.n_tokens] = (llama_pos) i;
-        batch.n_seq_id[batch.n_tokens] = 1;
-        batch.seq_id[batch.n_tokens][0] = 0;
-        batch.logits[batch.n_tokens] = 0;
-        batch.n_tokens++;
+    // KV 再利用: 前回評価と共通のトークン接頭辞はデコードし直さない（seq_rm で末尾のみ削除）。
+    const size_t T = all_tokens.size();
+    const size_t P = prompt_tokens.size();
+    size_t n_common = 0;
+    {
+        const auto &old = g_eval_cache.tokens;
+        const size_t lim = std::min(old.size(), T);
+        while (n_common < lim && old[n_common] == all_tokens[n_common]) ++n_common;
     }
+    // m: 再利用できない最初の評価位置（i < n_common かつ予測が残っている位置のみ再利用可）
+    size_t m = P;
+    while (m < T && m < n_common && m < g_eval_cache.pred_valid.size() && g_eval_cache.pred_valid[m]) ++m;
+    size_t start = std::min(n_common, m - 1);
+    if (start >= T) start = T - 1;
+    if (!llama_kv_cache_seq_rm(ctx, 0, (llama_pos) start, -1)) {
+        llama_kv_cache_clear(ctx);
+        invalidate_eval_cache_locked();
+        start = 0;
+        m = P;
+    }
+    g_eval_cache.tokens.resize(start);
+    g_eval_cache.pred_max.resize(T, 0);
+    g_eval_cache.pred_logprob.resize(T, 0.0f);
+    g_eval_cache.pred_valid.resize(T, 0);
+    for (size_t i = m; i < T; ++i) g_eval_cache.pred_valid[i] = 0;
 
-    // プロンプトの最後のトークンから候補の最後のトークンまで: logits必要
-    size_t logits_start_pos = prompt_tokens.size() - 1;
-    for (size_t i = logits_start_pos; i < all_tokens.size(); ++i) {
+    const size_t logits_from = std::max(start, P - 1);
+    llama_batch batch = llama_batch_init((int32_t) (T - start), 0, 1);
+    for (size_t i = start; i < T; ++i) {
         batch.token[batch.n_tokens] = all_tokens[i];
         batch.pos[batch.n_tokens] = (llama_pos) i;
         batch.n_seq_id[batch.n_tokens] = 1;
         batch.seq_id[batch.n_tokens][0] = 0;
-        batch.logits[batch.n_tokens] = 1;
+        batch.logits[batch.n_tokens] = i >= logits_from ? 1 : 0;
         batch.n_tokens++;
     }
 
@@ -961,28 +991,26 @@ static CandidateEvaluationResult candidate_evaluate(
             LOGE("candidate_evaluate: llama_decode failed: %d", rc);
         }
         llama_batch_free(batch);
+        llama_kv_cache_clear(ctx);
+        invalidate_eval_cache_locked();
         llama_set_abort_callback(ctx, never_abort, nullptr);
         return result;
     }
+    llama_batch_free(batch);
+    g_eval_cache.tokens = all_tokens;
 
     const int32_t n_vocab = llama_vocab_n_tokens(g_vocab);
-
-    float *all_logits = llama_get_logits(ctx);
-    if (!all_logits) {
-        LOGE("candidate_evaluate: all_logits is null");
-        llama_batch_free(batch);
-        llama_set_abort_callback(ctx, never_abort, nullptr);
-        return result;
-    }
-
-    float total_score = 0.0f;
-
-    for (size_t i = prompt_tokens.size(); i < all_tokens.size(); ++i) {
-        llama_token expected_token = all_tokens[i];
-
-        size_t logits_offset = (i - 1 - logits_start_pos) * (size_t) n_vocab;
-        float *logits = all_logits + logits_offset;
-
+    for (size_t j = logits_from; j + 1 < T; ++j) {
+        const size_t i = j + 1;
+        if (i < P) continue;
+        float *logits = llama_get_logits_ith(ctx, (int32_t) (j - start));
+        if (!logits) {
+            LOGE("candidate_evaluate: logits is null");
+            llama_kv_cache_clear(ctx);
+            invalidate_eval_cache_locked();
+            llama_set_abort_callback(ctx, never_abort, nullptr);
+            return result;
+        }
         int32_t max_id = 0;
         float max_logit = logits[0];
         for (int32_t tid = 1; tid < n_vocab; ++tid) {
@@ -991,21 +1019,28 @@ static CandidateEvaluationResult candidate_evaluate(
                 max_id = tid;
             }
         }
+        float sum_exp = 0.0f;
+        for (int32_t tid = 0; tid < n_vocab; ++tid) {
+            sum_exp += expf(logits[tid] - max_logit);
+        }
+        g_eval_cache.pred_max[i] = (llama_token) max_id;
+        g_eval_cache.pred_logprob[i] = logits[all_tokens[i]] - max_logit - logf(sum_exp);
+        g_eval_cache.pred_valid[i] = 1;
+    }
+    LOGI("candidate_evaluate: tokens=%zu reused=%zu decoded=%zu", T, start, T - start);
 
-        llama_token max_token = (llama_token) max_id;
+    float total_score = 0.0f;
+
+    for (size_t i = P; i < T; ++i) {
+        llama_token expected_token = all_tokens[i];
+        llama_token max_token = g_eval_cache.pred_max[i];
         const std::string max_piece = token_to_piece_str(max_token);
         ZenzOutputDecoder max_piece_decoder;
         const ZenzOutputDecoder::AppendResult max_piece_result =
                 max_piece_decoder.append_piece(max_piece);
         const bool max_token_is_protocol_marker =
                 max_piece_result == ZenzOutputDecoder::AppendResult::PROTOCOL_MARKER;
-
-        float sum_exp = 0.0f;
-        for (int32_t tid = 0; tid < n_vocab; ++tid) {
-            sum_exp += expf(logits[tid] - max_logit);
-        }
-        float log_prob = logits[expected_token] - max_logit - logf(sum_exp);
-        total_score += log_prob;
+        total_score += g_eval_cache.pred_logprob[i];
 
         if (max_token != expected_token) {
             if (llama_vocab_is_eog(g_vocab, max_token) || max_token_is_protocol_marker) {
@@ -1017,14 +1052,12 @@ static CandidateEvaluationResult candidate_evaluate(
                         &valid);
                 if (!valid || partial.empty()) {
                     result.type = CandidateEvaluationResultType::ERROR;
-                    llama_batch_free(batch);
                     llama_set_abort_callback(ctx, never_abort, nullptr);
                     return result;
                 }
                 result.type = CandidateEvaluationResultType::WHOLE_RESULT;
                 result.whole_result = partial;
                 LOGI("candidate_evaluate: WHOLE_RESULT at pos %zu, result=%s", i, partial.c_str());
-                llama_batch_free(batch);
                 llama_set_abort_callback(ctx, never_abort, nullptr);
                 return result;
             } else {
@@ -1036,7 +1069,6 @@ static CandidateEvaluationResult candidate_evaluate(
                         &valid);
                 if (!valid) {
                     result.type = CandidateEvaluationResultType::ERROR;
-                    llama_batch_free(batch);
                     llama_set_abort_callback(ctx, never_abort, nullptr);
                     return result;
                 }
@@ -1045,35 +1077,30 @@ static CandidateEvaluationResult candidate_evaluate(
                 if (prefix_decoder.append_piece(previous_prefix) !=
                             ZenzOutputDecoder::AppendResult::CONTINUE) {
                     result.type = CandidateEvaluationResultType::ERROR;
-                    llama_batch_free(batch);
                     llama_set_abort_callback(ctx, never_abort, nullptr);
                     return result;
                 }
                 if (!llama_vocab_is_control(g_vocab, max_token) || !max_piece.empty()) {
                     if (max_piece_result != ZenzOutputDecoder::AppendResult::CONTINUE) {
                         result.type = CandidateEvaluationResultType::ERROR;
-                        llama_batch_free(batch);
-                        llama_set_abort_callback(ctx, never_abort, nullptr);
+                            llama_set_abort_callback(ctx, never_abort, nullptr);
                         return result;
                     }
                     if (prefix_decoder.append_piece(max_piece) !=
                                 ZenzOutputDecoder::AppendResult::CONTINUE) {
                         result.type = CandidateEvaluationResultType::ERROR;
-                        llama_batch_free(batch);
-                        llama_set_abort_callback(ctx, never_abort, nullptr);
+                            llama_set_abort_callback(ctx, never_abort, nullptr);
                         return result;
                     }
                 }
                 if (!prefix_decoder.finish() || !prefix_decoder.has_text()) {
                     result.type = CandidateEvaluationResultType::ERROR;
-                    llama_batch_free(batch);
                     llama_set_abort_callback(ctx, never_abort, nullptr);
                     return result;
                 }
                 result.type = CandidateEvaluationResultType::FIX_REQUIRED;
                 result.prefix = prefix_decoder.text();
                 LOGI("candidate_evaluate: FIX_REQUIRED at pos %zu, prefix=%s", i, result.prefix.c_str());
-                llama_batch_free(batch);
                 llama_set_abort_callback(ctx, never_abort, nullptr);
                 return result;
             }
@@ -1084,7 +1111,6 @@ static CandidateEvaluationResult candidate_evaluate(
     result.score = total_score;
     LOGI("candidate_evaluate: PASS, score=%f", total_score);
 
-    llama_batch_free(batch);
     llama_set_abort_callback(ctx, never_abort, nullptr);
     return result;
 }
@@ -1094,6 +1120,7 @@ static bool prefill_prompt_prefix_locked(
         const std::vector<llama_token> &prompt_tokens
 ) {
     llama_kv_cache_clear(ctx);
+    invalidate_eval_cache_locked();
 
     if (prompt_tokens.size() <= 1) {
         return true;
@@ -1315,8 +1342,9 @@ Java_com_kazumaproject_zenz_ZenzEngine_setRuntimeConfig(
     if (n_ctx < 128) n_ctx = 128;
     if (n_ctx > 4096) n_ctx = 4096;
 
-    if (n_threads < 1) n_threads = 1;
-    if (n_threads > 8) n_threads = 8;
+    // 小型モデルでは 2〜4 スレッドが最速（それ以上は同期コストが勝つ）
+    if (n_threads < 2) n_threads = 2;
+    if (n_threads > 4) n_threads = 4;
 
     RuntimeConfig new_config{
             n_ctx,
