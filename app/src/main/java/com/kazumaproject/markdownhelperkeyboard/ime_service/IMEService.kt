@@ -2097,8 +2097,11 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         const val CANDIDATE_TYPE_NEXT_WORD: Byte = 53
         /** 文脈絵文字の事前スコア（モデルごとに一度だけ計算）の保存先。 */
 
-        /** 手が止まった後、FIX で直した結果を続けて判定する上限（最初の 1 回と合わせて最大 4 回）。 */
-        private const val ZENZAI_PAUSE_RECHECK_MAX = 3
+        /**
+         * 手が止まった後、FIX で直した結果を zenz が PASS するまで続けて判定する。これは安全上限
+         * （最初の 1 回と合わせて最大 9 回）。同じ判定・変化なし・制約経路なし・ドラフトの繰り返しでも止まる。
+         */
+        private const val ZENZAI_PAUSE_RECHECK_MAX = 8
 
         /** zenz の文脈長。左文脈 40 字 + 読み 32 字 + 候補で十分収まる。 */
         private const val ZENZ_N_CTX = 256
@@ -11042,9 +11045,11 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
             } ?: return@launch
             recordZenzaiDiagnostics(outcome)
             show(outcome.top)
-            // 手が止まった後なので、FIX で直した結果を続けて判定する（PASS か上限まで、打鍵で即キャンセル）。
+            // 手が止まった後なので、FIX で直した結果を zenz が満足する（PASS など）まで続けて判定する。打鍵で即キャンセル。
             var last = outcome
             var rounds = 0
+            // 同じドラフトに戻ったら（振動）止める。
+            val seenDrafts = hashSetOf(outcome.top.string)
             while (last.unverifiedFix && rounds < ZENZAI_PAUSE_RECHECK_MAX) {
                 if (requestToken != zenzRerankRequestToken) return@launch
                 rounds++
@@ -11060,6 +11065,7 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
                 if (!(next.top.zenzAdjusted || next.top.zenzChecked || !last.top.zenzAdjusted)) return@launch
                 show(next.top)
                 last = next
+                if (!seenDrafts.add(next.top.string)) return@launch
             }
         }
     }
@@ -16259,9 +16265,11 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
             }
             remember(outcome)
             show(outcome.top)
-            // 手が止まった後なので、直した結果を同じ読みで続けて判定する（PASS か上限まで）。打鍵で即キャンセル。
+            // 手が止まった後なので、直した結果を同じ読みで zenz が満足するまで続けて判定する。打鍵で即キャンセル。
             var last: ZenzaiOutcome = outcome
             var rounds = 0
+            // 同じドラフトに戻ったら（振動）止める。
+            val seenDrafts = hashSetOf(outcome.top.string)
             while (last.unverifiedFix && rounds < ZENZAI_PAUSE_RECHECK_MAX) {
                 if (!stillCurrent()) return@launch
                 rounds++
@@ -16281,6 +16289,7 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
                 shown = null
                 show(result.top)
                 last = result
+                if (!seenDrafts.add(result.top.string)) return@launch
             }
         }
     }
