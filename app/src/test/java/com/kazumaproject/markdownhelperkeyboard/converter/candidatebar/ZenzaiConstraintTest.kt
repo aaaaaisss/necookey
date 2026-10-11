@@ -56,4 +56,12 @@ class ZenzaiConstraintTest {
         assertFalse(c.isRealizedBy(listOf(seg(0, 3, "今日"), seg(3, 5, "は"))))
         assertFalse(c.isRealizedBy(emptyList()))
     }
+
+    @Test
+    fun fixMustKeepUserDictionarySegments() {
+        val user = seg(0, 3, "杏里")
+        assertTrue(ZenzaiConstraint.preserves(listOf(user, seg(3, 4, "と")), listOf(user)))
+        assertFalse(ZenzaiConstraint.preserves(listOf(seg(0, 3, "アンリ"), seg(3, 4, "と")), listOf(user)))
+        assertTrue(ZenzaiConstraint.preserves(listOf(seg(0, 3, "アンリ")), emptyList()))
+    }
 }

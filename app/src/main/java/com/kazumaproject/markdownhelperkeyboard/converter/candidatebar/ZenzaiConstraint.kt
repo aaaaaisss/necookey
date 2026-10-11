@@ -41,6 +41,12 @@ data class ZenzaiConstraint(
     companion object {
         private const val NON_INITIAL = "ぁぃぅぇぉゃゅょゎっゕゖァィゥェォャュョヮッヵヶー゛゜"
 
+        /** 経路 [segments] が守るべき文節 [protected]（ユーザー辞書・学習の語）をそのまま含むか。 */
+        fun preserves(
+            segments: List<CandidateConversionSegment>,
+            protected: List<CandidateConversionSegment>,
+        ): Boolean = protected.all { it in segments }
+
         /** [readingEnd] で切ると拗音・促音・長音が前の音から離れる。 */
         fun splitsMora(input: String, readingEnd: Int): Boolean =
             readingEnd < input.length && input[readingEnd] in NON_INITIAL

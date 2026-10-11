@@ -10708,24 +10708,33 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         val request = lastKanaKanjiQueryRequest?.copy(input = insertString) ?: return null
         val config = withContext(Dispatchers.Default) { resolveZenzRuntimeConfig() } ?: return null
 
+        // ユーザー辞書・学習辞書から来た文節は zenz に書き換えさせない。候補全体がそうなら推論しない。
+        val topSegments = sumireTop.conversionSegments.ifEmpty {
+            if (latestCandidateSegmentInput == insertString) {
+                latestCandidateSegmentsByString[sumireTop.string].orEmpty()
+            } else {
+                emptyList()
+            }
+        }
+        val protectedSegments = zenzaiProtectedSegments(request, insertString, sumireTop, topSegments)
+        if (protectedSegments == null) {
+            zenzaiCarry = null
+            return null
+        }
+
         // 前回の制約は、その読みが今の読みの先頭に残っている範囲だけ引き継ぐ（後退・途中編集で縮める/捨てる）。
         var constraint = zenzaiCarry?.carriedFor(insertString, context.leftContext)
         var draft = sumireTop
         if (constraint != null) {
-            val topSegments = sumireTop.conversionSegments.ifEmpty {
-                if (latestCandidateSegmentInput == insertString) {
-                    latestCandidateSegmentsByString[sumireTop.string].orEmpty()
-                } else {
-                    emptyList()
-                }
-            }
             if (!constraint.isRealizedBy(topSegments)) {
                 val carried = constraint
                 val constrained = withContext(Dispatchers.Default) {
                     session.queryConstrained(request, carried.surface)
                 }
                 // 表層が一致しても読みの範囲がずれた経路は制約として出さない。
-                if (constrained != null && carried.isRealizedBy(constrained.conversionSegments)) {
+                if (constrained != null && carried.isRealizedBy(constrained.conversionSegments) &&
+                    ZenzaiConstraint.preserves(constrained.conversionSegments, protectedSegments)
+                ) {
                     draft = constrained.copy(zenzAdjusted = true)
                     onProvisional(draft)
                 } else {
@@ -10757,6 +10766,7 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         }
 
         var top = draft
+        var fixRejected = false
         if (verdict.startsWith("FIX:")) {
             val fix = verdict.removePrefix("FIX:")
             if (fix.isNotEmpty() && fix != prefix && !draft.string.startsWith(fix)) {
@@ -10766,14 +10776,21 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
                 val fixed = corrected?.let {
                     ZenzaiConstraint.from(context.leftContext, insertString, fix, it.conversionSegments)
                 }
-                if (corrected != null && fixed != null) {
+                if (corrected != null && fixed != null &&
+                    ZenzaiConstraint.preserves(corrected.conversionSegments, protectedSegments)
+                ) {
                     top = corrected.copy(zenzAdjusted = true)
                     constraint = fixed
+                } else if (corrected != null && fixed != null) {
+                    // 直すとユーザー辞書・学習の語が消える: FIX を採らない（印も付けない）。
+                    fixRejected = true
                 }
             }
         }
         // zenz が評価した（推論・判定キャッシュ再利用）が直さなかった変換には [z] を付ける。
-        if (!verdict.startsWith("ERROR") && !top.zenzAdjusted) top = top.copy(zenzChecked = true)
+        if (!verdict.startsWith("ERROR") && !top.zenzAdjusted && !fixRejected) {
+            top = top.copy(zenzChecked = true)
+        }
         zenzaiCarry = constraint
         Timber.d(
             "zenzai: input=[%s] draft=[%s] verdict=[%s] top=[%s] constraint=[%s/%s] inferred=%s",
@@ -10785,6 +10802,36 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
             inferred = cached == null,
         )
     }
+
+    /**
+     * [candidate] のうちユーザー辞書・学習辞書の登録語そのもの（読み範囲と出力が一致）の文節。
+     * 経路の分かれ目が分からないユーザー辞書・学習候補（文節情報なし）は全体を守るため null。
+     */
+    private suspend fun zenzaiProtectedSegments(
+        request: KanaKanjiQueryRequest,
+        input: String,
+        candidate: Candidate,
+        segments: List<CandidateConversionSegment>,
+    ): List<CandidateConversionSegment>? {
+        val fromUserData = candidate.type == CANDIDATE_TYPE_USER_DICTIONARY ||
+            candidate.type == CANDIDATE_TYPE_LEARNED_DICTIONARY
+        if (segments.isEmpty()) return if (fromUserData) null else emptyList()
+        return withContext(Dispatchers.IO) {
+            segments.filter { segment ->
+                if (segment.inputStart < 0 || segment.inputEnd > input.length) return@filter false
+                val reading = input.substring(segment.inputStart, segment.inputEnd)
+                (isUserDictionaryEnable == true &&
+                    request.userDictionaryRepository.exactMatchesForConversion(reading)
+                        .any { it.word == segment.output }) ||
+                    request.learnRepository?.findExactMatchesForConversion(reading)
+                        ?.any { it.out == segment.output } == true
+            }
+        }
+    }
+
+    /** ユーザー辞書の候補: 読みが入力と完全一致する語を先に、その中はスコア（小さいほど強い）順。 */
+    private fun userDictionaryExactFirst(input: String): Comparator<Candidate> =
+        compareBy<Candidate>({ it.length.toInt() != input.length }, { it.score })
 
     private fun recordZenzaiDiagnostics(outcome: ZenzaiOutcome?) {
         if (outcome == null || !outcome.inferred) return
@@ -15881,7 +15928,9 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
             launchZenzaiForTwoRow(
                 insertString = insertString,
                 analysis = baseAnalysis,
-                sumireTop = sumireTop,
+                sumireTop = if (sumireTop.conversionSegments.isNotEmpty()) sumireTop else sumireTop.copy(
+                    conversionSegments = core?.candidateSegmentsByString?.get(sumireTop.string).orEmpty(),
+                ),
                 cacheKey = cacheKey,
                 context = context,
                 conversion = conversion,
@@ -16119,7 +16168,7 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
                         length = (it.reading.length).toUByte(),
                         score = it.posScore
                     )
-                }.sortedBy { it.score }
+                }.sortedWith(userDictionaryExactFirst(insertString))
             }
         } else {
             emptyList()
@@ -16231,7 +16280,7 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
                                 length = it.reading.length.toUByte(),
                                 score = it.posScore,
                             )
-                        }.sortedBy { it.score }
+                        }.sortedWith(userDictionaryExactFirst(insertString))
                     }
                 }
             } else {
@@ -16393,7 +16442,7 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
                         length = (it.reading.length).toUByte(),
                         score = it.posScore
                     )
-                }.sortedBy { it.score }
+                }.sortedWith(userDictionaryExactFirst(insertString))
             }
         } else {
             emptyList()

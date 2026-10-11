@@ -100,3 +100,5 @@
 - 182ce82 システム圧縮辞書の詰め込み配列（ラベル・termId・nodeId）と品詞・コスト（short）をメモリマップ領域のビューから直接読む（ヒープ約 15MB 減）。LOUDS のビット列と rank 索引（約 3.5MB）は複写のまま。要実機確認: 変換速度。
 - Room v51: 削除済み機能の表（candidate_order_override, ngram_rule, custom_zero_query_entries, system_user_dictionary_entry, physical_keyboard_shortcut_items）を MIGRATION_50_51 で DROP。関連コード・レイアウト・文字列・テストも削除。delete_key_flick（左フリック削除の設定が残存）、ローマ字表・Sumire 特殊キー（S4 まで）、shortcut 表（候補欄コードが型を使用）は残す。
 - ユーザー報告（2026-10-11）: 設定アプリ起動時のフリーズは解消。
+- 7afcc7e Zenzai の印: [Z]=zenz が直した、[z]=zenz が評価して同意（判定キャッシュ再利用を含む）、印なし=zenz が動かなかった。
+- ユーザー辞書・学習の語を zenz から保護: 原因はスコアではなく（posScore はそのまま単語コストで 1 が最強、既定 4000）、Zenzai の FIX 制約付き再探索がユーザー辞書の語（例 杏里）を置き換えていたこと。登録語と読み範囲・出力が一致する文節を消す FIX/引き継ぎ制約は採らない。文節情報のないユーザー辞書・学習候補では zenz を回さない。ユーザー辞書候補は読み完全一致を先頭に。
