@@ -10708,7 +10708,7 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         val request = lastKanaKanjiQueryRequest?.copy(input = insertString) ?: return null
         val config = withContext(Dispatchers.Default) { resolveZenzRuntimeConfig() } ?: return null
 
-        // ユーザー辞書・学習辞書から来た文節は zenz に書き換えさせない。候補全体がそうなら推論しない。
+        // ユーザー辞書から来た文節は zenz に書き換えさせない（学習語は守らない）。候補全体がそうなら推論しない。
         val topSegments = sumireTop.conversionSegments.ifEmpty {
             if (latestCandidateSegmentInput == insertString) {
                 latestCandidateSegmentsByString[sumireTop.string].orEmpty()
@@ -10782,7 +10782,7 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
                     top = corrected.copy(zenzAdjusted = true)
                     constraint = fixed
                 } else if (corrected != null && fixed != null) {
-                    // 直すとユーザー辞書・学習の語が消える: FIX を採らない（印も付けない）。
+                    // 直すとユーザー辞書の語が消える: FIX を採らない（印も付けない）。
                     fixRejected = true
                 }
             }
@@ -10804,8 +10804,8 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
     }
 
     /**
-     * [candidate] のうちユーザー辞書・学習辞書の登録語そのもの（読み範囲と出力が一致）の文節。
-     * 経路の分かれ目が分からないユーザー辞書・学習候補（文節情報なし）は全体を守るため null。
+     * [candidate] のうちユーザー辞書の登録語そのもの（読み範囲と出力が一致）の文節。学習語は守らない。
+     * 経路の分かれ目が分からないユーザー辞書候補（文節情報なし）は全体を守るため null。
      */
     private suspend fun zenzaiProtectedSegments(
         request: KanaKanjiQueryRequest,
@@ -10813,18 +10813,15 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         candidate: Candidate,
         segments: List<CandidateConversionSegment>,
     ): List<CandidateConversionSegment>? {
-        val fromUserData = candidate.type == CANDIDATE_TYPE_USER_DICTIONARY ||
-            candidate.type == CANDIDATE_TYPE_LEARNED_DICTIONARY
+        val fromUserData = ZenzaiConstraint.isProtectedCandidateType(candidate.type)
         if (segments.isEmpty()) return if (fromUserData) null else emptyList()
         return withContext(Dispatchers.IO) {
             segments.filter { segment ->
                 if (segment.inputStart < 0 || segment.inputEnd > input.length) return@filter false
                 val reading = input.substring(segment.inputStart, segment.inputEnd)
-                (isUserDictionaryEnable == true &&
+                isUserDictionaryEnable == true &&
                     request.userDictionaryRepository.exactMatchesForConversion(reading)
-                        .any { it.word == segment.output }) ||
-                    request.learnRepository?.findExactMatchesForConversion(reading)
-                        ?.any { it.out == segment.output } == true
+                        .any { it.word == segment.output }
             }
         }
     }

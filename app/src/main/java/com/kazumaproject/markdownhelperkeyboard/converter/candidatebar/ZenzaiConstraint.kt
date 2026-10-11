@@ -1,5 +1,6 @@
 package com.kazumaproject.markdownhelperkeyboard.converter.candidatebar
 
+import com.kazumaproject.markdownhelperkeyboard.converter.candidate.CANDIDATE_TYPE_USER_DICTIONARY
 import com.kazumaproject.markdownhelperkeyboard.converter.candidate.CandidateConversionSegment
 
 /**
@@ -41,7 +42,13 @@ data class ZenzaiConstraint(
     companion object {
         private const val NON_INITIAL = "ぁぃぅぇぉゃゅょゎっゕゖァィゥェォャュョヮッヵヶー゛゜"
 
-        /** 経路 [segments] が守るべき文節 [protected]（ユーザー辞書・学習の語）をそのまま含むか。 */
+        /**
+         * zenz に書き換えさせない候補の種類。ユーザー辞書だけ。学習辞書の語は守らない
+         * （誤って学習した同音異義語を zenz が直せるように）。
+         */
+        fun isProtectedCandidateType(type: Byte): Boolean = type == CANDIDATE_TYPE_USER_DICTIONARY
+
+        /** 経路 [segments] が守るべき文節 [protected]（ユーザー辞書の語）をそのまま含むか。 */
         fun preserves(
             segments: List<CandidateConversionSegment>,
             protected: List<CandidateConversionSegment>,

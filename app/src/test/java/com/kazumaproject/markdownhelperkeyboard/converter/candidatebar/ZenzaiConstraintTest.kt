@@ -1,5 +1,7 @@
 package com.kazumaproject.markdownhelperkeyboard.converter.candidatebar
 
+import com.kazumaproject.markdownhelperkeyboard.converter.candidate.CANDIDATE_TYPE_LEARNED_DICTIONARY
+import com.kazumaproject.markdownhelperkeyboard.converter.candidate.CANDIDATE_TYPE_USER_DICTIONARY
 import com.kazumaproject.markdownhelperkeyboard.converter.candidate.CandidateConversionSegment
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -63,5 +65,11 @@ class ZenzaiConstraintTest {
         assertTrue(ZenzaiConstraint.preserves(listOf(user, seg(3, 4, "と")), listOf(user)))
         assertFalse(ZenzaiConstraint.preserves(listOf(seg(0, 3, "アンリ"), seg(3, 4, "と")), listOf(user)))
         assertTrue(ZenzaiConstraint.preserves(listOf(seg(0, 3, "アンリ")), emptyList()))
+    }
+
+    @Test
+    fun onlyUserDictionaryIsProtectedNotLearnedWords() {
+        assertTrue(ZenzaiConstraint.isProtectedCandidateType(CANDIDATE_TYPE_USER_DICTIONARY))
+        assertFalse(ZenzaiConstraint.isProtectedCandidateType(CANDIDATE_TYPE_LEARNED_DICTIONARY))
     }
 }
