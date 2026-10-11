@@ -2171,6 +2171,11 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
     // necookey: two-row candidate bar + Zenzai (zenz verifies Sumire's draft, one inference per key).
     private val necookeyCandidateBarConfig = NecookeyCandidateBarConfig.DEFAULT
     private var necookeyZenzJob: Job? = null
+    /** Zenzai cache key of [necookeyZenzJob]; a repeat request for the same key keeps the running job. */
+    private var necookeyZenzJobKey: String? = null
+    private var necookeyZenzJobInput: String? = null
+    /** Newest candidate token for [necookeyZenzJobInput]; the running job publishes with it. */
+    private var necookeyZenzLatestToken: CandidateRequestToken? = null
     /** Bunsetsu analysis + paths of the latest two-row conversion; used to learn per bunsetsu. */
     /** Editor text left of the composition, captured for [necookeyLeftContextInput]. */
     @Volatile
@@ -4250,6 +4255,8 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         suggestionAdapter = null
         necookeyZenzJob?.cancel()
         necookeyZenzJob = null
+        necookeyZenzJobKey = null
+        necookeyZenzJobInput = null
         necookeyPredictionAdapter?.release()
         necookeyPredictionAdapter = null
         shortcutAdapter = null
@@ -15900,6 +15907,8 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
     private fun cancelNecookeyTwoRowBar() {
         necookeyZenzJob?.cancel()
         necookeyZenzJob = null
+        necookeyZenzJobKey = null
+        necookeyZenzJobInput = null
         if (necookeyPredictionRowInput.isNotEmpty() || necookeyPredictionRowCandidates.isNotEmpty()) {
             necookeyPredictionRowInput = ""
             necookeyPredictionRowCandidates = emptyList()
@@ -15913,8 +15922,16 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         token: CandidateRequestToken,
     ) {
         beginZenzRerankRequest()
-        necookeyZenzJob?.cancel()
-        necookeyZenzJob = null
+        // Latest-wins, but only a request for a different reading cancels the running inference.
+        // A refresh for the same reading (selection update, live-conversion echo) may return early
+        // below; cancelling here would drop the final keystroke's zenz result.
+        if (necookeyZenzJobInput != insertString) {
+            necookeyZenzJob?.cancel()
+            necookeyZenzJob = null
+            necookeyZenzJobKey = null
+            necookeyZenzJobInput = insertString
+        }
+        necookeyZenzLatestToken = token
 
         // Prediction first: both lookups update the shared bunsetsu state, and the conversion
         // result must be the one left behind for space / henkan handling.
@@ -15972,7 +15989,15 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         )
         publishNecookeyTwoRowBar(insertString, bar, token, applyLiveConversion = true)
 
-        if (sumireTop != null && cacheKey != null && cached == null && context != null) {
+        // Keep a running inference for exactly this context/reading/draft; anything else is superseded.
+        val keepRunning = cacheKey != null && necookeyZenzJobKey == cacheKey && necookeyZenzJob?.isActive == true
+        if (!keepRunning) {
+            necookeyZenzJob?.cancel()
+            necookeyZenzJob = null
+            necookeyZenzJobKey = null
+        }
+        if (sumireTop != null && cacheKey != null && cached == null && context != null && !keepRunning) {
+            necookeyZenzJobKey = cacheKey
             launchZenzaiForTwoRow(
                 insertString = insertString,
                 analysis = baseAnalysis,
@@ -16000,8 +16025,10 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
     ) {
         necookeyZenzJob = scope.launch {
             var shown: Candidate? = null
+            fun stillCurrent(): Boolean =
+                necookeyZenzJobKey == cacheKey && shouldApplyCandidateResult(insertString)
             suspend fun show(top: Candidate) {
-                if (inputString.value != insertString || !shouldApplyCandidateResult(insertString, token)) return
+                if (!stillCurrent()) return
                 if (!shouldUseNecookeyTwoRowBar()) return
                 val override = top.takeIf {
                     it.string != sumireTop.string || it.zenzChecked || it.zenzAdjusted
@@ -16017,7 +16044,7 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
                     isActionCandidate = ::isNecookeyActionCandidate,
                 )
                 shown = override
-                publishNecookeyTwoRowBar(insertString, bar, token, applyLiveConversion = false)
+                publishNecookeyTwoRowBar(insertString, bar, necookeyZenzLatestToken ?: token, applyLiveConversion = false)
                 if (
                     shouldStartLiveConversion(insertString) && !hasConvertedKatakana &&
                     inputString.value == insertString
@@ -16038,9 +16065,8 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
                 null
             } ?: return@launch
             recordZenzaiDiagnostics(outcome)
-            if (inputString.value != insertString || !shouldApplyCandidateResult(insertString, token)) {
-                return@launch
-            }
+            if (!stillCurrent()) return@launch
+            shown = null // a same-reading refresh may have repainted the bar since the provisional
             synchronized(necookeyZenzOverrideCache) {
                 necookeyZenzOverrideCache[cacheKey] =
                     (outcome.top.takeIf { outcome.changed || it.zenzChecked || it.zenzAdjusted }) to zenzaiCarry
