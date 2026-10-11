@@ -35,9 +35,6 @@ object NextWordExtras {
 
     private const val SENTENCE_END = "、。！？!?,.，．"
 
-    /** 2 個目以降の文脈絵文字を、1 個目の後ろに何件挟んで置くか。 */
-    const val EMOJI_SECOND_SLOT = 2
-
     /** おまけ候補を base の何位相当として位置ペナルティを掛けるか。 */
     const val EXTRA_RANK = 3
 
@@ -123,10 +120,11 @@ object NextWordExtras {
             compareByDescending<Slot> { it.fused }.thenBy { it.order },
         ).map { it.candidate }
         // 絵文字は PMI で既に選別済み。キーワードの生スコアは語の長さ・種類で助詞より低く出やすく、
-        // 生スコアで混ぜると画面外に押し出されていた。1 個目は base 先頭の直後、残りは少し後ろに固定する。
+        // 生スコアで混ぜると画面外に押し出されていた。1 個目は base の 1 位の直後、残りは base の 2 位の直後に固定する
+        // （一番押しやすい先頭は学習済みの後続語に残す）。
         val picked = emoji.filter { it.second in 0 until emojiTargets }
             .take(ContextEmojiSelector.MAX_SHOWN).map { it.first }
-        val middle = picked.take(1) + merged.take(EMOJI_SECOND_SLOT) + picked.drop(1) + merged.drop(EMOJI_SECOND_SLOT)
-        return top.map { head[it] } + middle + base.drop(head.size)
+        val tops = top.map { head[it] }
+        return tops.take(1) + picked.take(1) + tops.drop(1) + picked.drop(1) + merged + base.drop(head.size)
     }
 }

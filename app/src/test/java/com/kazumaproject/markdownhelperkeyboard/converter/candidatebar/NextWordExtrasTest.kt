@@ -21,7 +21,8 @@ class NextWordExtrasTest {
         // head a b c, then 4 emoji keywords; picked emoji are placed by their keyword score
         val scores = floatArrayOf(-2f, -2f, -5f, -9f, -3f, -1f, -8f)
         val out = NextWordExtras.rerank(base, scores, emptyList(), 4, listOf(e("E2") to 2, e("E1") to 1)).map { it.string }
-        assertEquals(listOf("a", "b"), out.take(2))
+        // emoji sit right after the first and second learned words
+        assertEquals(listOf("a", "E2", "b", "E1"), out.take(4))
         assertEquals(listOf("E2", "E1"), out.filter { it.startsWith("E") })
         assertTrue(out.containsAll(listOf("a", "b", "c")))
         assertEquals(5, out.size)

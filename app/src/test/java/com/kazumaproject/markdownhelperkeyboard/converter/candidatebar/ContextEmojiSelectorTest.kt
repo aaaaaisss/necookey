@@ -109,4 +109,16 @@ class ContextEmojiSelectorTest {
         scores[0] = -10.5f // ビール: PMI -0.5（文脈に出た語なので出す）
         assertEquals(listOf(0), sel.rank(pool, scores))
     }
+
+    @Test
+    fun priorsSurviveExportImportForSameModelOnly() {
+        val sel = ContextEmojiSelector(entries)
+        withPriors(sel, -7f)
+        val text = sel.exportPriors("m", "m|1|2")!!
+        val fresh = ContextEmojiSelector(entries)
+        assertEquals(0, fresh.importPriors("m", "m|9|9", text))
+        assertEquals(entries.size, fresh.importPriors("m", "m|1|2", text))
+        assertTrue(fresh.missingPriors("m").isEmpty())
+        assertEquals(-7f, fresh.prior("大爆笑")!!, 0f)
+    }
 }

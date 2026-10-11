@@ -184,6 +184,7 @@ import com.kazumaproject.markdownhelperkeyboard.clipboard_history.database.Clipb
 import com.kazumaproject.markdownhelperkeyboard.clipboard_history.database.ItemType
 import com.kazumaproject.markdownhelperkeyboard.converter.candidate.BunsetsuCandidateResult
 import com.kazumaproject.markdownhelperkeyboard.converter.candidatebar.ZenzaiConstraint
+import com.kazumaproject.markdownhelperkeyboard.converter.candidatebar.NextWordCarry
 import com.kazumaproject.markdownhelperkeyboard.converter.candidatebar.BunsetsuAnalysis
 import com.kazumaproject.markdownhelperkeyboard.converter.candidatebar.BunsetsuAnalyzer
 import com.kazumaproject.markdownhelperkeyboard.converter.candidatebar.BunsetsuRangeEditor
@@ -717,6 +718,11 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
     private var zeroQueryLookupJob: Job? = null
     /** 後続語候補の zenz 並べ替え（1 推論・非同期、入力・再確定でキャンセル）。 */
     private var zeroQueryZenzJob: Job? = null
+
+    /** 確定後に表示した後続語（並べ替え後）。続けて打ち始めたら読みで絞って予測欄の先頭に出す（[NextWordCarry]）。 */
+    @Volatile private var carriedNextWords: List<Candidate> = emptyList()
+    /** [carriedNextWords] を出したときの確定文字列。 */
+    @Volatile private var carriedNextWordsKey: String = ""
     private val zeroQueryProviderHolder = LazyZeroQueryProvider {
         ZeroQueryProvider(AndroidZeroQueryAssetReader(assets))
     }
@@ -1353,6 +1359,8 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
 
             val shown = NextWordExtras.initial(candidates, functionWords)
             zeroQueryCandidates = shown
+            carriedNextWords = shown
+            carriedNextWordsKey = key
             zeroQueryVisible = true
             zeroQuerySelectionUpdateSuppressCount += 1
             zeroQueryLookupJob = null
@@ -1402,6 +1410,8 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
                 Timber.w(e, "zenz next-word rerank failed")
                 null
             } ?: return@launch
+            // 再起動直後でも保存済みの事前スコアで絵文字を選べるように、採点前に読み込む。
+            model?.let { loadContextEmojiPriors(it) }
             val emoji = if (emojiTargets.isNotEmpty() && scores.size == head.size) {
                 val offset = head.size - emojiTargets.size
                 val seen = candidates.mapTo(HashSet()) { it.string }
@@ -1425,6 +1435,7 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
             ) {
                 Timber.d("zenz next-word rerank: %s -> %s", head, reranked.take(head.size).map { it.string })
                 zeroQueryCandidates = reranked
+                if (carriedNextWordsKey == key) carriedNextWords = reranked
                 refreshCandidateStripContent(candidatesShown = false)
             }
             zeroQueryZenzJob = null
@@ -1453,8 +1464,12 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
 
     /** 文脈絵文字キーワードの空文脈スコア（PMI の事前）を [ContextEmojiSelector.PRIOR_BATCH] 件ずつ計算してキャッシュ。続きがあれば true。 */
     private suspend fun fillContextEmojiPriors(model: String, first: List<MoodEmoji>): Boolean {
+        loadContextEmojiPriors(model)
         val keywords = contextEmojiSelector.missingPriors(model, first)
-        if (keywords.isEmpty()) return false
+        if (keywords.isEmpty()) {
+            saveContextEmojiPriors(model)
+            return false
+        }
         try {
             val priors = withContext(Dispatchers.Default) {
                 val config = resolveZenzRuntimeConfig() ?: return@withContext null
@@ -1478,6 +1493,49 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         } catch (e: Exception) {
             Timber.w(e, "zenz context emoji prior failed")
             return false
+        }
+    }
+
+    /** 事前スコアを読み込み済みのモデル（ファイルは 1 プロセスで 1 回だけ読む）。 */
+    private var contextEmojiPriorsLoadedFor: String? = null
+    private var contextEmojiPriorsSavedFor: String? = null
+
+    /** 保存ファイルのモデル識別子: パスと大きさ・更新時刻（同じパスで別モデルに差し替えても読み違えない）。 */
+    private fun contextEmojiPriorModelId(model: String): String {
+        val f = File(model)
+        return "$model|${f.length()}|${f.lastModified()}"
+    }
+
+    private suspend fun loadContextEmojiPriors(model: String) {
+        if (contextEmojiPriorsLoadedFor == model) return
+        contextEmojiPriorsLoadedFor = model
+        withContext(Dispatchers.IO) {
+            try {
+                val file = File(filesDir, CONTEXT_EMOJI_PRIOR_FILE)
+                if (file.isFile) {
+                    contextEmojiSelector.importPriors(model, contextEmojiPriorModelId(model), file.readText())
+                }
+            } catch (e: Exception) {
+                Timber.w(e, "context emoji priors load failed")
+            }
+        }
+    }
+
+    /** 全件そろったら一度だけ保存する。 */
+    private suspend fun saveContextEmojiPriors(model: String) {
+        if (contextEmojiPriorsSavedFor == model) return
+        contextEmojiPriorsSavedFor = model
+        val id = contextEmojiPriorModelId(model)
+        val text = contextEmojiSelector.exportPriors(model, id) ?: return
+        withContext(Dispatchers.IO) {
+            try {
+                val file = File(filesDir, CONTEXT_EMOJI_PRIOR_FILE)
+                val tmp = File(filesDir, "$CONTEXT_EMOJI_PRIOR_FILE.tmp")
+                tmp.writeText(text)
+                if (!tmp.renameTo(file)) tmp.delete()
+            } catch (e: Exception) {
+                Timber.w(e, "context emoji priors save failed")
+            }
         }
     }
 
@@ -1554,6 +1612,11 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         }
 
         val cursorMoved = oldSelStart != newSelStart || oldSelEnd != newSelEnd
+        if (cursorMoved && inputAndSelectionAreEmpty) {
+            // 入力なしでカーソルだけ動いた = 別の場所。引き継いだ後続語は使わない。
+            carriedNextWords = emptyList()
+            carriedNextWordsKey = ""
+        }
         if (
             editorTextSelected ||
             newSelStart != newSelEnd ||
@@ -2119,6 +2182,15 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         /** Learned following word (後続語) from the next-word table. */
         const val CANDIDATE_TYPE_NEXT_WORD: Byte = 53
         private const val CONTEXT_EMOJI_CANDIDATE_TYPE: Byte = 11
+        /** 文脈絵文字の事前スコア（モデルごとに一度だけ計算）の保存先。 */
+        private const val CONTEXT_EMOJI_PRIOR_FILE = "context_emoji_priors.tsv"
+
+        /** 入力が止まってから追加で Zenzai 判定するまでの時間。 */
+        private const val ZENZAI_IDLE_RECHECK_DELAY_MS = 350L
+
+        /** 入力停止後の追加判定の上限（打鍵時の 1 回と合わせて最大 3 回）。 */
+        private const val ZENZAI_IDLE_RECHECK_MAX = 2
+
         /** zenz の文脈長。左文脈 40 字 + 読み 32 字 + 候補で十分収まる。 */
         private const val ZENZ_N_CTX = 256
         private const val NEXT_WORD_CANDIDATE_LIMIT = 6
@@ -10793,6 +10865,8 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         val top: Candidate,
         val changed: Boolean,
         val inferred: Boolean,
+        /** FIX/WHOLE で直した結果をまだ zenz が確認していない（入力が止まったら追加で判定する対象）。 */
+        val unverifiedFix: Boolean = false,
     )
 
     /** zenz を回す対象か（唯一の設定は zenz の ON/OFF）。 */
@@ -10891,6 +10965,7 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         }
 
         var top = draft
+        var fixedNow = false
         // zenz が「この変換で良い」と判定した（PASS）ときだけ [z] を付ける。
         // 以前は WHOLE や「同じ制約が再び出た（直せなかった）」も同意扱いで [z] が付いていた。
         var agreed = verdict.startsWith("PASS")
@@ -10918,6 +10993,7 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
                 ) {
                     top = corrected.copy(zenzAdjusted = true)
                     constraint = fixed
+                    fixedNow = true
                 } else if (corrected == null) {
                     // 制約を満たす経路がない: azooKey 同様に制約は捨てる（直前のドラフトを使う）。
                     constraint = null
@@ -10937,6 +11013,7 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
             top = top,
             changed = top.string != sumireTop.string,
             inferred = cached == null,
+            unverifiedFix = fixedNow,
         )
     }
 
@@ -16088,7 +16165,13 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         cached?.let { (_, carry) -> zenzaiCarry = carry }
         val cachedOverride = cached?.first
 
-        val barPredictions = nextWordCandidates + predictions
+        val carried = carriedNextWordsFor(insertString)
+        if (!shouldApplyCandidateResult(insertString, token)) return
+        val barPredictions = if (carried.isEmpty()) {
+            nextWordCandidates + predictions
+        } else {
+            (carried + nextWordCandidates + predictions).distinctBy { it.string }
+        }
         val bar = TwoRowCandidateBarPlanner.plan(
             input = insertString,
             conversionCandidates = conversion,
@@ -16189,11 +16272,63 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
             recordZenzaiDiagnostics(outcome)
             if (!stillCurrent()) return@launch
             shown = null // a same-reading refresh may have repainted the bar since the provisional
-            synchronized(necookeyZenzOverrideCache) {
-                necookeyZenzOverrideCache[cacheKey] =
-                    (outcome.top.takeIf { outcome.changed || it.zenzChecked || it.zenzAdjusted }) to zenzaiCarry
+            fun remember(result: ZenzaiOutcome) {
+                synchronized(necookeyZenzOverrideCache) {
+                    necookeyZenzOverrideCache[cacheKey] =
+                        (result.top.takeIf { result.changed || it.zenzChecked || it.zenzAdjusted }) to zenzaiCarry
+                }
             }
+            remember(outcome)
             show(outcome.top)
+            // 入力が止まったら、直した結果を同じ読みでもう一度判定する（PASS か上限まで）。打鍵で即キャンセル。
+            // 1 打鍵 1 推論のままだと、最後の FIX で直した結果が未確認で残るため。
+            var last: ZenzaiOutcome = outcome
+            var rounds = 0
+            while (last.unverifiedFix && rounds < ZENZAI_IDLE_RECHECK_MAX) {
+                delay(ZENZAI_IDLE_RECHECK_DELAY_MS)
+                if (!stillCurrent()) return@launch
+                rounds++
+                val next = try {
+                    runZenzaiStep(insertString, sumireTop, context, ::show)
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    Timber.w(e, "zenzai idle recheck failed")
+                    null
+                } ?: return@launch
+                recordZenzaiDiagnostics(next)
+                if (!stillCurrent()) return@launch
+                // 追加判定で読みが同じまま候補が戻る（制約が捨てられた）ときは直前の結果を残す。
+                val result = if (next.top.zenzAdjusted || next.top.zenzChecked || !last.top.zenzAdjusted) next else last.copy(unverifiedFix = false)
+                remember(result)
+                shown = null
+                show(result.top)
+                last = result
+            }
+        }
+    }
+
+    /**
+     * 直前の確定後に表示した後続語のうち、読みが [insertString] で始まるもの（[NextWordCarry]）。
+     * 入力の直前がその確定文字列で終わっているときだけ（カーソル移動・削除後は使わない）。
+     */
+    private suspend fun carriedNextWordsFor(insertString: String): List<Candidate> {
+        val key = carriedNextWordsKey
+        val matches = NextWordCarry.filter(carriedNextWords, insertString)
+        if (matches.isEmpty() || key.isEmpty()) return emptyList()
+        return try {
+            val (inputConnection, liveLength) = withContext(Dispatchers.Main.immediate) {
+                currentInputConnection to lastCandidate?.length
+            }
+            // 未確定文字列はそのまま（ひらがな）か、ライブ変換後の表記のどちらかで出ている。
+            val composingLengths = listOfNotNull(insertString.length, liveLength).distinct()
+            val raw = getLeftContext(inputConnection, composingLengths.max())
+            if (composingLengths.any { NextWordCarry.contextMatches(key, raw.dropLast(it)) }) matches else emptyList()
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            Timber.w(e, "carried next words failed")
+            emptyList()
         }
     }
 

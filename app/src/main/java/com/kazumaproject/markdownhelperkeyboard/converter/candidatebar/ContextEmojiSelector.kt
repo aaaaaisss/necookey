@@ -136,6 +136,41 @@ class ContextEmojiSelector(entries: List<MoodEmoji>) {
     @Synchronized
     fun prior(keyword: String): Float? = priors[keyword]
 
+    /** [model] の事前スコアを保存用テキスト（1 行目が [header]＝モデル識別子、以降 keyword TAB score）にする。 */
+    @Synchronized
+    fun exportPriors(model: String, header: String): String? {
+        if (priorModel != model || priors.isEmpty()) return null
+        return buildString {
+            append(header).append('\n')
+            priors.forEach { (k, v) -> append(k).append('\t').append(v).append('\n') }
+        }
+    }
+
+    /**
+     * [exportPriors] の出力を読み込む（モデルが一致するときだけ）。事前スコアは文脈によらずモデルで決まるので、
+     * 一度計算すれば再起動後も使い回せる（毎回 150 語を採点し直さない）。読めた件数を返す。
+     */
+    @Synchronized
+    fun importPriors(model: String, header: String, text: String): Int {
+        val lines = text.lines()
+        if (lines.firstOrNull() != header) return 0
+        if (priorModel != model) {
+            priors.clear()
+            priorModel = model
+        }
+        var n = 0
+        for (line in lines.drop(1)) {
+            val tab = line.indexOf('\t')
+            if (tab <= 0) continue
+            val v = line.substring(tab + 1).toFloatOrNull() ?: continue
+            if (v.isFinite()) {
+                priors[line.substring(0, tab)] = v
+                n++
+            }
+        }
+        return n
+    }
+
     /**
      * [targets]（[prefilter] の結果）と同じ並びの左文脈つきスコアから PMI 上位 [MAX_SHOWN] 件の
      * インデックスを返す（PMI 降順、[MIN_PMI] 超のみ）。選ばれた絵文字は次回の [prefilter] の hot 枠に入り、採点されて選ばれなかった hot は外れる。

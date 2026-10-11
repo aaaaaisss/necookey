@@ -24,7 +24,7 @@ class NextWordExtrasFunctionWordTest {
         // head a..d, fw 、 。 は が を, emoji
         val scores = floatArrayOf(-3f, -3f, -3f, -3f, -9f, -1f, -2f, -0.5f, -8f, -4f)
         val out = NextWordExtras.rerank(base, scores, fw, 1, listOf(emoji[0] to 0)).map { it.string }
-        assertEquals(listOf("a", "b"), out.take(2))
+        assertEquals(listOf("a", "😀", "b"), out.take(3))
         assertEquals(listOf("が", "。", "は"), out.filter { it in setOf("、", "。", "は", "が", "を") })
         assertTrue(out.containsAll(listOf("a", "b", "c", "d", "😀")))
         assertEquals(8, out.size)
