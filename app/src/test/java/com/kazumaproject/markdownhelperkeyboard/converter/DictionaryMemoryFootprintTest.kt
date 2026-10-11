@@ -32,7 +32,7 @@ class DictionaryMemoryFootprintTest {
         report += "connectionMatrix" to usedHeapBytes()
 
         retained.addAll(listOf(
-            loadTriple(assetsDir, posTable, "system/tango.dat.zip", "system/yomi.dat.zip", "system/token.dat.zip"),
+            loadTriple(assetsDir, posTable, "../../../dictionary-src/system/tango.dat.zip", "../../../dictionary-src/system/yomi.dat.zip", "../../../dictionary-src/system/token.dat.zip"),
         ))
         report += "system" to usedHeapBytes()
 
@@ -98,7 +98,7 @@ class DictionaryMemoryFootprintTest {
     }
 
     private fun loadConnectionMatrix(assetsDir: File): ConnectionMatrix.CostTable =
-        assetsDir.open("connectionId.dat.zip").use { input ->
+        assetsDir.open("../../../dictionary-src/connectionId.dat.zip").use { input ->
             DictionaryBinaryReader.openZipAwareRaw(input, "connectionId.dat.zip") { raw, byteSize ->
                 raw.use {
                     ConnectionMatrix.fromShortArray(

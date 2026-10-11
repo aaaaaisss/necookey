@@ -154,7 +154,7 @@ internal object TestEngineFactory {
         val englishEngine = mock<EnglishEngine>()
         whenever(englishEngine.getCandidates(any(), any())).thenReturn(emptyList<Candidate>())
 
-        val system = loadTriple("system/tango.dat.zip", "system/yomi.dat.zip", "system/token.dat.zip")
+        val system = loadTriple("../../../dictionary-src/system/tango.dat.zip", "../../../dictionary-src/system/yomi.dat.zip", "../../../dictionary-src/system/token.dat.zip")
         val singleKanji = loadTriple(
             "single_kanji/tango_singleKanji.dat",
             "single_kanji/yomi_singleKanji.dat",
@@ -257,7 +257,7 @@ internal object TestEngineFactory {
     }
 
     private fun readConnectionIds(): ShortArray =
-        assetInput("connectionId.dat.zip") {
+        assetInput("../../../dictionary-src/connectionId.dat.zip") {
             ConnectionIdBuilder().readShortArrayFromBytes(it)
         }
 

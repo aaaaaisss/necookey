@@ -138,7 +138,7 @@ class ConnectionMatrixTest {
         }
 
     private fun <T> openBundledConnectionIdRaw(block: (InputStream, Long?) -> T): T =
-        FileInputStream(File(findAssetsDir(), "connectionId.dat.zip")).use { input ->
+        FileInputStream(File(findAssetsDir(), "../../../dictionary-src/connectionId.dat.zip")).use { input ->
             DictionaryBinaryReader.openZipAwareRaw(input, "connectionId.dat.zip", block)
         }
 

@@ -215,6 +215,13 @@ class DictionaryBinaryReader @Inject constructor(
                     store.markInvalid(key, error.message ?: error::class.java.simpleName)
                 }
         }
+        // システム辞書と連接表は APK に圧縮形式（system.compact.kdict / connection.compact）でしか入っていない。
+        check(
+            DictionaryFileSpecs.get(key).category != DictionaryCategory.SYSTEM &&
+                key != DictionaryFileKey.CONNECTION_ID,
+        ) {
+            "Bundled $key is only available from $COMPACT_SYSTEM_DICTIONARY_ASSET"
+        }
         return resolver.openBundledForKey(key).use(loader)
     }
 
@@ -247,19 +254,16 @@ class DictionaryBinaryReader @Inject constructor(
 
     private fun createConnectionMatrix(key: DictionaryFileKey): ConnectionMatrix.CostTable {
         if (key == DictionaryFileKey.CONNECTION_ID && !resolver.shouldUseOverride(key)) {
-            runCatching {
+            // 同梱の連接表は圧縮形式（connection.compact）だけ。密な connectionId.dat はビルド入力。
+            return runCatching {
                 resolver.openBundledAsset(COMPACT_CONNECTION_MATRIX_ASSET).use { data ->
                     resolver.openBundledAsset(COMPACT_CONNECTION_MATRIX_INDEX_ASSET).use { index ->
                         ConnectionMatrix.fromCompactInputStreams(data, index)
                     }
                 }
-            }.onSuccess { return it }
-                .onFailure { error ->
-                    Timber.w(
-                        error,
-                        "Exact compact connection matrix is unavailable. Falling back to dense matrix.",
-                    )
-                }
+            }.onFailure { error ->
+                Timber.e(error, "Compact connection matrix failed to load.")
+            }.getOrThrow()
         }
         return ConnectionMatrix.fromShortArray(loadConnectionIds(key))
     }
@@ -276,11 +280,8 @@ class DictionaryBinaryReader @Inject constructor(
                     CompactSystemDictionaryReader::read,
                 )
             }.onFailure { error ->
-                Timber.w(
-                    error,
-                    "Compact system dictionary is unavailable. Falling back to serialized assets.",
-                )
-            }.getOrNull()?.also { compactSystemDictionaryCache = it }
+                Timber.e(error, "Compact system dictionary failed to load; the system dictionary is unavailable.")
+            }.getOrThrow().also { compactSystemDictionaryCache = it }
         }
     }
 

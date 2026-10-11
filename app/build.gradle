@@ -194,7 +194,7 @@ android {
 
 }
 
-def bundledConnectionMatrixZip = file("src/main/assets/connectionId.dat.zip")
+def bundledConnectionMatrixZip = file("dictionary-src/connectionId.dat.zip")
 def compactConnectionMatrixAsset = layout.buildDirectory.file(
     "generated/compactConnectionMatrix/assets/connection/connection.compact"
 )
@@ -378,7 +378,7 @@ tasks.register("generateCompactConnectionMatrix") {
 
 def bundledPosTable = file("src/main/assets/pos_table.dat")
 def bundledCoreDictionaryTriples = [
-    [id: 0, zipped: true, tango: file("src/main/assets/system/tango.dat.zip"), yomi: file("src/main/assets/system/yomi.dat.zip"), token: file("src/main/assets/system/token.dat.zip")],
+    [id: 0, zipped: true, tango: file("dictionary-src/system/tango.dat.zip"), yomi: file("dictionary-src/system/yomi.dat.zip"), token: file("dictionary-src/system/token.dat.zip")],
     [id: 1, zipped: false, tango: file("src/main/assets/single_kanji/tango_singleKanji.dat"), yomi: file("src/main/assets/single_kanji/yomi_singleKanji.dat"), token: file("src/main/assets/single_kanji/token_singleKanji.dat")],
     [id: 2, zipped: false, tango: file("src/main/assets/emoji/tango_emoji.dat"), yomi: file("src/main/assets/emoji/yomi_emoji.dat"), token: file("src/main/assets/emoji/token_emoji.dat")],
     [id: 3, zipped: false, tango: file("src/main/assets/emoticon/tango_emoticon.dat"), yomi: file("src/main/assets/emoticon/yomi_emoticon.dat"), token: file("src/main/assets/emoticon/token_emoticon.dat")],
