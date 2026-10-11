@@ -83,3 +83,12 @@
 - 4b363df 候補欄のキーボード一覧表示を廃止（custom_keyboard_suggestion を false 固定、isCustomLayoutPickerShownForCandidateStrip を常に false）。コンパイル未確認・実機未確認。
 
 - f09a935 Zenzai方式を追加：ConstrainedPathSearch（prefix制約付きViterbi）、KanaKanjiEngine.getConstrainedBestCandidate、Session.queryConstrained、IMEService.runZenzaiDecoding（candidateEvaluate使用、最大3回、zenzaiCarryで制約引継ぎ）。結果は並び替え後の先頭に昇格。発動条件は既存zenz並び替えと同じ。コンパイル成功・実機未確認。後続語のzenz並び替えは未着手。
+
+## Zenzai パイプライン（2026-10-11）
+
+- 5e83d12 native: `candidate_evaluate` が毎回 `llama_kv_cache_clear` していたのをやめ、前回トークン列との共通接頭辞を KV に残して `llama_kv_cache_seq_rm(ctx,0,start,-1)` で末尾だけ再デコード。位置ごとの予測（argmax・対数確率）も保持し再利用。score/生成側の KV 使用時はこのキャッシュを無効化。スレッド数を 2〜4 に制限（以前は 1〜8、既定 4）。既存: score 経路にはプロンプト接頭辞の再利用が元からあった。
+- 328526c Zenzai を 1 キー 1 推論に作り替え。ドラフト=sumire 最良経路（前回の FIX 制約が使える＝読みが伸びただけ、なら制約付き再探索結果をドラフトに、推論なし）→ zenz evaluate 1 回（同じ文脈・読み・ドラフトは判定キャッシュで省略）→ FIX:prefix なら sumire が制約付き再探索して採用、制約を次キーへ引継ぎ。新しいキーでジョブをキャンセル（Binder キャンセル→native abort）、sumire ドラフトは即時表示。2 段バーと従来バーの両方で動作。旧 zenz 並び替え（enable_zenz_rerank、最大 3+4 推論）と自信度ゲート（ZenzBunsetsuReselector、文節ごと最大 3 推論）は削除。zenz 設定は ON/OFF（necookey_zenz_bunsetsu_gate_preference）・右文脈・モデル選択・診断のみ。[Z] 表示は zenz が変えた候補に付く。
+- 353899e n_ctx=256・スレッド=コア数/2（2〜4）固定、文字数/コンテキスト数/スレッド数設定を削除。
+- 0d5398b 後続語: 確定後のゼロクエリ候補上位 10 件を左文脈つきで zenz score 1 回（非同期、入力・次の変換でキャンセル）。空の読みでの採点は学習分布外なので削除はせず、元順位ペナルティ 0.15 nats/位 つきの並べ替えのみ（NextWordZenzReranker）。
+- 推論回数: 1 キー入力あたり最大 1 回（判定キャッシュヒット時 0 回）。後続語は確定ごとに 1 回。
+- 未確認: 実機（体感速度・FIX の質）。量子化は Q5_K_M のまま。
