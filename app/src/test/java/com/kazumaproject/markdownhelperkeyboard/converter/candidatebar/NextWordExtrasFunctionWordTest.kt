@@ -10,7 +10,8 @@ class NextWordExtrasFunctionWordTest {
 
     @Test
     fun functionWordsAreNotOfferedRightAfterPunctuation() {
-        assertTrue(NextWordExtras.functionWordsAfter("今日").containsAll(listOf("、", "。", "は", "です")))
+        assertEquals(listOf("は", "が", "を", "に", "、"), NextWordExtras.functionWordsAfter("今日"))
+        assertEquals(listOf("。", "、", "ね", "よ", "！"), NextWordExtras.functionWordsAfter("行きます"))
         assertEquals(emptyList<String>(), NextWordExtras.functionWordsAfter("今日。"))
         assertEquals(emptyList<String>(), NextWordExtras.functionWordsAfter(""))
     }

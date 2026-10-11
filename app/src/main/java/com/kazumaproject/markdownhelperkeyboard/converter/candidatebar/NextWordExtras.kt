@@ -18,6 +18,18 @@ object NextWordExtras {
         "から", "まで", "より", "た", "です", "ます", "ね", "よ",
     )
 
+    /** 1 回の zenz 採点にかける候補数の上限（遅延を抑える）。 */
+    const val MAX_SCORED = 16
+
+    /** 採点にかける助詞・句読点の数（直前の文字で安く絞り込んだ上位）。 */
+    const val FUNCTION_WORD_POOL = 5
+
+    /** 名詞らしい語（漢字・カタカナ・英数字）の後に採点する助詞・句読点。 */
+    private val AFTER_NOUN = listOf("は", "が", "を", "に", "、")
+
+    /** ひらがな（述語・助詞など）の後に採点する句読点・終助詞。 */
+    private val AFTER_KANA = listOf("。", "、", "ね", "よ", "！")
+
     /** 表示する助詞・句読点の上限。 */
     const val MAX_FUNCTION_WORDS = 3
 
@@ -47,11 +59,29 @@ object NextWordExtras {
         return keys.toList()
     }
 
-    /** 確定文字列の後に続けて採点する助詞・句読点。句読点の直後には出さない。 */
+    /**
+     * 確定文字列の後に続けて採点する助詞・句読点（[FUNCTION_WORD_POOL] 件、直前の文字で安く絞る）。
+     * 句読点の直後には出さない。
+     */
     fun functionWordsAfter(committedText: String): List<String> {
         val last = committedText.lastOrNull() ?: return emptyList()
-        return if (last in SENTENCE_END) emptyList() else FUNCTION_WORDS
+        if (last in SENTENCE_END) return emptyList()
+        val pool = if (last in '\u3041'..'\u309F') AFTER_KANA else AFTER_NOUN
+        return pool.filter { it in FUNCTION_WORDS }.take(FUNCTION_WORD_POOL)
     }
+
+    /** 採点する base 先頭件数: [MAX_SCORED] からおまけ分を引いた残り（[NextWordZenzReranker.TOP_K] まで）。 */
+    private fun headSize(base: List<Candidate>, emoji: List<Candidate>, functionWords: List<Candidate>): Int =
+        minOf(
+            base.size,
+            NextWordZenzReranker.TOP_K,
+            (MAX_SCORED - scoredFunctionWords(functionWords).size - scoredEmoji(emoji).size)
+                .coerceAtLeast(KEEP_BASE),
+        )
+
+    private fun scoredFunctionWords(functionWords: List<Candidate>) = functionWords.take(FUNCTION_WORD_POOL)
+
+    private fun scoredEmoji(emoji: List<Candidate>) = emoji.take(MAX_EMOJI)
 
     /** base と重複しないもの。 */
     fun withoutBase(base: List<Candidate>, extras: List<Candidate>): List<Candidate> {
@@ -79,12 +109,16 @@ object NextWordExtras {
             emoji.take(MAX_EMOJI) + base.drop(KEEP_BASE)
     }
 
-    /** zenz に渡す候補配列: head（base 上位 [NextWordZenzReranker.TOP_K]）+ 助詞・句読点 + 絵文字。 */
+    /**
+     * zenz に渡す候補配列（合計 [MAX_SCORED] 件まで）: head（学習済み base の上位）+
+     * 助詞・句読点 [FUNCTION_WORD_POOL] 件 + 絵文字 [MAX_EMOJI] 件。
+     */
     fun scoringTargets(
         base: List<Candidate>,
         emoji: List<Candidate>,
         functionWords: List<Candidate> = emptyList(),
-    ): List<Candidate> = base.take(NextWordZenzReranker.TOP_K) + functionWords + emoji
+    ): List<Candidate> = base.take(headSize(base, emoji, functionWords)) +
+        scoredFunctionWords(functionWords) + scoredEmoji(emoji)
 
     /**
      * [scores] は [scoringTargets] と同じ並び。base の head は従来どおり位置ペナルティつきで並べ替え、
@@ -93,11 +127,13 @@ object NextWordExtras {
      */
     fun rerank(
         base: List<Candidate>,
-        emoji: List<Candidate>,
+        allEmoji: List<Candidate>,
         scores: FloatArray,
-        functionWords: List<Candidate> = emptyList(),
+        allFunctionWords: List<Candidate> = emptyList(),
     ): List<Candidate> {
-        val head = base.take(NextWordZenzReranker.TOP_K)
+        val head = base.take(headSize(base, allEmoji, allFunctionWords))
+        val functionWords = scoredFunctionWords(allFunctionWords)
+        val emoji = scoredEmoji(allEmoji)
         if (scores.size != head.size + functionWords.size + emoji.size || scores.none { it.isFinite() }) {
             return initial(base, emoji, functionWords)
         }
