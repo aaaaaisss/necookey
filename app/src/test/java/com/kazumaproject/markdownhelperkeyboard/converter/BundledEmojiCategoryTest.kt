@@ -42,18 +42,18 @@ class BundledEmojiCategoryTest {
             EmojiCategory.OBJECTS to 262,
             EmojiCategory.SYMBOLS to 223,
             EmojiCategory.FLAGS to 269,
-            EmojiCategory.UNKNOWN to 4,
+            EmojiCategory.UNKNOWN to 0,
         )
 
         println("emojiTotal=${symbols.size}")
         EmojiCategory.entries.forEach { println("emoji.${it.name}=${counts.getValue(it)}") }
         println("emojiClassified=$classifiedCount")
 
-        assertEquals(1_902, symbols.size)
+        assertEquals(1_898, symbols.size)
         assertEquals(expectedCounts, counts)
         assertEquals(1_898, classifiedCount)
         assertEquals(
-            setOf("🦰", "🦱", "🦲", "🦳"),
+            emptySet<String>(),
             symbols.filter { categorizeEmoji(it) == EmojiCategory.UNKNOWN }.toSet(),
         )
     }
