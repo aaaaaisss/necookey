@@ -19,7 +19,7 @@ object NextWordExtras {
     )
 
     /** 1 回の zenz 採点にかける候補数の上限（遅延を抑える）。 */
-    const val MAX_SCORED = 24
+    const val MAX_SCORED = 25
 
     /** 採点にかける助詞・句読点の数（直前の文字で安く絞り込んだ上位）。 */
     const val FUNCTION_WORD_POOL = 5
