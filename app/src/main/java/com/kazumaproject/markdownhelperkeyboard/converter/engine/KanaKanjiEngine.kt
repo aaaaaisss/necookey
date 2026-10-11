@@ -2,7 +2,6 @@ package com.kazumaproject.markdownhelperkeyboard.converter.engine
 
 import android.content.Context
 import android.os.Build
-import androidx.core.text.isDigitsOnly
 import com.kazumaproject.Louds.LOUDS
 import com.kazumaproject.Louds.with_term_id.LOUDSWithTermId
 import com.kazumaproject.convertFullWidthToHalfWidth
@@ -5320,3 +5319,6 @@ class KanaKanjiEngine {
     }
 
 }
+
+/** TextUtils.isDigitsOnly と同じ判定（空文字は true）。android 非依存にして JVM テストから変換を呼べるようにする。 */
+private fun CharSequence.isDigitsOnly(): Boolean = all { Character.isDigit(it) }

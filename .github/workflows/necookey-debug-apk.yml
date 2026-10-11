@@ -132,7 +132,7 @@ jobs:
           TASKS=""
           if [ "${{ steps.changes.outputs.app }}" = "true" ] || [ "${{ steps.changes.outputs.zenz }}" = "true" ]; then
             # necookey's own tests; the full Sumire app suite (Robolectric) is not run on every push.
-            TASKS="$TASKS :app:testFullStandardDebugUnitTest --tests com.kazumaproject.markdownhelperkeyboard.converter.candidatebar.*"
+            TASKS="$TASKS :app:testFullStandardDebugUnitTest --tests com.kazumaproject.markdownhelperkeyboard.converter.candidatebar.* --tests com.kazumaproject.markdownhelperkeyboard.converter.quality.*"
           fi
           if [ "${{ steps.changes.outputs.core }}" = "true" ]; then TASKS="$TASKS :core:testDebugUnitTest"; fi
           if [ "${{ steps.changes.outputs.custom_keyboard }}" = "true" ]; then TASKS="$TASKS :custom_keyboard:testDebugUnitTest"; fi
