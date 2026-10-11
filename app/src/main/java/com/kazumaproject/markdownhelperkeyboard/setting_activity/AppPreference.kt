@@ -3907,10 +3907,7 @@ object AppPreference {
         }
 
     var custom_romaji_zenkaku_conversion_enable_preference: Boolean
-        get() = preferences.getBoolean(
-            CUSTOM_ROMAJI_ZENKAKU_CONVERSION_ENABLE_PREFERENCE.first,
-            CUSTOM_ROMAJI_ZENKAKU_CONVERSION_ENABLE_PREFERENCE.second
-        )
+        get() = CUSTOM_ROMAJI_ZENKAKU_CONVERSION_ENABLE_PREFERENCE.second // 設定UI削除済み: 保存値を無視して既定値に固定
         set(value) = preferences.edit {
             it.putBoolean(
                 CUSTOM_ROMAJI_ZENKAKU_CONVERSION_ENABLE_PREFERENCE.first,
@@ -3919,10 +3916,7 @@ object AppPreference {
         }
 
     var omission_search_offset_score_preference: Int
-        get() = preferences.getInt(
-            OMISSION_SEARCH_OFFSET_SCORE_PREFERENCE.first,
-            OMISSION_SEARCH_OFFSET_SCORE_PREFERENCE.second
-        )
+        get() = OMISSION_SEARCH_OFFSET_SCORE_PREFERENCE.second // 設定UI削除済み: 保存値を無視して既定値に固定
         set(value) = preferences.edit {
             it.putInt(OMISSION_SEARCH_OFFSET_SCORE_PREFERENCE.first, value)
         }
