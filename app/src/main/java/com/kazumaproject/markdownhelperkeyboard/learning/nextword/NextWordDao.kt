@@ -20,6 +20,28 @@ interface NextWordDao {
         limit: Int,
     ): List<NextWordEntity>
 
+    /** 1 つの文脈の後続語（回数・新しさの順に多めに取り、並べ替えは [NextWordPolicy.rank]）。 */
+    @Query(
+        "SELECT * FROM next_word_table WHERE context = :context " +
+            "AND reading >= :readingPrefix AND reading < :readingPrefixUpperBound " +
+            "AND length(reading) <= :maxReadingLength " +
+            "ORDER BY usageCount DESC, lastUsedAt DESC LIMIT :limit"
+    )
+    suspend fun findByContext(
+        context: String,
+        readingPrefix: String,
+        readingPrefixUpperBound: String,
+        maxReadingLength: Int,
+        limit: Int,
+    ): List<NextWordEntity>
+
+    /** 新しい順に [keep] 件を残して古いものを消す。 */
+    @Query(
+        "DELETE FROM next_word_table WHERE id IN " +
+            "(SELECT id FROM next_word_table ORDER BY lastUsedAt DESC LIMIT -1 OFFSET :keep)"
+    )
+    suspend fun pruneOldest(keep: Int): Int
+
     @Query(
         "UPDATE next_word_table SET usageCount = usageCount + 1, lastUsedAt = :timestamp " +
             "WHERE context = :context AND reading = :reading AND output = :output"

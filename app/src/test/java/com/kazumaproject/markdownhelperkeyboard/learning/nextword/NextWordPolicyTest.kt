@@ -49,4 +49,21 @@ class NextWordPolicyTest {
         assertNull(NextWordPolicy.remainderAfter("今日は", "今日は"))
         assertNull(NextWordPolicy.remainderAfter("明日", "今日は良い"))
     }
+
+    @Test
+    fun frequentShortContextBeatsOnceLongContext() {
+        val now = 100L * 86_400_000L
+        val once = NextWordEntity(context = "今日はとても", reading = "あつい", output = "暑い", usageCount = 1, lastUsedAt = now)
+        val often = NextWordEntity(context = "も", reading = "いい", output = "良い", usageCount = 40, lastUsedAt = now)
+        assertEquals(listOf("良い", "暑い"), NextWordPolicy.rank(listOf(once, often), now, 5).map { it.output })
+    }
+
+    @Test
+    fun oldUsesDecayAndSameOutputIsShownOnce() {
+        val now = 400L * 86_400_000L
+        val old = NextWordEntity(context = "は", reading = "あ", output = "A", usageCount = 10, lastUsedAt = 0L)
+        val fresh = NextWordEntity(context = "は", reading = "い", output = "B", usageCount = 2, lastUsedAt = now)
+        val dup = NextWordEntity(context = "日は", reading = "い", output = "B", usageCount = 1, lastUsedAt = now)
+        assertEquals(listOf("B", "A"), NextWordPolicy.rank(listOf(old, fresh, dup), now, 5).map { it.output })
+    }
 }

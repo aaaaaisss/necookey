@@ -1,6 +1,8 @@
 package com.kazumaproject.markdownhelperkeyboard.learning.nextword
 
 import com.kazumaproject.markdownhelperkeyboard.converter.engine.PredictionConfig
+import kotlin.math.ln
+import kotlin.math.pow
 
 /** Pure rules for learning and looking up following words (後続語) with their left context. */
 object NextWordPolicy {
@@ -26,6 +28,40 @@ object NextWordPolicy {
         if (tail.isBlank()) return emptyList()
         return (tail.length downTo 1).map { tail.takeLast(it) }.filter { it.isNotBlank() }.distinct()
     }
+
+    /** 回数の重みが半分になる日数（使っていない後続語ほど弱くなる）。 */
+    const val HALF_LIFE_DAYS = 30.0
+
+    /** 文脈 1 文字あたりの加点（ln(1+回数) と同じ尺度。文脈 8 文字で回数約 7 回分）。 */
+    const val CONTEXT_CHAR_WEIGHT = 0.25
+
+    /** 文脈ごとに読み出す件数の倍率（並べ替えの候補を多めに取る）。 */
+    const val POOL_FACTOR = 3
+
+    /** 保存する後続語の上限件数（超えたら古い順に消す）。 */
+    const val MAX_ENTRIES = 20_000
+
+    /**
+     * 並べ替えの点数（大きいほど上）。回数は [HALF_LIFE_DAYS] で半減させて ln(1+回数)、
+     * そこに文脈の長さ × [CONTEXT_CHAR_WEIGHT] を足す。長い文脈で 1 回だけの語が、短い文脈でよく使う語に負けられる。
+     */
+    fun rankScore(entry: NextWordEntity, now: Long): Double {
+        val ageDays = ((now - entry.lastUsedAt).coerceAtLeast(0L)) / 86_400_000.0
+        val decayed = entry.usageCount.coerceAtLeast(1) * 0.5.pow(ageDays / HALF_LIFE_DAYS)
+        return ln(1.0 + decayed) + CONTEXT_CHAR_WEIGHT * entry.context.length
+    }
+
+    /** [rankScore] の高い順（同点は新しい順）、同じ表記は最上位の 1 件だけ。 */
+    fun rank(entries: List<NextWordEntity>, now: Long, limit: Int): List<NextWordEntity> =
+        entries
+            .map { it to rankScore(it, now) }
+            .sortedWith(
+                compareByDescending<Pair<NextWordEntity, Double>> { it.second }
+                    .thenByDescending { it.first.lastUsedAt },
+            )
+            .map { it.first }
+            .distinctBy { it.output }
+            .take(limit)
 
     /**
      * Following-word pairs of one completed commit.
