@@ -1547,8 +1547,59 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
             clearZeroQueryAllState(refresh = true)
             return
         }
-        currentInputConnection?.commitText(candidate.string, 1)
+        val inputConnection = currentInputConnection
+        val leftBefore = if (isLearningWriteEnabled()) {
+            inputConnection?.getTextBeforeCursor(NextWordPolicy.MAX_CONTEXT_LENGTH * 2, 0)?.toString()
+        } else {
+            null
+        }
+        val shownKey = carriedNextWordsKey
+        inputConnection?.commitText(candidate.string, 1)
         clearZeroQueryAllState(refresh = true)
+        // タップした後続語も通常の確定と同じく後続語として学習する（この確定は変換セッションを通らないので二重にならない）。
+        persistZeroQueryNextWord(candidate, leftBefore, shownKey)
+        // 続けて、タップした語の後続語を出す（後続語 → 後続語のつながり）。
+        rememberZeroQueryKeyAfterCommit(candidate.string)
+        zeroQueryCandidateReading(candidate)?.let { pendingZeroQueryLastWord = it to candidate.string }
+        consumePendingZeroQueryAfterCommit()
+    }
+
+    /** 後続語候補の読み。学習済み後続語は保存した読み、ひらがなだけの語（助詞など）は表記そのもの。分からなければ null。 */
+    private fun zeroQueryCandidateReading(candidate: Candidate): String? {
+        if (candidate.type == CANDIDATE_TYPE_NEXT_WORD) {
+            return candidate.yomi?.takeIf { it.isNotEmpty() }
+        }
+        val text = candidate.string
+        return text.takeIf { t -> t.isNotEmpty() && t.all { it in '\u3041'..'\u309F' || it == 'ー' } }
+    }
+
+    /**
+     * タップした後続語を (直前の文節 → この語) として学習する。直前の文節は通常の確定で覚えた最後の文節、
+     * 無ければ後続語を出したときの確定文字列。どちらもカーソルの直前に残っているときだけ使う。
+     */
+    private fun persistZeroQueryNextWord(candidate: Candidate, leftBefore: String?, shownKey: String) {
+        val previous = lastLearnedBunsetsuOutput
+        lastLearnedBunsetsuOutput = candidate.string.takeIf { it.isNotBlank() }
+        if (leftBefore == null || !isLearningWriteEnabled()) return
+        val reading = zeroQueryCandidateReading(candidate) ?: return
+        val preceding = previous?.takeIf { it.isNotBlank() && leftBefore.endsWith(it) }
+            ?: shownKey.takeIf { it.isNotBlank() && leftBefore.endsWith(it) }
+            ?: return
+        val pairs = NextWordPolicy.pairs(
+            precedingBunsetsu = preceding,
+            bunsetsu = listOf(reading to candidate.string),
+            timestamp = System.currentTimeMillis(),
+        )
+        if (pairs.isEmpty()) return
+        ioScope.launch {
+            try {
+                nextWordRepository.record(pairs)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                Timber.e(e, "Saving tapped next word failed")
+            }
+        }
     }
 
     private suspend fun applyFirstSuggestionOnMainIfCurrent(
