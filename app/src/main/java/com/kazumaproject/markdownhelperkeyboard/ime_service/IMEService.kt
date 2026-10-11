@@ -11159,7 +11159,7 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         zenzaiScheduler.onInput(insertString, SystemClock.uptimeMillis())
         zenzRerankJob = scope.launch {
             // 2 段バーと同じく、手が止まってから始める（打鍵が続けば次の打鍵でキャンセルされ推論しない）。
-            if (!zenzaiScheduler.isForced()) delay(zenzaiScheduler.startDelayMs())
+            delay(zenzaiScheduler.startDelayMs())
             if (requestToken != zenzRerankRequestToken ||
                 !shouldApplyCandidateResult(insertString, candidateToken)
             ) return@launch
@@ -16344,14 +16344,15 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
             var shown: Candidate? = null
             fun stillCurrent(): Boolean =
                 necookeyZenzJobKey == cacheKey && shouldApplyCandidateResult(insertString)
-            // 打鍵が続くうちは始めない（次の打鍵でキャンセルされ、推論は走らない）。手が止まったら始める。
+            // 短い読み: 打鍵が続くうちは始めない（次の打鍵でキャンセル）。手が止まったら始める。
+            // 長い読み: 裏の推論が終わり次第、最新の読みで待たずに始める（表示しない、打鍵で中断しない）。
             awaitBefore?.join()
-            val forced = zenzaiScheduler.isForced()
-            if (!forced) delay(zenzaiScheduler.startDelayMs())
+            val background = zenzaiScheduler.runsInBackground(insertString)
+            if (!background) delay(zenzaiScheduler.startDelayMs())
             if (!stillCurrent()) return@launch
             zenzaiScheduler.onInferenceStarted()
             val self = coroutineContext[Job]
-            if (forced) {
+            if (background) {
                 necookeyZenzForcedJob = self
                 necookeyZenzForcedInput = insertString
             }
@@ -16384,7 +16385,11 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
                 }
             }
             val outcome = try {
-                runZenzaiStep(insertString, sumireTop, context, ::show)
+                if (background) {
+                    runZenzaiStep(insertString, sumireTop, context) { }
+                } else {
+                    runZenzaiStep(insertString, sumireTop, context, ::show)
+                }
             } catch (e: kotlinx.coroutines.TimeoutCancellationException) {
                 // withTimeout's exception is a CancellationException; it must not be swallowed silently.
                 Timber.e(e, "zenzai (two-row) timed out")
@@ -16405,6 +16410,17 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
             } ?: return@launch
             recordZenzaiDiagnostics(outcome)
             if (!stillCurrent()) return@launch
+            if (background) {
+                // 裏の推論の間に打鍵がなかった。ここからは普通の推論として、手が止まるのを待って表示・仕上げる。
+                // 待っている間の打鍵ではキャンセルされるよう、中断しない推論の印を外す。
+                if (necookeyZenzForcedJob === self) {
+                    necookeyZenzForcedJob = null
+                    necookeyZenzForcedInput = null
+                }
+                val wait = zenzaiScheduler.remainingPauseMs(SystemClock.uptimeMillis())
+                if (wait > 0) delay(wait)
+                if (!stillCurrent()) return@launch
+            }
             shown = null // a same-reading refresh may have repainted the bar since the provisional
             fun remember(result: ZenzaiOutcome) {
                 synchronized(necookeyZenzOverrideCache) {
@@ -16415,10 +16431,9 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
             remember(outcome)
             show(outcome.top)
             // 手が止まった後なので、直した結果を同じ読みで続けて判定する（PASS か上限まで）。打鍵で即キャンセル。
-            // 待たずに始めた推論（打鍵中）は 1 回で止め、続きは手が止まったときの推論に任せる。
             var last: ZenzaiOutcome = outcome
             var rounds = 0
-            while (!forced && last.unverifiedFix && rounds < ZENZAI_PAUSE_RECHECK_MAX) {
+            while (last.unverifiedFix && rounds < ZENZAI_PAUSE_RECHECK_MAX) {
                 if (!stillCurrent()) return@launch
                 rounds++
                 val next = try {

@@ -9,8 +9,9 @@ package com.kazumaproject.markdownhelperkeyboard.converter.candidatebar
  * - 打鍵後すぐではなく、その人の打鍵間隔より少し長く入力が止まったら始める（[startDelayMs]）。
  *   打鍵が続けば推論は始まらず、手が止まった瞬間に 1 回だけ走る。止まった後は PASS まで続けて判定するので、
  *   見るときの候補の質は毎打鍵推論と同じ。
- * - ただし長い文を止まらずに打ち続けると、前の文節の直し（FIX 制約）が溜まらない。[FORCE_AFTER] 打鍵
- *   推論していなければ待たずに始め、その推論は後続の打鍵で中断しない（[isForced]）。
+ * - 読みが [BACKGROUND_AFTER_CHARS] 文字を超えたら、打鍵中も裏で推論を回す（[runsInBackground]）。
+ *   結果は変換欄に出さず、FIX の直しだけを次の推論へ引き継ぐ。推論中に来た打鍵では中断せず、
+ *   終わったら最新の読みでもう一度走らせる。手が止まったときの仕上げは 1〜2 回で済み、表示が速い。
  */
 class ZenzaiScheduler {
     companion object {
@@ -24,8 +25,8 @@ class ZenzaiScheduler {
         /** これより長い間隔は打鍵リズムに数えない（考えている時間）。 */
         const val RHYTHM_GAP_MAX_MS = 900L
 
-        /** 推論せずに続いた打鍵がこれ以上なら待たずに推論する。 */
-        const val FORCE_AFTER = 8
+        /** 読みがこの文字数を超えたら、打鍵中も裏で推論する。 */
+        const val BACKGROUND_AFTER_CHARS = 3
     }
 
     private var rhythmMs = -1f
@@ -46,14 +47,17 @@ class ZenzaiScheduler {
         if (input.isEmpty()) sinceInference = 0 else sinceInference++
     }
 
-    /** 待たずに始める（後続の打鍵で中断しない）推論か。 */
+    /** 打鍵中も裏で（待たず、後続の打鍵で中断せず、表示せずに）推論する読みか。 */
+    fun runsInBackground(input: String): Boolean = input.length > BACKGROUND_AFTER_CHARS
+
+    /** 最後の打鍵から「手が止まった」とみなすまでの残り時間（[now] 時点）。 */
     @Synchronized
-    fun isForced(): Boolean = sinceInference >= FORCE_AFTER
+    fun remainingPauseMs(now: Long): Long =
+        if (lastKeyAt < 0) 0L else (startDelayMs() - (now - lastKeyAt)).coerceAtLeast(0L)
 
     /** 推論を始めるまでの待ち時間。 */
     @Synchronized
     fun startDelayMs(): Long {
-        if (sinceInference >= FORCE_AFTER) return 0L
         if (rhythmMs < 0) return MIN_DELAY_MS
         return (rhythmMs * GAP_FACTOR).toLong().coerceIn(MIN_DELAY_MS, MAX_DELAY_MS)
     }

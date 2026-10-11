@@ -28,16 +28,20 @@ class ZenzaiSchedulerTest {
     }
 
     @Test
-    fun forcesInferenceAfterManyKeystrokesWithoutOne() {
+    fun runsInBackgroundOnlyAfterThreeCharacters() {
         val s = ZenzaiScheduler()
-        var input = ""
-        repeat(ZenzaiScheduler.FORCE_AFTER - 1) { input += "あ"; s.onInput(input, it * 100L) }
-        assertFalse(s.isForced())
-        s.onInput(input + "い", 1000)
-        assertTrue(s.isForced())
-        assertEquals(0L, s.startDelayMs())
-        s.onInferenceStarted()
-        assertFalse(s.isForced())
+        assertFalse(s.runsInBackground("あいう"))
+        assertTrue(s.runsInBackground("あいうえ"))
+    }
+
+    @Test
+    fun remainingPauseCountsFromLastKeystroke() {
+        val s = ZenzaiScheduler()
+        s.onInput("あ", 0)
+        s.onInput("あい", 150)
+        s.onInput("あいう", 300) // rhythm 150ms -> pause 195ms
+        assertEquals(95L, s.remainingPauseMs(400))
+        assertEquals(0L, s.remainingPauseMs(600))
     }
 
     @Test
