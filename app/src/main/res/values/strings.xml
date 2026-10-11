@@ -860,8 +860,8 @@
     <string name="next_word_learning_clear_confirm">学習した後続語をすべて削除しますか？</string>
     <string name="next_word_learning_empty">学習した後続語はありません</string>
     <string name="next_word_learning_delete_entry_confirm">この後続語を削除しますか？</string>
-    <string name="settings_section_input">入力・キー操作</string>
-    <string name="settings_section_candidates">変換候補の表示</string>
+    <string name="settings_section_input">入力</string>
+    <string name="settings_section_candidates">候補</string>
     <string name="settings_section_dictionary">辞書・学習</string>
     <string name="ng_word_list_title">NG ワード（非表示にする単語）</string>
     <string name="ng_word_list_summary">変換候補に出したくない単語を登録・編集します。変換候補の長押しからも登録できます</string>
@@ -877,11 +877,11 @@
 
     <!-- 設定ホーム（UI 再設計） -->
     <string name="home_category_keyboard">キーボード</string>
-    <string name="home_category_keyboard_summary">配列の編集・位置とサイズ・文字サイズ・キー操作</string>
-    <string name="home_category_conversion">変換・予測</string>
-    <string name="home_category_conversion_summary">候補の表示・予測・入力ミス補正</string>
-    <string name="home_category_dictionary">辞書・学習</string>
-    <string name="home_category_dictionary_summary">学習辞書・ユーザー辞書・NGワード</string>
+    <string name="home_category_keyboard_summary">配列・サイズ・キー操作</string>
+    <string name="home_category_conversion">変換とzenz</string>
+    <string name="home_category_conversion_summary">候補の出し方とAI変換</string>
+    <string name="home_category_dictionary">辞書と学習</string>
+    <string name="home_category_dictionary_summary">ユーザー辞書・学習・NGワード</string>
     <string name="home_category_zenz">zenz</string>
     <string name="home_category_zenz_summary">AI 変換モデルと再ランキング</string>
     <string name="home_category_symbol_clipboard">クリップボード・記号</string>
@@ -903,4 +903,21 @@
     <string name="home_status_enable_button">有効にする</string>
     <string name="home_status_switch_button">切り替える</string>
     <string name="home_try_input_hint">ここで試し入力</string>
+    <string name="home_category_other">その他</string>
+    <string name="home_category_other_summary">クリップボード・バックアップ・情報</string>
+    <string name="settings_advanced_title">詳細設定</string>
+    <string name="settings_advanced_summary">ふだんは触らなくて大丈夫な項目</string>
+    <string name="settings_section_look">見た目とサイズ</string>
+    <string name="settings_section_key_behavior">キーの細かい動き</string>
+    <string name="settings_section_candidate_detail">候補の詳細</string>
+    <string name="settings_section_next_word">後続語</string>
+    <string name="settings_section_learning">学習</string>
+    <string name="settings_ut_dictionary_category">追加辞書（Mozc UT）</string>
+    <string name="settings_ut_person_title">人名辞書</string>
+    <string name="settings_ut_person_summary">人名を変換候補に出します</string>
+    <string name="settings_ut_places_title">地名辞書</string>
+    <string name="settings_ut_places_summary">地名を変換候補に出します</string>
+    <string name="settings_ut_wiki_title">Wikipedia 辞書</string>
+    <string name="settings_ut_wiki_summary">固有名詞や用語を増やします</string>
+    <string name="home_hero_subtitle">zenz 搭載の日本語キーボード</string>
 </resources>

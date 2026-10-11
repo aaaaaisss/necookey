@@ -1803,6 +1803,14 @@ object AppPreference {
 
     val time_same_pronounce_typing_preference: Int? get() = 1000 // S3: hardcoded, setting removed
 
+    /** 設定「辞書と学習 › 詳細設定」の UT 辞書オン/オフ（既定オン）。 */
+    val ut_person_name_enabled: Boolean
+        get() = preferences.getBoolean("ut_person_name_enabled_preference", true)
+    val ut_places_enabled: Boolean
+        get() = preferences.getBoolean("ut_places_enabled_preference", true)
+    val ut_wiki_enabled: Boolean
+        get() = preferences.getBoolean("ut_wiki_enabled_preference", true)
+
     var mozc_ut_person_names_preference: Boolean?
         get() = preferences.getBoolean(MOZCUT_PERSON_NAME.first, MOZCUT_PERSON_NAME.second)
         set(value) = preferences.edit {

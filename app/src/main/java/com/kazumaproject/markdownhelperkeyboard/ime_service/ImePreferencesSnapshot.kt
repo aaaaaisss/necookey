@@ -342,15 +342,15 @@ data class ImePreferencesSnapshot(
                 mozcUTPersonName = optionalEnabled(
                     DictionaryCategory.PERSON_NAME,
                     appPreference.mozc_ut_person_names_preference,
-                ),
+                ) && appPreference.ut_person_name_enabled,
                 mozcUTPlaces = optionalEnabled(
                     DictionaryCategory.PLACES,
                     appPreference.mozc_ut_places_preference,
-                ),
+                ) && appPreference.ut_places_enabled,
                 mozcUTWiki = optionalEnabled(
                     DictionaryCategory.WIKI,
                     appPreference.mozc_ut_wiki_preference,
-                ),
+                ) && appPreference.ut_wiki_enabled,
                 mozcUTNeologd = optionalEnabled(
                     DictionaryCategory.NEOLOGD,
                     appPreference.mozc_ut_neologd_preference,

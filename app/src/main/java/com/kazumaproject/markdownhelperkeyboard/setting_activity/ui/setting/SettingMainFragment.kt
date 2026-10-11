@@ -57,17 +57,17 @@ class SettingMainFragment : Fragment() {
     )
 
     private val categories: List<Category>
-        get() = buildList {
-            add(Category("screen_keyboard", R.string.home_category_keyboard, R.string.home_category_keyboard_summary, com.kazumaproject.core.R.drawable.keyboard_24px))
-            add(Category("screen_conversion", R.string.home_category_conversion, R.string.home_category_conversion_summary, R.drawable.ic_home_conversion))
-            add(Category("screen_dictionary", R.string.home_category_dictionary, R.string.home_category_dictionary_summary, com.kazumaproject.core.R.drawable.dictionary_24px))
-            if (AppVariantConfig.hasZenz) {
-                add(Category("screen_zenz", R.string.home_category_zenz, R.string.home_category_zenz_summary, R.drawable.ic_home_zenz))
-            }
-            add(Category("screen_symbol_clipboard", R.string.home_category_symbol_clipboard, R.string.home_category_symbol_clipboard_summary, com.kazumaproject.core.R.drawable.content_paste_24px))
-            add(Category("screen_backup", R.string.home_category_backup, R.string.home_category_backup_summary, R.drawable.ic_home_backup))
-            add(Category("screen_about", R.string.home_category_about, R.string.home_category_about_summary, R.drawable.ic_home_info))
-        }
+        get() = listOf(
+            Category("screen_keyboard", R.string.home_category_keyboard, R.string.home_category_keyboard_summary, com.kazumaproject.core.R.drawable.keyboard_24px),
+            Category(
+                "screen_conversion",
+                R.string.home_category_conversion,
+                R.string.home_category_conversion_summary,
+                if (AppVariantConfig.hasZenz) R.drawable.ic_home_zenz else R.drawable.ic_home_conversion,
+            ),
+            Category("screen_dictionary", R.string.home_category_dictionary, R.string.home_category_dictionary_summary, com.kazumaproject.core.R.drawable.dictionary_24px),
+            Category("screen_other", R.string.home_category_other, R.string.home_category_other_summary, R.drawable.ic_home_info),
+        )
 
     override fun onCreateView(
         inflater: LayoutInflater,
@@ -111,13 +111,29 @@ class SettingMainFragment : Fragment() {
     private fun buildCategoryList() {
         val list = binding.categoryList
         list.removeAllViews()
-        categories.forEach { category ->
-            val row = ItemSettingCategoryBinding.inflate(layoutInflater, list, false)
-            row.categoryIcon.setImageResource(category.icon)
-            row.categoryTitle.setText(category.title)
-            row.categorySummary.setText(category.summary)
-            row.root.setOnClickListener { openCategory(category) }
-            list.addView(row.root)
+        val gap = (12 * resources.displayMetrics.density).toInt()
+        categories.chunked(2).forEachIndexed { rowIndex, rowItems ->
+            val row = android.widget.LinearLayout(requireContext()).apply {
+                orientation = android.widget.LinearLayout.HORIZONTAL
+                layoutParams = android.widget.LinearLayout.LayoutParams(-1, -2).apply {
+                    if (rowIndex > 0) topMargin = gap
+                }
+            }
+            rowItems.forEachIndexed { index, category ->
+                val tile = ItemSettingCategoryBinding.inflate(layoutInflater, row, false)
+                tile.categoryIcon.setImageResource(category.icon)
+                tile.categoryTitle.setText(category.title)
+                tile.categorySummary.setText(category.summary)
+                tile.root.setOnClickListener { openCategory(category) }
+                (tile.root.layoutParams as android.widget.LinearLayout.LayoutParams).apply {
+                    if (index > 0) marginStart = gap
+                }
+                row.addView(tile.root)
+            }
+            if (rowItems.size == 1) {
+                row.addView(View(requireContext()), android.widget.LinearLayout.LayoutParams(0, 0, 1f).apply { marginStart = gap })
+            }
+            list.addView(row)
         }
     }
 

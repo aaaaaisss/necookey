@@ -94,6 +94,27 @@ class MainPreferenceFragment : AsyncPreferenceFragment() {
             onZenzModelUriSelected(uri)
         }
 
+    override fun onViewCreated(view: android.view.View, savedInstanceState: Bundle?) {
+        super.onViewCreated(view, savedInstanceState)
+        setDivider(null)
+        listView.clipToPadding = false
+        listView.addItemDecoration(SettingsCardDecoration(listView))
+    }
+
+    /** 入れ子の PreferenceScreen（各カテゴリの「詳細設定」）を同じ画面クラスで開く。 */
+    override fun onNavigateToScreen(preferenceScreen: androidx.preference.PreferenceScreen) {
+        // 同じ destination への遷移なので navigateSafely（自己遷移を無視する）は使わない。
+        runCatching {
+            androidx.navigation.fragment.NavHostFragment.findNavController(this).navigate(
+            R.id.categorySettingsFragment,
+            androidx.core.os.bundleOf(
+                androidx.preference.PreferenceFragmentCompat.ARG_PREFERENCE_ROOT to preferenceScreen.key,
+                ARG_TITLE to preferenceScreen.title?.toString().orEmpty(),
+            ),
+            )
+        }.onFailure { Timber.w(it, "Cannot open nested settings screen") }
+    }
+
     override fun onPreferencesReady(savedInstanceState: Bundle?, rootKey: String?) {
         bindInputSection()
         bindCandidateSection()
@@ -325,6 +346,7 @@ class MainPreferenceFragment : AsyncPreferenceFragment() {
     private fun bindZenzSection() {
         if (!AppVariantConfig.hasZenz) {
             findPreference<Preference>("zenz_category")?.isVisible = false
+            findPreference<Preference>("zenz_advanced_category")?.isVisible = false
             // The bunsetsu gate lives in the zenz section but depends on the two-row bar.
             return
         }
