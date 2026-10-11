@@ -606,14 +606,8 @@ object AppPreference {
         Pair("necookey_zenz_bunsetsu_gate_preference", true)
 
 
-    private val ZENZ_MAXIMUM_LETTER_SIZE_PREFERENCE =
-        Pair("zenz_maximum_letter_count_preference", 32)
 
-    private val ZENZ_MAXIMUM_CONTEXT_SIZE_PREFERENCE =
-        Pair("zenz_maximum_context_count_preference", 512)
 
-    private val ZENZ_MAXIMUM_THREAD_SIZE_PREFERENCE =
-        Pair("zenz_maximum_thread_count_preference", 4)
 
     private val QWERTY_KEY_VERTICAL_MARGIN = Pair("qwerty_key_vertical_margin_preference", 5.0f)
     private val QWERTY_KEY_HORIZONTAL_GAP = Pair("qwerty_key_horizontal_gap_preference", 2.0f)
@@ -3141,29 +3135,8 @@ object AppPreference {
             it.putBoolean(NECOOKEY_ZENZ_BUNSETSU_GATE_PREFERENCE.first, value)
         }
 
-    var zenz_maximum_letter_size_preference: Int?
-        get() = preferences.getInt(
-            ZENZ_MAXIMUM_LETTER_SIZE_PREFERENCE.first, ZENZ_MAXIMUM_LETTER_SIZE_PREFERENCE.second
-        )
-        set(value) = preferences.edit {
-            it.putInt(ZENZ_MAXIMUM_LETTER_SIZE_PREFERENCE.first, value ?: 32)
-        }
 
-    var zenz_maximum_context_size_preference: Int?
-        get() = preferences.getInt(
-            ZENZ_MAXIMUM_CONTEXT_SIZE_PREFERENCE.first, ZENZ_MAXIMUM_CONTEXT_SIZE_PREFERENCE.second
-        )
-        set(value) = preferences.edit {
-            it.putInt(ZENZ_MAXIMUM_CONTEXT_SIZE_PREFERENCE.first, value ?: 512)
-        }
 
-    var zenz_maximum_thread_size_preference: Int?
-        get() = preferences.getInt(
-            ZENZ_MAXIMUM_THREAD_SIZE_PREFERENCE.first, ZENZ_MAXIMUM_THREAD_SIZE_PREFERENCE.second
-        )
-        set(value) = preferences.edit {
-            it.putInt(ZENZ_MAXIMUM_THREAD_SIZE_PREFERENCE.first, value ?: 4)
-        }
 
     var qwerty_key_vertical_margin: Float?
         get() = preferences.getFloat(

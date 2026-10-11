@@ -1812,9 +1812,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
     private var deleteKeyHighLight: Boolean? = true
     private var customKeyboardSuggestionPreference: Boolean? = true
     private var customDirectInputReplaceComposingPreference = false
-    private var zenzMaximumLetterSizePreference: Int? = 32
-    private var zenzMaximumContextSizePreference: Int? = 512
-    private var zenzMaximumThreadSizePreference: Int? = 4
 
     private var sumireEnglishQwertyPreference: Boolean? = false
     private var conversionCandidatesRomajiEnablePreference: Boolean? = false
@@ -1959,6 +1956,8 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
     companion object {
         /** Learned following word (後続語) from the next-word table. */
         const val CANDIDATE_TYPE_NEXT_WORD: Byte = 53
+        /** zenz の文脈長。左文脈 40 字 + 読み 32 字 + 候補で十分収まる。 */
+        private const val ZENZ_N_CTX = 256
         private const val NEXT_WORD_CANDIDATE_LIMIT = 6
         private const val LONG_DELAY_TIME = 64L
         private const val DEFAULT_DELAY_MS = 1000L
@@ -2958,9 +2957,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         if (deleteKeyFlickPreferencesChanged) {
             refreshDeleteKeyFlickPreferenceLayouts()
         }
-        zenzMaximumLetterSizePreference = preferences.zenzMaximumLetterSizePreference
-        zenzMaximumContextSizePreference = preferences.zenzMaximumContextSizePreference
-        zenzMaximumThreadSizePreference = preferences.zenzMaximumThreadSizePreference
         clipboardPreviewVisibility = preferences.clipboardPreviewVisibility
         clipboardPreviewTapToDelete = preferences.clipboardPreviewTapToDelete
         tenkeyHeightPreferenceValue = preferences.tenkeyHeightPreferenceValue
@@ -4321,9 +4317,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         sumireKeymapGuideSettings = ModeKeymapGuideSettings()
         flickGuideTextSizeSpPreference = null
         flickGuideMaxCharactersPreference = null
-        zenzMaximumLetterSizePreference = null
-        zenzMaximumContextSizePreference = null
-        zenzMaximumThreadSizePreference = null
         symbolKeyboardFirstItem = null
         userDictionaryPrefixMatchNumber = null
         tenkeyQWERTYSwitchNumber = null
@@ -18575,8 +18568,8 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
 
         return ZenzRuntimeConfig(
             modelPath = modelPath,
-            nCtx = zenzMaximumContextSizePreference ?: 512,
-            nThreads = zenzMaximumThreadSizePreference ?: 4,
+            nCtx = ZENZ_N_CTX,
+            nThreads = (Runtime.getRuntime().availableProcessors() / 2).coerceIn(2, 4),
         )
     }
 

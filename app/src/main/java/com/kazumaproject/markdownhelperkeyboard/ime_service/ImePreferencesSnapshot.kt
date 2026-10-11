@@ -187,9 +187,6 @@ data class ImePreferencesSnapshot(
     val isDeleteLeftFlickPreference: Boolean,
     val isDeleteUpFlickPreference: Boolean,
     val isDeleteDownFlickPreference: Boolean,
-    val zenzMaximumLetterSizePreference: Int,
-    val zenzMaximumContextSizePreference: Int,
-    val zenzMaximumThreadSizePreference: Int,
     val clipboardPreviewVisibility: Boolean,
     val clipboardPreviewTapToDelete: Boolean,
     val tenkeyHeightPreferenceValue: Int,
@@ -579,12 +576,6 @@ data class ImePreferencesSnapshot(
                 isDeleteLeftFlickPreference = appPreference.delete_key_left_flick_preference,
                 isDeleteUpFlickPreference = appPreference.delete_key_up_flick_preference,
                 isDeleteDownFlickPreference = appPreference.delete_key_down_flick_preference,
-                zenzMaximumLetterSizePreference =
-                    appPreference.zenz_maximum_letter_size_preference ?: 32,
-                zenzMaximumContextSizePreference =
-                    appPreference.zenz_maximum_context_size_preference ?: 512,
-                zenzMaximumThreadSizePreference =
-                    appPreference.zenz_maximum_thread_size_preference ?: 4,
                 clipboardPreviewVisibility = appPreference.clipboard_preview_preference,
                 clipboardPreviewTapToDelete = appPreference.clipboard_preview_tap_delete_preference,
                 tenkeyHeightPreferenceValue = appPreference.keyboard_height ?: 280,
