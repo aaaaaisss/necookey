@@ -52,7 +52,7 @@ object ConstrainedPathSearch {
                 var states: States? = null
                 for (prev in prevNodes) {
                     val prevStates = table[prev] ?: continue
-                    val edge = connectionMatrix.cost(prev.r.toInt(), node.l.toInt())
+                    val edge = connectionMatrix.cost(prev.r.toInt(), node.l.toInt()) + PosPairPenalty.cost(prev, node)
                     for (k in 0..p) {
                         val base = prevStates.cost[k]
                         if (base == Int.MAX_VALUE) continue

@@ -1209,8 +1209,8 @@ class FindPath(
                     )
                     for (prevNode in prevNodes) {
                         val localCost = getEdgeCost(
-                            rid = prevNode.r.toInt(),
-                            lid = currentNode.l.toInt(),
+                            prev = prevNode,
+                            node = currentNode,
                             connectionMatrix = connectionMatrix,
                         ) + currentNode.adjustedScore + ngramRuleScorer.score(
                             prevNode = prevNode,
@@ -1248,8 +1248,8 @@ class FindPath(
 
                 for (prev in prevNodes) {
                     val edgeCost = getEdgeCost(
-                        rid = prev.r.toInt(),
-                        lid = node.l.toInt(),
+                        prev = prev,
+                        node = node,
                         connectionMatrix = connectionMatrix,
                     )
                     val tempCost = prev.f + nodeScore + edgeCost
@@ -1302,8 +1302,8 @@ class FindPath(
 
                 for (prev in prevNodes) {
                     val edgeCost = getEdgeCost(
-                        rid = prev.r.toInt(),
-                        lid = node.l.toInt(),
+                        prev = prev,
+                        node = node,
                         connectionMatrix = connectionMatrix,
                     )
                     val tempCost = prev.f + nodeScore + edgeCost
@@ -1420,8 +1420,8 @@ class FindPath(
             }
             cachedNodes[count] = previousNode
             localCosts[count] = getEdgeCost(
-                rid = previousNode.r.toInt(),
-                lid = currentNode.l.toInt(),
+                prev = previousNode,
+                node = currentNode,
                 connectionMatrix = connectionMatrix,
             ) + currentNode.adjustedScore + ngramRuleScorer.score(
                 prevNode = previousNode,
@@ -1504,11 +1504,11 @@ class FindPath(
     }
 
     private fun getEdgeCost(
-        rid: Int,
-        lid: Int,
+        prev: Node,
+        node: Node,
         connectionMatrix: ConnectionMatrix.CostTable,
     ): Int {
-        return connectionMatrix.cost(rid, lid)
+        return connectionMatrix.cost(prev.r.toInt(), node.l.toInt()) + PosPairPenalty.cost(prev, node)
     }
 
     private fun getStringFromNode(node: Node): String {
@@ -1964,8 +1964,8 @@ class FindPath(
                             if (result == MozcBoundaryCheckResult.INVALID) continue
                         }
                         val localCost = getEdgeCost(
-                            rid = prevNode.r.toInt(),
-                            lid = currentNode.l.toInt(),
+                            prev = prevNode,
+                            node = currentNode,
                             connectionMatrix = connectionMatrix,
                         ) + currentNode.adjustedScore + ngramRuleScorer.score(
                             prevNode = prevNode,
@@ -2101,8 +2101,8 @@ class FindPath(
 
                 for (prevNode in prevNodes) {
                     val edgeScore = getEdgeCost(
-                        rid = prevNode.r.toInt(),
-                        lid = node.first.l.toInt(),
+                        prev = prevNode,
+                        node = node.first,
                         connectionMatrix = connectionMatrix,
                     )
 
