@@ -1193,7 +1193,7 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
 
     /** 読み・表記 → 助詞・句読点の接続コスト（同じ語の後は毎回同じなので覚えておく）。 */
     private val followingWordCostCache = object : LinkedHashMap<Pair<String, String>, Map<String, Int>>(64, 0.75f, true) {
-        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<Pair<String, String>, Map<String, Int>>?) = size > 128
+        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<Pair<String, String>, Map<String, Int>>?): Boolean = size > 128
     }
 
     private fun committedLastWord(committedText: String): Pair<String, String>? {
@@ -1386,7 +1386,7 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
             } else {
                 emptyList()
             }
-            fun asCandidates(words: List<String>) = words.map { word ->
+            fun asCandidates(words: List<String>): List<Candidate> = words.map { word ->
                 Candidate(
                     string = word,
                     type = ZERO_QUERY_CANDIDATE_TYPE,
@@ -1398,10 +1398,10 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
             // 助詞・句読点: 直前の語が辞書で分かれば品詞のつながり（接続コスト）で並べる（zenz で採点しない）。
             // 分からなければ従来どおり直前の文字で絞って zenz で採点する。
             val connectionRanked = connectionRankedFunctionWords(key, lastWord)
-            val rankedFunctionWords = connectionRanked
+            val rankedFunctionWords: List<Candidate> = connectionRanked
                 ?.let { NextWordExtras.withoutBase(candidates, asCandidates(it)) }
                 .orEmpty()
-            val functionWords = if (connectionRanked != null) {
+            val functionWords: List<Candidate> = if (connectionRanked != null) {
                 emptyList()
             } else {
                 NextWordExtras.withoutBase(candidates, asCandidates(NextWordExtras.functionWordsAfter(key)))
