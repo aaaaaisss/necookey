@@ -70,7 +70,8 @@ object NextWordExtras {
         minOf(
             base.size,
             NextWordZenzReranker.TOP_K,
-            (MAX_SCORED - scoredFunctionWords(functionWords).size - emojiTargets).coerceAtLeast(KEEP_BASE),
+            // 絵文字キーワードは枠外（全キーワードを毎回採点するため、学習済み後続語の枠を削らない）。
+            (MAX_SCORED - scoredFunctionWords(functionWords).size).coerceAtLeast(KEEP_BASE),
         )
 
     private fun scoredFunctionWords(functionWords: List<Candidate>) = functionWords.take(FUNCTION_WORD_POOL)
@@ -102,8 +103,8 @@ object NextWordExtras {
     }
 
     /**
-     * zenz に渡す文字列（合計 [MAX_SCORED] 件まで）: head（学習済み base の上位）+
-     * 助詞・句読点 [FUNCTION_WORD_POOL] 件 + 文脈絵文字のキーワード（[ContextEmojiSelector.POOL] 件）。
+     * zenz に渡す文字列（head＋助詞で [MAX_SCORED] 件まで）: head（学習済み base の上位）+
+     * 助詞・句読点 [FUNCTION_WORD_POOL] 件 + 文脈絵文字の全キーワード。
      */
     fun scoringTargets(
         base: List<Candidate>,

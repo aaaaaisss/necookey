@@ -34,19 +34,6 @@ class ContextEmojiSelectorTest {
     }
 
     @Test
-    fun prefilterTakesPoolFromDistinctGroupsAndRotates() {
-        val sel = ContextEmojiSelector(entries)
-        val first = sel.prefilter()
-        assertEquals(minOf(ContextEmojiSelector.POOL, entries.map { it.group }.distinct().size), first.size)
-        assertEquals(first.size, first.map { it.group }.distinct().size)
-        val second = sel.prefilter()
-        val seen = (first + second).map { it.keyword }.toSet()
-        // two commits cover every group and start on second members
-        assertTrue(entries.map { it.group }.toSet().all { g -> (first + second).any { it.group == g } })
-        assertTrue(seen.size > first.size)
-    }
-
-    @Test
     fun rankUsesPmiNotRawScore() {
         val sel = ContextEmojiSelector(entries)
         val targets = listOf(entries[0], entries[2], entries[4])
@@ -55,32 +42,36 @@ class ContextEmojiSelectorTest {
         sel.putPriors("m", listOf("大爆笑", "号泣", "ビール"), floatArrayOf(-2f, -12f, -8f))
         // raw: 大爆笑 -3 best, but PMI 号泣 = +6 > ビール +1 > 大爆笑 -1 (dropped)
         val picked = sel.rank(targets, floatArrayOf(-3f, -6f, -7f))
-        assertEquals(listOf(1, 2), picked)
+        assertEquals(listOf(1), picked)
     }
 
     @Test
-    fun rankSkipsKeywordsWithoutPriorAndCapsAtThree() {
+    fun prefilterReturnsEveryKeyword() {
+        val sel = ContextEmojiSelector(entries)
+        assertEquals(entries.map { it.keyword }, sel.prefilter("なんでも").map { it.keyword })
+    }
+
+    @Test
+    fun rankPicksOneEmojiByItsBestKeyword() {
+        val mood = listOf(
+            MoodEmoji("😭", "号泣", "crying"), MoodEmoji("😭", "泣く", "crying"), MoodEmoji("😭", "つらい", "crying"),
+            MoodEmoji("🙌", "やった", "raise"), MoodEmoji("🙌", "嬉しい", "raise"),
+        )
+        val sel = ContextEmojiSelector(mood)
+        withPriors(sel, -10f)
+        val targets = sel.prefilter()
+        // 泣く PMI +5 beats やった +3; the others are ignored for their emoji
+        val picked = sel.rank(targets, floatArrayOf(-12f, -5f, -9f, -7f, -20f))
+        assertEquals(listOf(1), picked)
+    }
+
+    @Test
+    fun rankSkipsKeywordsWithoutPrior() {
         val sel = ContextEmojiSelector(entries)
         val targets = entries.take(6)
         sel.missingPriors("m", targets)
         sel.putPriors("m", targets.take(5).map { it.keyword }, FloatArray(5) { -10f })
-        val picked = sel.rank(targets, floatArrayOf(-1f, -2f, -3f, -4f, -5f, 0f))
-        assertEquals(listOf(0, 1, 2), picked)
-        assertFalse(5 in picked)
-    }
-
-    @Test
-    fun winnersStayInNextPrefilterAndDropWhenTheyLose() {
-        val sel = ContextEmojiSelector(entries)
-        withPriors(sel)
-        val targets = sel.prefilter()
-        val scores = FloatArray(targets.size) { -20f }.also { it[3] = -1f }
-        assertEquals(listOf(3), sel.rank(targets, scores))
-        val next = sel.prefilter()
-        assertEquals(targets[3], next.first())
-        assertEquals(1, next.count { it.group == targets[3].group })
-        sel.rank(next, FloatArray(next.size) { -20f })
-        assertFalse(targets[3] in sel.prefilter().take(1))
+        assertEquals(listOf(0), sel.rank(targets, floatArrayOf(-1f, -2f, -3f, -4f, -5f, 0f)))
     }
 
     @Test
@@ -95,20 +86,14 @@ class ContextEmojiSelectorTest {
     }
 
     @Test
-    fun prefilterPutsKeywordsFoundInLeftContextFirst() {
-        val sel = ContextEmojiSelector(entries)
-        val pool = sel.prefilter("昨日は友達とビールを飲んで大爆笑した")
-        assertEquals(listOf("大爆笑", "ビール"), pool.take(2).map { it.keyword })
-    }
-
-    @Test
     fun matchedKeywordPassesWithSlightlyNegativePmi() {
         val sel = ContextEmojiSelector(entries)
         withPriors(sel, -10f)
         val pool = sel.prefilter("ビール")
+        val beer = pool.indexOfFirst { it.keyword == "ビール" }
         val scores = FloatArray(pool.size) { -20f }
-        scores[0] = -10.5f // ビール: PMI -0.5（文脈に出た語なので出す）
-        assertEquals(listOf(0), sel.rank(pool, scores))
+        scores[beer] = -10.5f // ビール: PMI -0.5（文脈に出た語なので出す）
+        assertEquals(listOf(beer), sel.rank(pool, scores))
     }
 
     @Test

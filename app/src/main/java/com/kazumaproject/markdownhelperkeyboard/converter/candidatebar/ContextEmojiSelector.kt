@@ -4,26 +4,16 @@ package com.kazumaproject.markdownhelperkeyboard.converter.candidatebar
 data class MoodEmoji(val emoji: String, val keyword: String, val group: String)
 
 /**
- * 確定後の文脈絵文字（assets/emoji/emoji_mood.tsv、よく使われる約 150 絵文字）。
+ * 確定後の文脈絵文字（assets/emoji/emoji_mood.tsv、ユーザー指定の 8 絵文字 × 数語のキーワード）。
  *
- * 1 回の後続語 zenz 採点に [POOL] 件のキーワードだけ混ぜる（[prefilter]）: 直近に選ばれた絵文字
- * （最大 [MAX_HOT] 件、同じ会話ではムードが続きやすい）＋残りはムードグループを順に巡回して各グループの
- * 次の絵文字。順位は PMI = logP(キーワード|左文脈) − logP(キーワード|空文脈)（[rank]）。空文脈の
- * 事前スコアはモデルごとに一度だけ計算してキャッシュする（[missingPriors] / [putPriors]）。
+ * 確定ごとに全キーワードを後続語の zenz 採点 1 回に混ぜ（[prefilter]）、絵文字ごとに一番合ったキーワードの
+ * PMI = logP(キーワード|左文脈) − logP(キーワード|空文脈) で比べて、雰囲気に合う絵文字を [MAX_SHOWN] 個だけ出す（[rank]）。
+ * 空文脈の事前スコアはモデルごとに一度だけ計算してキャッシュする（[missingPriors] / [putPriors]）。
  * 事前スコアが未計算のキーワードは順位付けしない。
  */
 class ContextEmojiSelector(entries: List<MoodEmoji>) {
     companion object {
-        /** 1 回の確定で zenz に採点させるキーワード数。 */
-        const val POOL = 10
-
-        /** [POOL] のうち直近に選ばれた絵文字の枠。 */
-        const val MAX_HOT = 3
-
-        /** [POOL] のうち左文脈にキーワード（またはその語幹）が出てきた絵文字の枠。 */
-        const val MAX_MATCHED = 4
-
-        /** 左文脈に出てきたキーワードの絵文字は、PMI がこれより高ければ出す（通常の [MIN_PMI] より緩い）。 */
+        /** 左文脈にキーワード（またはその語幹）が出てきた絵文字は、PMI がこれより高ければ出す（通常の [MIN_PMI] より緩い）。 */
         const val MIN_PMI_MATCHED = -1.0f
 
         /** キーワード照合に使う左文脈の末尾文字数。 */
@@ -31,8 +21,8 @@ class ContextEmojiSelector(entries: List<MoodEmoji>) {
 
         private val SINGLE_CHAR_KEYS = setOf("犬", "猫", "雨", "雪", "桜", "月", "草", "星")
 
-        /** 表示する絵文字の上限。 */
-        const val MAX_SHOWN = 3
+        /** 表示する絵文字の数（雰囲気に合う 1 個）。 */
+        const val MAX_SHOWN = 1
 
         /** これより PMI が低い（文脈で起こりやすくならない）絵文字は出さない。 */
         const val MIN_PMI = 0f
@@ -40,7 +30,7 @@ class ContextEmojiSelector(entries: List<MoodEmoji>) {
         /** 事前スコアを 1 回で計算する上限（後続語採点と mutex を取り合わないよう小分け）。 */
         const val PRIOR_BATCH = 24
 
-        /** 事前スコア計算を続ける最大回数（150 語 / 24 件 ≒ 7 回）。 */
+        /** 事前スコア計算を続ける最大回数。 */
         const val MAX_PRIOR_ROUNDS = 10
 
         /** 事前スコア計算の 1 回ごとの間隔（変換の推論に割り込みすぎない）。 */
@@ -56,12 +46,7 @@ class ContextEmojiSelector(entries: List<MoodEmoji>) {
             .toList()
     }
 
-    private val groups: List<List<MoodEmoji>> =
-        entries.distinctBy { it.keyword }.groupBy { it.group }.values.toList()
-    private val all: List<MoodEmoji> = groups.flatten()
-    private var groupCursor = 0
-    private val memberCursor = IntArray(groups.size)
-    private val hot = ArrayDeque<MoodEmoji>()
+    private val all: List<MoodEmoji> = entries.distinctBy { it.keyword }
     private val priors = HashMap<String, Float>()
     private var priorModel: String? = null
     private var matched: Set<MoodEmoji> = emptySet()
@@ -90,10 +75,10 @@ class ContextEmojiSelector(entries: List<MoodEmoji>) {
     }
 
     /**
-     * zenz なしで出す絵文字: 今の文（最後の句点・改行より後ろ）にキーワードが出てきたもの、新しい順に [limit] 件。
+     * zenz なしで出す絵文字: 今の文（最後の句点・改行より後ろ）にキーワードが一番最近出てきたもの（[limit] 件）。
      * 前の文の語で反応しないよう文で区切る。
      */
-    fun plainMatches(leftContext: String, limit: Int = 2): List<MoodEmoji> {
+    fun plainMatches(leftContext: String, limit: Int = MAX_SHOWN): List<MoodEmoji> {
         val sentence = leftContext.takeLast(MATCH_WINDOW)
             .substringAfterLast('\n')
             .let { s ->
@@ -102,35 +87,16 @@ class ContextEmojiSelector(entries: List<MoodEmoji>) {
                 val cut = body.indexOfLast { it in "。！？!?" }
                 if (cut >= 0) body.substring(cut + 1) else body
             }
-        return matchesIn(sentence).take(limit)
+        return matchesIn(sentence).distinctBy { it.emoji }.take(limit)
     }
 
     val size: Int get() = all.size
 
-    /** 今回の確定で採点するキーワード（[POOL] 件まで、重複なし）。呼ぶたびに巡回位置が進む。 */
+    /** 今回の確定で採点するキーワード（全キーワード）。左文脈に出てきた語は [rank] で閾値を緩める。 */
     @Synchronized
     fun prefilter(leftContext: String = ""): List<MoodEmoji> {
-        if (groups.isEmpty()) return emptyList()
-        val out = LinkedHashMap<String, MoodEmoji>()
-        // 1. 左文脈に出てきた語の絵文字（文脈に直結するので最優先）
-        val hit = matchesIn(leftContext).take(MAX_MATCHED)
-        matched = hit.toSet()
-        hit.forEach { out[it.keyword] = it }
-        // 2. 直近に選ばれた絵文字
-        hot.take(MAX_HOT).forEach { out.putIfAbsent(it.keyword, it) }
-        val hotGroups = out.values.mapTo(HashSet()) { it.group }
-        var visited = 0
-        while (out.size < POOL && visited < groups.size) {
-            val g = groupCursor
-            groupCursor = (groupCursor + 1) % groups.size
-            visited++
-            val members = groups[g]
-            if (members.first().group in hotGroups) continue
-            val m = members[memberCursor[g] % members.size]
-            memberCursor[g] = (memberCursor[g] + 1) % members.size
-            out.putIfAbsent(m.keyword, m)
-        }
-        return out.values.take(POOL)
+        matched = matchesIn(leftContext).toSet()
+        return all
     }
 
     /** [model] の事前スコアが未計算のキーワード: [first] を先に、全体から [PRIOR_BATCH] 件まで。 */
@@ -190,28 +156,22 @@ class ContextEmojiSelector(entries: List<MoodEmoji>) {
     }
 
     /**
-     * [targets]（[prefilter] の結果）と同じ並びの左文脈つきスコアから PMI 上位 [MAX_SHOWN] 件の
-     * インデックスを返す（PMI 降順、[MIN_PMI] 超のみ）。選ばれた絵文字は次回の [prefilter] の hot 枠に入り、採点されて選ばれなかった hot は外れる。
+     * [targets]（[prefilter] の結果）と同じ並びの左文脈つきスコアから、絵文字ごとに PMI が一番高いキーワードを代表にして
+     * 比べ、上位 [MAX_SHOWN] 件のインデックス（代表キーワードの位置）を返す（PMI 降順、閾値超のみ）。
      */
     @Synchronized
     fun rank(targets: List<MoodEmoji>, scores: FloatArray): List<Int> {
         if (scores.size != targets.size) return emptyList()
-        val picked = targets.indices.mapNotNull { i ->
+        return targets.indices.mapNotNull { i ->
             val prior = priors[targets[i].keyword] ?: return@mapNotNull null
             if (!scores[i].isFinite()) return@mapNotNull null
             val pmi = scores[i] - prior
             val threshold = if (targets[i] in matched) MIN_PMI_MATCHED else MIN_PMI
             if (pmi > threshold) i to pmi else null
-        }.sortedWith(compareByDescending<Pair<Int, Float>> { it.second }.thenBy { it.first })
+        }.groupBy { targets[it.first].emoji }
+            .values.map { hits -> hits.maxWith(compareBy<Pair<Int, Float>> { it.second }.thenByDescending { it.first }) }
+            .sortedWith(compareByDescending<Pair<Int, Float>> { it.second }.thenBy { it.first })
             .take(MAX_SHOWN)
             .map { it.first }
-        val pickedSet = picked.mapTo(HashSet()) { targets[it] }
-        hot.removeAll { it in targets && it !in pickedSet }
-        for (i in picked.asReversed()) {
-            hot.remove(targets[i])
-            hot.addFirst(targets[i])
-        }
-        while (hot.size > MAX_HOT) hot.removeLast()
-        return picked
     }
 }

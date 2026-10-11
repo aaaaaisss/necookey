@@ -1447,8 +1447,8 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
     }
 
     /**
-     * 後続語の上位 [NextWordZenzReranker.TOP_K] 件＋助詞・句読点＋文脈絵文字キーワード（[ContextEmojiSelector.POOL] 件）を
-     * 左文脈つきで zenz が 1 回採点し、並べ替える。絵文字はキーワードの PMI（空文脈の事前スコアとの差）上位
+     * 後続語の上位 [NextWordZenzReranker.TOP_K] 件＋助詞・句読点＋文脈絵文字の全キーワードを
+     * 左文脈つきで zenz が 1 回採点し、並べ替える。絵文字は絵文字ごとに一番合ったキーワードの PMI（空文脈の事前スコアとの差）で比べた上位
      * [ContextEmojiSelector.MAX_SHOWN] 件。採点後、未計算の事前スコアを小分けに空文脈で計算してキャッシュする。
      */
     private fun launchZeroQueryZenzRerank(

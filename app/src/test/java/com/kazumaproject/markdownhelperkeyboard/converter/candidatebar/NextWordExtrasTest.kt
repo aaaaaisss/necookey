@@ -16,25 +16,25 @@ class NextWordExtrasTest {
     }
 
     @Test
-    fun rerankKeepsTopBaseAndMergesPickedEmoji() {
+    fun rerankKeepsTopBaseAndPlacesOneEmojiAfterTheFirstWord() {
         val base = listOf(c("a"), c("b"), c("c"))
-        // head a b c, then 4 emoji keywords; picked emoji are placed by their keyword score
+        // head a b c, then 4 emoji keywords
         val scores = floatArrayOf(-2f, -2f, -5f, -9f, -3f, -1f, -8f)
         val out = NextWordExtras.rerank(base, scores, emptyList(), 4, listOf(e("E2") to 2, e("E1") to 1)).map { it.string }
-        // emoji sit right after the first and second learned words
-        assertEquals(listOf("a", "E2", "b", "E1"), out.take(4))
-        assertEquals(listOf("E2", "E1"), out.filter { it.startsWith("E") })
+        // only one emoji, right after the first learned word
+        assertEquals(listOf("a", "E2", "b"), out.take(3))
+        assertEquals(listOf("E2"), out.filter { it.startsWith("E") })
         assertTrue(out.containsAll(listOf("a", "b", "c")))
-        assertEquals(5, out.size)
+        assertEquals(4, out.size)
     }
 
     @Test
-    fun scoringTargetsCappedAtMaxScoredKeepingLearnedHead() {
+    fun scoringTargetsKeepLearnedHeadAndAppendEveryEmojiKeyword() {
         val base = (1..12).map { c("b$it") }
         val fw = NextWordExtras.FUNCTION_WORDS.map(::c)
-        val keywords = (1..ContextEmojiSelector.POOL).map { "k$it" }
+        val keywords = (1..48).map { "k$it" }
         val targets = NextWordExtras.scoringTargets(base, keywords, fw)
-        assertTrue(targets.size <= NextWordExtras.MAX_SCORED)
+        assertTrue(targets.size - keywords.size <= NextWordExtras.MAX_SCORED)
         assertEquals(base.take(NextWordZenzReranker.TOP_K).map { it.string }, targets.take(NextWordZenzReranker.TOP_K))
         assertEquals(NextWordExtras.FUNCTION_WORD_POOL, targets.count { t -> fw.any { it.string == t } })
         assertEquals(keywords, targets.takeLast(keywords.size))
