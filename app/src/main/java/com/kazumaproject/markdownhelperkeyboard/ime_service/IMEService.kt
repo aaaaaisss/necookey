@@ -207,6 +207,7 @@ import com.kazumaproject.markdownhelperkeyboard.converter.candidate.ExactInputCa
 import com.kazumaproject.markdownhelperkeyboard.converter.candidate.QWERTY_GLIDE_CANDIDATE_TYPE
 import com.kazumaproject.markdownhelperkeyboard.converter.candidate.ZenzCandidate
 import com.kazumaproject.markdownhelperkeyboard.ime_service.zenz.ZenzDiagnosticsStore
+import com.kazumaproject.markdownhelperkeyboard.ime_service.zenz.ZenzSkipReason
 import com.kazumaproject.markdownhelperkeyboard.converter.candidate.buildRomajiCandidates
 import com.kazumaproject.markdownhelperkeyboard.converter.candidate.toUserTemplateCandidates
 import com.kazumaproject.markdownhelperkeyboard.converter.engine.EnglishEngine
@@ -10765,7 +10766,11 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
     ): ZenzaiOutcome? {
         val session = kanaKanjiConversionSession ?: return null
         val request = lastKanaKanjiQueryRequest?.copy(input = insertString) ?: return null
-        val config = withContext(Dispatchers.Default) { resolveZenzRuntimeConfig() } ?: return null
+        val config = withContext(Dispatchers.Default) { resolveZenzRuntimeConfig() }
+        if (config == null) {
+            ZenzDiagnosticsStore.recordSkip(applicationContext, ZenzSkipReason.NOT_LOADED)
+            return null
+        }
 
         // ユーザー辞書から来た文節は zenz に書き換えさせない（学習語は守らない）。候補全体がそうなら推論しない。
         val topSegments = sumireTop.conversionSegments.ifEmpty {
@@ -10778,6 +10783,7 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         val protectedSegments = zenzaiProtectedSegments(request, insertString, sumireTop, topSegments)
         if (protectedSegments == null) {
             zenzaiCarry = null
+            ZenzDiagnosticsStore.recordSkip(applicationContext, ZenzSkipReason.PROTECTED)
             return null
         }
 
@@ -10822,6 +10828,9 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         }
         if (cached == null && !verdict.startsWith("ERROR")) {
             synchronized(zenzaiVerdictCache) { zenzaiVerdictCache[key] = verdict }
+        }
+        if (verdict.startsWith("ERROR")) {
+            ZenzDiagnosticsStore.recordSkip(applicationContext, ZenzSkipReason.ERROR_VERDICT)
         }
 
         var top = draft
@@ -10944,11 +10953,22 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
             }
             val outcome = try {
                 runZenzaiStep(insertString, sumireTop, context, ::show)
+            } catch (e: kotlinx.coroutines.TimeoutCancellationException) {
+                // withTimeout's exception is a CancellationException; it must not be swallowed silently.
+                Timber.e(e, "zenzai (list) timed out")
+                ZenzDiagnosticsStore.recordSkip(applicationContext, ZenzSkipReason.TIMEOUT)
+                null
             } catch (e: CancellationException) {
+                ZenzDiagnosticsStore.recordSkip(applicationContext, ZenzSkipReason.CANCELLED)
                 throw e
             } catch (e: Exception) {
                 Timber.e(e, "zenzai (list) failed")
                 ZenzDiagnosticsStore.recordFailure(applicationContext)
+                if (e is com.kazumaproject.markdownhelperkeyboard.zenz.runtime.ZenzProcessException ||
+                    e is android.os.RemoteException
+                ) {
+                    ZenzDiagnosticsStore.recordSkip(applicationContext, ZenzSkipReason.BINDER_ERROR)
+                }
                 null
             } ?: return@launch
             recordZenzaiDiagnostics(outcome)
@@ -16058,11 +16078,22 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
             }
             val outcome = try {
                 runZenzaiStep(insertString, sumireTop, context, ::show)
+            } catch (e: kotlinx.coroutines.TimeoutCancellationException) {
+                // withTimeout's exception is a CancellationException; it must not be swallowed silently.
+                Timber.e(e, "zenzai (two-row) timed out")
+                ZenzDiagnosticsStore.recordSkip(applicationContext, ZenzSkipReason.TIMEOUT)
+                null
             } catch (e: CancellationException) {
+                ZenzDiagnosticsStore.recordSkip(applicationContext, ZenzSkipReason.CANCELLED)
                 throw e
             } catch (e: Exception) {
                 Timber.e(e, "zenzai (two-row) failed")
                 ZenzDiagnosticsStore.recordFailure(applicationContext)
+                if (e is com.kazumaproject.markdownhelperkeyboard.zenz.runtime.ZenzProcessException ||
+                    e is android.os.RemoteException
+                ) {
+                    ZenzDiagnosticsStore.recordSkip(applicationContext, ZenzSkipReason.BINDER_ERROR)
+                }
                 null
             } ?: return@launch
             recordZenzaiDiagnostics(outcome)

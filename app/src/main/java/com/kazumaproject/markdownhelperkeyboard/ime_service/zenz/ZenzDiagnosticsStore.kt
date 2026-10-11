@@ -13,6 +13,22 @@ data class ZenzDiagnosticEntry(
     enum class Outcome { CHANGED, UNCHANGED, NO_TARGETS, ERROR }
 }
 
+/** Why zenz did not produce a verdict for a conversion (no [z]/[Z] mark). */
+enum class ZenzSkipReason(val key: String) {
+    NOT_LOADED("not_loaded"),
+    CANCELLED("cancelled"),
+    BINDER_ERROR("binder_error"),
+    TIMEOUT("timeout"),
+    PROTECTED("protected"),
+    ERROR_VERDICT("error_verdict"),
+}
+
+data class ZenzSkipStats(
+    val lastReason: ZenzSkipReason?,
+    val lastAtEpochMillis: Long,
+    val counts: Map<ZenzSkipReason, Int>,
+)
+
 /** Stores aggregate-only diagnostics; no text, context, candidate, or model payload is persisted. */
 object ZenzDiagnosticsStore {
     private const val KEY_RECORDED_AT = "zenz_diagnostics_recorded_at"
@@ -37,6 +53,33 @@ object ZenzDiagnosticsStore {
 
     fun recordFailure(context: Context) {
         write(context, ZenzDiagnosticEntry.Outcome.ERROR, 0, 0)
+    }
+
+    private const val KEY_SKIP_LAST = "zenz_diagnostics_skip_last"
+    private const val KEY_SKIP_LAST_AT = "zenz_diagnostics_skip_last_at"
+    private const val KEY_SKIP_COUNT_PREFIX = "zenz_diagnostics_skip_count_"
+
+    /** Records why zenz was skipped (reason + per-reason counter only; no text). */
+    fun recordSkip(context: Context, reason: ZenzSkipReason) {
+        val preferences = PreferenceManager.getDefaultSharedPreferences(context.applicationContext)
+        val countKey = KEY_SKIP_COUNT_PREFIX + reason.key
+        preferences.edit()
+            .putString(KEY_SKIP_LAST, reason.key)
+            .putLong(KEY_SKIP_LAST_AT, System.currentTimeMillis())
+            .putInt(countKey, preferences.getInt(countKey, 0) + 1)
+            .apply()
+    }
+
+    fun skipStats(context: Context): ZenzSkipStats {
+        val preferences = PreferenceManager.getDefaultSharedPreferences(context.applicationContext)
+        val last = preferences.getString(KEY_SKIP_LAST, null)
+        return ZenzSkipStats(
+            lastReason = ZenzSkipReason.values().firstOrNull { it.key == last },
+            lastAtEpochMillis = preferences.getLong(KEY_SKIP_LAST_AT, 0L),
+            counts = ZenzSkipReason.values().associateWith {
+                preferences.getInt(KEY_SKIP_COUNT_PREFIX + it.key, 0)
+            },
+        )
     }
 
     fun latest(context: Context): ZenzDiagnosticEntry? {

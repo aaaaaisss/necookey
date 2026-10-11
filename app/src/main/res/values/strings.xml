@@ -842,6 +842,13 @@
     <string name="zenz_diagnostics_error">直近の採点処理に失敗しました。</string>
     <string name="zenz_diagnostics_timestamp">記録時刻：%1$s</string>
     <string name="zenz_diagnostics_privacy">この診断履歴には時刻と文節数だけを保存し、入力文・文脈・候補文字列は含めません。</string>
+    <string name="zenz_skip_last">直近のzenzスキップ：%1$s（%2$s）\nスキップ累計：</string>
+    <string name="zenz_skip_not_loaded">モデル未準備</string>
+    <string name="zenz_skip_cancelled">取消（新しい入力で中断）</string>
+    <string name="zenz_skip_binder_error">zenzプロセスとの通信エラー</string>
+    <string name="zenz_skip_timeout">タイムアウト</string>
+    <string name="zenz_skip_protected">ユーザー辞書の語を保護</string>
+    <string name="zenz_skip_error_verdict">推論エラー</string>
     <string name="zenz_diagnostics_refresh">更新</string>
     <string name="zenz_diagnostics_badge_explanation">[Z] は、zenz文節ゲートが選び直した主候補を示します。</string>
     <string name="cursor_move_target_pairs_not_set">未設定</string>

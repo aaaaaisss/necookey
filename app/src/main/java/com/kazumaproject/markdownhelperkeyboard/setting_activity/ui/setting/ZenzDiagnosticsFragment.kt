@@ -9,6 +9,7 @@ import com.google.android.material.textview.MaterialTextView
 import com.kazumaproject.markdownhelperkeyboard.R
 import com.kazumaproject.markdownhelperkeyboard.ime_service.zenz.ZenzDiagnosticEntry
 import com.kazumaproject.markdownhelperkeyboard.ime_service.zenz.ZenzDiagnosticsStore
+import com.kazumaproject.markdownhelperkeyboard.ime_service.zenz.ZenzSkipReason
 import com.kazumaproject.markdownhelperkeyboard.variant.AppVariantConfig
 import java.text.DateFormat
 import java.util.Date
@@ -39,10 +40,11 @@ class ZenzDiagnosticsFragment : Fragment(R.layout.fragment_zenz_diagnostics) {
 
         val resultView = view.findViewById<MaterialTextView>(R.id.zenz_diagnostics_result)
         val timestampView = view.findViewById<MaterialTextView>(R.id.zenz_diagnostics_timestamp)
+        val skipText = skipSummary(context)
         val entry = ZenzDiagnosticsStore.latest(context)
         if (entry == null) {
             resultView.setText(R.string.zenz_diagnostics_not_run)
-            timestampView.text = ""
+            timestampView.text = skipText
             return
         }
 
@@ -61,6 +63,28 @@ class ZenzDiagnosticsFragment : Fragment(R.layout.fragment_zenz_diagnostics) {
         }
         val recordedAt = DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT)
             .format(Date(entry.recordedAtEpochMillis))
-        timestampView.text = getString(R.string.zenz_diagnostics_timestamp, recordedAt)
+        timestampView.text = getString(R.string.zenz_diagnostics_timestamp, recordedAt) +
+            if (skipText.isEmpty()) "" else "\n\n" + skipText
+    }
+
+    private fun skipLabel(reason: ZenzSkipReason): String = getString(
+        when (reason) {
+            ZenzSkipReason.NOT_LOADED -> R.string.zenz_skip_not_loaded
+            ZenzSkipReason.CANCELLED -> R.string.zenz_skip_cancelled
+            ZenzSkipReason.BINDER_ERROR -> R.string.zenz_skip_binder_error
+            ZenzSkipReason.TIMEOUT -> R.string.zenz_skip_timeout
+            ZenzSkipReason.PROTECTED -> R.string.zenz_skip_protected
+            ZenzSkipReason.ERROR_VERDICT -> R.string.zenz_skip_error_verdict
+        },
+    )
+
+    private fun skipSummary(context: android.content.Context): String {
+        val stats = ZenzDiagnosticsStore.skipStats(context)
+        val last = stats.lastReason ?: return ""
+        val at = DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT)
+            .format(Date(stats.lastAtEpochMillis))
+        val counts = stats.counts.entries.filter { it.value > 0 }
+            .joinToString("\n") { (reason, count) -> "・" + skipLabel(reason) + "：" + count }
+        return getString(R.string.zenz_skip_last, skipLabel(last), at) + "\n" + counts
     }
 }
