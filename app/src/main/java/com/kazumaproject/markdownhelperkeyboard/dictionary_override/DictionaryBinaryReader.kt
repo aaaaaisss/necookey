@@ -216,11 +216,13 @@ class DictionaryBinaryReader @Inject constructor(
                 }
         }
         // システム辞書と連接表は APK に圧縮形式（system.compact.kdict / connection.compact）でしか入っていない。
+        // 英語辞書も同梱は english.compact.kdict だけ（reading/word/token は dictionary-src のビルド入力）。
         check(
             DictionaryFileSpecs.get(key).category != DictionaryCategory.SYSTEM &&
+                DictionaryFileSpecs.get(key).category != DictionaryCategory.ENGLISH &&
                 key != DictionaryFileKey.CONNECTION_ID,
         ) {
-            "Bundled $key is only available from $COMPACT_SYSTEM_DICTIONARY_ASSET"
+            "Bundled $key is only available from a compact asset"
         }
         return resolver.openBundledForKey(key).use(loader)
     }
@@ -298,11 +300,8 @@ class DictionaryBinaryReader @Inject constructor(
                     CompactEnglishDictionaryReader::read,
                 )
             }.onFailure { error ->
-                Timber.w(
-                    error,
-                    "Compact English dictionary is unavailable. Falling back to serialized assets.",
-                )
-            }.getOrNull()?.also { compactEnglishDictionaryCache = it }
+                Timber.e(error, "Compact English dictionary failed to load; the English dictionary is unavailable.")
+            }.getOrThrow().also { compactEnglishDictionaryCache = it }
         }
     }
 

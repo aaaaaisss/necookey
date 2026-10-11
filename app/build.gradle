@@ -388,9 +388,9 @@ def bundledCoreDictionaryTriples = [
 def compactSystemDictionaryAsset = layout.buildDirectory.file(
     "generated/compactSystemDictionary/assets/system/system.compact.kdict"
 )
-def bundledEnglishReading = file("src/main/assets/english/reading.dat.zip")
-def bundledEnglishWord = file("src/main/assets/english/word.dat")
-def bundledEnglishToken = file("src/main/assets/english/token.dat.zip")
+def bundledEnglishReading = file("dictionary-src/english/reading.dat.zip")
+def bundledEnglishWord = file("dictionary-src/english/word.dat")
+def bundledEnglishToken = file("dictionary-src/english/token.dat.zip")
 def compactEnglishDictionaryAsset = layout.buildDirectory.file(
     "generated/compactSystemDictionary/assets/english/english.compact.kdict"
 )
@@ -1161,7 +1161,8 @@ dependencies {
 
 // APK size: the raw serialized dictionaries below are build inputs for the compact images
 // (generated/compactSystemDictionary, generated/compactConnectionMatrix) and runtime fallbacks
-// that only matter when the compact image is missing. External dictionary overrides were removed,
+// that only matter when the compact image is missing (English serialized dictionaries live in
+// dictionary-src/english and are build inputs only). External dictionary overrides were removed,
 // so release APKs ship only the compact images. Debug builds and unit tests keep the raw files.
 def releaseOnlyCompactDictionaryInputs = [
         "connectionId.dat.zip",
@@ -1171,7 +1172,6 @@ def releaseOnlyCompactDictionaryInputs = [
         "emoticon/tango_emoticon.dat", "emoticon/yomi_emoticon.dat", "emoticon/token_emoticon.dat",
         "symbol/tango_symbol.dat", "symbol/yomi_symbol.dat", "symbol/token_symbol.dat",
         "reading_correction/tango_reading_correction.dat", "reading_correction/yomi_reading_correction.dat", "reading_correction/token_reading_correction.dat",
-        "english/reading.dat.zip", "english/word.dat", "english/token.dat.zip",
 ]
 tasks.withType(com.android.build.gradle.tasks.MergeSourceSetFolders).configureEach { mergeTask ->
     if (mergeTask.name.startsWith("merge") && mergeTask.name.endsWith("ReleaseAssets")) {
