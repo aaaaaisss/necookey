@@ -1185,6 +1185,46 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
     private fun rememberZeroQueryKeyAfterCommit(committedText: String) {
         if (committedText.isBlank()) return
         pendingZeroQueryKeyAfterCommit = committedText
+        pendingZeroQueryLastWord = committedLastWord(committedText)
+    }
+
+    /** 確定した最後の語（読み・表記）。後続の助詞を辞書の接続コストで並べるのに使う。 */
+    private var pendingZeroQueryLastWord: Pair<String, String>? = null
+
+    /** 読み・表記 → 助詞・句読点の接続コスト（同じ語の後は毎回同じなので覚えておく）。 */
+    private val followingWordCostCache = object : LinkedHashMap<Pair<String, String>, Map<String, Int>>(64, 0.75f, true) {
+        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<Pair<String, String>, Map<String, Int>>?) = size > 128
+    }
+
+    private fun committedLastWord(committedText: String): Pair<String, String>? {
+        val input = latestCandidateSegmentInput
+        val last = latestCandidateSegmentsByString[committedText]?.lastOrNull()
+        if (last != null && last.inputStart in 0 until last.inputEnd && last.inputEnd <= input.length &&
+            last.output.isNotEmpty() && committedText.endsWith(last.output)
+        ) {
+            return input.substring(last.inputStart, last.inputEnd) to last.output
+        }
+        // ひらがなのまま確定した短い語は、読み＝表記。
+        return committedText.takeIf { t -> t.length <= 8 && t.all { it in '\u3041'..'\u309F' } }?.let { it to it }
+    }
+
+    /** [word]（読み・表記）の後に続く助詞・句読点を接続コストで並べたもの。辞書に無ければ null。 */
+    private suspend fun connectionRankedFunctionWords(key: String, word: Pair<String, String>?): List<String>? {
+        if (word == null || !::kanaKanjiEngine.isInitialized) return null
+        val costs = synchronized(followingWordCostCache) { followingWordCostCache[word] }
+            ?: withContext(Dispatchers.Default) {
+                try {
+                    kanaKanjiEngine.followingWordCosts(word.first, word.second, NextWordExtras.CONNECTION_POOL)
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    Timber.w(e, "following word costs failed")
+                    null
+                }
+            }?.also { synchronized(followingWordCostCache) { followingWordCostCache[word] = it } }
+            ?: return null
+        if (costs.isEmpty()) return null
+        return NextWordExtras.functionWordsByConnection(key, costs)
     }
 
     private fun cancelZeroQueryLookup() {
@@ -1299,6 +1339,8 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
     private fun consumePendingZeroQueryAfterCommit() {
         val key = pendingZeroQueryKeyAfterCommit ?: return
         pendingZeroQueryKeyAfterCommit = null
+        val lastWord = pendingZeroQueryLastWord
+        pendingZeroQueryLastWord = null
         cancelZeroQueryLookup()
 
         if (!canShowZeroQueryAfterCommit(key)) {
@@ -1344,16 +1386,26 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
             } else {
                 emptyList()
             }
-            val functionWords = NextWordExtras.withoutBase(
-                candidates,
-                NextWordExtras.functionWordsAfter(key).map { word ->
-                    Candidate(
-                        string = word,
-                        type = ZERO_QUERY_CANDIDATE_TYPE,
-                        length = word.length.toUByte(),
-                        score = 0,
-                        yomi = word,
-                    )
+            fun asCandidates(words: List<String>) = words.map { word ->
+                Candidate(
+                    string = word,
+                    type = ZERO_QUERY_CANDIDATE_TYPE,
+                    length = word.length.toUByte(),
+                    score = 0,
+                    yomi = word,
+                )
+            }
+            // 助詞・句読点: 直前の語が辞書で分かれば品詞のつながり（接続コスト）で並べる（zenz で採点しない）。
+            // 分からなければ従来どおり直前の文字で絞って zenz で採点する。
+            val connectionRanked = connectionRankedFunctionWords(key, lastWord)
+            val rankedFunctionWords = connectionRanked
+                ?.let { NextWordExtras.withoutBase(candidates, asCandidates(it)) }
+                .orEmpty()
+            val functionWords = if (connectionRanked != null) {
+                emptyList()
+            } else {
+                NextWordExtras.withoutBase(candidates, asCandidates(NextWordExtras.functionWordsAfter(key)))
+            }
                 },
             )
 
@@ -1377,11 +1429,14 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
             } else {
                 emptyList()
             }
-            if (candidates.isEmpty() && functionWords.isEmpty() && plainEmoji.isEmpty()) {
+            if (candidates.isEmpty() && functionWords.isEmpty() && rankedFunctionWords.isEmpty() && plainEmoji.isEmpty()) {
                 clearZeroQueryShownState(refresh = true)
                 return@launch
             }
-            val shown = NextWordExtras.placeEmoji(NextWordExtras.initial(candidates, functionWords), plainEmoji)
+            val shown = NextWordExtras.placeEmoji(
+                NextWordExtras.initial(candidates, rankedFunctionWords.ifEmpty { functionWords }),
+                plainEmoji,
+            )
             zeroQueryCandidates = shown
             carriedNextWords = shown
             carriedNextWordsKey = key
@@ -1389,7 +1444,7 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
             zeroQuerySelectionUpdateSuppressCount += 1
             zeroQueryLookupJob = null
             refreshCandidateStripContent(candidatesShown = false)
-            launchZeroQueryZenzRerank(key, zenzLeftContext, candidates, emojiTargets, functionWords, shown)
+            launchZeroQueryZenzRerank(key, zenzLeftContext, candidates, emojiTargets, functionWords, shown, rankedFunctionWords)
         }
     }
 
@@ -1405,6 +1460,7 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         emojiTargets: List<MoodEmoji>,
         functionWords: List<Candidate>,
         shown: List<Candidate>,
+        rankedFunctionWords: List<Candidate> = emptyList(),
     ) {
         zeroQueryZenzJob?.cancel()
         val left = leftContext.takeLast(necookeyCandidateBarConfig.maxLeftContextChars)
@@ -1453,7 +1509,7 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
             } else {
                 emptyList()
             }
-            val reranked = NextWordExtras.rerank(candidates, scores, functionWords, emojiTargets.size, emoji)
+            val reranked = NextWordExtras.rerank(candidates, scores, functionWords, emojiTargets.size, emoji, rankedFunctionWords)
             if (zeroQueryVisible && zeroQueryCandidates == shown &&
                 canShowZeroQueryAfterCommit(key) && reranked != shown
             ) {
@@ -11102,7 +11158,14 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         val sumireTop = baseCandidates.firstOrNull {
             it.type != CANDIDATE_TYPE_TEXT_MACRO && it.length.toInt() == insertString.length
         } ?: return
+        zenzaiScheduler.onInput(insertString, SystemClock.uptimeMillis())
         zenzRerankJob = scope.launch {
+            // 2 段バーと同じく、手が止まってから始める（打鍵が続けば次の打鍵でキャンセルされ推論しない）。
+            if (!zenzaiScheduler.isForced()) delay(zenzaiScheduler.startDelayMs())
+            if (requestToken != zenzRerankRequestToken ||
+                !shouldApplyCandidateResult(insertString, candidateToken)
+            ) return@launch
+            zenzaiScheduler.onInferenceStarted()
             suspend fun show(top: Candidate) {
                 if (requestToken != zenzRerankRequestToken ||
                     !shouldApplyCandidateResult(insertString, candidateToken)
@@ -11148,6 +11211,25 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
             } ?: return@launch
             recordZenzaiDiagnostics(outcome)
             show(outcome.top)
+            // 手が止まった後なので、FIX で直した結果を続けて判定する（PASS か上限まで、打鍵で即キャンセル）。
+            var last = outcome
+            var rounds = 0
+            while (last.unverifiedFix && rounds < ZENZAI_PAUSE_RECHECK_MAX) {
+                if (requestToken != zenzRerankRequestToken) return@launch
+                rounds++
+                val next = try {
+                    runZenzaiStep(insertString, sumireTop, context, ::show)
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    Timber.w(e, "zenzai (list) recheck failed")
+                    null
+                } ?: return@launch
+                recordZenzaiDiagnostics(next)
+                if (!(next.top.zenzAdjusted || next.top.zenzChecked || !last.top.zenzAdjusted)) return@launch
+                show(next.top)
+                last = next
+            }
         }
     }
 

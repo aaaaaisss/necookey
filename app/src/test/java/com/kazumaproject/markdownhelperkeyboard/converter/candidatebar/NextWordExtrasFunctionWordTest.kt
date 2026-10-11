@@ -35,4 +35,21 @@ class NextWordExtrasFunctionWordTest {
         val out = NextWordExtras.initial(listOf(c("a"), c("b"), c("c")), listOf("、", "。", "は", "が").map(::c))
         assertEquals(listOf("a", "b", "、", "。", "は", "c"), out.map { it.string })
     }
+
+    @Test
+    fun connectionCostOrdersFunctionWordsWithoutZenz() {
+        val costs = mapOf("は" to 900, "が" to 400, "を" to 400, "。" to 3000, "ね" to 5000)
+        assertEquals(listOf("が", "を", "は"), NextWordExtras.functionWordsByConnection("天気", costs))
+        assertEquals(emptyList<String>(), NextWordExtras.functionWordsByConnection("天気。", costs))
+    }
+
+    @Test
+    fun rankedFunctionWordsAreNotScoredAndStayAfterTopTwo() {
+        val base = listOf(c("a"), c("b"), c("c"))
+        val ranked = listOf(c("が"), c("を"))
+        val targets = NextWordExtras.scoringTargets(base, emptyList(), emptyList())
+        assertEquals(listOf("a", "b", "c"), targets)
+        val out = NextWordExtras.rerank(base, floatArrayOf(-1f, -2f, -3f), emptyList(), 0, emptyList(), ranked).map { it.string }
+        assertEquals(listOf("a", "b", "が", "を", "c"), out)
+    }
 }

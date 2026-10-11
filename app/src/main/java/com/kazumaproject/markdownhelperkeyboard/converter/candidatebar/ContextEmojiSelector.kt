@@ -66,10 +66,12 @@ class ContextEmojiSelector(entries: List<MoodEmoji>) {
     private var priorModel: String? = null
     private var matched: Set<MoodEmoji> = emptySet()
 
-    /** 送り仮名を落とした語幹（美味しい→美味、頑張る→頑張）。2 文字未満になるなら元の語。 */
+    /** 送り仮名を落とした語幹（美味しい→美味、頑張る→頑張、悲しい→悲し）。 */
     private fun stem(keyword: String): String {
         val trimmed = keyword.trimEnd { it in '\u3041'..'\u309F' }
-        return if (trimmed.length >= 1 && trimmed != keyword && trimmed.any { it !in '\u3041'..'\u309F' }) trimmed else keyword
+        if (trimmed.isEmpty() || trimmed == keyword) return keyword
+        // 1 字の語幹（悲しい→悲）は誤反応するので、送り仮名を 1 字残す（悲し・泣く）。
+        return if (trimmed.length >= 2) trimmed else keyword.take(2)
     }
 
     private val stems: Map<MoodEmoji, String> by lazy { all.associateWith { stem(it.keyword) } }

@@ -42,6 +42,22 @@ object NextWordExtras {
      * 確定文字列の後に続けて採点する助詞・句読点（[FUNCTION_WORD_POOL] 件、直前の文字で安く絞る）。
      * 句読点の直後には出さない。
      */
+    /** 辞書の接続コストで並べる助詞・句読点（[functionWordsByConnection]）。 */
+    val CONNECTION_POOL: List<String> = listOf("は", "が", "を", "に", "で", "と", "も", "の", "、", "。", "ね", "よ")
+
+    /**
+     * 確定語の直後に続く助詞・句読点を、辞書の品詞のつながり（接続コスト＋単語コスト、[costs]）で並べた上位
+     * [MAX_FUNCTION_WORDS] 件。zenz を使わない。句読点の直後には出さない。
+     */
+    fun functionWordsByConnection(committedText: String, costs: Map<String, Int>): List<String> {
+        val last = committedText.lastOrNull() ?: return emptyList()
+        if (last in SENTENCE_END) return emptyList()
+        return costs.entries
+            .sortedWith(compareBy<Map.Entry<String, Int>> { it.value }.thenBy { CONNECTION_POOL.indexOf(it.key) })
+            .map { it.key }
+            .take(MAX_FUNCTION_WORDS)
+    }
+
     fun functionWordsAfter(committedText: String): List<String> {
         val last = committedText.lastOrNull() ?: return emptyList()
         if (last in SENTENCE_END) return emptyList()
@@ -66,10 +82,6 @@ object NextWordExtras {
     }
 
     /**
-     * zenz 採点前の並び: base 先頭 [KEEP_BASE] 件 → 助詞・句読点 [MAX_FUNCTION_WORDS] 件 → 残りの base。
-     * 文脈絵文字は zenz の採点後にだけ出す。
-     */
-    /**
      * zenz を使わないときの文脈絵文字の置き方: 1 個目は先頭の後続語の直後、残りは 2 番目の直後
      * （zenz あり時の [rerank] と同じ位置）。
      */
@@ -80,6 +92,10 @@ object NextWordExtras {
         return rest.take(1) + emoji.take(1) + rest.drop(1).take(1) + emoji.drop(1) + rest.drop(2)
     }
 
+    /**
+     * zenz 採点前の並び: base 先頭 [KEEP_BASE] 件 → 助詞・句読点 [MAX_FUNCTION_WORDS] 件 → 残りの base。
+     * 文脈絵文字は zenz の採点後にだけ出す。
+     */
     fun initial(base: List<Candidate>, functionWords: List<Candidate> = emptyList()): List<Candidate> {
         if (functionWords.isEmpty()) return base
         return base.take(KEEP_BASE) + functionWords.take(MAX_FUNCTION_WORDS) + base.drop(KEEP_BASE)
@@ -108,11 +124,12 @@ object NextWordExtras {
         allFunctionWords: List<Candidate> = emptyList(),
         emojiTargets: Int = 0,
         emoji: List<Pair<Candidate, Int>> = emptyList(),
+        rankedFunctionWords: List<Candidate> = emptyList(),
     ): List<Candidate> {
         val head = base.take(headSize(base, emojiTargets, allFunctionWords))
         val functionWords = scoredFunctionWords(allFunctionWords)
         if (scores.size != head.size + functionWords.size + emojiTargets || scores.none { it.isFinite() }) {
-            return initial(base, functionWords)
+            return initial(base, rankedFunctionWords.ifEmpty { functionWords })
         }
         val penalty = NextWordZenzReranker.POSITION_PENALTY
         fun s(i: Int) = if (scores[i].isFinite()) scores[i] else -1e6f
@@ -136,6 +153,8 @@ object NextWordExtras {
         val picked = emoji.filter { it.second in 0 until emojiTargets }
             .take(ContextEmojiSelector.MAX_SHOWN).map { it.first }
         val tops = top.map { head[it] }
-        return tops.take(1) + picked.take(1) + tops.drop(1) + picked.drop(1) + merged + base.drop(head.size)
+        // 接続コストで並べ済みの助詞・句読点（zenz で採点していない）は、採点前と同じく上位 2 件の後ろ。
+        return tops.take(1) + picked.take(1) + tops.drop(1) + picked.drop(1) +
+            rankedFunctionWords.take(MAX_FUNCTION_WORDS) + merged + base.drop(head.size)
     }
 }

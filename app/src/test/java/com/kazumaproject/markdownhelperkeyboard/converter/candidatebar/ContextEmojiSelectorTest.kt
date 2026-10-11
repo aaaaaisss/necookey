@@ -23,11 +23,12 @@ class ContextEmojiSelectorTest {
     }
 
     @Test
-    fun bundledAssetHasAboutOneHundredFiftyUniqueKeywords() {
+    fun bundledAssetHasOnlyTheUsersEightEmojiWithSeveralKeywordsEach() {
         val file = listOf("src/main/assets/emoji/emoji_mood.tsv", "app/src/main/assets/emoji/emoji_mood.tsv")
             .map(::File).first { it.exists() }
         val parsed = ContextEmojiSelector.parse(file.readText())
-        assertTrue(parsed.size in 120..180)
+        assertEquals(setOf("😭", "🤔", "😘", "✨", "🙏", "🙌", "💪", "😏"), parsed.map { it.emoji }.toSet())
+        assertTrue(parsed.groupBy { it.emoji }.values.all { it.size >= 3 && it.map { e -> e.group }.toSet().size == 1 })
         assertEquals(parsed.size, parsed.map { it.keyword }.distinct().size)
         assertEquals(parsed.size, ContextEmojiSelector(parsed).size)
     }
@@ -128,5 +129,13 @@ class ContextEmojiSelectorTest {
         assertEquals(listOf("☕"), sel.plainMatches("ビール飲んだ。今からコーヒー").map { it.emoji })
         assertEquals(listOf("☕"), sel.plainMatches("今からコーヒー。").map { it.emoji })
         assertTrue(sel.plainMatches("ビール飲んだ。\n次の話").isEmpty())
+    }
+
+    @Test
+    fun okuriganaStemKeepsOneKanaSoSingleKanjiDoesNotFire() {
+        val sel = ContextEmojiSelector(listOf(MoodEmoji("😭", "悲しい", "crying"), MoodEmoji("💪", "頑張る", "muscle")))
+        assertEquals(listOf("😭"), sel.matchesIn("ちょっと悲しかった").map { it.emoji })
+        assertTrue(sel.matchesIn("悲報").isEmpty())
+        assertEquals(listOf("💪"), sel.matchesIn("明日も頑張ろう").map { it.emoji })
     }
 }

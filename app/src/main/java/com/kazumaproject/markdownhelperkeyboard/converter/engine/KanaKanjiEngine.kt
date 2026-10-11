@@ -24,6 +24,7 @@ import com.kazumaproject.markdownhelperkeyboard.converter.candidate.CANDIDATE_TY
 import com.kazumaproject.markdownhelperkeyboard.converter.candidate.Candidate
 import com.kazumaproject.markdownhelperkeyboard.converter.candidate.CandidateConversionSegment
 import com.kazumaproject.markdownhelperkeyboard.converter.graph.GraphBuilder
+import com.kazumaproject.markdownhelperkeyboard.converter.graph.Node
 import com.kazumaproject.markdownhelperkeyboard.converter.graph.GraphNodeDedupMode
 import com.kazumaproject.markdownhelperkeyboard.converter.mozc.MozcBoundaryMode
 import com.kazumaproject.markdownhelperkeyboard.converter.mozc.MozcNodeAttributeTable
@@ -435,6 +436,91 @@ class KanaKanjiEngine {
             boundaryEvents = boundaryTrace,
             finalCandidates = candidateTrace,
         )
+    }
+
+    /** システム辞書だけで読み [input] のラティスを作る（後続語の接続コスト計算用、軽量）。 */
+    private suspend fun systemOnlyGraph(input: String): Map<Int, List<Node>> =
+        graphBuilder.constructGraph(
+            input,
+            systemYomiTrie,
+            systemTangoTrie,
+            systemTokenArray,
+            succinctBitVectorLBSYomi = systemSuccinctBitVectorLBSYomi,
+            succinctBitVectorIsLeafYomi = systemSuccinctBitVectorIsLeafYomi,
+            succinctBitVectorTokenArray = systemSuccinctBitVectorTokenArray,
+            succinctBitVectorTangoLBS = systemSuccinctBitVectorTangoLBS,
+            userDictionaryRepository = null,
+            learnRepository = null,
+            wikiYomiTrie = null,
+            wikiTangoTrie = null,
+            wikiTokenArray = null,
+            succinctBitVectorLBSWikiYomi = null,
+            succinctBitVectorWikiTangoLBS = null,
+            succinctBitVectorWikiTokenArray = null,
+            succinctBitVectorIsLeafWikiYomi = null,
+            webYomiTrie = null,
+            webTangoTrie = null,
+            webTokenArray = null,
+            succinctBitVectorLBSwebYomi = null,
+            succinctBitVectorwebTangoLBS = null,
+            succinctBitVectorwebTokenArray = null,
+            succinctBitVectorIsLeafwebYomi = null,
+            personYomiTrie = null,
+            personTangoTrie = null,
+            personTokenArray = null,
+            succinctBitVectorLBSpersonYomi = null,
+            succinctBitVectorpersonTangoLBS = null,
+            succinctBitVectorpersonTokenArray = null,
+            succinctBitVectorIsLeafpersonYomi = null,
+            neologdYomiTrie = null,
+            neologdTangoTrie = null,
+            neologdTokenArray = null,
+            succinctBitVectorLBSneologdYomi = null,
+            succinctBitVectorneologdTangoLBS = null,
+            succinctBitVectorneologdTokenArray = null,
+            succinctBitVectorIsLeafneologdYomi = null,
+            isOmissionSearchEnable = false,
+            enableTypoCorrectionJapaneseFlick = false,
+            typoCorrectionOffsetScore = 0,
+            omissionSearchOffSetScore = 0,
+            graphNodeDedupMode = graphNodeDedupModeForCurrentDictionary(),
+            mozcNodeAttributeTable = mozcNodeAttributeTableForCurrentDictionary(),
+        )
+
+    /** 読み [reading] 全体を 1 語で覆い、表記が [surface] の辞書ノード。 */
+    private fun wholeWordNodes(graph: Map<Int, List<Node>>, reading: String, surface: String): List<Node> =
+        graph.values.asSequence().flatten()
+            .filter { it.sPos == 0 && it.len.toInt() == reading.length && it.tango == surface }
+            .toList()
+
+    /**
+     * 確定した語（読み [reading]・表記 [surface]、文節の最後の 1 語）の直後に [words]（助詞・句読点など、
+     * 読み＝表記）が続くときのコスト（接続コスト＋単語コスト、小さいほど自然）。辞書の品詞のつながりで
+     * 後続の助詞を並べる（zenz を使わない）。確定語が辞書に無ければ null、辞書に無い後続語は含めない。
+     */
+    suspend fun followingWordCosts(reading: String, surface: String, words: List<String>): Map<String, Int>? {
+        if (reading.isEmpty() || surface.isEmpty() || words.isEmpty()) return null
+        if (!::connectionMatrix.isInitialized) return null
+        val matrix = connectionMatrixSnapshot().costTable
+        // 文節（「行きました」など）のときは、読みの末尾で終わり表記の末尾と一致する最も長い語（「た」）を使う。
+        val graph = systemOnlyGraph(reading)
+        val previous = wholeWordNodes(graph, reading, surface).ifEmpty {
+            val tail = graph.values.asSequence().flatten()
+                .filter { it.len > 0 && it.sPos + it.len == reading.length && it.tango.isNotEmpty() && surface.endsWith(it.tango) }
+                .toList()
+            val longest = tail.maxOfOrNull { it.tango.length } ?: return null
+            tail.filter { it.tango.length == longest }
+        }
+        val rightIds = previous.map { it.r.toInt() }.distinct()
+        val out = LinkedHashMap<String, Int>()
+        for (word in words) {
+            val nodes = wholeWordNodes(systemOnlyGraph(word), word, word)
+            if (nodes.isEmpty()) continue
+            out[word] = nodes.minOf { n ->
+                rightIds.minOf { r -> matrix.cost(r, n.l.toInt()) } + n.score
+            }
+        }
+        return out
     }
 
     fun applyDictionaryOverrideState(context: Context) {
