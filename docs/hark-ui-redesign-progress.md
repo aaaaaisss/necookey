@@ -112,3 +112,4 @@
 - 要端末確認: 採点候補が最大 10+21+5 件に増えた後続語 rerank の遅延、絵文字/助詞の並び。
 
 - 6980d7b 設定UI刷新：4カテゴリ＋詳細設定（入れ子PreferenceScreenはonNavigateToScreenで同Fragmentを開く）、角丸カード装飾、ホーム2列タイル、UT辞書スイッチ（ut_*_enabled_preference）。コンパイル成功・実機未確認。
+- 9f8f8cf Zenzai本家照合（WHOLE/PASS/同一制約）・文脈絵文字が出ない問題の修正
