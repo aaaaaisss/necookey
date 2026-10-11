@@ -7,6 +7,7 @@ import androidx.preference.PreferenceManager
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.textview.MaterialTextView
 import com.kazumaproject.markdownhelperkeyboard.R
+import com.kazumaproject.markdownhelperkeyboard.ime_service.zenz.ZenzConfidenceDiagnostics
 import com.kazumaproject.markdownhelperkeyboard.ime_service.zenz.ZenzDiagnosticEntry
 import com.kazumaproject.markdownhelperkeyboard.ime_service.zenz.ZenzDiagnosticsStore
 import com.kazumaproject.markdownhelperkeyboard.ime_service.zenz.ZenzSkipReason
@@ -40,7 +41,10 @@ class ZenzDiagnosticsFragment : Fragment(R.layout.fragment_zenz_diagnostics) {
 
         val resultView = view.findViewById<MaterialTextView>(R.id.zenz_diagnostics_result)
         val timestampView = view.findViewById<MaterialTextView>(R.id.zenz_diagnostics_timestamp)
-        val skipText = skipSummary(context)
+        // 信頼度の診断（確定と照らした zenz の判定の当たり外れ）はスキップ理由の後ろに付ける。
+        val skipText = listOf(skipSummary(context), ZenzConfidenceDiagnostics.summary(context))
+            .filter { it.isNotEmpty() }
+            .joinToString("\n\n")
         val entry = ZenzDiagnosticsStore.latest(context)
         if (entry == null) {
             resultView.setText(R.string.zenz_diagnostics_not_run)

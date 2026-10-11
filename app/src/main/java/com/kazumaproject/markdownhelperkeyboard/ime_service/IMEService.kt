@@ -208,6 +208,8 @@ import com.kazumaproject.markdownhelperkeyboard.converter.candidate.CandidateCon
 import com.kazumaproject.markdownhelperkeyboard.converter.candidate.ExactInputCandidatePromotionPolicy
 import com.kazumaproject.markdownhelperkeyboard.converter.candidate.QWERTY_GLIDE_CANDIDATE_TYPE
 import com.kazumaproject.markdownhelperkeyboard.converter.candidate.ZenzCandidate
+import com.kazumaproject.markdownhelperkeyboard.ime_service.zenz.ZenzConfidence
+import com.kazumaproject.markdownhelperkeyboard.ime_service.zenz.ZenzConfidenceDiagnostics
 import com.kazumaproject.markdownhelperkeyboard.ime_service.zenz.ZenzDiagnosticsStore
 import com.kazumaproject.markdownhelperkeyboard.ime_service.zenz.ZenzSkipReason
 import com.kazumaproject.markdownhelperkeyboard.converter.candidate.buildRomajiCandidates
@@ -10867,6 +10869,62 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         val unverifiedFix: Boolean = false,
     )
 
+    /** 直近の Zenzai の判定（信頼度の診断用。確定したときに当たり外れと一緒に記録する）。 */
+    private data class ZenzaiStepRecord(
+        val input: String,
+        val draft: String,
+        val top: String,
+        val kind: ZenzConfidenceDiagnostics.Kind,
+        val confidence: ZenzConfidence,
+        val sumireGap: Int?,
+    )
+
+    @Volatile private var lastZenzaiStepRecord: ZenzaiStepRecord? = null
+
+    /**
+     * Sumire の 1 位と 2 位（読み全体を覆う別表記の最小コスト）の差（Candidate.score の差、概算）。診断用。
+     */
+    private fun sumireCostGap(insertString: String, candidates: List<Candidate>, top: Candidate): Int? {
+        val second = candidates.asSequence()
+            .filter {
+                it.string != top.string && it.type != CANDIDATE_TYPE_TEXT_MACRO &&
+                    it.length.toInt() == insertString.length
+            }
+            .minOfOrNull { it.score } ?: return null
+        return second - top.score
+    }
+
+    /** 確定した表記と直前の Zenzai の判定を照らして、信頼度の診断に残す（文字列は残さない）。 */
+    private fun recordZenzaiConfidenceOutcome(reading: String, committed: String) {
+        val record = lastZenzaiStepRecord ?: return
+        lastZenzaiStepRecord = null
+        if (record.input != reading) return
+        val result = when (record.kind) {
+            ZenzConfidenceDiagnostics.Kind.PASS ->
+                if (committed == record.draft) ZenzConfidenceDiagnostics.Result.KEPT
+                else ZenzConfidenceDiagnostics.Result.OTHER
+            else -> when (committed) {
+                record.top -> ZenzConfidenceDiagnostics.Result.KEPT
+                record.draft -> ZenzConfidenceDiagnostics.Result.REJECTED
+                else -> ZenzConfidenceDiagnostics.Result.OTHER
+            }
+        }
+        Timber.d(
+            "zenzai confidence outcome: kind=%s result=%s %s sumireGap=%s",
+            record.kind, result, record.confidence.describe(), record.sumireGap,
+        )
+        val sample = ZenzConfidenceDiagnostics.Sample(record.kind, result, record.confidence, record.sumireGap)
+        ioScope.launch {
+            try {
+                ZenzConfidenceDiagnostics.record(applicationContext, sample)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                Timber.w(e, "zenz confidence diagnostics failed")
+            }
+        }
+    }
+
     /** zenz を回す対象か（唯一の設定は zenz の ON/OFF）。 */
     private fun isZenzaiEligible(insertString: String): Boolean =
         necookeyZenzGateEnabled() &&
@@ -10891,6 +10949,7 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         insertString: String,
         sumireTop: Candidate,
         context: ZenzContext,
+        sumireGap: Int?,
         onProvisional: suspend (Candidate) -> Unit,
     ): ZenzaiOutcome? {
         val session = kanaKanjiConversionSession ?: return null
@@ -10940,7 +10999,7 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
 
         val key = zenzaiKey(context, insertString, draft.string)
         val cached = synchronized(zenzaiVerdictCache) { zenzaiVerdictCache[key] }
-        val verdict = cached ?: withContext(Dispatchers.Default) {
+        val rawVerdict = cached ?: withContext(Dispatchers.Default) {
             zenzRuntimeClient.evaluate(
                 config = config,
                 profile = "",
@@ -10955,9 +11014,11 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
                 candidate = draft.string,
             )
         }
-        if (cached == null && !verdict.startsWith("ERROR")) {
-            synchronized(zenzaiVerdictCache) { zenzaiVerdictCache[key] = verdict }
+        if (cached == null && !rawVerdict.startsWith("ERROR")) {
+            synchronized(zenzaiVerdictCache) { zenzaiVerdictCache[key] = rawVerdict }
         }
+        // 判定の後ろに付いた信頼度（診断用）を外す。判定の扱いは信頼度で変えない。
+        val (verdict, confidence) = ZenzConfidence.split(rawVerdict)
         if (verdict.startsWith("ERROR")) {
             ZenzDiagnosticsStore.recordSkip(applicationContext, ZenzSkipReason.ERROR_VERDICT)
         }
@@ -11007,6 +11068,26 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
             "zenzai: input=[%s] draft=[%s] verdict=[%s] top=[%s] constraint=[%s/%s] inferred=%s",
             insertString, draft.string, verdict, top.string, constraint?.surface, constraint?.reading, cached == null,
         )
+        val kind = when {
+            verdict.startsWith("PASS") -> ZenzConfidenceDiagnostics.Kind.PASS
+            verdict.startsWith("FIX:") -> ZenzConfidenceDiagnostics.Kind.FIX
+            verdict.startsWith("WHOLE:") -> ZenzConfidenceDiagnostics.Kind.WHOLE
+            else -> null
+        }
+        if (confidence != null && kind != null) {
+            Timber.d(
+                "zenzai confidence: input=[%s] kind=%s %s sumireGap=%s changed=%s",
+                insertString, kind, confidence.describe(), sumireGap, fixedNow,
+            )
+            lastZenzaiStepRecord = ZenzaiStepRecord(
+                input = insertString,
+                draft = draft.string,
+                top = top.string,
+                kind = kind,
+                confidence = confidence,
+                sumireGap = sumireGap,
+            )
+        }
         return ZenzaiOutcome(
             top = top,
             changed = top.string != sumireTop.string,
@@ -11073,6 +11154,7 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
             it.type != CANDIDATE_TYPE_TEXT_MACRO && it.length.toInt() == insertString.length
         } ?: return
         zenzaiScheduler.onInput(insertString, SystemClock.uptimeMillis())
+        val sumireGap = sumireCostGap(insertString, baseCandidates, sumireTop)
         zenzRerankJob = scope.launch {
             // 待たずに始める（次の打鍵でキャンセル）。
             if (requestToken != zenzRerankRequestToken ||
@@ -11103,7 +11185,7 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
                 }
             }
             val outcome = try {
-                runZenzaiStep(insertString, sumireTop, context, ::show)
+                runZenzaiStep(insertString, sumireTop, context, sumireGap, ::show)
             } catch (e: kotlinx.coroutines.TimeoutCancellationException) {
                 // withTimeout's exception is a CancellationException; it must not be swallowed silently.
                 Timber.e(e, "zenzai (list) timed out")
@@ -11133,7 +11215,7 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
                 if (requestToken != zenzRerankRequestToken) return@launch
                 rounds++
                 val next = try {
-                    runZenzaiStep(insertString, sumireTop, context, ::show)
+                    runZenzaiStep(insertString, sumireTop, context, sumireGap, ::show)
                 } catch (e: CancellationException) {
                     throw e
                 } catch (e: Exception) {
@@ -15375,6 +15457,10 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
             learnFirstCandidate = learnFirstCandidateDictionaryPreference == true,
         )
         val committedText = fragments.joinToString(separator = "") { it.output }
+        recordZenzaiConfidenceOutcome(
+            reading = fragments.joinToString(separator = "") { it.reading },
+            committed = committedText,
+        )
         val revert = if (committedText.isNotEmpty() && isLearningWriteEnabled()) {
             LearningRevert(committedText, lastLearnedBunsetsuOutput)
         } else {
@@ -16317,6 +16403,7 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         token: CandidateRequestToken,
         awaitBefore: Job? = null,
     ) {
+        val sumireGap = sumireCostGap(insertString, conversion, sumireTop)
         necookeyZenzJob = scope.launch {
             var shown: Candidate? = null
             fun stillCurrent(): Boolean =
@@ -16362,9 +16449,9 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
             }
             val outcome = try {
                 if (background) {
-                    runZenzaiStep(insertString, sumireTop, context) { }
+                    runZenzaiStep(insertString, sumireTop, context, sumireGap) { }
                 } else {
-                    runZenzaiStep(insertString, sumireTop, context, ::show)
+                    runZenzaiStep(insertString, sumireTop, context, sumireGap, ::show)
                 }
             } catch (e: kotlinx.coroutines.TimeoutCancellationException) {
                 // withTimeout's exception is a CancellationException; it must not be swallowed silently.
@@ -16412,7 +16499,7 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
                 if (!stillCurrent()) return@launch
                 rounds++
                 val next = try {
-                    runZenzaiStep(insertString, sumireTop, context, ::show)
+                    runZenzaiStep(insertString, sumireTop, context, sumireGap, ::show)
                 } catch (e: CancellationException) {
                     throw e
                 } catch (e: Exception) {

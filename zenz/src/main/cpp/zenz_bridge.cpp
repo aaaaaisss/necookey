@@ -7,6 +7,7 @@
 #include <atomic>
 #include <cstdint>
 #include <cmath>
+#include <cstdio>
 #include <android/log.h>
 #include "llama.h"
 
@@ -53,6 +54,9 @@ struct EvalKvCache {
     std::vector<llama_token> tokens;
     std::vector<llama_token> pred_max;
     std::vector<float> pred_logprob;
+    // 信頼度の診断用: argmax の対数確率と 2 番目の対数確率（位置 i の予測分布）。
+    std::vector<float> pred_max_logprob;
+    std::vector<float> pred_second_logprob;
     std::vector<char> pred_valid;
 };
 static EvalKvCache g_eval_cache;
@@ -61,6 +65,8 @@ static void invalidate_eval_cache_locked() {
     g_eval_cache.tokens.clear();
     g_eval_cache.pred_max.clear();
     g_eval_cache.pred_logprob.clear();
+    g_eval_cache.pred_max_logprob.clear();
+    g_eval_cache.pred_second_logprob.clear();
     g_eval_cache.pred_valid.clear();
 }
 
@@ -78,7 +84,33 @@ struct CandidateEvaluationResult {
     float score;                // PASS の場合のスコア
     std::string prefix;         // FIX_REQUIRED の場合の接頭辞
     std::string whole_result;   // WHOLE_RESULT の場合の結果
+    // 信頼度（診断用）。zenz が受け入れたドラフトのトークン（判定位置の手前まで）について:
+    float min_logprob = NAN;    // ドラフトのトークンの対数確率の最小
+    float min_margin = NAN;     // argmax と 2 番目の対数確率の差の最小
+    // FIX/WHOLE の位置: zenz の argmax とドラフトのトークンの対数確率の差、argmax の対数確率。
+    float fix_gap = NAN;
+    float fix_max_logprob = NAN;
+    int accepted_tokens = 0;
 };
+
+// 判定位置 stop（PASS なら T）の手前のトークンと、stop の位置の信頼度を result に入れる。
+static void fill_confidence(CandidateEvaluationResult &result, size_t P, size_t stop, size_t T) {
+    float min_lp = NAN;
+    float min_margin = NAN;
+    for (size_t i = P; i < stop && i < T; ++i) {
+        const float lp = g_eval_cache.pred_logprob[i];
+        const float margin = g_eval_cache.pred_max_logprob[i] - g_eval_cache.pred_second_logprob[i];
+        if (std::isnan(min_lp) || lp < min_lp) min_lp = lp;
+        if (std::isnan(min_margin) || margin < min_margin) min_margin = margin;
+    }
+    result.min_logprob = min_lp;
+    result.min_margin = min_margin;
+    result.accepted_tokens = (int) (stop > P ? std::min(stop, T) - P : 0);
+    if (stop < T) {
+        result.fix_max_logprob = g_eval_cache.pred_max_logprob[stop];
+        result.fix_gap = g_eval_cache.pred_max_logprob[stop] - g_eval_cache.pred_logprob[stop];
+    }
+}
 
 // Zenz v3.x reserves the private-use range U+EE00..U+EE0F for prompt,
 // alignment, and future protocol markers.  These code points are not
@@ -978,6 +1010,8 @@ static CandidateEvaluationResult candidate_evaluate(
     g_eval_cache.tokens.resize(start);
     g_eval_cache.pred_max.resize(T, 0);
     g_eval_cache.pred_logprob.resize(T, 0.0f);
+    g_eval_cache.pred_max_logprob.resize(T, 0.0f);
+    g_eval_cache.pred_second_logprob.resize(T, 0.0f);
     g_eval_cache.pred_valid.resize(T, 0);
     for (size_t i = m; i < T; ++i) g_eval_cache.pred_valid[i] = 0;
 
@@ -1022,18 +1056,25 @@ static CandidateEvaluationResult candidate_evaluate(
         }
         int32_t max_id = 0;
         float max_logit = logits[0];
+        float second_logit = -INFINITY;
         for (int32_t tid = 1; tid < n_vocab; ++tid) {
             if (logits[tid] > max_logit) {
+                second_logit = max_logit;
                 max_logit = logits[tid];
                 max_id = tid;
+            } else if (logits[tid] > second_logit) {
+                second_logit = logits[tid];
             }
         }
         float sum_exp = 0.0f;
         for (int32_t tid = 0; tid < n_vocab; ++tid) {
             sum_exp += expf(logits[tid] - max_logit);
         }
+        const float log_sum = logf(sum_exp);
         g_eval_cache.pred_max[i] = (llama_token) max_id;
-        g_eval_cache.pred_logprob[i] = logits[all_tokens[i]] - max_logit - logf(sum_exp);
+        g_eval_cache.pred_logprob[i] = logits[all_tokens[i]] - max_logit - log_sum;
+        g_eval_cache.pred_max_logprob[i] = -log_sum;
+        g_eval_cache.pred_second_logprob[i] = second_logit - max_logit - log_sum;
         g_eval_cache.pred_valid[i] = 1;
     }
     LOGI("candidate_evaluate: tokens=%zu reused=%zu decoded=%zu", T, start, T - start);
@@ -1066,6 +1107,7 @@ static CandidateEvaluationResult candidate_evaluate(
                 }
                 result.type = CandidateEvaluationResultType::WHOLE_RESULT;
                 result.whole_result = partial;
+                fill_confidence(result, P, i, T);
                 LOGI("candidate_evaluate: WHOLE_RESULT at pos %zu, result=%s", i, partial.c_str());
                 llama_set_abort_callback(ctx, never_abort, nullptr);
                 return result;
@@ -1109,6 +1151,7 @@ static CandidateEvaluationResult candidate_evaluate(
                 }
                 result.type = CandidateEvaluationResultType::FIX_REQUIRED;
                 result.prefix = prefix_decoder.text();
+                fill_confidence(result, P, i, T);
                 LOGI("candidate_evaluate: FIX_REQUIRED at pos %zu, prefix=%s", i, result.prefix.c_str());
                 llama_set_abort_callback(ctx, never_abort, nullptr);
                 return result;
@@ -1118,6 +1161,7 @@ static CandidateEvaluationResult candidate_evaluate(
 
     result.type = CandidateEvaluationResultType::PASS;
     result.score = total_score;
+    fill_confidence(result, P, T, T);
     LOGI("candidate_evaluate: PASS, score=%f", total_score);
 
     llama_set_abort_callback(ctx, never_abort, nullptr);
@@ -1577,6 +1621,14 @@ static jstring candidate_evaluate_with_context(
         default:
             result_str = "ERROR";
             break;
+    }
+    if (eval_result.type != CandidateEvaluationResultType::ERROR) {
+        // 信頼度（診断用）を区切り文字 U+001F の後ろに付ける。アプリ側（ZenzRuntimeClient）で外す。
+        char buf[160];
+        snprintf(buf, sizeof(buf), "\x1F" "conf:%.4f,%.4f,%.4f,%.4f,%d",
+                 eval_result.min_logprob, eval_result.min_margin,
+                 eval_result.fix_gap, eval_result.fix_max_logprob, eval_result.accepted_tokens);
+        result_str += buf;
     }
 
     return toJString(env, result_str);
