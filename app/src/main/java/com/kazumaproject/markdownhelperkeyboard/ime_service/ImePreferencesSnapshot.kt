@@ -222,7 +222,6 @@ data class ImePreferencesSnapshot(
     val tenkeyLandscapeBottomMarginPreferenceValue: Int,
     val qwertyLandscapePositionPreferenceValue: Boolean,
     val qwertyLandscapeBottomMarginPreferenceValue: Int,
-    val zenzRerankPreference: Boolean,
     val qwertyKeyVerticalMargin: Float,
     val qwertyKeyHorizontalGap: Float,
     val qwertyKeyIndentLarge: Float,
@@ -641,8 +640,6 @@ data class ImePreferencesSnapshot(
                     appPreference.qwerty_keyboard_position_landscape ?: true,
                 qwertyLandscapeBottomMarginPreferenceValue =
                     appPreference.qwerty_keyboard_vertical_margin_bottom_landscape ?: 0,
-                zenzRerankPreference =
-                    AppVariantConfig.hasZenz && appPreference.enable_zenz_rerank_preference,
                 qwertyKeyVerticalMargin = appPreference.qwerty_key_vertical_margin ?: 5.0f,
                 qwertyKeyHorizontalGap = appPreference.qwerty_key_horizontal_gap ?: 2.0f,
                 qwertyKeyIndentLarge = appPreference.qwerty_key_indent_large ?: 23.0f,

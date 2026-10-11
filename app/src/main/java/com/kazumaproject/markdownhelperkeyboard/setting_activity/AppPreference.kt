@@ -598,8 +598,6 @@ object AppPreference {
 
 
 
-    private val ENABLE_ZENZ_RERANK_PREFERENCE =
-        Pair("enable_zenz_rerank_preference", false)
 
     // necookey
     private val NECOOKEY_TWO_ROW_CANDIDATE_BAR_PREFERENCE =
@@ -3141,15 +3139,6 @@ object AppPreference {
         )
         set(value) = preferences.edit {
             it.putBoolean(NECOOKEY_ZENZ_BUNSETSU_GATE_PREFERENCE.first, value)
-        }
-
-    var enable_zenz_rerank_preference: Boolean
-        get() = preferences.getBoolean(
-            ENABLE_ZENZ_RERANK_PREFERENCE.first,
-            ENABLE_ZENZ_RERANK_PREFERENCE.second
-        )
-        set(value) = preferences.edit {
-            it.putBoolean(ENABLE_ZENZ_RERANK_PREFERENCE.first, value)
         }
 
     var zenz_maximum_letter_size_preference: Int?

@@ -29,24 +29,6 @@ data class BunsetsuSlot(
 ) {
     val primaryOutput: String get() = span.output
 
-    /**
-     * Cost gap between the primary output and its best rival, normalized by reading length.
-     * `null` when Sumire offered no rival for this range (nothing for zenz to choose between).
-     * A negative gap is possible when Sumire's final ranking is not strictly by path cost
-     * (n-gram re-ranking); it counts as maximally ambiguous.
-     */
-    fun normalizedCostGap(): Double? {
-        if (alternatives.size < 2) return null
-        val primaryCost = alternatives[0].pathCost
-        val rivalCost = alternatives.asSequence().drop(1).minOf { it.pathCost }
-        return (rivalCost.toLong() - primaryCost.toLong()).toDouble() /
-            span.readingLength.coerceAtLeast(1)
-    }
-
-    fun isAmbiguous(threshold: Double): Boolean {
-        val gap = normalizedCostGap() ?: return false
-        return gap < threshold
-    }
 }
 
 object BunsetsuAnalyzer {
@@ -165,49 +147,6 @@ object BunsetsuAnalyzer {
         return BunsetsuAnalysis(input = input, primary = primary, slots = slots)
     }
 
-    /**
-     * Merges candidates queried for exact bunsetsu readings into the corresponding UTF-16 ranges.
-     * Full-input N-best alternatives stay first in Sumire order; exact-span alternatives are
-     * appended, duplicate outputs keep their lowest available cost, and the primary stays first.
-     */
-    fun addSpanCandidates(
-        analysis: BunsetsuAnalysis,
-        candidatesByRange: Map<Pair<Int, Int>, List<Candidate>>,
-    ): BunsetsuAnalysis {
-        if (candidatesByRange.isEmpty()) return analysis
-        val slots = analysis.slots.map { slot ->
-            val additions = candidatesByRange[slot.span.start to slot.span.end].orEmpty()
-            if (additions.isEmpty()) return@map slot
-
-            val alternativesByOutput = LinkedHashMap<String, Int>()
-            slot.alternatives.forEach { alternative ->
-                alternativesByOutput[alternative.output] = alternative.pathCost
-            }
-            if (slot.primaryOutput !in alternativesByOutput) {
-                alternativesByOutput[slot.primaryOutput] = analysis.primary.score
-            }
-            additions.forEach { candidate ->
-                if (candidate.length.toInt() != slot.span.readingLength || candidate.string.isEmpty()) {
-                    return@forEach
-                }
-                val previous = alternativesByOutput[candidate.string]
-                if (previous == null || candidate.score < previous) {
-                    alternativesByOutput[candidate.string] = candidate.score
-                }
-            }
-
-            val primaryCost = alternativesByOutput[slot.primaryOutput] ?: analysis.primary.score
-            val ordered = LinkedHashMap<String, Int>()
-            ordered[slot.primaryOutput] = primaryCost
-            alternativesByOutput.forEach { (output, cost) ->
-                if (output != slot.primaryOutput) ordered[output] = cost
-            }
-            slot.copy(
-                alternatives = ordered.map { (output, cost) -> BunsetsuAlternative(output, cost) },
-            )
-        }
-        return analysis.copy(slots = slots)
-    }
 }
 
 data class BunsetsuAnalysis(

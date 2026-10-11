@@ -427,12 +427,6 @@
             app:defaultValue="true"
             app:summary="@string/necookey_zenz_bunsetsu_gate_summary" />
 
-        <SwitchPreferenceCompat
-            android:key="enable_zenz_rerank_preference"
-            android:title="@string/enable_zenz_rerank_preference_title"
-            app:defaultValue="false"
-            app:summary="@string/enable_zenz_rerank_preference_summary" />
-
         <Preference
             android:key="zenz_model_select_preference"
             android:title="@string/zenz_model_source_title"
