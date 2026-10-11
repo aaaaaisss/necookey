@@ -20,14 +20,13 @@ class NextWordExtrasFunctionWordTest {
     fun zenzPicksTopThreeFunctionWordsAndKeepsLearnedNextWords() {
         val base = listOf(c("a"), c("b"), c("c"), c("d"))
         val fw = listOf("、", "。", "は", "が", "を").map(::c)
-        val emoji = listOf(c("😀"))
-        // head a..d, fw 、 。 は が を, emoji
-        val scores = floatArrayOf(-3f, -3f, -3f, -3f, -9f, -1f, -2f, -0.5f, -8f, -4f)
-        val out = NextWordExtras.rerank(base, scores, fw, 1, listOf(emoji[0] to 0)).map { it.string }
-        assertEquals(listOf("a", "😀", "b"), out.take(3))
+        // head a..d, fw 、 。 は が を
+        val scores = floatArrayOf(-3f, -3f, -3f, -3f, -9f, -1f, -2f, -0.5f, -8f)
+        val out = NextWordExtras.rerank(base, scores, fw).map { it.string }
+        assertEquals(listOf("a", "b"), out.take(2))
         assertEquals(listOf("が", "。", "は"), out.filter { it in setOf("、", "。", "は", "が", "を") })
-        assertTrue(out.containsAll(listOf("a", "b", "c", "d", "😀")))
-        assertEquals(8, out.size)
+        assertTrue(out.containsAll(listOf("a", "b", "c", "d")))
+        assertEquals(7, out.size)
     }
 
     @Test
@@ -47,9 +46,9 @@ class NextWordExtrasFunctionWordTest {
     fun rankedFunctionWordsAreNotScoredAndStayAfterTopTwo() {
         val base = listOf(c("a"), c("b"), c("c"))
         val ranked = listOf(c("が"), c("を"))
-        val targets = NextWordExtras.scoringTargets(base, emptyList(), emptyList())
+        val targets = NextWordExtras.scoringTargets(base, emptyList())
         assertEquals(listOf("a", "b", "c"), targets)
-        val out = NextWordExtras.rerank(base, floatArrayOf(-1f, -2f, -3f), emptyList(), 0, emptyList(), ranked).map { it.string }
+        val out = NextWordExtras.rerank(base, floatArrayOf(-1f, -2f, -3f), emptyList(), ranked).map { it.string }
         assertEquals(listOf("a", "b", "が", "を", "c"), out)
     }
 }
