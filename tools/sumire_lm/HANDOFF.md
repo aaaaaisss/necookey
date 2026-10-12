@@ -38,3 +38,33 @@ Goal (user): raise Sumire alone above zenz-v3.2-xsmall, using classical methods 
 6. On-device: pruned + quantized LM, target a few MB to ~20 MB; rerank Sumire N-best (n=50) after typing; measure latency. License: ship statistics only.
 
 Repo notes: never delete untracked gojuon_keyboard/, qwerty_keyboard/, tenkey/; no force-push. After pushing to main, report commit hashes right away (user checks CI).
+
+## 2026-10-12 update (Hark/necookey project)
+Work data lived in /workspace/work/sumire_lm (data, cands, lm, logs, scores, models, results_v1.txt; `. env.sh` loads pylib). N-best now comes from the branch-only dump CI (f4534e5, 1118a88; artifacts kept 3 days).
+
+| method (exact top1) | JWTD tune | JWTD held | AJIMEE |
+|---|---|---|---|
+| Sumire top1 | .309 | .319 | .525 |
+| 3-gram 1.5GB + cost (repro) | .436 | .438 | .685 |
+| 3-gram 4.5GB + cost | .471 | .467 | .720 |
+| 4-gram 4.5GB (abs. discount D=.9, KN unigram) + cost | .473 | .471 | .680 |
+| char 7-gram (stupid backoff) + cost | .441 | .457 | .690 |
+| linear listwise: structure + word LM | .469 | .478 | .725 |
+| + char LM | .486 | .499 | .735 |
+| **+ PMI (adopted, non-lexical: lin_base+lmw+lmc+pmi_tune)** | .513 | **.511** | **.760** |
+| LightGBM lambdarank (tune) | .529 | .487 | .715 |
+| linear trained on auto / tune+auto | .49 | .489-.490 | .755 |
+| linear + sparse POS | .516 | .515 | .745 |
+| zenz app loop (target) | .467 | .457 | .670 |
+| zenz LL rerank | .491 | .494 | .735 |
+| oracle@50 | .841 | .849 | .905 |
+
+- AJIMEE never used for training/tuning (weights on JWTD tune, l2 by inner 2-fold CV, lambda/length on tune). Lexical features (held up to .545) rejected by the leader: overfit risk.
+- Errors (adopted model): held 226/734 (31%) have gold outside top-50 (AJIMEE 19/48); most of the rest are orthographic variants (事/こと, 出来ない/できない, 製作/制作).
+- Size estimate (extrapolated): word 4-gram pruned ~4.6M entries ~25MB, char 7-gram ~6M ~30MB, PMI pairs>=500 1.7M ~9MB. Needs stronger pruning for a few MB-20MB.
+
+### Still to do (leader's on-device checks)
+1. Finish Sumire-segmentation version (no morphological analyzer): `SLM_PAIR=_seg cooc.py count 7`, `count 8`, `merge 0-8`; then `SLM_WKIND=ws SLM_PAIR=_seg SLM_ITEMS=_seg rr.py feats seg`; `SLM_FTAB=seg rr.py lin base+lmw+lmc+pmi tune`.
+2. Pruning sweep: `SLM_PRUNE=... rr.py feats`, retrain on tune, accuracy vs size, for both fugashi and Sumire-seg versions.
+3. Latency: `export_bench.py` with the chosen pruning, then `java -jar bench/bench.jar` (median/p95 ms after typing stops; sandbox CPU is faster than a phone); check agreement with Python picks.
+4. Next ideas: bigram bonus on FindPath edges to recover gold outside top-50; more corpus (cc_more.txt 6.6GB prepared).
