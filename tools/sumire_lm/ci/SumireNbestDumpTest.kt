@@ -16,7 +16,7 @@ import java.io.File
  * リポジトリの app には入れない）。学習/ユーザー/UT 辞書なし、本番と同じ文節分離経路。
  * 入力 NK_DUMP_IN: id, split, context, reading(ひらがな), expected... （先頭 4 列だけ使う）
  * 出力 NK_DUMP_OUT: id, rank(0..), surface, type, score(経路コスト), leftId, rightId, segs(読み:出力 を US 区切り)
- * NK_DUMP_SHARD=i/n なら行番号 % n == i の行だけ。
+ * NK_DUMP_SHARD=i/n なら行番号 % n == i の行だけ。1 文 20 秒で打ち切り（取消に応じない場合は .progress に最後の id）。
  */
 class SumireNbestDumpTest {
     @Test
@@ -25,7 +25,8 @@ class SumireNbestDumpTest {
         val outPath = System.getenv("NK_DUMP_OUT")
         assumeTrue(!inPath.isNullOrBlank() && !outPath.isNullOrBlank())
         val (si, sn) = (System.getenv("NK_DUMP_SHARD") ?: "0/1").split('/').map { it.toInt() }
-        val engine = TestEngineFactory.create()
+        var engine = TestEngineFactory.create()
+        val pool = java.util.concurrent.Executors.newCachedThreadPool { r -> Thread(r).also { it.isDaemon = true } }
         val userDict = mock<UserDictionaryRepository>()
         runBlocking { whenever(userDict.commonPrefixSearchInUserDict(any())).thenReturn(emptyList()) }
         var n = 0
@@ -36,10 +37,12 @@ class SumireNbestDumpTest {
                 val c = line.split('\t')
                 if (c.size < 4 || c[3].isEmpty()) return@forEachIndexed
                 val reading = c[3]
+                File("$outPath.progress").writeText("${c[0]}\t$reading\n")
                 val segs = HashMap<String, List<CandidateConversionSegment>>()
-                val res = try {
+                val eng = engine
+                val fut = pool.submit<com.kazumaproject.markdownhelperkeyboard.converter.candidate.BunsetsuCandidateResult> {
                     runBlocking {
-                        engine.getCandidatesWithBunsetsuSeparation(
+                        eng.getCandidatesWithBunsetsuSeparation(
                             input = reading, n = 50,
                             mozcUtPersonName = false, mozcUTPlaces = false, mozcUTWiki = false,
                             mozcUTNeologd = false, mozcUTWeb = false,
@@ -49,6 +52,13 @@ class SumireNbestDumpTest {
                             candidateSegmentCollector = segs,
                         )
                     }
+                }
+                val res = try {
+                    fut.get(20, java.util.concurrent.TimeUnit.SECONDS)
+                } catch (e: java.util.concurrent.TimeoutException) {
+                    // 取消に応じない経路探索は放置し、以後は新しいエンジンで続ける
+                    fut.cancel(true); File("$outPath.skipped").appendText("${c[0]}\t$reading\n")
+                    engine = TestEngineFactory.create(); null
                 } catch (e: Throwable) {
                     System.err.println("fail ${c[0]}: $e"); null
                 } ?: return@forEachIndexed
@@ -65,7 +75,7 @@ class SumireNbestDumpTest {
                     out.newLine()
                 }
                 n++
-                if (n % 500 == 0) {
+                if (n % 50 == 0) {
                     out.flush()
                     println("dumped $n in ${(System.nanoTime() - t0) / 1_000_000_000}s")
                 }
