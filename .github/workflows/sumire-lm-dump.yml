@@ -103,12 +103,41 @@ jobs:
           NK_DUMP_SHARD: ${{ matrix.shard }}/${{ needs.prep.outputs.nshard }}
         timeout-minutes: 100
         run: |
+          # 区切り固定の再変換（tools/sumire_lm/ci/split_reconv.txt = "K,m,N"、空なら無効）
+          export NK_SPLIT_RECONV="$(cat tools/sumire_lm/ci/split_reconv.txt 2>/dev/null || true)"
           cp tools/sumire_lm/ci/SumireNbestDumpTest.kt app/src/test/java/com/kazumaproject/markdownhelperkeyboard/converter/quality/
           ./gradlew :app:testLiteStandardDebugUnitTest --tests '*SumireNbestDumpTest*' -i --no-daemon --max-workers=2 -Dorg.gradle.jvmargs=-Xmx2g 2>&1 | grep -E "dumped|fail |FAILED|BUILD|error:|Exception" | head -200
           wc -l cands.${{ matrix.shard }}.tsv
+          [ -f cands.${{ matrix.shard }}.tsv.time ] && awk -F'\t' '{b+=$3; x+=$4; c+=$5; n++} END {printf "base %.1f ms/sent, extra %.1f ms/sent, extra cands %.1f/sent\n", b/n, x/n, c/n}' cands.${{ matrix.shard }}.tsv.time || true
       - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: sumire-lm-cands-${{ matrix.shard }}
           path: cands.${{ matrix.shard }}.tsv*
           retention-days: 3
+
+  # 変換器の既存単体テスト（区切り固定の再変換は既定で無効。既存の動作が変わらないことの確認）
+  unit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-java@v5
+        with:
+          java-version: '17'
+          distribution: temurin
+      - uses: android-actions/setup-android@v4
+      - run: sdkmanager "platforms;android-36"
+      - uses: actions/cache@v5
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: ${{ runner.os }}-sumire-lm-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+          restore-keys: |
+            ${{ runner.os }}-sumire-lm-gradle-
+            ${{ runner.os }}-gradle-
+      - name: Converter unit tests (Lite)
+        run: |
+          ./gradlew :app:testLiteStandardDebugUnitTest --tests 'com.kazumaproject.markdownhelperkeyboard.converter.*' --no-daemon --max-workers=2 -Dorg.gradle.jvmargs=-Xmx3g 2>&1 | grep -E "tests completed|FAILED|BUILD|error:|e: " | head -100
+          test "${PIPESTATUS[0]}" -eq 0

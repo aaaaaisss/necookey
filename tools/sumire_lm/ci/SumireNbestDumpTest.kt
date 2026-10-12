@@ -2,6 +2,8 @@ package com.kazumaproject.markdownhelperkeyboard.converter.quality
 
 import com.kazumaproject.markdownhelperkeyboard.converter.TestEngineFactory
 import com.kazumaproject.markdownhelperkeyboard.converter.candidate.CandidateConversionSegment
+import com.kazumaproject.markdownhelperkeyboard.converter.path_algorithm.SplitReconversionConfig
+import com.kazumaproject.markdownhelperkeyboard.converter.path_algorithm.SplitReconversionResult
 import com.kazumaproject.markdownhelperkeyboard.repository.UserDictionaryRepository
 import kotlinx.coroutines.runBlocking
 import org.junit.Assume.assumeTrue
@@ -17,6 +19,9 @@ import java.io.File
  * 入力 NK_DUMP_IN: id, split, context, reading(ひらがな), expected... （先頭 4 列だけ使う）
  * 出力 NK_DUMP_OUT: id, rank(0..), surface, type, score(経路コスト), leftId, rightId, segs(読み:出力 を US 区切り)
  * NK_DUMP_SHARD=i/n なら行番号 % n == i の行だけ。1 文 20 秒で打ち切り（取消に応じない場合は .progress に最後の id）。
+ * NK_SPLIT_RECONV=K,m,N（任意）: 区切り固定の再変換（上位 K 区切り・スパンあたり辞書上位 m 語・区切りあたり N 文字列）の追加候補を
+ *   top-50 の後に rank 50.. で出力し、列 9 以降に X, 区切り順位, 語順位の最大, 区切りが N-best 由来(1/0)。
+ *   .time に id, 読み長, 通常経路 ms, 追加処理 ms, 追加候補数, 区切り数, N-best 由来区切り数。
  */
 class SumireNbestDumpTest {
     @Test
@@ -29,6 +34,9 @@ class SumireNbestDumpTest {
         val pool = java.util.concurrent.Executors.newCachedThreadPool { r -> Thread(r).also { it.isDaemon = true } }
         val userDict = mock<UserDictionaryRepository>()
         runBlocking { whenever(userDict.commonPrefixSearchInUserDict(any())).thenReturn(emptyList()) }
+        val rc = System.getenv("NK_SPLIT_RECONV")?.takeIf { it.isNotBlank() }?.split(',')?.map { it.trim().toInt() }
+        val rcConfig = rc?.let { SplitReconversionConfig(maxPatterns = it[0], wordsPerSpan = it[1], perPattern = it[2]) }
+        val timeOut = rcConfig?.let { File("$outPath.time").bufferedWriter() }
         var n = 0
         val t0 = System.nanoTime()
         File(outPath!!).bufferedWriter().use { out ->
@@ -39,7 +47,9 @@ class SumireNbestDumpTest {
                 val reading = c[3]
                 File("$outPath.progress").writeText("${c[0]}\t$reading\n")
                 val segs = HashMap<String, List<CandidateConversionSegment>>()
+                val rcOut = rcConfig?.let { SplitReconversionResult() }
                 val eng = engine
+                val callStart = System.nanoTime()
                 val fut = pool.submit<com.kazumaproject.markdownhelperkeyboard.converter.candidate.BunsetsuCandidateResult> {
                     runBlocking {
                         eng.getCandidatesWithBunsetsuSeparation(
@@ -50,6 +60,8 @@ class SumireNbestDumpTest {
                             isOmissionSearchEnable = false,
                             typoCorrectionOffsetScore = 3000, omissionSearchOffsetScore = 1900,
                             candidateSegmentCollector = segs,
+                            splitReconversionConfig = rcConfig,
+                            splitReconversionCollector = rcOut,
                         )
                     }
                 }
@@ -62,6 +74,7 @@ class SumireNbestDumpTest {
                 } catch (e: Throwable) {
                     System.err.println("fail ${c[0]}: $e"); null
                 } ?: return@forEachIndexed
+                val callNs = System.nanoTime() - callStart
                 val seen = HashSet<String>()
                 val full = res.candidates.filter { it.length.toInt() == reading.length && seen.add(it.string) }.take(50)
                 full.forEachIndexed { r, cand ->
@@ -74,13 +87,39 @@ class SumireNbestDumpTest {
                     )
                     out.newLine()
                 }
+                if (rcOut != null) {
+                    var r = full.size
+                    rcOut.candidates.forEach { x ->
+                        val cand = x.candidate
+                        if (!seen.add(cand.string)) return@forEach
+                        val sg = x.segments.joinToString("\u001F") {
+                            reading.substring(it.inputStart.coerceIn(0, reading.length), it.inputEnd.coerceIn(0, reading.length)) + ":" + it.output
+                        }
+                        out.write(
+                            listOf(
+                                c[0], 50 + (r++ - full.size), cand.string.replace('\t', ' '), cand.type, cand.score, cand.leftId ?: "", cand.rightId ?: "", sg,
+                                "X", x.patternIndex, x.maxWordRank, if (x.patternFromNBest) 1 else 0,
+                            ).joinToString("\t"),
+                        )
+                        out.newLine()
+                    }
+                    timeOut?.write(
+                        listOf(
+                            c[0], reading.length, (callNs - rcOut.elapsedNs) / 1e6, rcOut.elapsedNs / 1e6, r - full.size,
+                            rcOut.patterns.size, rcOut.nBestPatternCount,
+                        ).joinToString("\t"),
+                    )
+                    timeOut?.newLine()
+                }
                 n++
                 if (n % 50 == 0) {
+                    timeOut?.flush()
                     out.flush()
                     println("dumped $n in ${(System.nanoTime() - t0) / 1_000_000_000}s")
                 }
             }
         }
+        timeOut?.close()
         println("dumped $n total in ${(System.nanoTime() - t0) / 1_000_000_000}s")
     }
 }
