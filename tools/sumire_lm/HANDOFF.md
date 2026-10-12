@@ -293,3 +293,58 @@ Reproduce: `. env.sh; python3 $T/bunseg.py; python3 $T/bunsum.py; python3 $T/rec
 - ダンプ設定は既定（N_AUTO=24000、split_reconv 空 = 無効）に戻した（trigger は変更せず、CI は走らせていない）。
 Reproduce: `$WORK/dl_art.sh RUN_ID`（$WORK/srx で実行）で artifact を $WORK/srx/cands に → `setsid nohup bash $T/srx_run.sh &` → `SRX_GRID=8:3:A,10:8:AF python3 $T/srx.py eval`
 → `python3 $T/srx.py view 8 3 A; cd $WORK/srx/view_K8_m3A && SLM_WORK=$PWD python3 $T/bunseg.py && SLM_WORK=$PWD python3 $T/bunsum.py`。
+
+## 2026-10-12 アプリ組み込み: 変換エンジン「sumire_lm」（ブランチ sumire-lm-app、main には入れない）
+Sumire + SUMIRE-LM リランカーが基本、リランカーが迷った読みだけ zenz xsmall（読み込んだ zenz モデル）で文脈判断。
+JINEN（c4fdf75）と zenz モードのコードはそのまま残し、設定の「変換エンジン」で選べる。**このブランチでは既定を sumire_lm に変更**
+（AppPreference の zenz_engine_preference 既定値と pref_main.xml の defaultValue。既に値を保存済みの端末はその値のまま）。
+
+### 実装
+- `converter/sumirelm/SumireLmReranker.kt`: bench/OdBench.kt の rerank() の移植（特徴量・計算順同じ、Sumire-seg 版）。表は mmap、
+  語彙は 64bit 文字列ハッシュ → id の開番地表（文字列は持たない）。`load(dir)` は必要ファイルが無い・壊れていれば null。
+  検証: od5 表（bench/od5）で held+eval 1700 文のうち 1698 文が OdBench と同じ 1 位（残り 2 文は語彙ハッシュ/同点の差と思われる、未調査）、
+  中央 1.0 ms / p95 2.1 ms（サンドボックス JVM、OdBench は 0.69 ms。mmap の ByteBuffer 読みの分）。
+- `converter/candidatebar/SumireLmGate.kt`: 全読み候補（重複なし、最大 50、テキストマクロ除外）を採点して 1 位とマージン（1 位 − 2 位、
+  線形スコア単位）を返す。先頭がユーザー辞書の候補なら並べ替えない（null）。`needsZenz(margin, しきい値×0.01)`。
+- `KanaKanjiConversionSession.queryRerankPool(request, 50)`: 表示用とは別に文節分離の N-best 50 と語分割を、逐次状態を使わず計算
+  （表示の N-best は 1 段バー/2 段バーとも従来どおり。リランカー 1 位が表示リストに無ければ先頭に足す = zenz の FIX と同じ扱い）。
+- `IMEService.runSumireLmStep`（`runZenzaiStep` の先頭で sumire_lm のときに分岐。既存の起動経路・キャンセル・表示・判定キャッシュをそのまま使う）:
+  1. リランカーで 1 位を決める（表が無ければ Sumire 1 位のまま）。
+  2. zenz に回す条件 = zenz モデル読み込み済み（`zenz_model_uri_preference` が空でない。内蔵モデルは jinen なので使わない）かつ
+     （マージン < しきい値 / 前回の FIX 制約を引き継いでいる / 入力停止後の追加判定 / 表が無いときは従来の ZENZ-GATE（Sumire 経路コスト差 < 1448））。
+  3. 回すときはリランカー 1 位をドラフトとして従来の Zenzai ループ（PASS / FIX:prefix 制約付き再探索 / WHOLE）に渡す
+     （ZENZ-GATE はここでは使わない）。FIX の prefix 制約が「迷った範囲」の語選びになる。zenz が失敗したらリランカーの結果を使う。
+  4. 回さないときはリランカーの 1 位をそのまま先頭に（印なし）。文節区切りもリランカー 1 位の経路を採る（adoptZenzaiBunsetsuPath）。
+- `isJinenEngine()` は sumire_lm で false（内蔵 jinen を使わない）。後続語の zenz 並べ替えは `isZenzPromptModelLoaded()`（zenz/sumire_lm かつモデル読み込み済み）のときだけ。
+- 設定: 「変換エンジン」に「Sumire＋リランカー（迷ったときだけ読み込んだ zenz で判断）」を追加、「zenz に回すしきい値」SeekBar
+  （`sumire_lm_zenz_margin_preference`、0–300 = マージン 0.00–3.00、既定 50 = 0.50、0 なら zenz を使わない）。
+- テスト: `SumireLmGateTest`（合成の空表 + cost だけの線形モデルで並べ替え・マージン・重複/部分候補の除外・ユーザー辞書の保護・ハッシュ表の検索・しきい値境界、表なし → null）。
+
+### しきい値の暫定値 0.50 の根拠（AJIMEE 不使用）
+od5 表で JWTD held 1500 文を採点（`work/slmchk/Check.kt` 相当、リポジトリ外）: マージン分位 10/25/50/75/90% = 0.13/0.31/0.70/1.32/2.10。
+| しきい値 | zenz に回す文 | 回す文のリランカー正解率 | 回さない文の正解率 | リランカー誤りのうち回す割合 |
+|---|---|---|---|---|
+| 0.25 | 21% | .20 | .40 | 26% |
+| 0.50 | 38% | .21 | .45 | 47% |
+| 1.00 | 64% | .25 | .56 | 75% |
+| 1.50 | 80% | .28 | .67 | 90% |
+5MB の bench 表（下記の注意）なので精度の絶対値は参考。zenz 側の正解率（回した文で zenz がどれだけ直すか）は未測定 → JWTD tune で
+「リランカー 1 位をドラフトにした zenz ループ」の CI ダンプを取ってしきい値を決め直すのが次の作業。
+
+### 表の置き場所と生成（大きな表はコミットしない）
+- 読み込み順: 外部ファイル領域 `/sdcard/Android/data/<applicationId>/files/sumire_lm/` → 内部 `files/sumire_lm/` →
+  アセット `app/src/main/assets/sumire_lm/`（あれば内部へコピー）。無ければリランカーなし（30 秒ごとに再探索）。
+  デバッグ: `adb push OUTDIR/. /sdcard/Android/data/<applicationId>/files/sumire_lm/`（必要ファイル: meta.tsv cb.tsv model.tsv vocab.tsv
+  w1..w4 / c1..c5 / p の .dir .rel .fp と .lp .bw .cnt）。
+- **注意: 既存の export_od.py の出力（bench/od5 など）は評価文が引く n-gram + 乱数の埋め草だけで、実入力用の表ではない**（ベンチ専用。
+  アプリに置くと動くが、評価文以外では LM 特徴がほぼ効かない）。実用の表には export_od.py に「刈り込み後に残る全 n-gram を
+  書き出す」モードが要る（未実装）: 全コーパスの n-gram 表（lm/ の 4.5GB 計数）から odsim.py と同じカットオフ・backoff 再正規化・
+  量子化で全エントリを出し、`build()` に埋め草なしで渡す。PMI も全ペア（floor50, top-K）。vocab.tsv（23MB テキスト、語彙 786k）は
+  端末では 64bit ハッシュ表にするので、将来はハッシュ済みの二進形式にすると読み込みが速く小さくなる。
+- 生成の流れ（現状の bench 表）: `. env.sh; python3 $T/export_od.py OUTDIR seg q=4 fp=12 w=5,500,2000,4000 c=1,20,500,4000,4000 pf=50 pk=8`（5MB 設定）。
+
+### 残作業
+1. 実用表の書き出しモード（上記）と、端末での読み込み時間・メモリ（vocab 786k のハッシュ表 ~14MB + mmap 表）の実測。
+2. しきい値を zenz の実効果で決め直す（JWTD tune、AJIMEE は報告のみ）。
+3. 実機レイテンシ（N-best 50 の追加問い合わせ ~5 ms + リランク ~1–4 ms 推定）。打鍵ごとに走るので、重ければ入力停止後だけにする。
+4. JINEN を既定から外すかはユーザー判断待ち（このブランチだけ sumire_lm を既定にした）。

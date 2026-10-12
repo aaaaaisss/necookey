@@ -871,6 +871,9 @@
     <string name="settings_backup_imported">設定をインポートしました</string>
     <string name="settings_backup_import_failed">インポートに失敗しました: %1$s</string>
     <string name="zenz_engine_title">変換エンジン</string>
+    <string name="zenz_engine_sumire_lm">Sumire＋リランカー（迷ったときだけ読み込んだ zenz で判断）</string>
+    <string name="sumire_lm_zenz_margin_title">zenz に回すしきい値（リランカーのスコア差 ×0.01）</string>
+    <string name="sumire_lm_zenz_margin_summary">1 位と 2 位の差がこれ未満の読みだけ zenz で文脈判断します（Sumire＋リランカー時）。0 で zenz を使いません。</string>
     <string name="zenz_engine_jinen">jinen（内蔵・入力が止まったら文全体を変換）</string>
     <string name="zenz_engine_zenz">zenz（読み込んだ zenz モデルが必要）</string>
     <string name="zenz_model_source_title">モデルの読み込み元</string>

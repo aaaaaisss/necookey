@@ -195,10 +195,19 @@
             <ListPreference
                 android:key="zenz_engine_preference"
                 android:title="@string/zenz_engine_title"
-                android:defaultValue="jinen"
+                android:defaultValue="sumire_lm"
                 android:entries="@array/zenz_engine_entries"
                 android:entryValues="@array/zenz_engine_values"
                 app:useSimpleSummaryProvider="true"
+                app:iconSpaceReserved="false" />
+            <SeekBarPreference
+                android:defaultValue="50"
+                android:key="sumire_lm_zenz_margin_preference"
+                android:max="300"
+                android:title="@string/sumire_lm_zenz_margin_title"
+                android:summary="@string/sumire_lm_zenz_margin_summary"
+                app:min="0"
+                app:showSeekBarValue="true"
                 app:iconSpaceReserved="false" />
             <Preference
                 android:key="zenz_model_select_preference"
