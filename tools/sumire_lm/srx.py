@@ -13,7 +13,7 @@ srx.py delta           : W2/delta/lm/need_{w,c}.npz, need_pair.npz = keys missin
 srx.py combine         : W2/lm/stats_w.npz, stats_c.npz, pair.npz aligned to the W2 need sets (old values for old keys)
   (then)  SLM_WORK=W2 rr.py feats            -> W2/ftab.npz
 srx.py xflags          : W2/xflags.npz (per ftab row: extra?, pattern index, max word rank, pattern from N-best)
-srx.py view K m        : W2/view_K{K}_m{m}/ (filtered cands, ftab.npz, scores/lin_base+lmw+lmc+pmi_tune.npy) for bunseg.py / bunsum.py
+srx.py view K m [kinds]: W2/view_K{K}_m{m}/ (filtered cands, ftab.npz, scores/lin_base+lmw+lmc+pmi_tune.npy) for bunseg.py / bunsum.py
 srx.py eval            : Sumire top1 / adopted linear model (base+lmw+lmc+pmi, trained on JWTD tune, l2 by inner CV on tune)
                          for the original pool and for pools with extras of pattern index < K and word rank < m.
                          AJIMEE (split eval) is reported only."""
@@ -79,14 +79,15 @@ elif mode == 'xflags':
     for fn in glob.glob(f'{W2}/cands/cands.*.tsv'):
         for l in open(fn):
             f = l.rstrip('\n').split('\t')
-            if len(f) >= 12 and f[8] == 'X': fl[(f[0], f[2])] = (int(f[9]), int(f[10]), int(f[11]))
+            if len(f) >= 12 and f[8] == 'X': fl[(f[0], f[2])] = (int(f[9]), int(f[10]), int(f[11]), f[12] if len(f) > 12 else 'A')
     items = pickle.load(open(f'{W2}/items.pkl', 'rb'))
-    X, PI, WR, NB = [], [], [], []
+    X, PI, WR, NB, KD = [], [], [], [], []
     for i, sp, exp, ctx, rows in items:
         for t in rows:
             v = fl.get((i, t[1])) if t[0] >= 50 else None
             X.append(v is not None); PI.append(v[0] if v else -1); WR.append(v[1] if v else -1); NB.append(v[2] if v else -1)
-    np.savez(f'{W2}/xflags.npz', X=np.array(X), PI=np.array(PI), WR=np.array(WR), NB=np.array(NB)); print('rows', len(X), 'extra', sum(X))
+            KD.append(v[3] if v else '')
+    np.savez(f'{W2}/xflags.npz', X=np.array(X), PI=np.array(PI), WR=np.array(WR), NB=np.array(NB), KD=np.array(KD)); print('rows', len(X), 'extra', sum(X))
 
 elif mode == 'eval':
     os.environ['SLM_WORK'] = W2
@@ -95,15 +96,18 @@ elif mode == 'eval':
     T0 = rr.load(); xf = np.load(f'{W2}/xflags.npz')
     assert len(xf['X']) == len(T0['G'])
     names = rr.dense_names(T0, ['base', 'lmw', 'lmc', 'pmi'])
-    grid = [(0, 0)] + [(K, m) for K in map(int, os.environ.get('SRX_K', '4,8,10').split(',')) for m in map(int, os.environ.get('SRX_M', '3,8').split(','))]
+    # SRX_GRID = 'K:m:kinds,...' (kinds A = A* K-best in the split, F = best path through each node, AF = both)
+    grid = [(0, 0, '')] + [(int(a), int(b), c) for a, b, c in (g.split(':') for g in os.environ.get('SRX_GRID', '4:3:A,8:3:A,10:8:A').split(','))]
+    KD = xf['KD'] if 'KD' in xf.files else np.where(xf['X'], 'A', '')
     res = []
-    for K, m in grid:
-        keep = ~xf['X'] if K == 0 else (~xf['X']) | ((xf['PI'] < K) & (xf['WR'] < m))
+    for K, m, kinds in grid:
+        kind_ok = np.array([any(k in d for k in kinds) for d in KD]) if kinds else np.zeros(len(KD), bool)
+        keep = ~xf['X'] if K == 0 else (~xf['X']) | ((xf['PI'] < K) & (xf['WR'] < m) & kind_ok)
         T = {k: (v[keep] if isinstance(v, np.ndarray) and len(v) == len(keep) else v) for k, v in T0.items()}
         gs = rr.group_first(T['G']); T['gst'] = gs; T['gsp'] = T['SPL'][gs]; T['ng'] = len(gs)
         assert T['ng'] == T0['ng']
         top1 = rr.acc_by_split(-rr.col(T, 'rank'), T)
-        os.environ['SLM_TAG'] = f'srx_K{K}_m{m}'
+        os.environ['SLM_TAG'] = f'srx_K{K}_m{m}{kinds}'
         s, w, l2 = rr.linear(T, names, ['tune'])
         a = rr.acc_by_split(s, T)
         orc = np.zeros(T['ng'], bool); np.logical_or.at(orc, T['G'], T['LAB'])
@@ -111,17 +115,17 @@ elif mode == 'eval':
         ncand = {sp: float(np.bincount(T['G'])[T['gsp'] == sp].mean()) for sp in ('tune', 'held', 'eval')}
         nx = {sp: float(np.bincount(T['G'], weights=xf['X'][keep].astype(float))[T['gsp'] == sp].mean()) for sp in ('tune', 'held', 'eval')}
         # gold only reachable through an extra candidate
-        np.save(f'{W2}/score_K{K}_m{m}.npy', s.astype(np.float32)); np.save(f'{W2}/keep_K{K}_m{m}.npy', keep)
-        r = dict(K=K, m=m, l2=l2, top1={k: float(top1[k]) for k in ('tune', 'held', 'eval')}, rr={k: float(a[k]) for k in ('tune', 'held', 'eval')},
+        np.save(f'{W2}/score_K{K}_m{m}{kinds}.npy', s.astype(np.float32)); np.save(f'{W2}/keep_K{K}_m{m}{kinds}.npy', keep)
+        r = dict(K=K, m=m, kinds=kinds, l2=l2, top1={k: float(top1[k]) for k in ('tune', 'held', 'eval')}, rr={k: float(a[k]) for k in ('tune', 'held', 'eval')},
                  oracle=o, ncand=ncand, nextra=nx)
         res.append(r); print(json.dumps(r), flush=True)
     json.dump(res, open(f'{W2}/eval.json', 'w'), indent=1)
 
 elif mode == 'view':
-    K, m = int(sys.argv[2]), int(sys.argv[3]); V = f'{W2}/view_K{K}_m{m}'
+    K, m = int(sys.argv[2]), int(sys.argv[3]); kinds = sys.argv[4] if len(sys.argv) > 4 else ''; V = f'{W2}/view_K{K}_m{m}{kinds}'
     for d in (V, f'{V}/cands', f'{V}/scores', f'{V}/diag'): os.makedirs(d, exist_ok=True)
     link(f'{WORK}/data', f'{V}/data')
-    keep = np.load(f'{W2}/keep_K{K}_m{m}.npy'); s = np.load(f'{W2}/score_K{K}_m{m}.npy')
+    keep = np.load(f'{W2}/keep_K{K}_m{m}{kinds}.npy'); s = np.load(f'{W2}/score_K{K}_m{m}{kinds}.npy')
     z = np.load(f'{W2}/ftab.npz', allow_pickle=True)
     np.savez(f'{V}/ftab.npz', **{k: (z[k][keep] if z[k].ndim and len(z[k]) == len(keep) else z[k]) for k in z.files})
     np.save(f'{V}/scores/lin_base+lmw+lmc+pmi_tune.npy', s)

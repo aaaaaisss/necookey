@@ -233,3 +233,63 @@ Sumire). The reranker already fixes 55 of Sumire's 89 tune boundary errors and i
 - JWTD under-represents everyday input; a daily-use test set (chat-style clauses) would weight boundary errors more realistically.
 Reproduce: `. env.sh; python3 $T/bunseg.py; python3 $T/bunsum.py; python3 $T/recomb.py; python3 $T/segfeat.py feats; python3 $T/segfeat.py train; python3 $T/splitguard.py`
 (each < 2 min, 2 CPU).
+
+## 2026-10-12 修正案1「区切りを固定した再変換」の実装と評価（結論: 効果なし、既定無効のまま）
+判断は JWTD tune のみ（K・m・F の選択、重み、l2 は tune / tune 内 2-fold CV）。held / AJIMEE は報告のみ、AJIMEE は一切の選択に未使用。
+
+### 実装（既定動作・表示順は不変）
+- `path_algorithm/SplitReconversion.kt`: `SplitReconversionConfig(maxPatterns=K, wordsPerSpan=m, perPattern=N, perPatternForced=F, popBudget)`,
+  `SplitReconversionCandidate`（候補・読み区間・区切り順位・語順位の最大・N-best 由来か・forced か）, `SplitReconversionResult`（受け皿 + elapsedNs）。
+- `FindPath.splitConstrainedReconversion(graph(枝刈り前), length, cm, nBestPatterns, exclude, config, out)`:
+  1. 区切り = N-best の出現順の区切り + 文節区切りだけを状態に持つ A*（(node, 区切り suffix) で重複除去、正確な前向き Viterbi をヒューリスティックに）で上位 K 種類。
+     `MAX_BUNSETSU_SPLIT_PATTERNS`(=4, UI の区切り候補) は変えていない（UI の挙動を変えないため別経路で K を取る）。
+  2. 区切りごとに「区切りをまたぐ語なし・区切り位置では自立語で始まり・それ以外の位置で自立語が始まらない」ノードだけ、各スパンは辞書上位 m 語
+     （adjustedScore 順、同表記同順位）に制限して前向き Viterbi → 後ろ向き A*（連接 + 語コスト + NgramRuleScorer + Mozc 境界チェック）で N-best 外の上位 N 文字列（A）。
+  3. （任意 F>0）区切り固定の前向き/後ろ向き Viterbi で「各ノードを必ず通る最良経路」をコスト順に F 本（1 語入れ替え候補、F）。
+- `KanaKanjiEngine.getCandidatesWithBunsetsuSeparation(..., splitReconversionConfig, splitReconversionCollector)`: 両方渡したときだけ forwardDp 前に
+  ノード一覧を複製（ノード共有）し、N-best 後に計算して collector に入れる。戻り値の候補は変えない（`SplitReconversionTest` で確認）。
+- 文節伸縮の再変換との共通化（設計メモ）: UI で文節を伸縮した後の再変換は「区切りを 1 つ固定してスパンごとに語を選び直す」ので、
+  `splitConstrainedReconversion(nBestPatterns = listOf(固定区切り), maxPatterns = 1)` の手順 2 がそのまま使える。現状の UI 経路は別実装のまま（未統合）。
+- ダンプ CI: `ci/split_reconv.txt` = "K,m,N[,F]"（空 = 無効）を `NK_SPLIT_RECONV` に渡し、追加候補を rank 50.. で出力（列 9-13 = X, 区切り順位, 語順位最大,
+  N-best 由来, A/F/AF）、`.time` に通常経路 / 追加処理の ms。`unit` ジョブで変換器の単体テスト（`converter.*`）を実行（両 run とも成功）。
+- 評価: `srx.py`（prep / delta / combine / xflags / eval / view）, `srx_run.sh`（旧 need に無い n-gram・PMI ペアだけコーパスで数え直して合成、~15 分）。
+  作業ディレクトリ $WORK/srx（v1/ に 1 回目の結果）。
+
+### CI run（N_AUTO=0: JWTD 3000 + AJIMEE 200 のみ、8 シャード、各 ~4 分）
+- 38249847524（488b190）: K=10, m=8, N=8（F なし）。
+- 38252246071（556fbf9）: K=10, m=8, N=8, F=30。K'<=10, m'<=8 は区切り順位・語順位の列で絞って模擬（m は近似: 小さい m で探索し直したときに出る別候補は含まない）。
+
+### 結果（採用リランカー = 語彙なし線形 base+lmw+lmc+pmi を各候補プールで JWTD tune に再学習。tune / held / AJIMEE）
+| pool | 候補数/文 | Sumire top1 | rr | oracle@pool | l2(CV) |
+|---|---|---|---|---|---|
+| top-50（再計算） | 50 | .309/.319/.525 | .509/.507/.750 | .841/.849/.905 | 0.3 |
+| top-50, l2=0.03 固定 | 50 | | **.513/.511/.760** | | |
+| + A K=4 m=3 (v1) | 52 | 同上 | .508/.508/.750 | .841/.851/.905 | 0.3 |
+| + A K=8 m=3 | 58 | 同上 | .512/.512/.760 | .841/.851/.905 | 0.03 |
+| + A K=10 m=8 | 77 | 同上 | .509/.505/.750 | .845/.851/.905 | 0.3 |
+| + F K=4 m=3 | 83 | 同上 | .512/.513/.760 | .842/.854/.905 | 0.03 |
+| + F K=10 m=3 | 128 | 同上 | .512/.511/.760 | .842/.856/.910 | 0.03 |
+| + F K=10 m=8 | 343 | 同上 | .506/.507/.755 | .851/.865/.910 | 0.3 |
+| + A+F K=10 m=8 | 347 | 同上 | .505/.507/.755 | .851/.866/.910 | 0.3 |
+- tune 最良は .512（A K=8 m=3 ほか同率）だが、top-50 だけでも l2=0.03 なら .513/.511/.760（既存採用モデルと同じ）。差は l2 の選び方によるもので、**追加候補による改善はない**。
+  oracle の伸びも最大 +0.010 tune（+15 文 / 1500）、held +0.017、AJIMEE +0.005（+1 文）で、増えた正解もリランカーが選べていない。
+- 文節境界ミス（bunsum の A、rr / Sumire、in-pool/out）: top-50 tune 45 (11/34), held 64, AJIMEE 2 → A K=8 m=3: tune 47 (11/36), held 68, AJIMEE 2 →
+  A+F K=10 m=8: tune 47 (18/29), held 59, AJIMEE 2。正解区切りの候補がプールに入る文は増える（tune in-pool 11→18）が、選ばれない。Sumire top1 の A は不変（89 tune）。
+- 速度（CI ランナー、JVM、1 文あたり、通常経路 = graph 構築 + N-best 50）: 通常 4.5-4.9 ms に対し追加処理 A(K10 m8 N8) 平均 99 ms（中央 93 / p90 178 / p99 249 / 最大 1.2 s）、
+  A+F30 平均 116 ms（中央 112 / p90 197 / p99 283）。追加候補数 A: 平均 26/文、A+F30: 平均 298/文。現状の実装（IdentityHashMap・区切りごとの Viterbi×2・区切り探索）は端末では遅すぎる。
+
+### なぜ効かないか（tune、正解が top-50 外の 238 文）
+- 238 文中 180 文は「top-50 のどれか 1 つの候補と 1 箇所だけ違う」が、その候補は区切りごとの最良経路から 2-3 箇所違う（例 j464: 正解「後に製作が中京テレビへ移行」、
+  top-50 に「あとに製作が中京テレビへ移行」(rank 42) はあるが、区切り最良経路は「あとに制作が中京テレビへ行こう」）。A（コスト順の組み合わせ）も F（最良経路から 1 語）も
+  そこまで届かない。正解の語が辞書に無い例（梨紅, 征男, 関城, 加賀見, 廊坊, 太田胃散）も多い。
+- 区切りの多様化（K を 4→10）では、JWTD の誤りの大半（同音異義 C）は救えず、境界誤り A は正解区切りが既に top-50 にあるものが多い（前回の診断どおり）。
+
+### 残作業 / 次の候補
+1. N-best 近傍の生成: 区切り最良経路ではなく top-k（例 10）の各候補を基準に、各文節を辞書上位語で 1 箇所だけ入れ替える（候補 × 文節 × m）。上の 180 文の多くはこれで届く見込み（未検証）。
+   リランカー側で採点するので Kotlin では生成だけ（LM 不要）。
+2. それでも選べない問題: プールを増やすと l2 が強くなり精度が落ちる（K10 m8 で -.003〜-.007）。追加候補を区別する特徴（由来・区切り順位・コスト差）や、プール別の学習が要る。
+3. UT 辞書あり（修正案2）での再ダンプ: 正解語が辞書に無い例が多いので、再変換より先に効く可能性が高い。
+4. 速度: 採用するなら区切り探索を既存 `collectBunsetsuSplitPatterns` の scratch（容量 K）に寄せ、Viterbi を配列化。
+- ダンプ設定は既定（N_AUTO=24000、split_reconv 空 = 無効）に戻した（trigger は変更せず、CI は走らせていない）。
+Reproduce: `$WORK/dl_art.sh RUN_ID`（$WORK/srx で実行）で artifact を $WORK/srx/cands に → `setsid nohup bash $T/srx_run.sh &` → `SRX_GRID=8:3:A,10:8:AF python3 $T/srx.py eval`
+→ `python3 $T/srx.py view 8 3 A; cd $WORK/srx/view_K8_m3A && SLM_WORK=$PWD python3 $T/bunseg.py && SLM_WORK=$PWD python3 $T/bunsum.py`。
