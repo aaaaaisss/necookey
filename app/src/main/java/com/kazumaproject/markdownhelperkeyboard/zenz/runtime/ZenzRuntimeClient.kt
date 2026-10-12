@@ -120,6 +120,20 @@ class ZenzRuntimeClient @Inject constructor(
             ?: throw ZenzProcessException("Zenz returned an unexpected generate response.")
     }
 
+    /** jinen-v2 の自由生成（プロンプトは呼び出し側で組み立て・NFKC 済み）。 */
+    suspend fun generateRaw(
+        config: ZenzRuntimeConfig,
+        prompt: String,
+        maxTokens: Int,
+    ): String = operationMutex.withLock {
+        val service = connectAndInitializeLocked(config)
+        val result = executeLocked(service, GENERATE_TIMEOUT_MS) { requestId, callback ->
+            service.generateRaw(requestId, prompt, maxTokens, callback)
+        }
+        (result as? RuntimeResult.Text)?.value
+            ?: throw ZenzProcessException("Zenz returned an unexpected generateRaw response.")
+    }
+
     suspend fun evaluate(
         config: ZenzRuntimeConfig,
         profile: String?,

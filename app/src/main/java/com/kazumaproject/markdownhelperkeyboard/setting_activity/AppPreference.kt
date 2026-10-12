@@ -701,6 +701,8 @@ object AppPreference {
         Pair("qwerty_keyboard_margin_end_dp_landscape_preference", 0)
 
     private val ZENZ_MODEL_URI_PREFERENCE = Pair("zenz_model_uri_preference", "")
+    /** 変換エンジン: "jinen"（内蔵 jinen-v2-small の自由生成、既定）/ "zenz"（読み込んだ zenz モデルの評価ループ）。 */
+    private val ZENZ_ENGINE_PREFERENCE = Pair("zenz_engine_preference", "jinen")
     private val SUMINAGASHI_INK_EFFECT_ENABLE =
         Pair("suminagashi_ink_effect_preference", false)
     private val KEYBOARD_TOUCH_EFFECT_QUALITY =
@@ -3600,6 +3602,15 @@ object AppPreference {
                 QWERTY_KEYBOARD_MARGIN_END_DP_LANDSCAPE.first,
                 value ?: 0
             )
+        }
+
+    var zenz_engine_preference: String
+        get() = preferences.getString(
+            ZENZ_ENGINE_PREFERENCE.first,
+            ZENZ_ENGINE_PREFERENCE.second
+        ) ?: ZENZ_ENGINE_PREFERENCE.second
+        set(value) = preferences.edit {
+            it.putString(ZENZ_ENGINE_PREFERENCE.first, value)
         }
 
     var zenz_model_uri_preference: String

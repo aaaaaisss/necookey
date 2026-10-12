@@ -13,6 +13,11 @@ object ZenzEngine {
         maxTokens: Int
     ): String = ""
 
+    fun generateRaw(
+        prompt: String,
+        maxTokens: Int
+    ): String = ""
+
     fun generateWithContext(
         leftContext: String,
         input: String,

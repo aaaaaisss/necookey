@@ -21,6 +21,12 @@ object ZenzEngine {
         maxTokens: Int
     ): String
 
+    /** jinen-v2: 組み立て済み（NFKC 済み）のプロンプトをそのまま貪欲生成（空白の全角化なし・BOS なし）。 */
+    external fun generateRaw(
+        prompt: String,
+        maxTokens: Int
+    ): String
+
     external fun generateWithContext(
         leftContext: String,
         input: String,

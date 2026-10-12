@@ -230,6 +230,22 @@ class OpenSourceFragment : Fragment() {
         }
 
         if (AppVariantConfig.hasZenz) {
+            entries += LicenseEntry("togatogah/jinen-v2-small.gguf") {
+                showLicenseDialog(
+                    title = "togatogah/jinen-v2-small.gguf",
+                    notice = Notice(
+                        "togatogah/jinen-v2-small.gguf (jinen-v2-small, Q5_K_M)",
+                        "https://huggingface.co/togatogah/jinen-v2-small.gguf",
+                        "Copyright Hitoshi Togasaki. CC BY-SA 4.0.\n" +
+                            "出典：国立国会図書館「全国書誌データ」（2026年7月9日に取得）および" +
+                            " 国立国会図書館サーチの書誌データを加工して作成\n" +
+                            "加工および本モデルの作成は Hitoshi Togasaki によるものであり、" +
+                            "国立国会図書館が作成・提供・保証するものではありません。",
+                        ZenzLicense()
+                    )
+                )
+            }
+
             entries += LicenseEntry("Miwa-Keita/zenz-v3.2-xsmall-gguf") {
                 showLicenseDialog(
                     title = "Miwa-Keita/zenz-v3.2-xsmall-gguf",

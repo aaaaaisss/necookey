@@ -343,6 +343,6 @@ class ZenzRuntimeInstrumentedTest {
     }
 
     private companion object {
-        const val MODEL_ASSET_NAME = "ggml-model-Q5_K_M.gguf"
+        const val MODEL_ASSET_NAME = "jinen-v2-small-Q5_K_M.gguf"
     }
 }

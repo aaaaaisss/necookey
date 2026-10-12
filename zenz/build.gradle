@@ -10,16 +10,22 @@ if (localPropertiesFile.exists()) {
 }
 
 def zenzModelRepo = providers.gradleProperty("zenzModelRepo")
-        .orElse(localProperties.getProperty("zenzModelRepo") ?: "Miwa-Keita/zenz-v3.2-xsmall-gguf")
+        .orElse(localProperties.getProperty("zenzModelRepo") ?: "togatogah/jinen-v2-small.gguf")
         .get()
 def zenzModelRevision = providers.gradleProperty("zenzModelRevision")
-        .orElse(localProperties.getProperty("zenzModelRevision") ?: "4f5423f0fad41a73b1242eb96fe5c12ae4fdca83")
+        .orElse(localProperties.getProperty("zenzModelRevision") ?: "3461d0573ab447985badde3174165b967d06076c")
         .get()
 def zenzModelQuantization = providers.gradleProperty("zenzModelQuantization")
         .orElse(localProperties.getProperty("zenzModelQuantization") ?: "Q5_K_M")
         .get()
 def zenzModelAssetName = providers.gradleProperty("zenzModelAssetName")
-        .orElse(localProperties.getProperty("zenzModelAssetName") ?: "ggml-model-Q5_K_M.gguf")
+        .orElse(localProperties.getProperty("zenzModelAssetName") ?: "jinen-v2-small-Q5_K_M.gguf")
+        .get()
+// Files fetched from the model repo (comma-separated globs). Defaults to the GGUF asset only, so repos that
+// ship several quantizations (jinen: Q4/Q5/Q8/f16) do not download everything. Use "*" for a
+// safetensors repo that must be converted and quantized locally.
+def zenzModelAllowPatterns = providers.gradleProperty("zenzModelAllowPatterns")
+        .orElse(localProperties.getProperty("zenzModelAllowPatterns") ?: zenzModelAssetName)
         .get()
 def zenzModelHfToken = providers.gradleProperty("zenzModelHfToken")
         .orElse(localProperties.getProperty("zenzModelHfToken") ?: System.getenv("HF_TOKEN") ?: "")
@@ -135,6 +141,7 @@ def prepareZenzModel = tasks.register("prepareZenzModel", Exec) {
     inputs.property("revision", zenzModelRevision)
     inputs.property("quantization", zenzModelQuantization)
     inputs.property("assetName", zenzModelAssetName)
+    inputs.property("allowPatterns", zenzModelAllowPatterns)
     outputs.file(new File(outputDir, zenzModelAssetName))
 
     commandLine "bash", "${project.projectDir}/scripts/prepare_zenz_model.sh"
@@ -142,6 +149,7 @@ def prepareZenzModel = tasks.register("prepareZenzModel", Exec) {
     environment "ZENZ_MODEL_REVISION", zenzModelRevision
     environment "ZENZ_MODEL_QUANTIZATION", zenzModelQuantization
     environment "ZENZ_MODEL_ASSET_NAME", zenzModelAssetName
+    environment "ZENZ_MODEL_ALLOW_PATTERNS", zenzModelAllowPatterns
     environment "ZENZ_MODEL_OUTPUT_DIR", outputDir.absolutePath
     environment "ZENZ_MODEL_WORK_DIR", layout.buildDirectory.dir("intermediates/zenzModel").get().asFile.absolutePath
     environment "ZENZ_MODEL_HF_TOKEN", zenzModelHfToken

@@ -88,6 +88,18 @@ class ZenzRuntimeService : Service() {
             }
         }
 
+        override fun generateRaw(
+            requestId: Long,
+            prompt: String,
+            maxTokens: Int,
+            callback: IZenzRuntimeCallback,
+        ) {
+            submitInitialized(requestId, callback) {
+                val result = ZenzEngine.generateRaw(prompt, maxTokens)
+                if (isLatest(requestId)) callback.safeStringResult(requestId, result)
+            }
+        }
+
         override fun evaluate(
             requestId: Long,
             profile: String,

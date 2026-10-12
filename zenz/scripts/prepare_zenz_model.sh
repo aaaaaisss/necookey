@@ -50,6 +50,10 @@ if [[ -n "${CACHE_DIR}" ]]; then
   mkdir -p "${CACHE_DIR}"
 fi
 
+# Only the configured model is packaged: drop a previously prepared model with another name
+# (e.g. the old zenz asset after switching the default to jinen) from the generated assets.
+find "${OUTPUT_DIR}" -maxdepth 1 -name '*.gguf' ! -name "${ZENZ_MODEL_ASSET_NAME}" -delete
+
 if [[ -f "${OUTPUT_FILE}" && -f "${STAMP_FILE}" ]] && grep -qx "${EXPECTED_STAMP}" "${STAMP_FILE}"; then
   if [[ -n "${CACHE_FILE}" ]]; then
     if [[ ! -f "${CACHE_FILE}" || ! -f "${CACHE_STAMP_FILE}" ]] || ! grep -qx "${EXPECTED_STAMP}" "${CACHE_STAMP_FILE}"; then
@@ -88,10 +92,13 @@ repo_id = os.environ["ZENZ_MODEL_REPO"]
 revision = os.environ["ZENZ_MODEL_REVISION"]
 local_dir = os.path.abspath(os.environ["MODEL_DIR"])
 token = os.environ.get("HF_TOKEN") or None
+patterns = [p.strip() for p in os.environ.get("ZENZ_MODEL_ALLOW_PATTERNS", "").split(",") if p.strip()]
+allow = None if not patterns or patterns == ["*"] else patterns
 
 snapshot_download(
     repo_id=repo_id,
     revision=revision,
+    allow_patterns=allow,
     local_dir=local_dir,
     local_dir_use_symlinks=False,
     token=token,

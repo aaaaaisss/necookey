@@ -192,6 +192,14 @@
                 app:defaultValue="true"
                 app:summary="@string/necookey_zenz_bunsetsu_gate_summary"
                 app:iconSpaceReserved="false" />
+            <ListPreference
+                android:key="zenz_engine_preference"
+                android:title="@string/zenz_engine_title"
+                android:defaultValue="jinen"
+                android:entries="@array/zenz_engine_entries"
+                android:entryValues="@array/zenz_engine_values"
+                app:useSimpleSummaryProvider="true"
+                app:iconSpaceReserved="false" />
             <Preference
                 android:key="zenz_model_select_preference"
                 android:title="@string/zenz_model_source_title"

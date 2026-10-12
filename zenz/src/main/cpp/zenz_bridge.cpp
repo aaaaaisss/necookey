@@ -316,12 +316,12 @@ static jstring toJString(JNIEnv *env, const char *cstr) {
 // Swift の preprocessText とほぼ同じ:
 // - 半角スペース -> 全角スペース (\u3000)
 // - 改行は削除
-static std::string preprocess_text(const std::string &text) {
+static std::string preprocess_text(const std::string &text, bool map_spaces = true) {
     std::string out;
     out.reserve(text.size());
 
     for (unsigned char c: text) {
-        if (c == ' ') {
+        if (map_spaces && c == ' ') {
             out.append(u8"\u3000");
         } else if (c == '\n' || c == '\r') {
             continue;
@@ -802,7 +802,8 @@ static std::string accepted_zenz_text(const ZenzGenerationResult &result) {
 static ZenzGenerationResult pure_greedy_decoding(
         const std::string &leftSideContext,
         int maxCount,
-        uint64_t request_seq
+        uint64_t request_seq,
+        bool map_spaces = true
 ) {
     std::unique_lock<std::mutex> session_lock(g_session.mutex);
     if (is_request_stale(request_seq)) {
@@ -825,7 +826,7 @@ static ZenzGenerationResult pure_greedy_decoding(
         llama_set_abort_callback(ctx, never_abort, nullptr);
     };
 
-    std::string pre = preprocess_text(leftSideContext);
+    std::string pre = preprocess_text(leftSideContext, map_spaces);
     auto prompt_tokens = tokenize_text(pre, /*add_bos=*/false, /*add_eos=*/false);
     if (prompt_tokens.empty()) {
         clear_abort_callback();
@@ -1456,6 +1457,27 @@ Java_com_kazumaproject_zenz_ZenzEngine_generate(
             request_seq);
 
     // ★ NewStringUTFは禁止（不正UTF-8の可能性）
+    return toJString(env, accepted_zenz_text(result));
+}
+
+// ------- JNI: jinen-v2 用。呼び出し側が組み立てた（NFKC 済みの）プロンプトをそのまま貪欲生成 -------
+// zenz 用の前処理（半角スペース -> 全角スペース）はしない（改行は除く）。BOS なし、EOS/プロトコル記号で停止。
+
+extern "C"
+JNIEXPORT jstring JNICALL
+Java_com_kazumaproject_zenz_ZenzEngine_generateRaw(
+        JNIEnv *env,
+        jobject /* thiz */,
+        jstring jPrompt,
+        jint maxTokens
+) {
+    std::string prompt = jstring_to_string(env, jPrompt);
+    uint64_t request_seq = g_request_seq.fetch_add(1, std::memory_order_relaxed) + 1;
+    const ZenzGenerationResult result = pure_greedy_decoding(
+            prompt,
+            /*maxCount=*/maxTokens,
+            request_seq,
+            /*map_spaces=*/false);
     return toJString(env, accepted_zenz_text(result));
 }
 
