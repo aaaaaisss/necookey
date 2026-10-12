@@ -907,12 +907,13 @@ class GraphBuilder {
                             )
                         }
                         val leftId = tokenArray.leftIds[posTableIndex.toInt()]
+                        val cost = wordCost.toInt() + VerbInflectionCost.delta(leftId, yomiStr, tango)
                         val node = Node(
                             l = leftId,
                             r = tokenArray.rightIds[posTableIndex.toInt()],
-                            score = wordCost.toInt(),
-                            f = wordCost.toInt(),
-                            g = wordCost.toInt(),
+                            score = cost,
+                            f = cost,
+                            g = cost,
                             tango = tango,
                             yomiUsed = yomiStr,
                             len = yomiStr.length.toShort(),

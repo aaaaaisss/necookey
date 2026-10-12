@@ -53,6 +53,15 @@ class ConversionQualityRegressionTest {
         assertTrue(strings("よ").contains("四"))
     }
 
+    /** 活用形でも終止形と同じ表記が 1 位（つとめる→務める なのに つとめた→努めた だった）。 */
+    @Test
+    fun verbInflectionFollowsBaseFormSpelling() {
+        assertEquals("務める", top("つとめる"))
+        assertEquals("会長を務めた", top("かいちょうをつとめた"))
+        assertEquals("部長を務めていた", top("ぶちょうをつとめていた"))
+        assertTrue(strings("かいちょうをつとめた").take(5).contains("会長を努めた"))
+    }
+
     /** Sumire 単体の期待。Zenzai（zenz）を通した結果は JVM では検証できない（端末で [z]/[Z] と合わせて確認）。 */
     @Test
     fun kimonoSumireOnly() {
