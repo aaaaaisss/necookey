@@ -161,3 +161,75 @@ to keep most of the .51 gain.
    rerank decision, instead of count cutoffs; entropy pruning as a baseline.
 3. Bloom-filter/compressed-trie style keys (~10 bits/n-gram) to fit more rare n-grams; re-select fp per budget.
 4. Real-device latency with the bench (adb) and mmap loading.
+
+## 2026-10-12 bunsetsu-boundary error diagnosis (bunseg.py / bunsum.py / recomb.py / segfeat.py / splitguard.py)
+All judgments on JWTD tune only; held / AJIMEE(eval) are counts for reference. No new dumps: uses cands/*.tsv (Sumire top-50 with
+segments `reading:surface`), ftab.npz, scores/lin_base+lmw+lmc+pmi_tune.npy. Outputs in $W/diag/ (not committed).
+
+### Method
+- Gold split: Sumire's own segments of the gold row if gold is in the top-50, else fugashi(unidic-lite) tokens of the gold with their
+  kana (must concatenate to the input reading). Splits compared as cut sets in reading space, chunked at common cuts, so pure
+  granularity differences with the same surface are not errors.
+- A boundary = a1 crossing (a top1 segment partially overlaps a gold segment) + a2 nested-func (one side absorbs / splits off a
+  particle or okurigana: 毛|が vs 怪我). a2 nested-compound (大治|郎 vs 大二郎, same span, different compound granularity) counted as C.
+  B variant = same split, kana/kanji, okurigana, 子ども/子供, width. C homophone = same split, different kanji (製作/制作, 一次/一時).
+  Most severe chunk decides (A > C > B). Heuristic; a few A are really homophones with a different split (与し/組みし).
+
+### Error classes (errors / 1500, in top-50 / out)
+| | tune rr (adopted) | tune Sumire top1 | held rr | held Sumire | AJIMEE rr | AJIMEE Sumire |
+|---|---|---|---|---|---|---|
+| errors | 731 | 1037 | 734 | 1022 | 48/200 | 95/200 |
+| A boundary | 45 (6.2%, 3.0% of sents) 10/35 | 89 (8.6%, 5.9%) 43/46 | 68 | 101 | 2 | 8 |
+| B variant | 144 (19.7%) 114/30 | 124 108/16 | 133 | 123 | 6 | 13 |
+| C homophone | 506 (69.2%) 366/140 | 794 640/154 | 497 | 759 | 30 | 62 |
+| C compound split | 36 3/33 | 30 8/22 | 36 | 39 | 1 | 3 |
+| D other | 0 | 0 | 0 | 0 | 9 (gold alignment failed) | 9 |
+JWTD is a Wikipedia mis-conversion corpus, so it is homophone-heavy; boundary errors are 3% of sentences after the reranker (5.9% for
+Sumire). The reranker already fixes 55 of Sumire's 89 tune boundary errors and introduces 11 (held: fixes 56, introduces 23).
+
+### Boundary errors, tune (rr 45 / Sumire 89)
+- A candidate with the gold split exists in the top-50 for 35/45 rr errors (Sumire rank 0: 12, 1-4: 12, 5-19: 7, 20-49: 4; absent 10);
+  for Sumire 79/89 (mostly rank 1-4). Distinct splits in the top-50: median 4 (FindPath MAX_BUNSETSU_SPLIT_PATTERNS = 4).
+- rr out-of-top-50 boundary errors 35: gold split in top-50 for 25, of which 22 have every gold noun output somewhere in the dump
+  (proxy for 'in Sumire's dictionary'); 7 contain a noun Sumire never outputs (held: 48 / 41 / 32 / 11).
+- Direction (rr): crossing 25, top under-splits 17, over-splits 3.
+- Patterns (rr / Sumire): P1 rare or unregistered word, gold noun absent from top-50 18/21 (劉|光世 <- 流行|性, 竜|貴妃 <- 隆起|費,
+  藩|主家 <- 藩主|化); P2 kana fragments of unknown katakana words 1/12 (ヴォ|っ|ファ, が|ー, は|なし for 話); P3 particle/auxiliary absorbed or
+  split off 14/24 (毛|が <- 怪我, は|行っ <- 入っ, の|度 <- 喉, で|小 <- でしょう, と|称さ <- 渡渉|さ); P4 inflection 0/1;
+  P5 compound / prefix-suffix 12/31 (代替|駅 <- 大|体液, 長身|痩躯 <- 超|真相|区, 電信|機 <- 電|新規).
+- Sumire cost gap gold - top1 for rr in-top-50 boundary errors: 0..3493 (median ~700).
+
+### Cheap offline checks (all on existing data)
+| check | tune | held | AJIMEE | decision |
+|---|---|---|---|---|
+| adopted lin (repro) | .513 (CV .5955) | .511 | .760 | |
+| + 7 split features (kana fragments, mixed-script segs, 1-char segs, split share / cost-weighted share in N-best, same split as rank 0, nseg-min) | .509 (CV .5987) | .513 | .750 | not adopted (noise; in-top-50 crossing errors 2->3 tune, 8->8 held) |
+| split guard (keep a split compatible with Sumire rank 0 unless margin > theta) | best theta=0 (any theta>0 lowers tune) | | | not adopted |
+| N-best lattice recombination oracle (re-combine segments of the top-K by reading span) | top-50: 73/238 gold-outside sentences spellable (A 6/35, B 16/30, C 51/173); top-10: 8/238 | 66/226 (A 5/48) | 4/19 | worth building for B/C recall; little for A |
+-> Reranker-side features cannot fix boundary errors: the in-top-50 ones are already mostly fixed; the rest need candidate generation.
+
+### Fix proposals (estimated boundary errors fixable, tune rr baseline 45; upper bounds)
+1. **Split-constrained re-conversion** (biggest lever): for each of the top-K distinct splits in the N-best (raise
+   MAX_BUNSETSU_SPLIT_PATTERNS 4 -> ~8-10), take per-segment top-k words from the dictionary for that exact reading span and build the
+   best combinations (Viterbi per split with the LM), append to the N-best, rerank. Upper bound 22 tune / 32 held (gold split present,
+   gold nouns known), realistic ~half; also helps the 140 C + 30 B out-of-top-50 errors. Where: FindPath.backwardAStarWithBunsetsu
+   (splitPatterns collection ~L1776-1860, collectBunsetsuSplitPatterns, enqueueBunsetsuSplitExpansion) and
+   KanaKanjiEngine.getCandidatesWithBunsetsuSeparation (merge per-split candidates into BunsetsuCandidateResult; splitPatterns /
+   splitPatternByCandidateString already flow out). This is also what the UI does when the user stretches a bunsetsu, so it can share code.
+2. **Dictionary coverage**: the dump ran without UT dicts (wiki/neologd/person/places). 7 tune / 11 held boundary errors contain a noun
+   Sumire never outputs (P1 total 18/20). Re-dump with UT on to measure (one CI run); proper nouns dominate.
+3. **Katakana run node for unknown kana spans**: GraphBuilder step 9 adds only a 1-char node (cost 10000) when no dictionary entry ->
+   unknown katakana words fragment (ヴォ|っ|ファ). Add a maximal katakana-transliteration node over spans not covered by dictionary words
+   (like Mozc AddCharacterTypeBasedNodes). Sumire top1: up to 12 tune; after rr only 1 (low priority for the adopted pipeline).
+4. **N-best lattice recombination** in the reranker (no dictionary calls, top-50 segments only): oracle +73 tune / +66 held gold into the
+   list (A only 6/5). Needs LM Viterbi over the recombined lattice (median 576 paths at top-50).
+5. Not recommended: connection-cost tweaks for P3 (particle absorption is context dependent; LM with left context already fixes most
+   when in the list), split features / split guard (tested above, no gain).
+
+### Remaining work
+- Implement 1 in a branch-only experiment: dump per-split re-conversion candidates with the CI (ZenzBench-like driver), re-score with
+  rr.py, measure tune; then held/AJIMEE for reporting only.
+- Re-dump with UT dictionaries on (2) and re-run bunseg.py/bunsum.py.
+- JWTD under-represents everyday input; a daily-use test set (chat-style clauses) would weight boundary errors more realistically.
+Reproduce: `. env.sh; python3 $T/bunseg.py; python3 $T/bunsum.py; python3 $T/recomb.py; python3 $T/segfeat.py feats; python3 $T/segfeat.py train; python3 $T/splitguard.py`
+(each < 2 min, 2 CPU).
