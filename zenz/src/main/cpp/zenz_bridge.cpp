@@ -14,6 +14,14 @@
 #define LOGI(...) __android_log_print(ANDROID_LOG_INFO,  "zenz-bridge", __VA_ARGS__)
 #define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, "zenz-bridge", __VA_ARGS__)
 
+// llama.cpp b9637: KV キャッシュ操作は llama_memory_* (llama_get_memory) 経由。
+static inline void zenz_kv_clear(llama_context *c) {
+    llama_memory_clear(llama_get_memory(c), true);
+}
+static inline bool zenz_kv_seq_rm(llama_context *c, llama_seq_id seq, llama_pos p0, llama_pos p1) {
+    return llama_memory_seq_rm(llama_get_memory(c), seq, p0, p1);
+}
+
 // モデルと語彙のみグローバルで保持する。
 // コンテキストはセッションで使い回す。
 static llama_model *g_model = nullptr;
@@ -808,7 +816,7 @@ static ZenzGenerationResult pure_greedy_decoding(
     if (!ctx) {
         return no_zenz_result(ZenzGenerationTermination::DECODE_ERROR);
     }
-    llama_kv_cache_clear(ctx);
+    zenz_kv_clear(ctx);
     invalidate_eval_cache_locked();
 
     AbortRequestState abort_state{request_seq};
@@ -1001,8 +1009,8 @@ static CandidateEvaluationResult candidate_evaluate(
     while (m < T && m < n_common && m < g_eval_cache.pred_valid.size() && g_eval_cache.pred_valid[m]) ++m;
     size_t start = std::min(n_common, m - 1);
     if (start >= T) start = T - 1;
-    if (!llama_kv_cache_seq_rm(ctx, 0, (llama_pos) start, -1)) {
-        llama_kv_cache_clear(ctx);
+    if (!zenz_kv_seq_rm(ctx, 0, (llama_pos) start, -1)) {
+        zenz_kv_clear(ctx);
         invalidate_eval_cache_locked();
         start = 0;
         m = P;
@@ -1034,7 +1042,7 @@ static CandidateEvaluationResult candidate_evaluate(
             LOGE("candidate_evaluate: llama_decode failed: %d", rc);
         }
         llama_batch_free(batch);
-        llama_kv_cache_clear(ctx);
+        zenz_kv_clear(ctx);
         invalidate_eval_cache_locked();
         llama_set_abort_callback(ctx, never_abort, nullptr);
         return result;
@@ -1049,7 +1057,7 @@ static CandidateEvaluationResult candidate_evaluate(
         float *logits = llama_get_logits_ith(ctx, (int32_t) (j - start));
         if (!logits) {
             LOGE("candidate_evaluate: logits is null");
-            llama_kv_cache_clear(ctx);
+            zenz_kv_clear(ctx);
             invalidate_eval_cache_locked();
             llama_set_abort_callback(ctx, never_abort, nullptr);
             return result;
@@ -1173,8 +1181,8 @@ static bool prefill_prompt_prefix_locked(
         const std::vector<llama_token> &prompt_tokens
 ) {
     // Only the scoring sequence is reset; the evaluation cache (seq 0) stays valid.
-    if (!llama_kv_cache_seq_rm(ctx, ZENZ_SCORE_SEQ, -1, -1)) {
-        llama_kv_cache_clear(ctx);
+    if (!zenz_kv_seq_rm(ctx, ZENZ_SCORE_SEQ, -1, -1)) {
+        zenz_kv_clear(ctx);
         invalidate_eval_cache_locked();
     }
 
@@ -1218,7 +1226,7 @@ static float score_candidate_avg_logprob_reuse_prompt_locked(
     }
 
     const llama_pos suffix_start = (llama_pos) (prompt_tokens.size() - 1);
-    llama_kv_cache_seq_rm(ctx, ZENZ_SCORE_SEQ, suffix_start, -1);
+    zenz_kv_seq_rm(ctx, ZENZ_SCORE_SEQ, suffix_start, -1);
 
     const int32_t cap = (int32_t) (1 + candidate_tokens.size());
     llama_batch batch = llama_batch_init(cap, 0, 1);

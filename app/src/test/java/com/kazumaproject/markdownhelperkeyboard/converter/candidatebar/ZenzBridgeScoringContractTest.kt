@@ -55,14 +55,14 @@ class ZenzBridgeScoringContractTest {
         assertTrue(body.contains("total_score / (float) candidate_tokens.size()"))
         // Each candidate is its own sequence: the KV suffix after the prompt is dropped first.
         // Scoring runs on its own KV sequence so the evaluation cache (seq 0) survives.
-        assertTrue(body.contains("llama_kv_cache_seq_rm(ctx, ZENZ_SCORE_SEQ, suffix_start, -1)"))
-        assertFalse(body.contains("llama_kv_cache_clear"))
+        assertTrue(body.contains("zenz_kv_seq_rm(ctx, ZENZ_SCORE_SEQ, suffix_start, -1)"))
+        assertFalse(body.contains("zenz_kv_clear"))
     }
 
     @Test
     fun promptPrefillDoesNotWipeEvaluationCache() {
         val body = function("static bool prefill_prompt_prefix_locked(")
-        assertTrue(body.contains("llama_kv_cache_seq_rm(ctx, ZENZ_SCORE_SEQ, -1, -1)"))
+        assertTrue(body.contains("zenz_kv_seq_rm(ctx, ZENZ_SCORE_SEQ, -1, -1)"))
         assertTrue(body.contains("batch.seq_id[batch.n_tokens][0] = ZENZ_SCORE_SEQ;"))
     }
 
