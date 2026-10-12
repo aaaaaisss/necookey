@@ -925,6 +925,23 @@ class GraphBuilder {
                 }
             }
 
+            // 3.0 文中の複合数詞（NumberReadingNodes.kt）
+            for ((endIndex, value) in NumberReadingNodes.spans(str, i)) {
+                if (endIndex <= reusablePrefixLength) continue
+                val yomiStr = str.substring(i, endIndex)
+                foundInAnyDictionary = true
+                for ((tango, id, cost) in listOf(
+                    Triple(value.toString(), NumberReadingNodes.ARABIC_ID, NumberReadingNodes.ARABIC_COST),
+                    Triple(NumberReadingNodes.toKanji(value), NumberReadingNodes.KANJI_ID, NumberReadingNodes.ARABIC_COST + NumberReadingNodes.KANJI_EXTRA_COST),
+                )) {
+                    addOrUpdateNode(
+                        graph, endIndex,
+                        Node(l = id, r = id, score = cost, f = cost, g = cost, tango = tango, yomiUsed = yomiStr, len = yomiStr.length.toShort(), sPos = i),
+                        graphNodeDedupMode, graphNodeTrace, str, "NUMBER",
+                    )
+                }
+            }
+
             // 3.1 英語読み辞書
             val localEnglishReadingYomiTrie = englishReadingYomiTrie
             val localEnglishReadingTangoTrie = englishReadingTangoTrie

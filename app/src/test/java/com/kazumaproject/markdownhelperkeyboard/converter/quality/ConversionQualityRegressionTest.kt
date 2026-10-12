@@ -62,6 +62,20 @@ class ConversionQualityRegressionTest {
         assertTrue(strings("かいちょうをつとめた").take(5).contains("会長を努めた"))
     }
 
+    /** 文中の複合数詞が 1 語になる（にじゅうよん → 二重4 / 二重四 にならない）。 */
+    @Test
+    fun compoundNumeralsInsideSentence() {
+        assertEquals("二千二十五年", top("にせんにじゅうごねん"))
+        assertTrue(strings("にせんにじゅうごねん").take(5).contains("2025年"))
+        assertEquals("二十四時間", top("にじゅうよじかん"))
+        assertEquals("時速四十五キロ", top("じそくよんじゅうごきろ"))
+        assertEquals("三十四箇所", top("さんじゅうよっかしょ"))
+        assertEquals("千九百九十一年", top("せんきゅうひゃくきゅうじゅういちねん"))
+        // 位取りの語を含まない読み・紛らわしい読みは数詞にしない
+        assertEquals("聴取率", top("ちょうしゅりつ"))
+        assertEquals("四日", top("よっか"))
+    }
+
     /** Sumire 単体の期待。Zenzai（zenz）を通した結果は JVM では検証できない（端末で [z]/[Z] と合わせて確認）。 */
     @Test
     fun kimonoSumireOnly() {
