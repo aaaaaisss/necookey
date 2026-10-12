@@ -293,3 +293,10 @@ Reproduce: `. env.sh; python3 $T/bunseg.py; python3 $T/bunsum.py; python3 $T/rec
 - ダンプ設定は既定（N_AUTO=24000、split_reconv 空 = 無効）に戻した（trigger は変更せず、CI は走らせていない）。
 Reproduce: `$WORK/dl_art.sh RUN_ID`（$WORK/srx で実行）で artifact を $WORK/srx/cands に → `setsid nohup bash $T/srx_run.sh &` → `SRX_GRID=8:3:A,10:8:AF python3 $T/srx.py eval`
 → `python3 $T/srx.py view 8 3 A; cd $WORK/srx/view_K8_m3A && SLM_WORK=$PWD python3 $T/bunseg.py && SLM_WORK=$PWD python3 $T/bunsum.py`。
+
+## 案2 ラティスコストの識別学習（2026-10-12、途中）
+- A: 語・語対補正の構造化パーセプトロン（lcost.py）→ tune .300/held .314、不採用。
+- B: 辺コストに単語bigram LM補正 λ·(−log p(w|v))+μ+ω·[OOV]（lcbig.py集計、lcfeat.py/lcsim.py評価）。top-50内並び替え見積もり、int8:
+  語対80万 4.8MB tune .351/held .347/AJIMEE .545、語対100万 5.8MB .357/.351/.550（現状 .309/.319/.525）。辺ローカル上限 .407/.399/.620。
+- 作業データ /workspace/work/sumire_lm/lcost/（sim3.logにRESULT）。
+- 残り: 構成決定(tune)→lcsim.py export→Kotlin LatticeLmCost.kt＋FindPath.getEdgeCost（既定無効）→CIで実探索ダンプ（表の受け渡し方法は要決定）。
