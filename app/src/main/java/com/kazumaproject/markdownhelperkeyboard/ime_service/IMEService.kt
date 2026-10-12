@@ -16717,7 +16717,7 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
             }
             val outcome = try {
                 if (background) {
-                    runZenzaiStep(insertString, sumireTop, context, sumireGap, conversion) { }
+                    runZenzaiStep(insertString, sumireTop, context, sumireGap, conversion, onProvisional = { })
                 } else {
                     runZenzaiStep(insertString, sumireTop, context, sumireGap, conversion, ::show)
                 }
