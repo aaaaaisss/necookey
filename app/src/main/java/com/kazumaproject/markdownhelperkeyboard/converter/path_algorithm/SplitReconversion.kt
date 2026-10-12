@@ -21,6 +21,11 @@ data class SplitReconversionConfig(
     val maxPatterns: Int = 8,
     val wordsPerSpan: Int = 3,
     val perPattern: Int = 8,
+    /**
+     * 区切りごとに「各ノードを必ず通る最良経路」（区切り固定の前向き/後ろ向き Viterbi、n-gram 補正なし）を
+     * コスト順に最大この数だけ追加する（0 = 使わない）。1 語だけ入れ替えた候補を、組み合わせの K-best より深く拾う。
+     */
+    val perPatternForced: Int = 0,
     /** 区切り探索・各区切りの A* で取り出す要素数の上限（長い入力での安全弁） */
     val popBudget: Int = 40_000,
 )
@@ -35,6 +40,8 @@ data class SplitReconversionCandidate(
     val splitPositions: List<Int>,
     /** その区切りが通常の N-best に出ていたか */
     val patternFromNBest: Boolean,
+    /** true = ノード固定の最良経路（perPatternForced）、false = 区切り内 A* の K-best。同じ文字列が両方に出ることがある */
+    val forced: Boolean = false,
 )
 
 /** 呼び出し側が渡す受け皿。candidates に追加候補、elapsedNs に追加処理の所要時間、patterns に使った区切り。 */

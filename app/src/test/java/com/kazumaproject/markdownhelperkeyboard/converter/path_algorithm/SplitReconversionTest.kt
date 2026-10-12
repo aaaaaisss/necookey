@@ -42,14 +42,16 @@ class SplitReconversionTest {
         for (input in listOf("きょうはいいてんきです", "けががなおった", "かれはがっこうへいった")) {
             val plain = engine.convert(input)
             val out = SplitReconversionResult()
-            val withExtra = engine.convert(input, SplitReconversionConfig(maxPatterns = 8, wordsPerSpan = 3, perPattern = 5), out)
+            val withExtra = engine.convert(input, SplitReconversionConfig(maxPatterns = 8, wordsPerSpan = 3, perPattern = 5, perPatternForced = 5), out)
             assertEquals(plain.candidates.map { it.string }, withExtra.candidates.map { it.string })
             assertTrue(out.patterns.isNotEmpty())
             assertTrue(out.patterns.size <= 8)
             assertEquals(out.patterns.size, out.patterns.distinct().size)
             val nBest = withExtra.candidates.map { it.string }.toSet()
-            val strings = out.candidates.map { it.candidate.string }
-            assertEquals(strings.size, strings.toSet().size)
+            for (kind in out.candidates.groupBy { it.forced }.values) {
+                val strings = kind.map { it.candidate.string }
+                assertEquals(strings.size, strings.toSet().size)
+            }
             for (x in out.candidates) {
                 assertFalse(x.candidate.string in nBest)
                 assertTrue(x.maxWordRank < 3)

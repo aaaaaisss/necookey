@@ -2698,7 +2698,7 @@ class FindPath(
             for (p in s + 1 until e) if (p <= length && isB[p]) return false
             return s == 0 || isIndependentWord(node.l) == isB[s]
         }
-        fun forward(isB: BooleanArray?): IdentityHashMap<Node, Int> {
+        fun forward(isB: BooleanArray?, back: IdentityHashMap<Node, Node>? = null): IdentityHashMap<Node, Int> {
             val fc = IdentityHashMap<Node, Int>()
             fc[BOS] = 0
             for (end in 1..length + 1) {
@@ -2706,12 +2706,16 @@ class FindPath(
                 for (node in nodes) {
                     if (!allowed(node, isB)) continue
                     var best = Int.MAX_VALUE
+                    var bestPrev: Node? = null
                     for (p in prevOf(node)) {
                         val pf = fc[p] ?: continue
                         val c = pf + getEdgeCost(p, node, connectionMatrix) + node.adjustedScore
-                        if (c < best) best = c
+                        if (c < best) { best = c; bestPrev = p }
                     }
-                    if (best != Int.MAX_VALUE) fc[node] = best
+                    if (best != Int.MAX_VALUE) {
+                        fc[node] = best
+                        if (back != null && bestPrev != null) back[node] = bestPrev
+                    }
                 }
             }
             return fc
@@ -2763,10 +2767,12 @@ class FindPath(
         // 2. 区切りごとに、区切りに合うノードだけで上位 perPattern 文字列
         val result = ArrayList<SplitReconversionCandidate>()
         val emitted = HashSet<String>(exclude)
+        val emittedForced = HashSet<String>(exclude)
         patterns.forEachIndexed { pi, pattern ->
             val isB = BooleanArray(length + 1)
             pattern.forEach { if (it in 1..length) isB[it] = true }
-            val fc = forward(isB)
+            val back = IdentityHashMap<Node, Node>()
+            val fc = forward(isB, back)
             val start = fc[eos] ?: return@forEachIndexed
             val pops = IdentityHashMap<Node, Int>()
             val cap = config.perPattern * 2
@@ -2837,6 +2843,80 @@ class FindPath(
                 }
             }
             queue.clear()
+            if (config.perPatternForced > 0) {
+                // 各ノードを通る最良経路（区切り固定）: 1 語だけ入れ替えた候補を語コストの順位に関係なく作る
+                val startAt = HashMap<Int, MutableList<Node>>()
+                for (end in 1..length) {
+                    for (nd in nodesAt[end].orEmpty()) if (fc.containsKey(nd)) startAt.getOrPut(nd.sPos) { ArrayList() }.add(nd)
+                }
+                val bc = IdentityHashMap<Node, Int>()
+                val nxt = IdentityHashMap<Node, Node>()
+                for (end in length downTo 1) {
+                    for (nd in nodesAt[end].orEmpty()) {
+                        if (!fc.containsKey(nd)) continue
+                        if (end == length) {
+                            bc[nd] = getEdgeCost(nd, eos, connectionMatrix) + eos.adjustedScore
+                            nxt[nd] = eos
+                            continue
+                        }
+                        var best = Int.MAX_VALUE
+                        var bn: Node? = null
+                        for (w in startAt[end].orEmpty()) {
+                            val wb = bc[w] ?: continue
+                            val c = getEdgeCost(nd, w, connectionMatrix) + w.adjustedScore + wb
+                            if (c < best) { best = c; bn = w }
+                        }
+                        if (bn != null) { bc[nd] = best; nxt[nd] = bn }
+                    }
+                }
+                val through = ArrayList<Pair<Int, Node>>()
+                for ((nd, b) in bc) { val f = fc[nd] ?: continue; through.add((f + b) to nd) }
+                through.sortWith(compareBy<Pair<Int, Node>> { it.first }.thenBy { it.second.sPos })
+                var forcedFound = 0
+                for ((total, v) in through) {
+                    if (forcedFound >= config.perPatternForced) break
+                    val path = ArrayList<Node>()
+                    var x: Node? = v
+                    while (x != null && x.tango != "BOS") { path.add(x); x = back[x] }
+                    path.reverse()
+                    var y = nxt[v]
+                    while (y != null && y !== eos) { path.add(y); y = nxt[y] }
+                    val sb = StringBuilder()
+                    val yomi = StringBuilder()
+                    val segs = ArrayList<CandidateConversionSegment>()
+                    var maxRank = 0
+                    var position = 0
+                    for (nd in path) {
+                        sb.append(nd.tango); yomi.append(nd.yomiUsed)
+                        segs.add(CandidateConversionSegment(position, position + nd.len.toInt(), nd.tango))
+                        position += nd.len.toInt()
+                        maxRank = maxOf(maxRank, rank[nd] ?: 0)
+                    }
+                    if (position != length) continue
+                    val str = sb.toString()
+                    if (!emittedForced.add(str)) continue
+                    forcedFound++
+                    result.add(
+                        SplitReconversionCandidate(
+                            candidate = Candidate(
+                                string = str,
+                                type = 1,
+                                length = length.toUByte(),
+                                yomi = yomi.toString(),
+                                score = total,
+                                leftId = path.firstOrNull()?.l,
+                                rightId = path.firstOrNull()?.r,
+                            ),
+                            segments = segs,
+                            patternIndex = pi,
+                            maxWordRank = maxRank,
+                            splitPositions = pattern,
+                            patternFromNBest = pi < nBestCount,
+                            forced = true,
+                        ),
+                    )
+                }
+            }
         }
         out?.candidates?.addAll(result)
         return result
