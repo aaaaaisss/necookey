@@ -186,6 +186,7 @@ import com.kazumaproject.markdownhelperkeyboard.converter.candidate.BunsetsuCand
 import com.kazumaproject.markdownhelperkeyboard.converter.candidatebar.ZenzaiConstraint
 import com.kazumaproject.markdownhelperkeyboard.converter.candidatebar.NextWordCarry
 import com.kazumaproject.markdownhelperkeyboard.converter.candidatebar.ZenzaiScheduler
+import com.kazumaproject.markdownhelperkeyboard.converter.candidatebar.ZenzaiGate
 import com.kazumaproject.markdownhelperkeyboard.converter.candidatebar.BunsetsuAnalysis
 import com.kazumaproject.markdownhelperkeyboard.converter.candidatebar.BunsetsuAnalyzer
 import com.kazumaproject.markdownhelperkeyboard.converter.candidatebar.BunsetsuRangeEditor
@@ -10882,17 +10883,10 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
     @Volatile private var lastZenzaiStepRecord: ZenzaiStepRecord? = null
 
     /**
-     * Sumire の 1 位と 2 位（読み全体を覆う別表記の最小コスト）の差（Candidate.score の差、概算）。診断用。
+     * Sumire の 1 位と 2 位（読み全体を覆う別表記のシステム辞書経路の最小コスト）の差。ZENZ-GATE と診断に使う。
      */
-    private fun sumireCostGap(insertString: String, candidates: List<Candidate>, top: Candidate): Int? {
-        val second = candidates.asSequence()
-            .filter {
-                it.string != top.string && it.type != CANDIDATE_TYPE_TEXT_MACRO &&
-                    it.length.toInt() == insertString.length
-            }
-            .minOfOrNull { it.score } ?: return null
-        return second - top.score
-    }
+    private fun sumireCostGap(insertString: String, candidates: List<Candidate>, top: Candidate): Int? =
+        ZenzaiGate.pathCostGap(insertString, candidates, top)
 
     /** 確定した表記と直前の Zenzai の判定を照らして、信頼度の診断に残す（文字列は残さない）。 */
     private fun recordZenzaiConfidenceOutcome(reading: String, committed: String) {
@@ -10999,6 +10993,13 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
 
         val key = zenzaiKey(context, insertString, draft.string)
         val cached = synchronized(zenzaiVerdictCache) { zenzaiVerdictCache[key] }
+        // ZENZ-GATE: Sumire が十分に自信のある読みは評価しない（制約の引き継ぎ中・判定キャッシュありは対象外）。
+        if (constraint == null && cached == null &&
+            !ZenzaiGate.shouldEvaluate(insertString.length, context.leftContext.length, sumireGap)
+        ) {
+            zenzaiCarry = null
+            return ZenzaiOutcome(top = draft, changed = false, inferred = false, unverifiedFix = false)
+        }
         val rawVerdict = cached ?: withContext(Dispatchers.Default) {
             zenzRuntimeClient.evaluate(
                 config = config,
