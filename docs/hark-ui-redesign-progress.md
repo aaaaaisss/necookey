@@ -153,3 +153,10 @@
 - zenz（かな漢字変換モデル）は「次に続く語の確率」しか測れず、雰囲気で絵文字を選ぶのは苦手だったため、後続語スロットの文脈絵文字を全部削除: `ContextEmojiSelector`・`assets/emoji/emoji_mood.tsv`・事前スコア（`files/context_emoji_priors.tsv` は端末に残っても読まない）・`NextWordExtras.placeEmoji`・絵文字キーワードの zenz 採点。後続語の zenz 採点は head＋助詞だけ（最大 25 件）に戻った。
 - 絵文字の読み辞書（変換で出る絵文字）はそのまま。
 - 後回し: ML-Ask 感情語辞書（BSD-3）で選ぶ案。
+
+## 2026-10-13: sumire-lm-app を main にマージ（dbec2cd）
+
+- 変換エンジンの既定を「Sumire＋SUMIRE-LM リランカー（迷った読みだけ読み込んだ zenz で判断）」に。JINEN / zenz モードは設定「変換エンジン」に残す。
+- 案2 ラティス辺コスト（`LatticeLmCost`、単語 bigram 補正、`FindPath.getEdgeCost` に加算）を既定オン。表（5.8MB, `lc_np1m.slc`）はリポジトリに入れず、ビルド時に孤立ブランチ `lm-data` の固定コミット 63732f8 から取り出し sha256 照合（不一致でビルド失敗）してアセット `lattice_lm/` に同梱。IME 起動時に IO スレッドで読み込み（ヒープ約 11MB）。設定「単語のつながりで変換を補正」で無効化、表が無ければ従来どおり。CI ランナーで +1.8ms/文、**実機速度は未確認（遅ければ既定オフに戻す）**。
+- はいる→入る 対策（`PosPairPenalty.hairuCost`）: 「わかって入る」→「わかってはいる」、「そう入っても」→「そうは言っても」型。評価で悪化 0。
+- Sumire top1（評価用データ）: JWTD held .319→.361、AJIMEE .525→.560、日常文 held .555→.583。詳細は `sumire-lm` ブランチの tools/sumire_lm/HANDOFF.md。
