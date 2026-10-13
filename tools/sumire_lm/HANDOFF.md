@@ -384,3 +384,58 @@ CI: `ci/lattice_cost.txt`=1・`ci/n_auto.txt`=0 で trigger → `$WORK/dl_art.sh
 - 次: 実機で速度・メモリ（表 約 11MB ヒープ、+1.8 ms/文 CI）を確認、遅ければ Node 単位の語番号キャッシュか既定オフに戻す。名詞＋は＋いっ 型。リランカー再適用後の精度。
 Reproduce: `in_daily.tsv` = ajimee + jwtd_kc + probe + daily を NK_DUMP_IN に、NK_LATTICE_COST=lc_np1m.slc、NK_HAIRU=0 / 8000 で
 `./gradlew :app:testLiteStandardDebugUnitTest --rerun --tests '*SumireNbestDumpTest*'`（テストファイルを quality/ にコピー、各 ~2 分）→ `python3 $T/hcmp.py OFF ON`。
+
+## 2026-10-13 リランカー v2（ラティスあり N-best・寛容ラベル・同音共起票の特徴）— オフラインの一次評価のみ
+ユーザー指示で今回はアプリ書き出し / Kotlin / lm-data / CI はなし。最終採用はリーダーの実用 n-gram 表待ち。
+選択（β・l2）はすべて tune 系（JWTD tune + daily dtune + 口語 ctune）の 2-fold CV。held / AJIMEE(eval) / dheld / cheld は報告のみ。
+
+### データと手順（作業 $WORK/rr2、コミットしない）
+- N-best = /workspace/work/nk-bd/s_1000/cands.{0,1}.tsv（ラティスあり・hairu 8000・ColloquialKanaNodes 1000、9,200 文 = probe 30 を除く全部）。
+  `rr2/data/jwtd_kc.tsv` = nk-bd/in_all.tsv（daily の split は dtune/dheld に改名）。
+- 特徴: `SLM_SRX=$WORK/rr2 setsid nohup bash srx_run.sh &`（srx_run.sh は SLM_SRX で作業ディレクトリを指定可に変更）→ 旧 need に無い n-gram / PMI ペア
+  だけコーパス全体で数え直して合成 → `rr2/ftab.npz`（2 CPU で ~15 分）。特徴量は旧採用モデルと同じ（base+lmw+lmc+pmi、**刈り込みなしの全計数**）。
+- `rr2.py run hc_1m hc_500k`（~6 分、nohup）→ rr2/rr2_results.json（各モデルの split 別精度・旧比 fix/reg・誤り分類・重み）。
+  共起表 rr2/hcx/hc_1m.hcx（sha256 d019d6db…0980）, hc_500k.hcx（hc_export.py np1024c3a10am1 500000 lam 2 th .5、1,653,938 B、sha256 8d0b3605…148b）。
+- 寛容ラベル: NFKC・空白除去後、difflib の非一致チャンクごとに「ひらがな化で一致」か「どちらかが全部かな」なら OK。daily Sumire top1 寛容 .883/.880（依頼文の値と一致）。
+- **寛容ラベルだけで学習すると崩れる**（v2_lenonly）: 全部かなの候補は常に寛容正解なので、ひらがな候補を選ぶモデルになる（held 完全一致 .235）。
+  → 目的関数 = −[log P(完全一致の正解) + β·log P(寛容正解の集合)]（完全一致が無い文は寛容項のみ）。β∈{0,.3,1,3}・l2∈{.01,.1} を CV（基準 = (完全+寛容)/2）で選び β=.3, l2=.01。
+- 共起票の特徴 hv = Sumire rank 0 に対する純同音差分チャンクの票の和（hc_eval と同じ語分割なし検索・文脈 = 左文脈 + rank0 の差分を空白にした文）, hvm = 引けたか。
+
+### 結果（top1 完全一致 / 寛容。old = 現行採用重み（旧ラティスなし ftab で学習）をそのまま新 N-best に適用 = ベースライン）
+| model | JWTD held | AJIMEE | daily held | 口語 cheld | JWTD tune | daily tune | ctune |
+|---|---|---|---|---|---|---|---|
+| Sumire（ラティスあり） | .361 / .459 | .555 / .615 | .583 / .880 | .517 / .887 | .362 / .460 | .557 / .883 | .538 / .897 |
+| oracle@50 | .862 / .927 | .930 / .960 | .948 / .994 | .931 / .995 | .859 / .927 | .944 / .995 | .918 / .995 |
+| **old（現行重み）** | .514 / .607 | .760 / .805 | .660 / .936 | .500 / .917 | .515 / .613 | .623 / .936 | .503 / .917 |
+| 再学習（完全一致・JWTD tune のみ） | .511 / .607 | .745 / .790 | .656 / .936 | .483 / .905 | .511 / .614 | .623 / .939 | .497 / .917 |
+| v2_lenonly（寛容のみ・崩壊） | .235 / .713 | .345 / .840 | .263 / .959 | .199 / .955 | | | |
+| v2（混合目的・tune 3 種） | .499 / .598 | .730 / .775 | .670 / .938 | .583 / .932 | .486 / .595 | .640 / .938 | .601 / .934 |
+| v2 + 共起 500k | .518 / .617 | .745 / .790 | .675 / .943 | .585 / .931 | .501 / .608 | .639 / .939 | .604 / .936 |
+| v2 + 共起 1M | .518 / .617 | .760 / .805 | .675 / .943 | .585 / .932 | .504 / .610 | .641 / .941 | .603 / .937 |
+- old に対する寛容 fix/reg（完全一致 fix/reg）: v2 = held 33/47 (41/63), AJIMEE 0/6, dheld 12/9 (83/68), cheld 45/22 (184/60)。
+  v2+1M = held 64/49 (72/66), AJIMEE 6/6 (9/9), dheld 20/9 (91/68), cheld 45/22 (188/61)。500k ≒ 1M（held 60/45, dheld 20/10, AJIMEE 4/7）。
+- 旧重みはラティスあり N-best でもそのまま効く（old on old ftab .513/.511/.760 → 新 N-best .515/.514/.760）。
+- v2 は口語に大きく効く（cheld 完全 .500→.583、寛容 .917→.932: 旧重みは口語のかな表記を嫌う）が、JWTD held は −.9pt（寛容）。学習に daily/口語を混ぜて JWTD の重みが 1/3 になったため（未対処: split 別重み）。
+- 共起の上乗せ（v2 → v2+1M）: JWTD held 寛容 +1.9 / daily held +0.5 / AJIMEE +3.0 / cheld ±0。同音誤り held 340→321（−6%）、dheld 46→41、AJIMEE 27→23、cheld 52→56。
+  500k は held / dheld で 1M と同じ、AJIMEE だけ 3 文少ない（200 文中、ノイズ域）。
+
+### 判断
+- **ゲートに届かず（停止）**: 最良の v2+1M でも old 比 寛容 JWTD held +1.0pt / daily held +0.7pt（< ~1pt 基準を daily で下回る）。v2 単体は JWTD で負け。
+- **共起票は今は採用しない**: AI なし既定での上乗せは daily held +0.5pt（7/1500 文）・同音誤り −5 文で明確でない。JWTD（書き言葉）は +1.9pt なので、
+  書き言葉を重視するなら 500k（1.65MB・ヒープ ~3MB 見積）で十分（1M との差はノイズ）。リーダー表での再学習時に 500k で再確認する。
+- zenz 比較（旧数値、完全一致）: zenz app ループ held .457 / AJIMEE .670、zenz LL 並べ替え .494 / .735 に対し、AI なしの old / v2+1M は .514-.518 / .760。
+  JWTD/AJIMEE ではリランカーが既に zenz を上回る（ただし刈り込みなし計数での値。20MB 刈り込みでは .41/.645 まで落ちていた）。zenz の候補別出力が残っていないので
+  zenz が直す同音誤りの数は比較できない。
+
+### 残る寛容誤りの内訳（old / v2+1M。H 同音・B 区切り違い・O その他（かな↔漢字以外の混在差など）・M 寛容正解が top-50 に無い）
+| | JWTD held | AJIMEE | daily held | cheld |
+|---|---|---|---|---|
+| Sumire | H582 B24 O96 M109 | H61 B2 O6 M8 | H116 B12 O43 M9 | H113 B7 O42 M8 |
+| old | H307 B32 O141 M109 | H23 B0 O8 M8 | H43 B6 O38 M9 | H57 B16 O44 M8 |
+| v2+1M | H321 B31 O113 M109 | H23 B1 O7 M8 | H41 B4 O31 M9 | H56 B11 O27 M8 |
+（分類: 選択候補と最上位の寛容正解候補の Sumire 区切りを共通切れ目でチャンク化。全チャンク純同音 = H、どれかのチャンクで区切りが違う = B、それ以外 = O。）
+→ daily held の残り 85 件中 41 件が同音（zenz / UI 同音チップの守備範囲）、区切り 4・その他 31・候補外 9。
+
+### 次
+1. リーダーの実用表が来たら: その表で ftab を作り直し（rr.py feats の計数を表の値に差し替え）→ `rr2.py run hc_500k` を再実行。
+2. split 別の重み（JWTD を落とさない）を 1 回だけ試す。3. 採用時のみアプリ書き出し（export_od 形式の model.tsv に hv/hvm の 2 行）+ Kotlin 共起ローダ。

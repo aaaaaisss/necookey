@@ -1,7 +1,7 @@
 #!/bin/bash
 # srx_run.sh : after the dump artifacts are in $WORK/srx/cands, rebuild items/features for the split re-conversion pool
 # (only n-grams/pairs missing from the old need sets are counted; ~10 min on 2 CPUs). Run detached: setsid nohup bash srx_run.sh &
-WORK=${SLM_WORK0:-/workspace/work/sumire_lm}; W2=$WORK/srx; D=$W2/delta; T=$(dirname $(realpath $0))
+WORK=${SLM_WORK0:-/workspace/work/sumire_lm}; W2=${SLM_SRX:-$WORK/srx}; export SLM_SRX=$W2; D=$W2/delta; T=$(dirname $(realpath $0))
 export PYTHONPATH=$WORK/pylib
 cd $W2 && rm -f $D/lm/part_* $D/lm/pair_* $D/lm/stats_* $D/lm/pair.npz
 python3 $T/srx.py prep > run.log 2>&1
