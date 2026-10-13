@@ -601,6 +601,7 @@ class GraphBuilder {
             )
         )
         val learnedCostNow = System.currentTimeMillis()
+        val colloquialActive = ColloquialKanaNodes.mayApply(str)
         for (i in str.indices) {
             currentCoroutineContext().ensureActive()
             var subStrCache: String? = null
@@ -938,6 +939,49 @@ class GraphBuilder {
                         graph, endIndex,
                         Node(l = id, r = id, score = cost, f = cost, g = cost, tango = tango, yomiUsed = yomiStr, len = yomiStr.length.toShort(), sPos = i),
                         graphNodeDedupMode, graphNodeTrace, str, "NUMBER",
+                    )
+                }
+            }
+
+            // 3.05 長音・語末促音で崩した口語のかな語（ColloquialKanaNodes.kt）
+            if (colloquialActive && i < str.length) {
+                val colloquialPenalty = ColloquialKanaNodes.penalty
+                val last = minOf(str.length, i + ColloquialKanaNodes.MAX_LEN)
+                for (endIndex in i + 2..last) {
+                    if (endIndex <= reusablePrefixLength) continue
+                    val variants = ColloquialKanaNodes.variants(str, i, endIndex)
+                    if (variants.isEmpty()) continue
+                    val yomiStr = str.substring(i, endIndex)
+                    // 読みそのままが辞書にある語（ちーず→チーズ）は辞書に任せる
+                    val selfIdx = yomiTrie.getNodeIndex(yomiStr, succinctBitVectorLBSYomi)
+                    if (selfIdx > 0 && yomiTrie.getTermId(selfIdx, succinctBitVectorIsLeafYomi) >= 0) continue
+                    var bestCost = Int.MAX_VALUE
+                    var bestL: Short = 0
+                    var bestR: Short = 0
+                    for (v in variants) {
+                        val idx = yomiTrie.getNodeIndex(v.key, succinctBitVectorLBSYomi)
+                        if (idx <= 0) continue
+                        val termId = yomiTrie.getTermId(idx, succinctBitVectorIsLeafYomi)
+                        if (termId < 0) continue
+                        // ひらがな表記の語だけ使い、表記 = 読みそのまま（ー・っ付き）。漢字・カタカナ表記＋ー/っ は
+                        // ナイトー・鍛冶ー のような誤りが増えたので使わない（HANDOFF 2026-10-13 口語境界の節）。
+                        tokenArray.forEachDictionaryByYomiTermId(termId, succinctBitVectorTokenArray) { posTableIndex, wordCost, tokenNodeId ->
+                            if (tokenNodeId == -2 && wordCost < bestCost) {
+                                bestCost = wordCost.toInt()
+                                bestL = tokenArray.leftIds[posTableIndex.toInt()]
+                                bestR = tokenArray.rightIds[posTableIndex.toInt()]
+                            }
+                        }
+                    }
+                    if (bestCost == Int.MAX_VALUE) continue
+                    val cost = bestCost + colloquialPenalty
+                    addOrUpdateNode(
+                        graph, endIndex,
+                        Node(
+                            l = bestL, r = bestR, score = cost, f = cost, g = cost, tango = yomiStr, yomiUsed = yomiStr,
+                            len = yomiStr.length.toShort(), sPos = i, mozcAttributes = mozcAttributesFor(bestL),
+                        ),
+                        graphNodeDedupMode, graphNodeTrace, str, "COLLOQUIAL",
                     )
                 }
             }
