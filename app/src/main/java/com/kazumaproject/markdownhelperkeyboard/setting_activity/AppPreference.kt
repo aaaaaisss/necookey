@@ -708,6 +708,8 @@ object AppPreference {
     private val ZENZ_ENGINE_PREFERENCE = Pair("zenz_engine_preference", "sumire_lm")
     /** sumire_lm: リランカーの 1 位と 2 位のスコア差がこれ（百分の一単位）未満なら zenz に回す。 */
     private val SUMIRE_LM_ZENZ_MARGIN_PREFERENCE = Pair("sumire_lm_zenz_margin_preference", 50)
+    /** 同音異義 UI の迷い印の判定にリランカーの文節マージン（SumireLmSpanMargin）を使う（既定オフ、設定画面なし）。 */
+    private val SUMIRE_LM_HOMOPHONE_MARGIN_PREFERENCE = Pair("sumire_lm_homophone_margin_preference", false)
     private val SUMINAGASHI_INK_EFFECT_ENABLE =
         Pair("suminagashi_ink_effect_preference", false)
     private val KEYBOARD_TOUCH_EFFECT_QUALITY =
@@ -3607,6 +3609,15 @@ object AppPreference {
                 QWERTY_KEYBOARD_MARGIN_END_DP_LANDSCAPE.first,
                 value ?: 0
             )
+        }
+
+    var sumire_lm_homophone_margin_preference: Boolean
+        get() = preferences.getBoolean(
+            SUMIRE_LM_HOMOPHONE_MARGIN_PREFERENCE.first,
+            SUMIRE_LM_HOMOPHONE_MARGIN_PREFERENCE.second
+        )
+        set(value) = preferences.edit {
+            it.putBoolean(SUMIRE_LM_HOMOPHONE_MARGIN_PREFERENCE.first, value)
         }
 
     var sumire_lm_zenz_margin_preference: Int

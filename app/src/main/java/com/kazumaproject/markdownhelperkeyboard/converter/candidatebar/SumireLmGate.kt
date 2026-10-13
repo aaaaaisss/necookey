@@ -28,6 +28,8 @@ object SumireLmGate {
         val margin: Double?,
         /** 並べ替えた全読み候補（スコア降順）。 */
         val ranked: List<Candidate>,
+        /** [ranked] と同じ順のリランカースコア（線形モデルの単位、大きいほど良い）。 */
+        val scores: List<Double> = emptyList(),
     )
 
     /**
@@ -63,7 +65,7 @@ object SumireLmGate {
         // 同点は Sumire の順を保つ。
         val order = pool.indices.sortedWith(compareByDescending<Int> { scores[it] }.thenBy { it })
         val margin = if (order.size > 1) scores[order[0]] - scores[order[1]] else null
-        return Decision(top = pool[order[0]], margin = margin, ranked = order.map { pool[it] })
+        return Decision(top = pool[order[0]], margin = margin, ranked = order.map { pool[it] }, scores = order.map { scores[it] })
     }
 
     /** zenz に回すか。マージンが取れない（候補 1 つ・リランカーなし）ときは回さない。 */
