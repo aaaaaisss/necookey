@@ -299,4 +299,63 @@ Reproduce: `$WORK/dl_art.sh RUN_ID`（$WORK/srx で実行）で artifact を $WO
 - B: 辺コストに単語bigram LM補正 λ·(−log p(w|v))+μ+ω·[OOV]（lcbig.py集計、lcfeat.py/lcsim.py評価）。top-50内並び替え見積もり、int8:
   語対80万 4.8MB tune .351/held .347/AJIMEE .545、語対100万 5.8MB .357/.351/.550（現状 .309/.319/.525）。辺ローカル上限 .407/.399/.620。
 - 作業データ /workspace/work/sumire_lm/lcost/（sim3.logにRESULT）。
-- 残り: 構成決定(tune)→lcsim.py export→Kotlin LatticeLmCost.kt＋FindPath.getEdgeCost（既定無効）→CIで実探索ダンプ（表の受け渡し方法は要決定）。
+- 残り: 構成決定(tune)→lcsim.py export→Kotlin LatticeLmCost.kt＋FindPath.getEdgeCost（既定無効）→CIで実探索ダンプ（表の受け渡し方法は要決定）。→ 下の節で実施済み。
+
+## 2026-10-13 案2 の実装と実探索での計測（既定無効のまま）
+選択はすべて JWTD tune（構成は sim3.log の tune 結果）。held / AJIMEE は報告のみ。
+
+### 構成と表
+- 語対 1,000,000・語の min-count 20・int8 値（qs=7）・D=0.75。tune で再フィット: LAM=272.9 MU=760.5 OMEGA=-684.1（l2=1.0, CV .3581、sim3 と同じ）。
+- `lcsim.py run np=1000000 cu=20 qs=7 d=0.75 export=$WORK/lcost/lc_np1m.slc` → 5,798,500 バイト（語 133,166・対 999,895、指紋衝突で 105 対を落とす）。
+  sha256 `1accd8c96f3df50761879e36e476f38911e9a8e29df5caabfd2dcf4a7c8a00b5`。
+- **語キーを Java String.hashCode から FNV-1a(UTF-16)+fmix32 に変更**: String.hashCode は 2 文字の CJK で 31*c1+c2 が衝突し、初回の書き出しでは
+  語彙外の 10k 語が語彙内と誤認された（行の 13% でコストがずれ、held .349/AJIMEE .545）。変更後は語の衝突 0。
+- 往復検証 `lcverify.py TABLE`: Kotlin と同じ式で表から全 top-50 行（1.36M 行）を採点 → シミュレーションと 99.95% の行で同一コスト、
+  top1 は tune .357 / held .351 / AJIMEE .550 で一致。`lcverify.py TABLE pairs FILE` で任意の (前語, 語) の補正値を出せる。
+- 表の受け渡し: 孤立ブランチ `lm-data`（コミット 63732f821b7100dc6e3b9a47ea7725818151ea84、表と README だけ。main / sumire-lm には絶対に
+  マージしない）。ダンプ CI はこの固定コミットの raw URL から取得し、ワークフローに直書きした sha256 と照合、不一致なら失敗。
+  （シークレット gist は GitHub コネクタに gist 権限がなく 403 だったため、ユーザー指示で孤立ブランチに変更。）
+
+### 実装
+- `path_algorithm/LatticeLmCost.kt`: `@Volatile table: Table?`（既定 null = 無効、補正 0）。`load(InputStream)` で SLC2 を読み、語と対をそれぞれ
+  開番地ハッシュ（容量 = 2 倍以上の 2 冪、語 2^18・対 2^21 → int 配列 約 9MB + byte 約 2MB をヒープに持つ）に詰める。
+  `correction(prev, node)`: node が EOS なら 0、prev が BOS なら p1 のみ、それ以外は対 → なければ alpha(v)·p1(w)。`rint(LAM·(−lp/QS) + MU + OMEGA·oov)`。
+- `FindPath.getEdgeCost` に `+ LatticeLmCost.correction(prev, node)` を足しただけ（前向き DP・後ろ向き A*・文節・区切り固定の再変換が同じ値を使う）。
+  ConstrainedPathSearch と PosPairPenalty は変更なし（Zenzai の制約付き探索には補正が入らない点に注意）。
+- `LatticeLmCostTest`（5 件）: 表なし → 0 かつエンジンの候補・スコアが表の設定/解除の前後で同一、SLC2 読み込み、式（期待値は lcverify.py と同じ計算）、
+  BOS/EOS、ハッシュが Python 書き出し側と一致。ローカルと CI unit ジョブで成功。
+- ダンプ: `NK_LATTICE_COST=PATH` で各文を表なし / 表ありで 1 回ずつ変換（順序は文ごとに交互）、表ありを `cands.*.tsv`、表なしを `cands.*.tsv.base`、
+  `.time` に id・読み長・表なし ms・表あり ms。`ci/lattice_cost.txt` = 1 で有効（既定 0）。`ci/probe_hairu.tsv` = はいる/いる確認用の手書き 30 文（split=probe）。
+- 評価 `lcx.py DIR`: Sumire top1・oracle@50（split 別）、はいる→入る誤り、文節境界ミス（bunseg/bunsum を Sumire 順のスコアで実行、A = a1 + nested-func）、速度。
+
+### 結果（CI run 38366880715 = da02112、N_AUTO=0、8 シャード。サンドボックスでのローカル実行も同じ精度）
+| | Sumire top1 tune / held / AJIMEE | oracle@50 tune / held / AJIMEE | 文節境界ミス(A) tune / held / AJIMEE |
+|---|---|---|---|
+| 表なし | .309 / .319 / .525 | .841 / .849 / .905 | 89 / 101 / 8 |
+| 表あり（5.8MB） | **.362 / .361 / .560** | .858 / .862 / .930 | **80 / 92 / 6** |
+| （参考: top-50 並べ替えシミュレーション） | .357 / .351 / .550 | | |
+- 実探索ではシミュレーション（top-50 内の並べ替え）より良い: top-50 外の経路も補正で上がる（oracle@50 も +.013〜+.025）。
+- 速度（CI ランナー JVM、1 文あたり、graph 構築 + N-best 50 の全体）: 表なし 平均 4.64 / 中央 3.01 / p90 7.31 / p99 25.8 ms、
+  表あり 平均 6.40 / 中央 4.61 / p90 10.65 / p99 34.0 ms（+38%、平均 +1.8 ms）。ローカル: 3.51 → 5.06 ms。実機は未測定。
+  遅さは辺ごとの語ハッシュ計算（同じノードを何度も引く）。Node ごとに語番号をキャッシュすれば大半は消せる見込み（未実施）。
+- リランカー再適用後の精度は未測定（srx_run.sh 相当の再集計が要る、~15 分。今回はスコープ外）。
+
+### はいる→入る（「わかってはいるけど」「そうはいっても」型）
+daily.tsv はこのサンドボックスにもリポジトリ（homophone-ui 含む）にも無かったため、手書きプローブ 30 文と JWTD/AJIMEE で数えた
+（定義: 読みに「はい」、top1 に「入」、正解のどれにも「入」が無い）。
+| | probe 30 | tune | held | AJIMEE |
+|---|---|---|---|---|
+| 表なし → 表あり | 2 → 2 | 3 → 3 | 1 → 1 | 0 → 0 |
+- 例（両方とも不変）: わかってはいるけど → わかって入るけど、そうはいっても → そう入っても、ご趣旨はわかったと入ったが（正: とは言ったが）、
+  採用して入るが（正: してはいるが）、運行自体入っている（正: 自体は行っている）。わかっている・しっている等の「ている」は表なしでも正しい。
+- 理由: 補正は語ごとに MU=760 を足す（語数ペナルティ）ので、2 語「は|いる」は 1 語「入る」より不利。h01 の補正和は 入る 6277 vs は+いる 6882
+  （逆方向 +605、元の差 159）。h08 は は+言っ が 175 有利になるが元の差 2459 に届かない。→ この型を直すには助詞「は」の後の補助動詞用の
+  語対特徴か MU を品詞依存にする必要がある（未実施）。
+- 悪化例: ともだちとはなしている → 友達と話ている（表なしは正しい）。
+
+### 次
+1. Node 単位の語番号キャッシュで速度差を縮める。2. リランカー再適用（srx_run.sh）で最終精度。3. daily.tsv（homophone-ui 担当側にある）で再計測。
+4. MU の品詞依存化 / 「は+いる」型の対特徴（はいる→入る対策）。5. ConstrainedPathSearch にも補正を入れるかの判断。
+Reproduce: `python3 $T/lcsim.py run np=1000000 cu=20 qs=7 d=0.75 export=OUT.slc; python3 $T/lcverify.py OUT.slc`;
+CI: `ci/lattice_cost.txt`=1・`ci/n_auto.txt`=0 で trigger → `$WORK/dl_art.sh RUN`（$WORK/lcx/ci で）→ `python3 $T/lcx.py $WORK/lcx/ci/cands`。
+ダンプ設定は既定（N_AUTO=24000、lattice_cost=0）に戻した（trigger は変更していないので CI は走らない）。
