@@ -4,7 +4,7 @@ name: necookey debug APK
 # arm64-v8a. No lint, no other flavors. (Workflow name kept for tooling.)
 on:
   push:
-    branches: [sumire-fork, main]
+    branches: [sumire-fork, main, sumire-lm-app]
     paths-ignore:
       - '**/*.md'
       - 'docs/**'
@@ -123,8 +123,16 @@ jobs:
           path: .zenz-model-cache
           key: zenz-model-v2-4f5423f0fad41a73b1242eb96fe5c12ae4fdca83-Q5_K_M
 
+      # SUMIRE-LM 案2 ラティス辺コスト表: 孤立ブランチ lm-data の固定コミットから git で取り出す（非公開リポジトリなので raw URL は不可）。
+      # sha256 は app/build.gradle の fetchLatticeLmTable が照合し、不一致ならビルド失敗。
+      - name: Fetch lattice LM table (lm-data, pinned)
+        run: |
+          git fetch -q --depth=1 origin 63732f821b7100dc6e3b9a47ea7725818151ea84
+          git show 63732f821b7100dc6e3b9a47ea7725818151ea84:lc_np1m.slc > "$RUNNER_TEMP/lc_np1m.slc"
+          echo "LATTICE_LM_FLAGS=-PlatticeLmTableFile=$RUNNER_TEMP/lc_np1m.slc" >> "$GITHUB_ENV"
+
       - name: Build fullStandard release APK (arm64-v8a)
-        run: ./gradlew :app:assembleFullStandardRelease $GRADLE_FLAGS
+        run: ./gradlew :app:assembleFullStandardRelease $GRADLE_FLAGS $LATTICE_LM_FLAGS
 
       - name: JVM unit tests (touched modules only)
         if: steps.changes.outputs.app == 'true' || steps.changes.outputs.core == 'true' || steps.changes.outputs.custom_keyboard == 'true' || steps.changes.outputs.zenz == 'true'
@@ -132,11 +140,11 @@ jobs:
           TASKS=""
           if [ "${{ steps.changes.outputs.app }}" = "true" ] || [ "${{ steps.changes.outputs.zenz }}" = "true" ]; then
             # necookey's own tests; the full Sumire app suite (Robolectric) is not run on every push.
-            TASKS="$TASKS :app:testFullStandardDebugUnitTest --tests com.kazumaproject.markdownhelperkeyboard.converter.candidatebar.* --tests com.kazumaproject.markdownhelperkeyboard.converter.quality.* --tests com.kazumaproject.markdownhelperkeyboard.zeroquery.ZeroQueryBackoffTest"
+            TASKS="$TASKS :app:testFullStandardDebugUnitTest --tests com.kazumaproject.markdownhelperkeyboard.converter.candidatebar.* --tests com.kazumaproject.markdownhelperkeyboard.converter.quality.* --tests com.kazumaproject.markdownhelperkeyboard.converter.path_algorithm.LatticeLmCostTest --tests com.kazumaproject.markdownhelperkeyboard.zeroquery.ZeroQueryBackoffTest"
           fi
           if [ "${{ steps.changes.outputs.core }}" = "true" ]; then TASKS="$TASKS :core:testDebugUnitTest"; fi
           if [ "${{ steps.changes.outputs.custom_keyboard }}" = "true" ]; then TASKS="$TASKS :custom_keyboard:testDebugUnitTest"; fi
-          ./gradlew $TASKS $GRADLE_FLAGS --quiet
+          ./gradlew $TASKS $GRADLE_FLAGS $LATTICE_LM_FLAGS --quiet
 
       - name: Locate APK and verify no INTERNET permission
         id: apk

@@ -31,4 +31,27 @@ class PosPairPenaltyTest {
         assertEquals(PosPairPenalty.RENYOU_SURU_PENALTY, PosPairPenalty.cost(node(842, "話し", "はなし"), node(638, "し", "し")))
         assertEquals(0, PosPairPenalty.cost(node(1848, "話", "はなし"), node(638, "し", "し")))
     }
+
+    @Test
+    fun hairuAfterTeOrQuoteIsPenalized() {
+        val p = PosPairPenalty.HAIRU_PENALTY
+        val hairu = node(744, "入る", "はいる")
+        val haitt = node(744, "入っ", "はいっ")
+        assertEquals(p, PosPairPenalty.cost(node(348, "て", "て"), hairu))
+        assertEquals(p, PosPairPenalty.cost(node(349, "で", "で"), hairu))
+        assertEquals(p, PosPairPenalty.cost(node(387, "と", "と"), haitt))
+        assertEquals(p, PosPairPenalty.cost(node(2600, "そう", "そう"), haitt))
+        // 入って（熱くて入って）・格助詞「で」（車で入る）・副詞「ぐっと」の後は対象外
+        assertEquals(0, PosPairPenalty.cost(node(348, "て", "て"), haitt))
+        assertEquals(0, PosPairPenalty.cost(node(370, "で", "で"), hairu))
+        assertEquals(0, PosPairPenalty.cost(node(2600, "ぐっと", "ぐっと"), haitt))
+        assertEquals(0, PosPairPenalty.cost(node(2000, "部屋", "へや"), hairu))
+        val old = PosPairPenalty.hairuPenalty
+        try {
+            PosPairPenalty.hairuPenalty = 0
+            assertEquals(0, PosPairPenalty.cost(node(348, "て", "て"), hairu))
+        } finally {
+            PosPairPenalty.hairuPenalty = old
+        }
+    }
 }

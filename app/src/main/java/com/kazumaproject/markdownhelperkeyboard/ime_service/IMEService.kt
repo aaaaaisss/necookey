@@ -1,5 +1,6 @@
 package com.kazumaproject.markdownhelperkeyboard.ime_service
 
+import com.kazumaproject.markdownhelperkeyboard.converter.path_algorithm.LatticeLmCost
 import android.annotation.SuppressLint
 import android.Manifest
 import android.content.ClipDescription
@@ -187,6 +188,8 @@ import com.kazumaproject.markdownhelperkeyboard.converter.candidatebar.ZenzaiCon
 import com.kazumaproject.markdownhelperkeyboard.converter.candidatebar.NextWordCarry
 import com.kazumaproject.markdownhelperkeyboard.converter.candidatebar.ZenzaiScheduler
 import com.kazumaproject.markdownhelperkeyboard.converter.candidatebar.ZenzaiGate
+import com.kazumaproject.markdownhelperkeyboard.converter.candidatebar.SumireLmGate
+import com.kazumaproject.markdownhelperkeyboard.converter.sumirelm.SumireLmReranker
 import com.kazumaproject.markdownhelperkeyboard.converter.candidatebar.JinenConversion
 import com.kazumaproject.markdownhelperkeyboard.converter.candidatebar.BunsetsuAnalysis
 import com.kazumaproject.markdownhelperkeyboard.converter.candidatebar.BunsetsuAnalyzer
@@ -1360,7 +1363,7 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         }
         // 後続語・絵文字の並べ替えは zenz のプロンプト（評価）専用。jinen では使わない。
         val zenzLeftContext = if (
-            necookeyZenzGateEnabled() && !isJinenEngine() && currentInputType !in passwordTypes
+            necookeyZenzGateEnabled() && isZenzPromptModelLoaded() && currentInputType !in passwordTypes
         ) {
             leftContext.ifEmpty {
                 currentInputConnection
@@ -2171,6 +2174,13 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         /** zenz の文脈長。左文脈 40 字 + 読み 32 字 + 候補で十分収まる。 */
         private const val ZENZ_N_CTX = 256
         private const val ZENZ_ENGINE_ZENZ = "zenz"
+        private const val ZENZ_ENGINE_SUMIRE_LM = "sumire_lm"
+        /** SUMIRE-LM の表（tools/sumire_lm/export_od.py の出力）を置くディレクトリ名（外部ファイル領域 / 内部 / アセット）。 */
+        private const val SUMIRE_LM_TABLE_DIR = "sumire_lm"
+        /** 表が見つからなかったときに次に探すまでの間隔。 */
+        private const val SUMIRE_LM_RETRY_MS = 30_000L
+        /** 案2 ラティス辺コスト表（LatticeLmCost、SLC2）のアセット。ビルド時に lm-data から取得（無ければ従来どおり）。 */
+        private const val LATTICE_LM_ASSET = "lattice_lm/lc_np1m.slc"
         private const val DEFAULT_MODEL_ASSET_NAME = "jinen-v2-small-Q5_K_M.gguf"
         private const val LEGACY_ZENZ_MODEL_ASSET_NAME = "ggml-model-Q5_K_M.gguf"
         private const val NEXT_WORD_CANDIDATE_LIMIT = 6
@@ -2543,6 +2553,7 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         }
         Timber.d("onCreate")
         registerCrossWindowBlurListener()
+        syncLatticeLmCost()
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
             inlineAutofillController = InlineAutofillController(
                 context = this,
@@ -4170,6 +4181,7 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         syncRuntimeInputPreferences()
         syncCustomKeyboardSuggestionPreference()
         syncNgramDictionaryPreferences()
+        syncLatticeLmCost()
         isInputViewActive = true
         // A hidden input view must not carry the previous candidate-display phase into
         // the next render. The editor can restart the view without onStartInput().
@@ -10928,9 +10940,194 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
      * 変換エンジンが jinen-v2（内蔵モデルの自由生成）か。zenz を選んでもモデルを読み込んでいなければ
      * 内蔵モデルは jinen なので jinen として扱う（zenz のプロンプトを jinen に渡さない）。
      */
-    private fun isJinenEngine(): Boolean =
-        AppPreference.zenz_engine_preference != ZENZ_ENGINE_ZENZ ||
-            AppPreference.zenz_model_uri_preference.isBlank()
+    private fun isJinenEngine(): Boolean = when (AppPreference.zenz_engine_preference) {
+        ZENZ_ENGINE_ZENZ -> AppPreference.zenz_model_uri_preference.isBlank()
+        // sumire_lm は内蔵の jinen を使わない（zenz を読み込んでいなければリランカーだけ）。
+        ZENZ_ENGINE_SUMIRE_LM -> false
+        else -> true
+    }
+
+    /** 変換エンジンが Sumire + SUMIRE-LM リランカー（迷った読みだけ zenz）か。 */
+    private fun isSumireLmEngine(): Boolean =
+        AppPreference.zenz_engine_preference == ZENZ_ENGINE_SUMIRE_LM
+
+    /** zenz 用のプロンプト（評価）を渡せるモデル（読み込んだ zenz）があるか。内蔵モデルは jinen なので対象外。 */
+    private fun isZenzPromptModelLoaded(): Boolean =
+        AppPreference.zenz_engine_preference.let { it == ZENZ_ENGINE_ZENZ || it == ZENZ_ENGINE_SUMIRE_LM } &&
+            AppPreference.zenz_model_uri_preference.isNotBlank()
+
+    @Volatile private var latticeLmLoadStarted = false
+
+    /**
+     * 案2: ラティス辺コスト補正（[LatticeLmCost]）を設定に合わせる。有効（既定）なら初回だけアセットの表を IO スレッドで
+     * 読み込んで設定し、無効なら外す（表なし = 従来の変換）。アセットが無い・壊れている場合も表なしのまま。
+     */
+    private fun syncLatticeLmCost() {
+        if (!AppPreference.lattice_lm_cost_preference) {
+            LatticeLmCost.table = null
+            latticeLmLoadStarted = false
+            return
+        }
+        if (LatticeLmCost.table != null || latticeLmLoadStarted) return
+        latticeLmLoadStarted = true
+        ioScope.launch {
+            val table = try {
+                val t0 = SystemClock.uptimeMillis()
+                assets.open(LATTICE_LM_ASSET).use { LatticeLmCost.load(it) }.also {
+                    Timber.d("lattice-lm: %d words, %d pairs in %d ms", it.wordCount, it.pairCount, SystemClock.uptimeMillis() - t0)
+                }
+            } catch (e: java.io.FileNotFoundException) {
+                Timber.d("lattice-lm: no table asset")
+                null
+            } catch (e: Exception) {
+                Timber.w(e, "lattice-lm: table load failed")
+                null
+            }
+            if (table != null && AppPreference.lattice_lm_cost_preference && latticeLmLoadStarted) LatticeLmCost.table = table
+        }
+    }
+
+    private val sumireLmLoadMutex = Mutex()
+    @Volatile private var sumireLmReranker: SumireLmReranker? = null
+    @Volatile private var sumireLmLastMissAt: Long = Long.MIN_VALUE
+    /** 直前のリランカー 1 位（入力が止まった後の追加判定で、ドラフトの基準に使う）: 文脈・読み → 候補。 */
+    @Volatile private var sumireLmLastTop: Pair<String, Candidate>? = null
+
+    /**
+     * SUMIRE-LM の表を読み込む（初回だけ、IO）。探す順: 外部ファイル領域 files/sumire_lm/（adb でデバッグ用に置ける:
+     * /sdcard/Android/data/<package>/files/sumire_lm/）→ 内部 files/sumire_lm/ → アセット sumire_lm/（あれば内部へコピー）。
+     * 無ければ null（リランカーなし）、[SUMIRE_LM_RETRY_MS] 後にまた探す。
+     */
+    private suspend fun sumireLmRerankerOrNull(): SumireLmReranker? {
+        sumireLmReranker?.let { return it }
+        val now = SystemClock.uptimeMillis()
+        if (sumireLmLastMissAt != Long.MIN_VALUE && now - sumireLmLastMissAt < SUMIRE_LM_RETRY_MS) return null
+        return sumireLmLoadMutex.withLock {
+            sumireLmReranker?.let { return@withLock it }
+            val loaded = withContext(Dispatchers.IO + NonCancellable) {
+                val dirs = listOfNotNull(
+                    getExternalFilesDir(null)?.let { File(it, SUMIRE_LM_TABLE_DIR) },
+                    File(filesDir, SUMIRE_LM_TABLE_DIR),
+                )
+                dirs.firstNotNullOfOrNull { dir ->
+                    if (dir == dirs.last()) copySumireLmAssetsIfNeeded(dir)
+                    SumireLmReranker.load(dir)
+                }
+            }
+            if (loaded == null) sumireLmLastMissAt = SystemClock.uptimeMillis()
+            Timber.d("sumire-lm: reranker %s", if (loaded != null) "loaded" else "not found")
+            sumireLmReranker = loaded
+            loaded
+        }
+    }
+
+    /** アセットに表（sumire_lm/meta.tsv ほか）があれば内部の [dir] へコピーする（既にあれば何もしない）。 */
+    private fun copySumireLmAssetsIfNeeded(dir: File) {
+        try {
+            if (File(dir, "meta.tsv").isFile) return
+            val names = assets.list(SUMIRE_LM_TABLE_DIR)?.toList().orEmpty()
+            if (SumireLmReranker.REQUIRED_FILES.any { it !in names }) return
+            val temporary = File(filesDir, "$SUMIRE_LM_TABLE_DIR.tmp")
+            temporary.deleteRecursively()
+            temporary.mkdirs()
+            for (name in names) {
+                assets.open("$SUMIRE_LM_TABLE_DIR/$name").use { input ->
+                    FileOutputStream(File(temporary, name)).use { input.copyTo(it) }
+                }
+            }
+            dir.deleteRecursively()
+            if (!temporary.renameTo(dir)) temporary.deleteRecursively()
+        } catch (e: Exception) {
+            Timber.w(e, "sumire-lm: asset copy failed")
+        }
+    }
+
+    /**
+     * 変換エンジン sumire_lm の 1 ステップ（[SumireLmGate]）。リランカーで 1 位を決め、マージンが小さいとき・
+     * 前回の FIX 制約を引き継いでいるときだけ zenz（[runZenzaiStep] の評価ループ）にその 1 位をドラフトとして渡す。
+     * 表が無ければ Sumire の順のまま（zenz の判定は従来の ZENZ-GATE）、zenz を読み込んでいなければリランカーだけ。
+     */
+    private suspend fun runSumireLmStep(
+        insertString: String,
+        sumireTop: Candidate,
+        context: ZenzContext,
+        sumireGap: Int?,
+        sumireCandidates: List<Candidate>,
+        onProvisional: suspend (Candidate) -> Unit,
+    ): ZenzaiOutcome? {
+        val session = kanaKanjiConversionSession ?: return null
+        val request = lastKanaKanjiQueryRequest?.copy(input = insertString) ?: return null
+        val leftContext = context.leftContext.takeLast(necookeyCandidateBarConfig.maxLeftContextChars)
+        val topKey = "${leftContext.length}:$leftContext\u0001$insertString"
+        val recheck = sumireCandidates.isEmpty()
+        val reranker = sumireLmRerankerOrNull()
+        var top = sumireTop
+        var margin: Double? = null
+        if (recheck) {
+            // 入力が止まった後の追加判定: 直前のリランカー 1 位を基準にする（zenz の続き）。
+            sumireLmLastTop?.takeIf { it.first == topKey }?.let { top = it.second }
+        } else if (reranker != null) {
+            var poolSegments: Map<String, List<CandidateConversionSegment>> = emptyMap()
+            val decision = withContext(Dispatchers.Default) {
+                val pool = try {
+                    session.queryRerankPool(request, SumireLmGate.POOL_SIZE)
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    Timber.w(e, "sumire-lm: rerank pool failed")
+                    null
+                }
+                val candidates = pool?.candidates?.ifEmpty { null } ?: sumireCandidates
+                val segments = pool?.candidateSegmentsByString.orEmpty()
+                poolSegments = segments
+                SumireLmGate.rerank(
+                    reranker = reranker,
+                    input = insertString,
+                    leftContext = leftContext,
+                    candidates = candidates,
+                    segmentsOf = { c ->
+                        c.conversionSegments.ifEmpty {
+                            segments[c.string] ?: necookeyLearningSegmentsByString[c.string].orEmpty()
+                        }
+                    },
+                    isExcluded = { it.type == CANDIDATE_TYPE_TEXT_MACRO },
+                )
+            }
+            if (decision != null) {
+                margin = decision.margin
+                val picked = decision.top
+                // 文節表示・FIX 制約のため、リランカー 1 位には語分割（経路）を付けて渡す。
+                top = if (picked.string == sumireTop.string) sumireTop else picked.copy(
+                    conversionSegments = picked.conversionSegments.ifEmpty { poolSegments[picked.string].orEmpty() },
+                )
+            }
+        }
+        sumireLmLastTop = topKey to top
+        val carried = zenzaiCarry?.carriedFor(insertString, context.leftContext) != null
+        val askZenz = isZenzPromptModelLoaded() && (
+            recheck || carried || when {
+                margin != null -> SumireLmGate.needsZenz(margin, appPreference.sumire_lm_zenz_margin_preference)
+                reranker == null -> ZenzaiGate.shouldEvaluate(insertString.length, context.leftContext.length, sumireGap)
+                else -> false
+            }
+            )
+        Timber.d(
+            "sumire-lm: input=[%s] sumire=[%s] rerank=[%s] margin=%s zenz=%s",
+            insertString, sumireTop.string, top.string, margin, askZenz,
+        )
+        val rerankOutcome = ZenzaiOutcome(top = top, changed = top.string != sumireTop.string, inferred = false)
+        if (!askZenz) {
+            zenzaiCarry = null
+            return rerankOutcome
+        }
+        if (top.string != sumireTop.string) onProvisional(top)
+        // ZENZ-GATE（Sumire の経路コスト差）はここでは使わない（判定済み）: 差なし = 必ず評価。
+        val zenz = runZenzaiStep(
+            insertString, top, context, sumireGap = null, sumireCandidates = sumireCandidates,
+            onProvisional = onProvisional, viaSumireLm = true,
+        ) ?: return rerankOutcome
+        return zenz.copy(changed = zenz.top.string != sumireTop.string)
+    }
 
     /** zenz を回す対象か（唯一の設定は zenz の ON/OFF）。 */
     private fun isZenzaiEligible(insertString: String): Boolean =
@@ -10962,7 +11159,11 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         sumireGap: Int?,
         sumireCandidates: List<Candidate> = emptyList(),
         onProvisional: suspend (Candidate) -> Unit,
+        viaSumireLm: Boolean = false,
     ): ZenzaiOutcome? {
+        if (!viaSumireLm && isSumireLmEngine()) {
+            return runSumireLmStep(insertString, sumireTop, context, sumireGap, sumireCandidates, onProvisional)
+        }
         val session = kanaKanjiConversionSession ?: return null
         val request = lastKanaKanjiQueryRequest?.copy(input = insertString) ?: return null
         val config = withContext(Dispatchers.Default) { resolveZenzRuntimeConfig() }
@@ -12415,7 +12616,8 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
      * 文節変換は Sumire の元の最良経路ではなく、この経路の conversionSegments に従う。
      */
     private fun adoptZenzaiBunsetsuPath(input: String, accepted: Candidate) {
-        if (!accepted.zenzAdjusted || accepted.length.toInt() != input.length) return
+        // sumire_lm ではリランカーの 1 位（zenz の印なし）も、その文節経路を採る。
+        if (!(accepted.zenzAdjusted || isSumireLmEngine()) || accepted.length.toInt() != input.length) return
         val segments = accepted.conversionSegments
         if (segments.isEmpty() || segments.last().inputEnd != input.length) return
         val splits = sanitizeSplitPositions(input, segments.map { it.inputEnd }.dropLast(1))
@@ -16551,7 +16753,7 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
             }
             val outcome = try {
                 if (background) {
-                    runZenzaiStep(insertString, sumireTop, context, sumireGap, conversion) { }
+                    runZenzaiStep(insertString, sumireTop, context, sumireGap, conversion, onProvisional = { })
                 } else {
                     runZenzaiStep(insertString, sumireTop, context, sumireGap, conversion, ::show)
                 }

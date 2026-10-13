@@ -1,0 +1,13 @@
+allprojects {
+  afterEvaluate { p ->
+    if (p.path == ':app') {
+      p.tasks.register('printTestCp') {
+        def cpf = p.tasks.getByName('testFullStandardDebugUnitTest').classpath
+        inputs.files(cpf)
+        doLast {
+          new File('/workspace/work/ime/data/testcp.txt').text = cpf.files.join(':')
+        }
+      }
+    }
+  }
+}

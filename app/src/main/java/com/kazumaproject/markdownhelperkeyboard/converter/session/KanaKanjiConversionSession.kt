@@ -240,6 +240,35 @@ class KanaKanjiConversionSession(
         }
     }
 
+    /**
+     * SUMIRE-LM リランカー用の候補プール（文節分離の変換候補 [n] 件と語分割）。表示用の問い合わせとは別に、
+     * セッションの逐次状態を使わず・変更せずに計算する（予測なし、学習/ユーザー辞書は表示と同じ設定）。
+     */
+    suspend fun queryRerankPool(request: KanaKanjiQueryRequest, n: Int): KanaKanjiQueryResult =
+        mutex.withLock {
+            val segmentCollector = LinkedHashMap<String, List<CandidateConversionSegment>>()
+            engine.getCandidatesWithoutPredictionWithBunsetsu(
+                input = request.input,
+                n = n,
+                mozcUtPersonName = request.mozcUtPersonName,
+                mozcUTPlaces = request.mozcUtPlaces,
+                mozcUTWiki = request.mozcUtWiki,
+                mozcUTNeologd = request.mozcUtNeologd,
+                mozcUTWeb = request.mozcUtWeb,
+                userDictionaryRepository = request.userDictionaryRepository,
+                learnRepository = request.learnRepository,
+                typoCorrectionOffsetScore = request.typoCorrectionOffsetScore,
+                omissionSearchOffsetScore = request.omissionSearchOffsetScore,
+                beamWidth = request.beamWidth,
+                incrementalSessionState = null,
+                predictionConfig = request.predictionConfig.copy(
+                    japanesePredictionEnabled = false,
+                    englishPredictionEnabled = false,
+                ),
+                candidateSegmentCollector = segmentCollector,
+            ).asQueryResult(segmentCollector)
+        }
+
     private suspend fun queryConversion(request: KanaKanjiQueryRequest): KanaKanjiQueryResult {
         val segmentCollector = request.newCandidateSegmentCollector()
         return if (request.bunsetsuSeparation) {

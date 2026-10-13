@@ -1,0 +1,143 @@
+name: SUMIRE-LM N-best dump
+
+# sumire-lm ブランチ専用。tools/sumire_lm/ci/trigger.txt を変更して push すると走る。
+# JWTD v2 / AJIMEE-Bench / CC-100 はランナー上でダウンロードし、リポジトリには入れない。
+# 出力（Sumire top-50 N-best と経路コスト）は短期保持の artifact のみ。
+on:
+  push:
+    branches: [sumire-lm]
+    paths: ['tools/sumire_lm/ci/trigger.txt']
+
+permissions:
+  contents: read
+
+jobs:
+  prep:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    outputs:
+      shards: ${{ steps.sh.outputs.shards }}
+      nshard: ${{ steps.sh.outputs.nshard }}
+    steps:
+      - uses: actions/checkout@v6
+      - id: sh
+        run: |
+          echo "shards=$(cat tools/sumire_lm/ci/shards.txt)" >> "$GITHUB_OUTPUT"
+          echo "nshard=$(cat tools/sumire_lm/ci/nshard.txt)" >> "$GITHUB_OUTPUT"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Build eval TSVs + auto-generated clauses
+        run: |
+          pip install -q fugashi unidic-lite pyahocorasick
+          mkdir -p data && cd data
+          curl -sSfL -o jwtd.tar.gz https://nlp.ist.i.kyoto-u.ac.jp/nl-resource/JWTD/jwtd_v2.0.tar.gz
+          tar xzf jwtd.tar.gz
+          git clone -q https://github.com/azooKey/AJIMEE-Bench ajimee
+          python ../tools/sumire_lm/build_jwtd.py 3000
+          N_AUTO=$(cat ../tools/sumire_lm/ci/n_auto.txt)
+          if [ "$N_AUTO" -gt 0 ]; then
+            # CC-100 先頭 1.36 GB（圧縮）を展開し、LM 集計に使う先頭 4.5e9 バイトより後ろだけを保存
+            curl -sSf -r 0-1359855615 https://data.statmt.org/cc-100/ja.txt.xz | python -c "
+          import lzma,sys
+          d=lzma.LZMADecompressor(); n=0; SKIP=4500000000
+          o=open('holdout.txt','wb')
+          while True:
+              b=sys.stdin.buffer.read(1<<22)
+              if not b: break
+              try: x=d.decompress(b)
+              except EOFError: break
+              if n+len(x)>SKIP: o.write(x[max(0,SKIP-n):])
+              n+=len(x)
+          print(n)"
+            python ../tools/sumire_lm/autogen.py holdout.txt 0 "$N_AUTO" auto.tsv jwtd_kc.tsv ajimee.tsv
+            rm holdout.txt
+          else
+            : > auto.tsv
+          fi
+          cat ajimee.tsv jwtd_kc.tsv auto.tsv > all.tsv
+          wc -l *.tsv
+      - uses: actions/upload-artifact@v7
+        with:
+          name: sumire-lm-inputs
+          path: |
+            data/jwtd_kc.tsv
+            data/ajimee.tsv
+            data/auto.tsv
+            data/all.tsv
+          retention-days: 3
+
+  dump:
+    needs: prep
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: ${{ fromJSON(needs.prep.outputs.shards) }}
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-java@v5
+        with:
+          java-version: '17'
+          distribution: temurin
+      - uses: android-actions/setup-android@v4
+      - run: sdkmanager "platforms;android-36"
+      - uses: actions/cache@v5
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: ${{ runner.os }}-sumire-lm-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+          restore-keys: |
+            ${{ runner.os }}-sumire-lm-gradle-
+            ${{ runner.os }}-gradle-
+      - uses: actions/download-artifact@v7
+        with:
+          name: sumire-lm-inputs
+          path: data
+      - name: Dump Sumire N-best (Lite, no zenz)
+        env:
+          NK_DUMP_IN: ${{ github.workspace }}/data/all.tsv
+          NK_DUMP_OUT: ${{ github.workspace }}/cands.${{ matrix.shard }}.tsv
+          NK_DUMP_SHARD: ${{ matrix.shard }}/${{ needs.prep.outputs.nshard }}
+        timeout-minutes: 100
+        run: |
+          # 区切り固定の再変換（tools/sumire_lm/ci/split_reconv.txt = "K,m,N"、空なら無効）
+          export NK_SPLIT_RECONV="$(cat tools/sumire_lm/ci/split_reconv.txt 2>/dev/null || true)"
+          cp tools/sumire_lm/ci/SumireNbestDumpTest.kt app/src/test/java/com/kazumaproject/markdownhelperkeyboard/converter/quality/
+          ./gradlew :app:testLiteStandardDebugUnitTest --tests '*SumireNbestDumpTest*' -i --no-daemon --max-workers=2 -Dorg.gradle.jvmargs=-Xmx2g 2>&1 | grep -E "dumped|fail |FAILED|BUILD|error:|Exception" | head -200
+          wc -l cands.${{ matrix.shard }}.tsv
+          [ -f cands.${{ matrix.shard }}.tsv.time ] && awk -F'\t' '{b+=$3; x+=$4; c+=$5; n++} END {printf "base %.1f ms/sent, extra %.1f ms/sent, extra cands %.1f/sent\n", b/n, x/n, c/n}' cands.${{ matrix.shard }}.tsv.time || true
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: sumire-lm-cands-${{ matrix.shard }}
+          path: cands.${{ matrix.shard }}.tsv*
+          retention-days: 3
+
+  # 変換器の既存単体テスト（区切り固定の再変換は既定で無効。既存の動作が変わらないことの確認）
+  unit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-java@v5
+        with:
+          java-version: '17'
+          distribution: temurin
+      - uses: android-actions/setup-android@v4
+      - run: sdkmanager "platforms;android-36"
+      - uses: actions/cache@v5
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: ${{ runner.os }}-sumire-lm-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+          restore-keys: |
+            ${{ runner.os }}-sumire-lm-gradle-
+            ${{ runner.os }}-gradle-
+      - name: Converter unit tests (Lite)
+        run: |
+          ./gradlew :app:testLiteStandardDebugUnitTest --tests 'com.kazumaproject.markdownhelperkeyboard.converter.*' --no-daemon --max-workers=2 -Dorg.gradle.jvmargs=-Xmx3g 2>&1 | grep -E "tests completed|FAILED|BUILD|error:|e: " | head -100
+          test "${PIPESTATUS[0]}" -eq 0

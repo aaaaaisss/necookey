@@ -701,8 +701,17 @@ object AppPreference {
         Pair("qwerty_keyboard_margin_end_dp_landscape_preference", 0)
 
     private val ZENZ_MODEL_URI_PREFERENCE = Pair("zenz_model_uri_preference", "")
-    /** 変換エンジン: "jinen"（内蔵 jinen-v2-small の自由生成、既定）/ "zenz"（読み込んだ zenz モデルの評価ループ）。 */
-    private val ZENZ_ENGINE_PREFERENCE = Pair("zenz_engine_preference", "jinen")
+    /**
+     * 変換エンジン: "sumire_lm"（Sumire + SUMIRE-LM リランカー、迷った読みだけ読み込んだ zenz で判断。sumire-lm-app の既定）/
+     * "jinen"（内蔵 jinen-v2-small の自由生成）/ "zenz"（読み込んだ zenz モデルの評価ループ）。
+     */
+    private val ZENZ_ENGINE_PREFERENCE = Pair("zenz_engine_preference", "sumire_lm")
+    /** sumire_lm: リランカーの 1 位と 2 位のスコア差がこれ（百分の一単位）未満なら zenz に回す。 */
+    private val SUMIRE_LM_ZENZ_MARGIN_PREFERENCE = Pair("sumire_lm_zenz_margin_preference", 50)
+    /** 同音異義 UI の迷い印の判定にリランカーの文節マージン（SumireLmSpanMargin）を使う（既定オフ、設定画面なし）。 */
+    private val SUMIRE_LM_HOMOPHONE_MARGIN_PREFERENCE = Pair("sumire_lm_homophone_margin_preference", false)
+    /** 案2: 経路探索の辺コストに単語 bigram LM 補正（LatticeLmCost、表はアセット）を足す（既定オン）。 */
+    private val LATTICE_LM_COST_PREFERENCE = Pair("lattice_lm_cost_preference", true)
     private val SUMINAGASHI_INK_EFFECT_ENABLE =
         Pair("suminagashi_ink_effect_preference", false)
     private val KEYBOARD_TOUCH_EFFECT_QUALITY =
@@ -3602,6 +3611,33 @@ object AppPreference {
                 QWERTY_KEYBOARD_MARGIN_END_DP_LANDSCAPE.first,
                 value ?: 0
             )
+        }
+
+    var sumire_lm_homophone_margin_preference: Boolean
+        get() = preferences.getBoolean(
+            SUMIRE_LM_HOMOPHONE_MARGIN_PREFERENCE.first,
+            SUMIRE_LM_HOMOPHONE_MARGIN_PREFERENCE.second
+        )
+        set(value) = preferences.edit {
+            it.putBoolean(SUMIRE_LM_HOMOPHONE_MARGIN_PREFERENCE.first, value)
+        }
+
+    var lattice_lm_cost_preference: Boolean
+        get() = preferences.getBoolean(
+            LATTICE_LM_COST_PREFERENCE.first,
+            LATTICE_LM_COST_PREFERENCE.second
+        )
+        set(value) = preferences.edit {
+            it.putBoolean(LATTICE_LM_COST_PREFERENCE.first, value)
+        }
+
+    var sumire_lm_zenz_margin_preference: Int
+        get() = preferences.getInt(
+            SUMIRE_LM_ZENZ_MARGIN_PREFERENCE.first,
+            SUMIRE_LM_ZENZ_MARGIN_PREFERENCE.second
+        )
+        set(value) = preferences.edit {
+            it.putInt(SUMIRE_LM_ZENZ_MARGIN_PREFERENCE.first, value)
         }
 
     var zenz_engine_preference: String
