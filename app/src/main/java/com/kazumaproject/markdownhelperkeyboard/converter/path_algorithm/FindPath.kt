@@ -1508,7 +1508,8 @@ class FindPath(
         node: Node,
         connectionMatrix: ConnectionMatrix.CostTable,
     ): Int {
-        return connectionMatrix.cost(prev.r.toInt(), node.l.toInt()) + PosPairPenalty.cost(prev, node)
+        return connectionMatrix.cost(prev.r.toInt(), node.l.toInt()) + PosPairPenalty.cost(prev, node) +
+            LatticeLmCost.correction(prev, node) // 案2（表が null なら 0）
     }
 
     private fun getStringFromNode(node: Node): String {
@@ -2646,6 +2647,280 @@ class FindPath(
         }
 
         return positions
+    }
+
+    /**
+     * 区切りを固定した再変換（[SplitReconversionConfig] 参照）。[graph] は forwardDp で枝刈りされる前のノード一覧
+     * （終了位置 -> ノード。ノードは通常経路と共有でよく、node.f / node.prev は変更しない）。
+     * 返す候補は [exclude] に含まれない文字列だけで、区切りの順・各区切り内はコスト順。
+     */
+    fun splitConstrainedReconversion(
+        graph: Map<Int, List<Node>>,
+        length: Int,
+        connectionMatrix: ConnectionMatrix.CostTable,
+        nBestPatterns: List<List<Int>>,
+        exclude: Set<String>,
+        config: SplitReconversionConfig,
+        out: SplitReconversionResult? = null,
+        cancellationCheck: () -> Unit = {},
+    ): List<SplitReconversionCandidate> {
+        val eos = graph[length + 1]?.firstOrNull() ?: return emptyList()
+        val ngramRuleScorer = ngramRuleScorerProvider()
+        val boundaryChecker = mozcSegmenterProvider()?.let {
+            MozcBoundaryChecker(segmenter = it, mode = mozcBoundaryModeProvider())
+        }
+        val m = config.wordsPerSpan.coerceAtLeast(1)
+        // スパン（開始位置・長さ）ごとの語の順位（Sumire の語コスト順、同じ表記は同順位）
+        val rank = IdentityHashMap<Node, Int>()
+        val nodesAt = HashMap<Int, List<Node>>()
+        for (end in 1..length) {
+            val nodes = graph[end] ?: continue
+            nodes.groupBy { it.sPos }.forEach { (_, group) ->
+                val best = HashMap<String, Int>()
+                group.forEach { node ->
+                    val old = best[node.tango]
+                    if (old == null || node.adjustedScore < old) best[node.tango] = node.adjustedScore
+                }
+                val order = HashMap<String, Int>()
+                best.entries.sortedBy { it.value }.forEachIndexed { i, e -> order[e.key] = i }
+                group.forEach { rank[it] = order.getValue(it.tango) }
+            }
+            nodesAt[end] = nodes.filter { rank.getValue(it) < m }
+        }
+        fun prevOf(node: Node): List<Node> = when {
+            node === eos -> nodesAt[length].orEmpty()
+            node.sPos == 0 -> bosNodes
+            else -> nodesAt[node.sPos].orEmpty()
+        }
+        fun allowed(node: Node, isB: BooleanArray?): Boolean {
+            if (isB == null || node === eos || node.tango == "BOS") return true
+            val s = node.sPos
+            val e = s + node.len.toInt()
+            for (p in s + 1 until e) if (p <= length && isB[p]) return false
+            return s == 0 || isIndependentWord(node.l) == isB[s]
+        }
+        fun forward(isB: BooleanArray?, back: IdentityHashMap<Node, Node>? = null): IdentityHashMap<Node, Int> {
+            val fc = IdentityHashMap<Node, Int>()
+            fc[BOS] = 0
+            for (end in 1..length + 1) {
+                val nodes = if (end == length + 1) listOf(eos) else nodesAt[end] ?: continue
+                for (node in nodes) {
+                    if (!allowed(node, isB)) continue
+                    var best = Int.MAX_VALUE
+                    var bestPrev: Node? = null
+                    for (p in prevOf(node)) {
+                        val pf = fc[p] ?: continue
+                        val c = pf + getEdgeCost(p, node, connectionMatrix) + node.adjustedScore
+                        if (c < best) { best = c; bestPrev = p }
+                    }
+                    if (best != Int.MAX_VALUE) {
+                        fc[node] = best
+                        if (back != null && bestPrev != null) back[node] = bestPrev
+                    }
+                }
+            }
+            return fc
+        }
+        class El(val node: Node, val g: Int, val prio: Int, val split: Int, val next: El?)
+        val queue = PriorityQueue<El>(compareBy<El> { it.prio })
+        var polls = 0
+
+        // 1. 区切り: N-best の出現順 + 区切りだけを状態に持つ K-best 探索
+        val patterns = ArrayList<List<Int>>()
+        nBestPatterns.forEach { if (patterns.size < config.maxPatterns && it !in patterns) patterns.add(it) }
+        val nBestCount = patterns.size
+        if (patterns.size < config.maxPatterns) {
+            val fc0 = forward(null)
+            val splitPos = arrayListOf(-1)
+            val splitParent = arrayListOf(-1)
+            val splitIds = HashMap<Long, Int>()
+            fun prepend(pos: Int, parent: Int): Int = splitIds.getOrPut((pos.toLong() shl 32) or parent.toLong()) {
+                splitPos.add(pos); splitParent.add(parent); splitPos.size - 1
+            }
+            val nodeIdx = IdentityHashMap<Node, Int>()
+            val visited = HashSet<Long>()
+            queue.add(El(eos, 0, fc0[eos] ?: 0, 0, null))
+            while (queue.isNotEmpty() && patterns.size < config.maxPatterns && polls < config.popBudget) {
+                if (polls++ and 0x3f == 0) cancellationCheck()
+                val el = queue.poll() ?: break
+                val key = (nodeIdx.getOrPut(el.node) { nodeIdx.size }.toLong() shl 32) or el.split.toLong()
+                if (!visited.add(key)) continue
+                if (el.node.tango == "BOS") {
+                    val pos = ArrayList<Int>()
+                    var id = el.split
+                    while (id > 0) { pos.add(splitPos[id]); id = splitParent[id] }
+                    if (pos !in patterns) patterns.add(pos)
+                    continue
+                }
+                val cur = el.node
+                val split = if (cur !== eos && cur.sPos > 0 && isIndependentWord(cur.l)) prepend(cur.sPos, el.split) else el.split
+                for (p in prevOf(cur)) {
+                    val pf = fc0[p] ?: continue
+                    val g = el.g + getEdgeCost(p, cur, connectionMatrix) + cur.adjustedScore
+                    queue.add(El(p, g, g + pf, split, el))
+                }
+            }
+            queue.clear()
+        }
+        out?.patterns?.addAll(patterns)
+        out?.nBestPatternCount = nBestCount
+
+        // 2. 区切りごとに、区切りに合うノードだけで上位 perPattern 文字列
+        val result = ArrayList<SplitReconversionCandidate>()
+        val emitted = HashSet<String>(exclude)
+        val emittedForced = HashSet<String>(exclude)
+        patterns.forEachIndexed { pi, pattern ->
+            val isB = BooleanArray(length + 1)
+            pattern.forEach { if (it in 1..length) isB[it] = true }
+            val back = IdentityHashMap<Node, Node>()
+            val fc = forward(isB, back)
+            val start = fc[eos] ?: return@forEachIndexed
+            val pops = IdentityHashMap<Node, Int>()
+            val cap = config.perPattern * 2
+            var found = 0
+            var localPolls = 0
+            queue.add(El(eos, 0, start, 0, null))
+            while (queue.isNotEmpty() && found < config.perPattern && localPolls++ < config.popBudget) {
+                if (localPolls and 0x3f == 0) cancellationCheck()
+                val el = queue.poll() ?: break
+                val cur = el.node
+                val c = pops[cur] ?: 0
+                if (c >= cap) continue
+                pops[cur] = c + 1
+                if (cur.tango == "BOS") {
+                    val sb = StringBuilder()
+                    val yomi = StringBuilder()
+                    val segs = ArrayList<CandidateConversionSegment>()
+                    var maxRank = 0
+                    var position = 0
+                    var e = el.next
+                    while (e != null && e.node !== eos) {
+                        val nd = e.node
+                        sb.append(nd.tango); yomi.append(nd.yomiUsed)
+                        segs.add(CandidateConversionSegment(position, position + nd.len.toInt(), nd.tango))
+                        position += nd.len.toInt()
+                        maxRank = maxOf(maxRank, rank[nd] ?: 0)
+                        e = e.next
+                    }
+                    val s = sb.toString()
+                    if (emitted.add(s)) {
+                        found++
+                        result.add(
+                            SplitReconversionCandidate(
+                                candidate = Candidate(
+                                    string = s,
+                                    type = 1,
+                                    length = length.toUByte(),
+                                    yomi = yomi.toString(),
+                                    score = el.prio,
+                                    leftId = el.next?.node?.l,
+                                    rightId = el.next?.node?.r,
+                                ),
+                                segments = segs,
+                                patternIndex = pi,
+                                maxWordRank = maxRank,
+                                splitPositions = pattern,
+                                patternFromNBest = pi < nBestCount,
+                            ),
+                        )
+                    }
+                    continue
+                }
+                for (p in prevOf(cur)) {
+                    val pf = fc[p] ?: continue
+                    if (boundaryChecker != null) {
+                        val isEdge = p.mozcNodeType == MozcNodeType.BOS || cur.mozcNodeType == MozcNodeType.EOS
+                        if (boundaryChecker.check(p, cur, isEdge) == MozcBoundaryCheckResult.INVALID) continue
+                    }
+                    val g = el.g + getEdgeCost(p, cur, connectionMatrix) + cur.adjustedScore +
+                        ngramRuleScorer.score(
+                            prevNode = p,
+                            currentNode = cur,
+                            nextNode1 = el.next?.node,
+                            nextNode2 = el.next?.next?.node,
+                            nextNode3 = el.next?.next?.next?.node,
+                        )
+                    queue.add(El(p, g, g + pf, 0, el))
+                }
+            }
+            queue.clear()
+            if (config.perPatternForced > 0) {
+                // 各ノードを通る最良経路（区切り固定）: 1 語だけ入れ替えた候補を語コストの順位に関係なく作る
+                val startAt = HashMap<Int, MutableList<Node>>()
+                for (end in 1..length) {
+                    for (nd in nodesAt[end].orEmpty()) if (fc.containsKey(nd)) startAt.getOrPut(nd.sPos) { ArrayList() }.add(nd)
+                }
+                val bc = IdentityHashMap<Node, Int>()
+                val nxt = IdentityHashMap<Node, Node>()
+                for (end in length downTo 1) {
+                    for (nd in nodesAt[end].orEmpty()) {
+                        if (!fc.containsKey(nd)) continue
+                        if (end == length) {
+                            bc[nd] = getEdgeCost(nd, eos, connectionMatrix) + eos.adjustedScore
+                            nxt[nd] = eos
+                            continue
+                        }
+                        var best = Int.MAX_VALUE
+                        var bn: Node? = null
+                        for (w in startAt[end].orEmpty()) {
+                            val wb = bc[w] ?: continue
+                            val c = getEdgeCost(nd, w, connectionMatrix) + w.adjustedScore + wb
+                            if (c < best) { best = c; bn = w }
+                        }
+                        if (bn != null) { bc[nd] = best; nxt[nd] = bn }
+                    }
+                }
+                val through = ArrayList<Pair<Int, Node>>()
+                for ((nd, b) in bc) { val f = fc[nd] ?: continue; through.add((f + b) to nd) }
+                through.sortWith(compareBy<Pair<Int, Node>> { it.first }.thenBy { it.second.sPos })
+                var forcedFound = 0
+                for ((total, v) in through) {
+                    if (forcedFound >= config.perPatternForced) break
+                    val path = ArrayList<Node>()
+                    var x: Node? = v
+                    while (x != null && x.tango != "BOS") { path.add(x); x = back[x] }
+                    path.reverse()
+                    var y = nxt[v]
+                    while (y != null && y !== eos) { path.add(y); y = nxt[y] }
+                    val sb = StringBuilder()
+                    val yomi = StringBuilder()
+                    val segs = ArrayList<CandidateConversionSegment>()
+                    var maxRank = 0
+                    var position = 0
+                    for (nd in path) {
+                        sb.append(nd.tango); yomi.append(nd.yomiUsed)
+                        segs.add(CandidateConversionSegment(position, position + nd.len.toInt(), nd.tango))
+                        position += nd.len.toInt()
+                        maxRank = maxOf(maxRank, rank[nd] ?: 0)
+                    }
+                    if (position != length) continue
+                    val str = sb.toString()
+                    if (!emittedForced.add(str)) continue
+                    forcedFound++
+                    result.add(
+                        SplitReconversionCandidate(
+                            candidate = Candidate(
+                                string = str,
+                                type = 1,
+                                length = length.toUByte(),
+                                yomi = yomi.toString(),
+                                score = total,
+                                leftId = path.firstOrNull()?.l,
+                                rightId = path.firstOrNull()?.r,
+                            ),
+                            segments = segs,
+                            patternIndex = pi,
+                            maxWordRank = maxRank,
+                            splitPositions = pattern,
+                            patternFromNBest = pi < nBestCount,
+                            forced = true,
+                        ),
+                    )
+                }
+            }
+        }
+        out?.candidates?.addAll(result)
+        return result
     }
 
     private fun isIndependentWord(id: Short): Boolean {

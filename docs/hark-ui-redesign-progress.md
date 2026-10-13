@@ -153,3 +153,20 @@
 - zenz（かな漢字変換モデル）は「次に続く語の確率」しか測れず、雰囲気で絵文字を選ぶのは苦手だったため、後続語スロットの文脈絵文字を全部削除: `ContextEmojiSelector`・`assets/emoji/emoji_mood.tsv`・事前スコア（`files/context_emoji_priors.tsv` は端末に残っても読まない）・`NextWordExtras.placeEmoji`・絵文字キーワードの zenz 採点。後続語の zenz 採点は head＋助詞だけ（最大 25 件）に戻った。
 - 絵文字の読み辞書（変換で出る絵文字）はそのまま。
 - 後回し: ML-Ask 感情語辞書（BSD-3）で選ぶ案。
+
+## 2026-10-13: sumire-lm-app を main にマージ（dbec2cd）
+
+- 変換エンジンの既定を「Sumire＋SUMIRE-LM リランカー（迷った読みだけ読み込んだ zenz で判断）」に。JINEN / zenz モードは設定「変換エンジン」に残す。
+- 案2 ラティス辺コスト（`LatticeLmCost`、単語 bigram 補正、`FindPath.getEdgeCost` に加算）を既定オン。表（5.8MB, `lc_np1m.slc`）はリポジトリに入れず、ビルド時に孤立ブランチ `lm-data` の固定コミット 63732f8 から取り出し sha256 照合（不一致でビルド失敗）してアセット `lattice_lm/` に同梱。IME 起動時に IO スレッドで読み込み（ヒープ約 11MB）。設定「単語のつながりで変換を補正」で無効化、表が無ければ従来どおり。CI ランナーで +1.8ms/文、**実機速度は未確認（遅ければ既定オフに戻す）**。
+- はいる→入る 対策（`PosPairPenalty.hairuCost`）: 「わかって入る」→「わかってはいる」、「そう入っても」→「そうは言っても」型。評価で悪化 0。
+- Sumire top1（評価用データ）: JWTD held .319→.361、AJIMEE .525→.560、日常文 held .555→.583。詳細は `sumire-lm` ブランチの tools/sumire_lm/HANDOFF.md。
+
+## 2026-10-13: main（性能改善）を homophone-ui にマージ
+
+- origin/main（sumire-lm-app マージ dbec2cd まで）を homophone-ui に取り込み。リーダーの同音異義 UI（2 段バー・迷い印・差分チップ）と AI モデル非同梱（GGUF 同梱は既定オフ、jinen / zenz はモデルを読み込んだときだけ選べる・動く）はそのまま。JINEN / zenz のコードは残す。
+- 変換エンジン設定を一本化: 既定「Sumire（AI を使わない）」（値 `sumire`）= Sumire＋ラティス LM 辺コスト（既定オン）＋SUMIRE-LM リランカー（表があれば）。zenz / jinen には触れない。旧値 `sumire_lm`（main の既定）は `AppPreference.zenz_engine_preference` が `sumire` に読み替える（設定キーは同じ）。選択肢は sumire / jinen / zenz の 3 つ。
+  - `zenz`＋モデル読み込み済み: リランカー経由で、1・2 位の差が `sumire_lm_zenz_margin_preference` 未満の読みだけ zenz 評価（表が無ければ従来の ZENZ-GATE と同じ判定）。
+  - `jinen`＋モデル読み込み済み: 従来の jinen。モデル未読み込みなら何を選んでも Sumire＋リランカー。
+  - `necookeyZenzGateEnabled` は main と同じ（AI 有無でなく「zenz ON/OFF」設定だけ）にし、AI を止めるのは `isAiEngineActive`（`resolveZenzRuntimeConfig`・`isZenzPromptModelLoaded`・`isJinenEngine`）。
+- 迷い印・差分チップの判定元: `SumireLmMarginSource`（`SumireLmSpanMargin` の `BunsetsuMarginSource` 実装、しきい値 `DEFAULT_THRESHOLD_CENTS`=50、未較正）を、設定 `sumire_lm_homophone_margin_preference`（既定オン、画面なし）がオンでその読みにリランカーが動いたときだけ使う。リランカー結果が届いたら同じ 1 位でもバーを描き直す。それ以外は Sumire の経路コスト差 800。
+- **注意**: リランカーの LM 表（`sumire_lm/`）はまだ同梱していない（リーダーが実用表を作成中）ので、今の APK ではリランカーは動かず、迷い印は Sumire 差 800 のまま。表を入れたら 50 の較正が必要。

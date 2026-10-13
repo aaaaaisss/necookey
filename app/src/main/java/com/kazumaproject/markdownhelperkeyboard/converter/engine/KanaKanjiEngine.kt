@@ -30,6 +30,8 @@ import com.kazumaproject.markdownhelperkeyboard.converter.mozc.MozcBoundaryMode
 import com.kazumaproject.markdownhelperkeyboard.converter.mozc.MozcNodeAttributeTable
 import com.kazumaproject.markdownhelperkeyboard.converter.mozc.MozcSegmenter
 import com.kazumaproject.markdownhelperkeyboard.converter.path_algorithm.FindPath
+import com.kazumaproject.markdownhelperkeyboard.converter.path_algorithm.SplitReconversionConfig
+import com.kazumaproject.markdownhelperkeyboard.converter.path_algorithm.SplitReconversionResult
 import com.kazumaproject.markdownhelperkeyboard.converter.trace.BoundaryTrace
 import com.kazumaproject.markdownhelperkeyboard.converter.trace.CandidateTrace
 import com.kazumaproject.markdownhelperkeyboard.converter.trace.ConversionTrace
@@ -2218,6 +2220,12 @@ class KanaKanjiEngine {
         incrementalSessionState: IncrementalSessionState? = null,
         predictionConfig: PredictionConfig = PredictionConfig(),
         candidateSegmentCollector: MutableMap<String, List<CandidateConversionSegment>>? = null,
+        /**
+         * 区切りを固定した再変換（SUMIRE-LM 実験）。両方渡したときだけ計算し、追加候補は collector にだけ入る
+         * （戻り値の候補と表示順は変えない）。
+         */
+        splitReconversionConfig: SplitReconversionConfig? = null,
+        splitReconversionCollector: SplitReconversionResult? = null,
     ): BunsetsuCandidateResult {
         val conversionContext = currentCoroutineContext()
 
@@ -2283,6 +2291,13 @@ class KanaKanjiEngine {
             )
         } else {
             val connectionMatrix = connectionMatrixSnapshot()
+            // forwardDp のビーム枝刈り前のノード一覧（ノードは共有、リストだけ複製）
+            val unprunedGraph: Map<Int, List<Node>>? =
+                if (splitReconversionConfig != null && splitReconversionCollector != null) {
+                    graph.mapValues { it.value.toList() }
+                } else {
+                    null
+                }
             findPath.backwardAStarWithBunsetsu(
                 graph = graph,
                 length = input.length,
@@ -2292,7 +2307,25 @@ class KanaKanjiEngine {
                 cancellationCheck = { conversionContext.ensureActive() },
                 sessionState = incrementalSessionState?.pathState,
                 candidateSegmentCollector = candidateSegmentCollector,
-            )
+            ).also { nBest ->
+                if (unprunedGraph != null && splitReconversionConfig != null && splitReconversionCollector != null) {
+                    val startNs = System.nanoTime()
+                    val nBestPatterns = nBest.candidates
+                        .mapNotNull { nBest.splitPatternByCandidateString[it.string] }
+                        .distinct()
+                    findPath.splitConstrainedReconversion(
+                        graph = unprunedGraph,
+                        length = input.length,
+                        connectionMatrix = connectionMatrix.costTable,
+                        nBestPatterns = nBestPatterns,
+                        exclude = nBest.candidates.mapTo(HashSet()) { it.string },
+                        config = splitReconversionConfig,
+                        out = splitReconversionCollector,
+                        cancellationCheck = { conversionContext.ensureActive() },
+                    )
+                    splitReconversionCollector.elapsedNs += System.nanoTime() - startNs
+                }
+            }
         }
         conversionContext.ensureActive()
 

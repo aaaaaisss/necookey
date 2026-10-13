@@ -165,6 +165,7 @@ android {
     sourceSets {
         main.assets.srcDir(layout.buildDirectory.dir("generated/compactConnectionMatrix/assets"))
         main.assets.srcDir(layout.buildDirectory.dir("generated/compactSystemDictionary/assets"))
+        main.assets.srcDir(layout.buildDirectory.dir("generated/latticeLmTable/assets"))
     }
 
     applicationVariants.configureEach { variant ->
@@ -677,6 +678,73 @@ tasks.register("generateCompactSystemDictionary") {
 tasks.named("preBuild").configure {
     dependsOn("generateCompactConnectionMatrix")
     dependsOn("generateCompactSystemDictionary")
+}
+
+// SUMIRE-LM 案2: ラティス辺コスト表（LatticeLmCost、SLC2）をビルド時に孤立ブランチ lm-data の固定コミットから取得し、
+// sha256 を照合してアセット lattice_lm/lc_np1m.slc に置く（リポジトリには入れない）。不一致ならビルド失敗。
+// -PlatticeLmTable=false で取得しない（アプリは表なし = 従来どおりの変換）。
+def latticeLmCommit = "63732f821b7100dc6e3b9a47ea7725818151ea84"
+def latticeLmFileName = "lc_np1m.slc"
+def latticeLmSha256 = "1accd8c96f3df50761879e36e476f38911e9a8e29df5caabfd2dcf4a7c8a00b5"
+def latticeLmUrl = "https://raw.githubusercontent.com/aaaaaisss/necookey/${latticeLmCommit}/${latticeLmFileName}"
+def latticeLmEnabled = (findProperty("latticeLmTable") ?: "true").toString() != "false"
+def latticeLmAsset = layout.buildDirectory.file("generated/latticeLmTable/assets/lattice_lm/${latticeLmFileName}")
+def latticeLmCacheDir = new File(gradle.gradleUserHomeDir, "caches/necookey-lattice-lm")
+// リポジトリが非公開のとき（raw URL は 404）は CI で git から取り出したファイルを -PlatticeLmTableFile=PATH で渡す（同じく sha256 照合）。
+def latticeLmLocalFile = findProperty("latticeLmTableFile")?.toString()
+
+tasks.register("fetchLatticeLmTable") {
+    inputs.property("latticeLmSha256", latticeLmSha256)
+    inputs.property("latticeLmEnabled", latticeLmEnabled)
+    outputs.dir(layout.buildDirectory.dir("generated/latticeLmTable/assets"))
+    doLast {
+        def out = latticeLmAsset.get().asFile
+        out.parentFile.deleteDir()
+        if (!latticeLmEnabled) {
+            out.parentFile.mkdirs()
+            return
+        }
+        def sha = { File f ->
+            def md = java.security.MessageDigest.getInstance("SHA-256")
+            f.withInputStream { ins ->
+                byte[] buf = new byte[1 << 16]
+                int n
+                while ((n = ins.read(buf)) > 0) md.update(buf, 0, n)
+            }
+            md.digest().collect { String.format("%02x", it) }.join("")
+        }
+        def cached = new File(latticeLmCacheDir, "${latticeLmSha256}.slc")
+        if (latticeLmLocalFile) {
+            def local = new File(latticeLmLocalFile)
+            def got = local.isFile() ? sha(local) : "missing"
+            if (got != latticeLmSha256) {
+                throw new GradleException("lattice LM table sha256 mismatch: expected ${latticeLmSha256}, got ${got} (${local})")
+            }
+            cached = local
+        } else if (!cached.isFile() || sha(cached) != latticeLmSha256) {
+            latticeLmCacheDir.mkdirs()
+            def tmp = new File(latticeLmCacheDir, "${latticeLmSha256}.slc.tmp")
+            def conn = new URL(latticeLmUrl).openConnection()
+            conn.connectTimeout = 30000
+            conn.readTimeout = 120000
+            conn.inputStream.withCloseable { ins -> tmp.withOutputStream { it << ins } }
+            def got = sha(tmp)
+            if (got != latticeLmSha256) {
+                tmp.delete()
+                throw new GradleException("lattice LM table sha256 mismatch: expected ${latticeLmSha256}, got ${got} (${latticeLmUrl})")
+            }
+            cached.delete()
+            if (!tmp.renameTo(cached)) throw new GradleException("could not store ${cached}")
+        }
+        out.parentFile.mkdirs()
+        java.nio.file.Files.copy(cached.toPath(), out.toPath(), java.nio.file.StandardCopyOption.REPLACE_EXISTING)
+        if (sha(out) != latticeLmSha256) throw new GradleException("lattice LM table sha256 mismatch after copy")
+        logger.lifecycle("lattice LM table: ${out} (${out.length()} bytes, sha256 ok)")
+    }
+}
+
+tasks.named("preBuild").configure {
+    dependsOn("fetchLatticeLmTable")
 }
 
 tasks.register("generateMozcSegmenterData") {

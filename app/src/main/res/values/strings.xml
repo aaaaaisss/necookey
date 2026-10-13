@@ -877,6 +877,10 @@
     <string name="zenz_engine_jinen">jinen（読み込んだ jinen モデル・入力が止まったら文全体を変換）</string>
     <string name="zenz_engine_zenz">zenz（読み込んだ zenz モデルの評価）</string>
     <string name="zenz_engine_needs_model">AI モデルを読み込むと jinen / zenz を選べます</string>
+    <string name="sumire_lm_zenz_margin_title">zenz に回すしきい値（リランカーのスコア差 ×0.01）</string>
+    <string name="sumire_lm_zenz_margin_summary">1 位と 2 位の差がこれ未満の読みだけ zenz で文脈判断します（zenz を選んでモデルを読み込んだとき。表が無いときは従来の ZENZ-GATE）。0 で zenz を使いません。</string>
+    <string name="lattice_lm_cost_title">単語のつながりで変換を補正（ラティス LM）</string>
+    <string name="lattice_lm_cost_summary">内蔵の単語 bigram 表で変換経路を補正します（メモリ約 11MB）。遅いと感じたらオフにしてください。</string>
     <string name="zenz_model_source_title">モデルの読み込み元</string>
     <string name="zenz_model_source_default">なし（AI モデルは同梱していません）</string>
     <string name="zenz_model_source_pick">モデルファイルを選択する</string>
