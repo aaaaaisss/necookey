@@ -690,6 +690,8 @@ def latticeLmUrl = "https://raw.githubusercontent.com/aaaaaisss/necookey/${latti
 def latticeLmEnabled = (findProperty("latticeLmTable") ?: "true").toString() != "false"
 def latticeLmAsset = layout.buildDirectory.file("generated/latticeLmTable/assets/lattice_lm/${latticeLmFileName}")
 def latticeLmCacheDir = new File(gradle.gradleUserHomeDir, "caches/necookey-lattice-lm")
+// リポジトリが非公開のとき（raw URL は 404）は CI で git から取り出したファイルを -PlatticeLmTableFile=PATH で渡す（同じく sha256 照合）。
+def latticeLmLocalFile = findProperty("latticeLmTableFile")?.toString()
 
 tasks.register("fetchLatticeLmTable") {
     inputs.property("latticeLmSha256", latticeLmSha256)
@@ -712,7 +714,14 @@ tasks.register("fetchLatticeLmTable") {
             md.digest().collect { String.format("%02x", it) }.join("")
         }
         def cached = new File(latticeLmCacheDir, "${latticeLmSha256}.slc")
-        if (!cached.isFile() || sha(cached) != latticeLmSha256) {
+        if (latticeLmLocalFile) {
+            def local = new File(latticeLmLocalFile)
+            def got = local.isFile() ? sha(local) : "missing"
+            if (got != latticeLmSha256) {
+                throw new GradleException("lattice LM table sha256 mismatch: expected ${latticeLmSha256}, got ${got} (${local})")
+            }
+            cached = local
+        } else if (!cached.isFile() || sha(cached) != latticeLmSha256) {
             latticeLmCacheDir.mkdirs()
             def tmp = new File(latticeLmCacheDir, "${latticeLmSha256}.slc.tmp")
             def conn = new URL(latticeLmUrl).openConnection()
