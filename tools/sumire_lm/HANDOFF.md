@@ -384,3 +384,80 @@ CI: `ci/lattice_cost.txt`=1・`ci/n_auto.txt`=0 で trigger → `$WORK/dl_art.sh
 - 次: 実機で速度・メモリ（表 約 11MB ヒープ、+1.8 ms/文 CI）を確認、遅ければ Node 単位の語番号キャッシュか既定オフに戻す。名詞＋は＋いっ 型。リランカー再適用後の精度。
 Reproduce: `in_daily.tsv` = ajimee + jwtd_kc + probe + daily を NK_DUMP_IN に、NK_LATTICE_COST=lc_np1m.slc、NK_HAIRU=0 / 8000 で
 `./gradlew :app:testLiteStandardDebugUnitTest --rerun --tests '*SumireNbestDumpTest*'`（テストファイルを quality/ にコピー、各 ~2 分）→ `python3 $T/hcmp.py OFF ON`。
+
+## 2026-10-13 同音異義の文脈投票（homophone-ctx、zenz なし・オフライン評価のみ、アプリ未統合）
+選択（語数予算・KALT・LAM・TH・窓・α）はすべて JWTD tune + daily tune。held / AJIMEE は報告のみ。対象 N-best = ラティスコストあり（現既定）:
+JWTD/AJIMEE は lcx/ci/cands、daily は lcx/h1/cands.0.tsv。作業データ $WORK/hctx（コミットしない）。
+
+### 方法
+1. 混同ペアの採掘（hc_mine.py）: Sumire top1 と rank 1..19 の候補のうち「同じ読み区間で漢字だけ違う」純同音差分（chunks: 共通の読み切れ目で区切り、
+   両側に漢字・かな/送り/幅の違いは除外）。差分の核を fugashi 語境界まで広げ、両側が 1 語（語彙内）のときペアに。ソース = JWTD tune + daily tune の N-best
+   と CC-100 由来の auto 24k 文（旧ダンプ）。→ 17,641 ペア / 18,808 語（例 支店/視点, 帽子/防止, 時間/次官, 照会/紹介, 参加/酸化, 思い/想い, 行っ/言っ）。
+   複数語にまたがる差分（初めて/始めて, 十分/充分 など 42k 種）は対象外。
+2. 文脈の集計（hc_count.py）: コーパス全体 9.6 億語で各メンバー語の出現（1 チャンクあたり最大 2,500 件 = 最大 22.5k 件/語）の ±15 語（同じ行）にある
+   内容語（2 文字以上・漢字かカタカナを含む）を数える（2 CPU で 9 チャンク各 ~20 s）。
+3. ペアごとの票（hc_eval.py buildnp）: δ(w) = log P(w|a) − log P(w|b)、P(w|m) = (c(m,w) + α·p_ab(w)) / (N_m + α)、α=10、c(a,w)+c(b,w) >= 3。
+   語の選択 = |δ|·(c(a,w)+c(b,w)) の大きい順に全体予算 B 語（ペアごとの上位 K でもほぼ同じ）。重みは 4 bit（±8 でクリップ）。
+4. 適用: top1 と rank 1..KALT-1 のうち純同音差分の候補について、各差分チャンクをペア表で引き（下記の語分割なし検索）、
+   score = LAM·Σ vote − (cost_alt − cost_top1)/1000、最大の score > TH なら差し替え。文脈 = 左文脈 + top1 の文（差分チャンクを空白に）、
+   表の語が部分文字列として含まれれば加点。**語分割なしの検索**: 共通接頭/接尾を除いた核を左右 0..3 文字ずつ広げ、表にある最長の窓を採用
+   （fugashi で語境界を取る場合と精度同等: held .400/.597/.595 vs .400/.596/.595。最短優先だと崩れが増える）。端末に形態素解析は不要。
+
+### 結果（Sumire top1 → +文脈投票、4 bit、語分割なし検索、KALT=5）。homErr = 正解が N-best 内にあり top1 との差が純同音の誤り
+| 予算（語数） | サイズ | 設定（tune） | JWTD tune | JWTD held | daily tune | daily held | AJIMEE |
+|---|---|---|---|---|---|---|---|
+| なし | 0 | | .362 (homErr 536) | .361 (539) | .557 (103) | .582 (105) | .560 (59) |
+| 250k | 0.89MB | LAM .5 TH 0 | .381 (508) | .385 (502) | .565 (92) | .589 (95) | .560 (59) |
+| 500k | 1.58MB | LAM 2 TH .5 | .388 (497) | .393 (491) | .565 (92) | .591 (92) | .575 (56) |
+| **1M（推奨）** | **2.98MB** | LAM 1 TH .5 | .393 (490) | **.400 (480)** | .570 (85) | **.597 (83)** | **.595 (52)** |
+| 2M | 5.5MB | LAM 1 TH 0 | .405 (471) | .413 (460) | .570 (85) | .595 (86) | .580 (55) |
+| 4M | 10.6MB | LAM 1.5 TH .5 | .416 (455) | .419 (450) | .571 (82) | .597 (82) | .590 (53) |
+| 14.8M（全部, 8bit） | 45MB | | .435 (427) | .431 (434) | .571 (83) | .595 (86) | .590 (53) |
+- 1M: homErr held −11%（JWTD 539→480）/ −21%（daily 105→83）/ AJIMEE 59→52。差し替え fix/break: JWTD held 64/5、daily held 28/6、AJIMEE 12/5、
+  JWTD tune 68/22、daily tune 27/8。全分割で純増、悪化は少数（tune の break が held より多い）。
+- 窓 ±5 は daily で break が増える（held .585）ので ±15 を採用。α（3〜100）・ペアの出現回数の下限はほぼ影響なし。1 文字メンバー（社/者, 見/観）を
+  除くと daily が下がる（.589）ので残す。8 bit と 4 bit は同等。
+- daily のリーク確認: daily 正解 40 文をコーパス先頭 2GB で検索 → 0 件（対照語は 69 件）。
+
+### リランカーとの重なり（hc_rr.py、旧ラティスなし N-best。リランカーのスコアはこれにしか無い。表は per-pair K=128 ≈ 2M 語・float）
+| | JWTD tune | JWTD held | AJIMEE |
+|---|---|---|---|
+| Sumire（ラティスなし）→ +投票 | .309→.369 | .319→.383 | .525→.560 |
+| 採用リランカー（lin base+lmw+lmc+pmi）→ +投票（KALT 5, LAM .5 を tune で） | .513→.523 | .511→.523 | .760→.770 |
+- homErr はリランカー後 352→337 / 349→330 / 24→22（−4〜5%）。投票が Sumire に対して直す文の 71〜72% はリランカー単独でも正解（tune 84/118, held 78/108）。
+- PMI 特徴との相関: 同音差し替え候補 33k 組で corr(投票, Δpmi_sum) = 0.26、corr(Δpmi_max) = 0.19、両方 0 でない組の符号一致 52%。
+  特徴としては別物（ペア内の識別重み vs 文脈語×候補語の PMI 最大値）だが、リランカーの語 4-gram + 文字 LM + PMI で大半は既に取れている。
+
+### UI チップ用: 同音誤りの残りの内訳（1M 適用後、held）
+- Sumire コスト差（正解 − 表示中）: JWTD <=500: 20% / <=1000: 35% / <=2000: 59%、daily <=500: 36% / <=1000: 51% / <=2000: 70%（適用前 daily 33/51/75%）。
+- 正解が「表示中の候補の純同音バリアント（Sumire 順）」の何番目か: daily held 1 番目 61% / 2 番目まで 78% / 3 番目まで 88% / 5 番目まで 95%、
+  JWTD held 44 / 63 / 70 / 79%、AJIMEE 44 / 56 / 63 / 79%（適用前 daily 64 / 82 / 90 / 96%）。→ 同音チップ 2〜3 個で日常文の残り誤りの ~8〜9 割をカバー。
+
+### 書き出し形式 HCX1（hc_export.py、往復検証つき）
+`magic 'HCX1' | u32 ver, nWords, nMembers, nPairs, nEntries | f32 lam, th, clip | u32 qbits` → 語プール（u32 offsets + UTF-8、整列）→ メンバープール →
+ペア配列 (u16 memberA, u16 memberB, u32 firstEntry)（A<B、末尾に番兵）→ 語 id u16[nEntries] → 4 bit 重み（下位ニブル先、−7..7、重み = q·clip/7、正 = A 寄り）。
+1M 予算: 2,983,626 バイト、語 21,459・メンバー 13,917・ペア 13,568・語エントリ 994,253（q=0 は落とす）、lam=1.0 th=0.5、
+sha256 `d019d6db5ca8daece4f82d51aef1f4908a036564970c43b0cb448b6adf760980`（未公開: lm-data には載せていない）。
+
+### Kotlin 実装の見取り図（未実装）
+- `HomophoneContext.load(InputStream)`: 語・メンバーを String 配列に、ペアは `HashMap<Long, Int>`（メンバー番号 2 つを詰めたキー → ペア番号）、
+  メンバー文字列 → 番号の `HashMap<String, Int>`。語 id は ShortArray、重みは ByteArray（ニブル）。ヒープ ~4〜5 MB。
+- `rescore(top: Cand, alts: List<Cand>, left: CharSequence): Int?`（getCandidatesWithBunsetsuSeparation の N-best 上位 5 と各候補の (読み, 表記) 区切りを使う）:
+  1. 各 alt について読みの累積切れ目の共通部分で区切り、表記の違うチャンクが全部「両側に漢字・核にも漢字」かを確認（hc_common.is_homophone_diff と同じ）。
+  2. チャンクごとに共通接頭/接尾を外し、左右 0..3 文字の窓を長い順に試して (ma, mb) のペアを引く（無ければその alt は対象外）。
+  3. 文脈文字列 = left（getTextBeforeCursor、~100 文字）+ 空白 + top の表記（差分チャンクは空白に）。ペアの語（平均 ~79 語）で `ctx.contains(word)` が
+     真なら重みを足す（alt が B 側なら符号反転）。score = lam·Σ − Δcost/1000、最大が th を超えたらその alt を先頭に。
+  4. 候補の並べ替えだけで変換経路は不変。設定でオフ可。表が無ければ何もしない。
+- 速度見積り: 1 文あたり alt ≤4・ルックアップ ≤16 回・contains ~80 回 × 文脈 ~30〜130 文字 → 数十 µs（Python でも投票部分は 0.015 ms/文。端末実測は未）。
+
+### 推奨
+- リランカーを載せない構成（現状のラティスコストありの Sumire）なら **1M 版（3.0MB）を top-5 の並べ替えとして追加する価値あり**:
+  held top1 JWTD +3.9 / daily +1.5 / AJIMEE +3.5 pt、同音誤り −11%（JWTD）/ −21%（daily）、悪化は fix の 1/5〜1/3。2〜4M（5〜11MB）は JWTD がさらに +1〜2 pt、daily は横ばい。
+- フルのリランカーがある構成では +1 pt 程度（重なり ~70%）で、優先度は低い。
+- 次: (1) Kotlin 実装 + 単体テスト（Python と同じ票になるか）、表は lm-data に sha256 固定で配置。(2) 複数語にまたがる差分（初めて/始めて 等）を
+  メンバー = 表記文字列にして拡張。(3) 端末の確定履歴を文脈に使う（左文脈が長いほど効く。daily は左文脈なしでこの数字）。
+Reproduce（$WORK=/workspace/work/sumire_lm、`. env.sh`、2 CPU、ほぼ各 < 2 分）:
+`hc_prep.py` → `hc_base.py` → `hc_mine.py 20` → `hc_count.py members` → `hc_count.py count I`（I=0..8）→ `hc_count.py merge 0-8` →
+`hc_eval.py buildnp 1024,3,10,a` → `HC_DEVORDER=long hc_run.py prep np1024c3a10am1` → `HC_PREP=_devlong hc_budget.py np1024c3a10am1 1000000 4` →
+`hc_cover.py $WORK/hctx/res_np1024c3a10am1_1000000_q4_devlong.pkl` ; `hc_eval.py build 128,3,10,a` + `hc_rr.py k128c3a10am1`（リランカー重なり）;
+`hc_export.py np1024c3a10am1 1000000 OUT.hcx 1.0 0.5`。メモリ ~3GB 空きを想定（merge は会員範囲ごと）。
