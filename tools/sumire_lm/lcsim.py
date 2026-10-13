@@ -5,7 +5,7 @@ Edge cost added to the Sumire path (prev -> node, node != EOS):
     lp(w | v) = q(log p2(w|v)) if the pair (v, w) is stored, else q(log alpha(v)) + q(log p1(w)); prev = BOS -> q(log p1(w))
     p1 = KN unigram (continuation counts), p2 = interpolated absolute discounting (D), alpha(v) = D N1+(v .) / c(v)
     words below the unigram cutoff are OOV (p1 = floor, alpha = 1); q() = rounding to 1/QS nats (int16 on device)
-Keys: Java String.hashCode() of the raw node surface (Sumire's own word split, no NFKC), so the device needs no vocabulary.
+Keys: LatticeLmCost.wordHash (FNV-1a + fmix32) of the raw node surface (Sumire's own word split, no NFKC), so the device needs no vocabulary.
 Pairs kept: the top NP pairs by c(vw) * |log p2 - log(alpha(v) p1(w))| (weighted log-ratio pruning), count >= 2.
 LAM / MU / OMEGA: linear listwise model (cost + lp sum + #OOV + #words) fitted on JWTD tune (l2 by tune 2-fold CV).
 lcsim.py run np=500000 cu=20 [qs=7] [d=0.75] [export=PATH]   -> prints tune/held/eval top1 (Sumire-student, top-50), sizes"""
@@ -17,9 +17,12 @@ NPAIR = int(float(P.get('np', 500000))); CU = int(P.get('cu', 20)); QS = float(P
 VB = 1 << 20
 
 def jhash(s):
-    h = 0; b = s.encode('utf-16-le')
+    """word key, identical to LatticeLmCost.wordHash (Kotlin): FNV-1a 32 over UTF-16 code units, then murmur3 fmix32.
+    (Java String.hashCode collides far too often on short CJK strings: 31*c1+c2.)"""
+    h = 0x811C9DC5; b = s.encode('utf-16-le')
     for i in range(0, len(b), 2):
-        h = (31 * h + (b[i] | (b[i + 1] << 8))) & 0xFFFFFFFF
+        h = ((h ^ (b[i] | (b[i + 1] << 8))) * 0x01000193) & 0xFFFFFFFF
+    h ^= h >> 16; h = (h * 0x85EBCA6B) & 0xFFFFFFFF; h ^= h >> 13; h = (h * 0xC2B2AE35) & 0xFFFFFFFF; h ^= h >> 16
     return h - (1 << 32) if h >= 1 << 31 else h
 
 voc = pickle.load(open(f'{WORK}/lm/voc.pkl', 'rb'))

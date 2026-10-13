@@ -55,7 +55,7 @@ jobs:
           else
             : > auto.tsv
           fi
-          cat ajimee.tsv jwtd_kc.tsv auto.tsv > all.tsv
+          cat ajimee.tsv jwtd_kc.tsv auto.tsv ../tools/sumire_lm/ci/probe_hairu.tsv > all.tsv
           wc -l *.tsv
       - uses: actions/upload-artifact@v7
         with:
@@ -103,11 +103,22 @@ jobs:
           NK_DUMP_SHARD: ${{ matrix.shard }}/${{ needs.prep.outputs.nshard }}
         timeout-minutes: 100
         run: |
+          # 案2 ラティスコスト表（tools/sumire_lm/ci/lattice_cost.txt が "1" のときだけ）。表は孤立ブランチ lm-data の
+          # 固定コミットから取得し、sha256 が一致しなければ失敗させる（表はリポジトリの通常ブランチには入れない）。
+          LC_COMMIT=63732f821b7100dc6e3b9a47ea7725818151ea84
+          LC_FILE=lc_np1m.slc
+          LC_SHA256=1accd8c96f3df50761879e36e476f38911e9a8e29df5caabfd2dcf4a7c8a00b5
+          if [ "$(cat tools/sumire_lm/ci/lattice_cost.txt 2>/dev/null)" = "1" ]; then
+            curl -sSfL -o "$RUNNER_TEMP/$LC_FILE" "https://raw.githubusercontent.com/${{ github.repository }}/$LC_COMMIT/$LC_FILE"
+            echo "$LC_SHA256  $RUNNER_TEMP/$LC_FILE" | sha256sum -c - || { echo "lattice cost table sha256 mismatch"; exit 1; }
+            export NK_LATTICE_COST="$RUNNER_TEMP/$LC_FILE"
+          fi
           # 区切り固定の再変換（tools/sumire_lm/ci/split_reconv.txt = "K,m,N"、空なら無効）
           export NK_SPLIT_RECONV="$(cat tools/sumire_lm/ci/split_reconv.txt 2>/dev/null || true)"
           cp tools/sumire_lm/ci/SumireNbestDumpTest.kt app/src/test/java/com/kazumaproject/markdownhelperkeyboard/converter/quality/
           ./gradlew :app:testLiteStandardDebugUnitTest --tests '*SumireNbestDumpTest*' -i --no-daemon --max-workers=2 -Dorg.gradle.jvmargs=-Xmx2g 2>&1 | grep -E "dumped|fail |FAILED|BUILD|error:|Exception" | head -200
           wc -l cands.${{ matrix.shard }}.tsv
+          [ -n "${NK_LATTICE_COST:-}" ] && awk -F'\t' '{b+=$3; l+=$4; n++} END {printf "no table %.2f ms/sent, with table %.2f ms/sent (n=%d)\n", b/n, l/n, n}' cands.${{ matrix.shard }}.tsv.time && exit 0
           [ -f cands.${{ matrix.shard }}.tsv.time ] && awk -F'\t' '{b+=$3; x+=$4; c+=$5; n++} END {printf "base %.1f ms/sent, extra %.1f ms/sent, extra cands %.1f/sent\n", b/n, x/n, c/n}' cands.${{ matrix.shard }}.tsv.time || true
       - uses: actions/upload-artifact@v7
         if: always()
