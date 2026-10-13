@@ -15,6 +15,7 @@ import android.graphics.BitmapFactory
 import android.graphics.Color
 import android.graphics.Point
 import android.graphics.Rect
+import android.graphics.RectF
 import android.graphics.drawable.Drawable
 import android.graphics.drawable.GradientDrawable
 import android.hardware.input.InputManager
@@ -200,6 +201,11 @@ import com.kazumaproject.markdownhelperkeyboard.converter.candidatebar.NextWordZ
 import com.kazumaproject.markdownhelperkeyboard.converter.candidatebar.TwoRowCandidateBar
 import com.kazumaproject.markdownhelperkeyboard.converter.candidatebar.TwoRowCandidateBarPlanner
 import com.kazumaproject.markdownhelperkeyboard.converter.candidatebar.HomophoneChips
+import com.kazumaproject.markdownhelperkeyboard.converter.candidatebar.HomophonePlan
+import com.kazumaproject.markdownhelperkeyboard.converter.candidatebar.InlineChoices
+import com.kazumaproject.markdownhelperkeyboard.converter.candidatebar.InlineBoundaryEdit
+import com.kazumaproject.markdownhelperkeyboard.converter.candidatebar.CharBox
+import com.kazumaproject.markdownhelperkeyboard.converter.candidatebar.CommittedSpanTracker
 import com.kazumaproject.markdownhelperkeyboard.converter.candidatebar.BunsetsuMarginSource
 import com.kazumaproject.markdownhelperkeyboard.converter.candidatebar.SumireCostGapMargin
 import com.kazumaproject.markdownhelperkeyboard.converter.candidatebar.SumireLmMarginSource
@@ -2369,6 +2375,30 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
     @Volatile
     private var necookeyLastBarInputs: NecookeyBarInputs? = null
 
+    // --- Inline choices prototype (necookey_inline_choices_preference) ---
+    /** Recently committed texts with their per-bunsetsu alternatives (post-commit correction). */
+    private val inlineCommittedSpans = CommittedSpanTracker()
+    private var inlineBubbleController: InlineBubbleController? = null
+    private var inlineLastAnchorInfo: CursorAnchorInfo? = null
+    /** The editor reported character bounds for the composing text (else: candidate-bar chips). */
+    private var inlineAnchorWorks = false
+    /** Homophone plan of the live-conversion text currently composed. */
+    @Volatile
+    private var inlineShownPlan: InlineShownPlan? = null
+    /** Live bunsetsu whose end shows the boundary ◀▶ bubble (after a tap inside the composing text). */
+    private var inlineBoundarySlot: Int? = null
+    private var inlinePostCommitHit: CommittedSpanTracker.Hit? = null
+    private var inlineReplacing = false
+    private var inlineLastCandidatesStart = -1
+    private var inlineLastSelStart = -1
+    private var inlineLastSelEnd = -1
+
+    private data class InlineShownPlan(
+        val input: String,
+        val analysis: BunsetsuAnalysis,
+        val plan: HomophonePlan,
+    )
+
     private data class NecookeyBarInputs(
         val input: String,
         val conversion: List<Candidate>,
@@ -2871,6 +2901,7 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
     override fun onStartInput(attribute: EditorInfo?, restarting: Boolean) {
         dismissKeyboardSelectionPopups()
         super.onStartInput(attribute, restarting)
+        resetInlineChoices(clearCommitted = !restarting)
         resetCustomToggleState()
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
             inlineAutofillController?.startInputSession()
@@ -4213,6 +4244,7 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         syncNgramDictionaryPreferences()
         syncLatticeLmCost()
         isInputViewActive = true
+        requestInlineCursorUpdates()
         // A hidden input view must not carry the previous candidate-display phase into
         // the next render. The editor can restart the view without onStartInput().
         shortcutToolbarHiddenForCandidates = false
@@ -4329,6 +4361,7 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
 
     override fun onFinishInput() {
         dismissKeyboardSelectionPopups()
+        resetInlineChoices(clearCommitted = true)
         modeSwitchAwaitingCursorPosition = false
         dismissJob?.cancel()
         forwardDeleteCoordinator.cancel()
@@ -4341,6 +4374,7 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
 
     override fun onFinishInputView(finishingInput: Boolean) {
         dismissKeyboardSelectionPopups()
+        inlineBubbleController?.dismissAll()
         modeSwitchAwaitingCursorPosition = false
         dismissJob?.cancel()
         imeSwitchPopupWindow?.dismiss()
@@ -4776,6 +4810,13 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
 
     override fun onUpdateCursorAnchorInfo(cursorAnchorInfo: CursorAnchorInfo?) {
         super.onUpdateCursorAnchorInfo(cursorAnchorInfo)
+        if (!inlineChoicesEnabled()) return
+        inlineLastAnchorInfo = cursorAnchorInfo
+        val composing = cursorAnchorInfo?.composingText
+        if (cursorAnchorInfo != null && !composing.isNullOrEmpty()) {
+            inlineAnchorWorks = cursorAnchorInfo.getCharacterBounds(cursorAnchorInfo.composingTextStart) != null
+        }
+        refreshInlineBubbles()
     }
 
     override fun onConfigurationChanged(newConfig: Configuration) {
@@ -5382,6 +5423,7 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         forwardDeleteCoordinator.onSelectionChanged(newSelStart, newSelEnd)
         observeSelectionForLearningRevert(newSelStart, newSelEnd)
         invalidateCustomToggleStateForSelection(newSelStart, newSelEnd)
+        onInlineSelectionChanged(newSelStart, newSelEnd, candidatesStart, candidatesEnd)
         // Skip if composing text is active
         if (candidatesStart != -1 || candidatesEnd != -1) {
             return
@@ -12572,6 +12614,12 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         val commitString = getCandidateCommitString(candidate)
         lastCandidate = commitString
         val newSpannable = createSpannableWithTail(commitString)
+        // Inline choices prototype: visible bunsetsu boundaries in the live-conversion text.
+        val bunsetsuLengths = if (inlineChoicesEnabled() && stringInTail.get().isEmpty()) {
+            InlineChoices.segmentLengths(commitString, inlineShownPlan?.plan?.slotOutputs)
+        } else {
+            null
+        }
         setComposingTextAfterEdit(
             inputString = commitString,
             spannableString = newSpannable,
@@ -12585,7 +12633,8 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
                 inputCompositionTextColor
             } else {
                 null
-            }
+            },
+            segmentLengths = bunsetsuLengths,
         )
         endBatchEdit()
     }
@@ -16243,8 +16292,35 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         inputString: String,
         spannableString: SpannableString,
         @ColorInt backgroundColor: Int,
-        @ColorInt textColor: Int? = null
+        @ColorInt textColor: Int? = null,
+        segmentLengths: List<Int>? = null,
     ) {
+        if (segmentLengths != null && segmentLengths.size > 1 && segmentLengths.sum() == inputString.length &&
+            spannableString.length == inputString.length
+        ) {
+            // Per-bunsetsu styling: alternate background strength and one underline per bunsetsu.
+            val flags = Spannable.SPAN_EXCLUSIVE_EXCLUSIVE or Spannable.SPAN_COMPOSING
+            val lighter = Color.argb(
+                (Color.alpha(backgroundColor) * 45 / 100).coerceAtLeast(0x30),
+                Color.red(backgroundColor),
+                Color.green(backgroundColor),
+                Color.blue(backgroundColor),
+            )
+            var start = 0
+            segmentLengths.forEachIndexed { index, length ->
+                val end = start + length
+                spannableString.setSpan(
+                    BackgroundColorSpan(if (index % 2 == 0) backgroundColor else lighter), start, end, flags,
+                )
+                spannableString.setSpan(UnderlineSpan(), start, end, flags)
+                start = end
+            }
+            textColor?.let { color ->
+                spannableString.setSpan(ForegroundColorSpan(color), 0, inputString.length, flags)
+            }
+            setComposingText(spannableString, 1)
+            return
+        }
         // stringInTail が空でなければ、下線の終了位置を延長する
         val underlineEnd = if (stringInTail.get().isNotEmpty()) {
             inputString.length + stringInTail.get().length
@@ -16980,6 +17056,302 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
             ?.takeIf { it.first == insertString && appPreference.sumire_lm_homophone_margin_preference }
             ?.second
 
+    // ---------------------------------------------------------------------------------------------
+    // Inline choices prototype: floating bubbles over the editor (CursorAnchorInfo), post-commit
+    // correction, and the bunsetsu boundary ◀▶. Off: necookey_inline_choices_preference = false.
+    // ---------------------------------------------------------------------------------------------
+
+    private fun inlineChoicesEnabled(): Boolean =
+        appPreference.necookey_inline_choices_preference && dictionaryInputConnection == null
+
+    private fun requestInlineCursorUpdates() {
+        if (!inlineChoicesEnabled()) return
+        val ok = runCatching {
+            currentInputConnection?.requestCursorUpdates(
+                InputConnection.CURSOR_UPDATE_MONITOR or InputConnection.CURSOR_UPDATE_IMMEDIATE,
+            ) ?: false
+        }.getOrDefault(false)
+        if (!ok) inlineAnchorWorks = false
+    }
+
+    private fun resetInlineChoices(clearCommitted: Boolean) {
+        inlineBubbleController?.dismissAll()
+        inlineLastAnchorInfo = null
+        inlineAnchorWorks = false
+        inlineShownPlan = null
+        inlineBoundarySlot = null
+        inlinePostCommitHit = null
+        inlineLastCandidatesStart = -1
+        inlineLastSelStart = -1
+        inlineLastSelEnd = -1
+        if (clearCommitted) inlineCommittedSpans.clear()
+    }
+
+    private fun onInlineSelectionChanged(selStart: Int, selEnd: Int, candidatesStart: Int, candidatesEnd: Int) {
+        inlineLastCandidatesStart = candidatesStart
+        inlineLastSelStart = selStart
+        inlineLastSelEnd = selEnd
+        if (!inlineChoicesEnabled() || inlineReplacing) return
+        val composing = candidatesStart >= 0 && candidatesEnd > candidatesStart
+        if (composing) {
+            inlinePostCommitHit = null
+            val shown = inlineShownPlan
+            // A tap strictly inside the live-conversion text: offer ◀▶ at the nearest bunsetsu end.
+            if (shown != null && selStart == selEnd && selStart > candidatesStart && selStart < candidatesEnd &&
+                !isBunsetsuCursorMoveSessionActive() && shown.plan.slotOutputs.size > 0 &&
+                candidatesEnd - candidatesStart == shown.plan.sentence.length
+            ) {
+                inlineBoundarySlot = InlineBoundaryEdit.slotForTap(shown.plan.slotOutputs, selStart - candidatesStart)
+                refreshInlineBubbles()
+            }
+            return
+        }
+        inlineBoundarySlot = null
+        inlinePostCommitHit = if (inputString.value.isEmpty() && stringInTail.get().isEmpty()) {
+            findInlinePostCommitHit(selStart, selEnd)
+        } else {
+            null
+        }
+        refreshInlineBubbles()
+    }
+
+    /** The remembered committed bunsetsu at the selection, if the editor still holds its text. */
+    private fun findInlinePostCommitHit(selStart: Int, selEnd: Int): CommittedSpanTracker.Hit? {
+        val hit = inlineCommittedSpans.hitAt(selStart, selEnd) ?: return null
+        val ic = currentInputConnection ?: return null
+        val entry = hit.entry
+        val before = runCatching { ic.getTextBeforeCursor(selStart - entry.start, 0) }.getOrNull()
+        val after = runCatching {
+            val selected = if (selEnd > selStart) ic.getSelectedText(0)?.toString() ?: return@runCatching null else ""
+            selected + (ic.getTextAfterCursor((entry.end - selEnd).coerceAtLeast(0), 0) ?: return@runCatching null)
+        }.getOrNull()
+        if (!inlineCommittedSpans.verify(hit, selStart, before, after)) {
+            inlineCommittedSpans.invalidate(entry)
+            return null
+        }
+        return hit
+    }
+
+    /** Remembers a commit that matches what the bunsetsu session or the live conversion showed. */
+    private fun recordInlineCommit(text: String?, start: Int) {
+        if (!inlineChoicesEnabled()) return
+        val shown = inlineShownPlan
+        inlineShownPlan = null
+        inlineBoundarySlot = null
+        inlineBubbleController?.dismissAll()
+        if (text.isNullOrEmpty() || start < 0) return
+        val session = bunsetsuConversionSession
+        val slots = if (session != null && session.segments.joinToString(separator = "") { it.displayText } == text) {
+            var position = 0
+            session.segments.map { segment ->
+                val alternatives = (listOf(segment.displayText) + segment.candidates.map(::displayTextFromCandidate))
+                    .filter { it.isNotEmpty() }
+                    .distinct()
+                    .take(InlineChoices.MAX_CHOICES)
+                CommittedSpanTracker.Slot(position, segment.displayText, segment.reading, alternatives)
+                    .also { position += segment.displayText.length }
+            }
+        } else {
+            shown?.let { CommittedSpanTracker.slotsOf(it.analysis, it.plan.slotOutputs) }
+                ?.let { CommittedSpanTracker.prefixSlots(it, text) }
+        } ?: return
+        inlineCommittedSpans.record(start, text, slots)
+    }
+
+    private fun inlineBubbleColors(): InlineBubbleController.Colors {
+        val colors = resolveCandidatePanelColors()
+        val background = if (Color.alpha(colors.background) < 0xF0) {
+            Color.rgb(Color.red(colors.background), Color.green(colors.background), Color.blue(colors.background))
+        } else {
+            colors.background
+        }
+        return InlineBubbleController.Colors(background = background, text = colors.text, current = colors.pressed)
+    }
+
+    /** Screen-space box of absolute character [index] from [info], or null when not reported. */
+    private fun inlineCharBox(info: CursorAnchorInfo, index: Int): CharBox? {
+        val bounds = info.getCharacterBounds(index) ?: return null
+        val rect = RectF(bounds)
+        info.matrix?.mapRect(rect)
+        return CharBox(rect.left, rect.top, rect.right, rect.bottom)
+    }
+
+    /** Main thread. Shows the bubbles that fit the current state, or none. */
+    private fun refreshInlineBubbles() {
+        val controller = inlineBubbleController ?: InlineBubbleController(this).also { inlineBubbleController = it }
+        val parent = mainLayoutBinding?.root
+        val info = inlineLastAnchorInfo
+        if (!inlineChoicesEnabled() || parent == null || info == null || !isInputViewActive) {
+            controller.dismissAll()
+            return
+        }
+        val bubbles = ArrayList<InlineBubbleController.Bubble>()
+        val composing = info.composingText?.toString().orEmpty()
+        val density = resources.displayMetrics.density
+        if (composing.isNotEmpty() && inputString.value.isNotEmpty()) {
+            val composingStart = info.composingTextStart
+            val boxAt: (Int) -> CharBox? = { offset -> inlineCharBox(info, composingStart + offset) }
+            val session = bunsetsuConversionSession?.takeIf { isBunsetsuCursorMoveSessionActive() }
+            if (session != null) {
+                // Bunsetsu session: ◀▶ resizes the focused bunsetsu (only the reading after it is re-split).
+                val focus = session.focusedIndex.coerceIn(0, session.segments.lastIndex)
+                val end = session.segments.take(focus + 1).sumOf { it.displayText.length }
+                if (end in 1..composing.length) {
+                    boxAt(end - 1)?.let { box ->
+                        bubbles += InlineBubbleController.Bubble(
+                            labels = listOf("◀", "▶"),
+                            currentIndex = -1,
+                            anchorX = box.right - 28 * density,
+                            anchorY = box.top,
+                            onTap = { i -> resizeFocusedBunsetsuSegment(if (i == 0) -1 else 1) },
+                        )
+                    }
+                }
+            } else {
+                val shown = inlineShownPlan?.takeIf { it.input == inputString.value && it.plan.sentence == composing }
+                if (shown != null) {
+                    val choices = InlineChoices.of(shown.analysis, shown.plan)
+                    for (choice in choices) {
+                        val anchor = InlineChoices.anchorOf(choice.start, choice.end, boxAt) ?: continue
+                        bubbles += InlineBubbleController.Bubble(
+                            labels = choice.chips.map { it.label },
+                            currentIndex = 0,
+                            anchorX = anchor.first,
+                            anchorY = anchor.second,
+                            onTap = { i -> onInlineChoiceTap(shown, choice.slotIndex, choice.chips.getOrNull(i)) },
+                        )
+                    }
+                    if (choices.isNotEmpty() && bubbles.isEmpty()) inlineAnchorWorks = false
+                    val boundarySlot = inlineBoundarySlot
+                    if (boundarySlot != null && boundarySlot in shown.plan.slotOutputs.indices) {
+                        val end = InlineChoices.slotStarts(shown.plan.slotOutputs)[boundarySlot] +
+                            shown.plan.slotOutputs[boundarySlot].length
+                        boxAt(end - 1)?.let { box ->
+                            bubbles += InlineBubbleController.Bubble(
+                                labels = listOf("◀", "▶"),
+                                currentIndex = -1,
+                                anchorX = box.right - 28 * density,
+                                anchorY = box.top,
+                                onTap = { i -> onInlineBoundaryTap(shown, boundarySlot, if (i == 0) -1 else 1) },
+                            )
+                        }
+                    }
+                }
+            }
+        } else if (composing.isEmpty() && inputString.value.isEmpty()) {
+            val hit = inlinePostCommitHit
+            val x = info.insertionMarkerHorizontal
+            val top = info.insertionMarkerTop
+            if (hit != null && info.selectionStart == inlineLastSelStart && !x.isNaN() && !top.isNaN()) {
+                val point = floatArrayOf(x, top)
+                info.matrix?.mapPoints(point)
+                bubbles += InlineBubbleController.Bubble(
+                    labels = hit.slot.alternatives,
+                    currentIndex = 0,
+                    anchorX = point[0] - 16 * density,
+                    anchorY = point[1],
+                    onTap = { i -> onInlinePostCommitTap(hit, i) },
+                )
+            }
+        }
+        if (bubbles.isEmpty()) controller.dismissAll() else controller.show(parent, bubbles, inlineBubbleColors())
+    }
+
+    /** A bubble choice: same path as a bottom-row diff chip (sentence edit, learned on commit). */
+    private fun onInlineChoiceTap(shown: InlineShownPlan, slot: Int, chip: com.kazumaproject.markdownhelperkeyboard.converter.candidatebar.DiffChip?) {
+        if (chip == null || chip.isCurrent) return
+        if (inlineShownPlan !== shown || inputString.value != shown.input) return
+        val span = shown.analysis.slots.getOrNull(slot)?.span ?: return
+        onNecookeyHomophoneChipClick(
+            Candidate(
+                string = chip.label,
+                type = TwoRowCandidateBarPlanner.CANDIDATE_TYPE_HOMOPHONE_CHIP,
+                length = shown.input.length.toUByte(),
+                score = 0,
+                yomi = shown.input.substring(span.start, span.end),
+                commitText = chip.output,
+                homophoneSlot = slot,
+            ),
+        )
+    }
+
+    /**
+     * ◀▶ at a live bunsetsu end: enter the bunsetsu session there, keep what was shown for the
+     * bunsetsu before it, and resize it; only the reading after it is re-converted and re-split.
+     */
+    private fun onInlineBoundaryTap(shown: InlineShownPlan, slot: Int, delta: Int) {
+        val mainView = mainLayoutBinding ?: return
+        val slotEnd = shown.analysis.slots.getOrNull(slot)?.span?.end ?: return
+        if (inputString.value != shown.input) return
+        inlineBoundarySlot = null
+        scope.launch {
+            if (!activateBunsetsuConversionSession(shown.input, mainView)) return@launch
+            if (!isBunsetsuCursorMoveSessionActive()) return@launch
+            bunsetsuOperationMutex.withLock {
+                val session = bunsetsuConversionSession ?: return@withLock
+                if (session.conversionInput != shown.input) return@withLock
+                val readings = session.segments.map { it.reading }
+                val focus = InlineBoundaryEdit.focusIndexFor(readings, slotEnd) ?: return@withLock
+                val kept = InlineBoundaryEdit.keptOutputs(
+                    readings,
+                    shown.analysis.slots.map { it.span.start to it.span.end },
+                    shown.plan.slotOutputs,
+                    focus,
+                )
+                val segments = session.segments.mapIndexed { i, segment ->
+                    val output = kept[i]
+                    if (output == null || output == segment.displayText) segment else segment.copy(
+                        displayText = output,
+                        hasConvertedDisplay = true,
+                        candidatesLoaded = false,
+                        overrideDisplayCandidate = null,
+                        explicitlySelected = true,
+                    )
+                }
+                bunsetsuConversionSession = session.copy(segments = segments, focusedIndex = focus)
+            }
+            resizeFocusedBunsetsuSegment(delta)
+        }
+    }
+
+    /** Post-commit bubble choice: replace just that bunsetsu in the editor and learn it. */
+    private fun onInlinePostCommitTap(hit: CommittedSpanTracker.Hit, index: Int) {
+        val output = hit.slot.alternatives.getOrNull(index) ?: return
+        inlinePostCommitHit = null
+        inlineBubbleController?.dismissAll()
+        if (output == hit.slot.output) return
+        if (inputString.value.isNotEmpty()) return
+        // The text may have changed since the bubble appeared.
+        if (findInlinePostCommitHit(inlineLastSelStart, inlineLastSelEnd)?.entry != hit.entry) return
+        inlineReplacing = true
+        try {
+            beginBatchEdit()
+            setComposingRegion(hit.absoluteStart, hit.absoluteEnd)
+            commitText(output, 1)
+            endBatchEdit()
+        } finally {
+            inlineReplacing = false
+        }
+        inlineCommittedSpans.applyReplacement(hit, output)
+        learnInlineCorrection(hit.slot.reading, output)
+    }
+
+    private fun learnInlineCorrection(reading: String, output: String) {
+        if (reading.isEmpty() || !isLearningWriteEnabled()) return
+        conversionLearningSession.cancel()
+        conversionLearningSession.beginIfNeeded(reading)
+        conversionLearningSession.record(
+            LearningFragment(
+                reading = reading,
+                output = output,
+                candidateScore = 3000,
+                candidateIndex = 1,
+                explicitlySelected = true,
+            ),
+        )
+        persistCompletedLearningSession()
+    }
+
     /**
      * Bottom-row chip tap (main thread). A diff chip replaces only its bunsetsu in the top-row
      * sentence; a focus chip moves the chips to another marked bunsetsu. Nothing is committed here:
@@ -17037,8 +17409,22 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
             if (!shouldApplyCandidateResult(insertString, token)) return@withContext
             necookeyPredictionRowInput = insertString
             necookeyTopRowInput = insertString
-            necookeyPredictionRowCandidates = bar.bottomRow
+            val inlinePlan = if (inlineChoicesEnabled()) {
+                val analysis = necookeyLastBarInputs?.takeIf { it.input == insertString }?.analysis
+                val homophone = bar.homophone
+                if (analysis != null && homophone != null) InlineShownPlan(insertString, analysis, homophone) else null
+            } else {
+                null
+            }
+            if (inlinePlan != inlineShownPlan) inlineBoundarySlot = null
+            inlineShownPlan = inlinePlan
+            // Bubbles over the text replace the bottom-row chips when the editor gives character bounds.
+            // Only with live conversion: the bubbles sit on the converted text, not on plain kana.
+            val inlineTakesChips = inlinePlan != null && inlineAnchorWorks &&
+                shouldStartLiveConversion(insertString) && !hasConvertedKatakana
+            necookeyPredictionRowCandidates = if (inlineTakesChips) bar.predictions else bar.bottomRow
             bar.primary?.let { adoptZenzaiBunsetsuPath(insertString, it) }
+            if (inlineChoicesEnabled()) refreshInlineBubbles()
         }
         if (!suppressSuggestions) {
             updateSuggestionAdaptersOnMain(
@@ -19754,10 +20140,12 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         if (!customToggleEditInProgress) resetCustomToggleState()
         val connection = currentInputConnection ?: return false
         flickInputPreviewCoordinator.cancel(restore = true)
+        val inlineStart = if (inlineLastCandidatesStart >= 0) inlineLastCandidatesStart else inlineLastSelStart
         val committed = connection.commitText(p0, p1)
         if (committed) {
             editorMutationRevision.advance()
             composingTextArbiter.markCanonicalFinished()
+            if (!inlineReplacing) recordInlineCommit(p0?.toString(), inlineStart)
         }
         return committed
     }

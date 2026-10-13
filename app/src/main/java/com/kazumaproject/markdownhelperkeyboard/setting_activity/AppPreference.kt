@@ -717,6 +717,8 @@ object AppPreference {
      * リランカーの表が無いときは Sumire の経路コスト差（HomophoneChips.SUMIRE_GAP_THRESHOLD）に戻る。
      */
     private val SUMIRE_LM_HOMOPHONE_MARGIN_PREFERENCE = Pair("sumire_lm_homophone_margin_preference", true)
+    /** 試作: 迷い文節の候補を入力欄の語の真上に浮かべる・確定後の訂正・文節区切りの ◀▶（既定オン、設定画面なし）。 */
+    private val NECOOKEY_INLINE_CHOICES_PREFERENCE = Pair("necookey_inline_choices_preference", true)
     /** 案2: 経路探索の辺コストに単語 bigram LM 補正（LatticeLmCost、表はアセット）を足す（既定オン）。 */
     private val LATTICE_LM_COST_PREFERENCE = Pair("lattice_lm_cost_preference", true)
     private val SUMINAGASHI_INK_EFFECT_ENABLE =
@@ -3627,6 +3629,15 @@ object AppPreference {
                 QWERTY_KEYBOARD_MARGIN_END_DP_LANDSCAPE.first,
                 value ?: 0
             )
+        }
+
+    var necookey_inline_choices_preference: Boolean
+        get() = preferences.getBoolean(
+            NECOOKEY_INLINE_CHOICES_PREFERENCE.first,
+            NECOOKEY_INLINE_CHOICES_PREFERENCE.second
+        )
+        set(value) = preferences.edit {
+            it.putBoolean(NECOOKEY_INLINE_CHOICES_PREFERENCE.first, value)
         }
 
     var sumire_lm_homophone_margin_preference: Boolean

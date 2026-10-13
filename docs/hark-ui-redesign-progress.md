@@ -170,3 +170,13 @@
   - `necookeyZenzGateEnabled` は main と同じ（AI 有無でなく「zenz ON/OFF」設定だけ）にし、AI を止めるのは `isAiEngineActive`（`resolveZenzRuntimeConfig`・`isZenzPromptModelLoaded`・`isJinenEngine`）。
 - 迷い印・差分チップの判定元: `SumireLmMarginSource`（`SumireLmSpanMargin` の `BunsetsuMarginSource` 実装、しきい値 `DEFAULT_THRESHOLD_CENTS`=50、未較正）を、設定 `sumire_lm_homophone_margin_preference`（既定オン、画面なし）がオンでその読みにリランカーが動いたときだけ使う。リランカー結果が届いたら同じ 1 位でもバーを描き直す。それ以外は Sumire の経路コスト差 800。
 - **注意**: リランカーの LM 表（`sumire_lm/`）はまだ同梱していない（リーダーが実用表を作成中）ので、今の APK ではリランカーは動かず、迷い印は Sumire 差 800 のまま。表を入れたら 50 の較正が必要。
+
+## 2026-10-13: インライン候補 UI の試作（ブランチ inline-ui、homophone-ui abea5a6 から）
+
+ユーザー承認済みの試作。2 タップのバー操作（迷い印 → 下段チップ）を、入力欄の語の上に直接出す方式に置き換える。設定 `necookey_inline_choices_preference`（既定オン、画面なし）でオフにすると従来どおり。
+
+1. **インライン候補の吹き出し**: `onStartInputView` で `requestCursorUpdates(MONITOR|IMMEDIATE)`。`onUpdateCursorAnchorInfo` の未確定文字の座標（行列で画面座標に変換）から、迷い文節ごとに小さな吹き出し（IME ウィンドウに付けた非フォーカス PopupWindow、`InlineBubbleController`）を語の真上に出す。複数の迷い文節は同時に（最大 4 個、1 個 5 候補まで）。中身は差分チップと同じ判定元（同音異義＋N-best の同じ読み範囲で区切りが違う出力: 和菓子を／沸かしを、買って／勝手）。タップは `onNecookeyHomophoneChipClick` と同じ経路（その文節だけ置換、確定時に文節ごと学習）。座標が取れる入力欄では下段のチップを出さず、取れない（文字座標なし・`requestCursorUpdates` 失敗）ときは従来の下段チップのまま。配置は `InlineChoices.layout`（同じ行は重ならないよう右へ、画面端で戻す）。PopupWindow の座標系が端末で違う対策として、表示後に実位置を測って `update` で補正。
+2. **確定後の訂正**: `CommittedSpanTracker`（直近 5 確定・200 字まで、入力欄が変わったら消去）。確定文字列が表示中の文（または文節セッションの文節）と一致したら、文節ごとの代替を記録。カーソルが文節の内側に入る（またはちょうど 1 文節を選択）と、挿入位置の上に吹き出し。前後の文字列を `getTextBeforeCursor/AfterCursor` で照合し、違えば記録を捨てる。タップで `setComposingRegion`＋`commitText` によりその範囲だけ置換し、読み→表記を明示選択として学習（直後の後退で学習取り消しは従来どおり）。
+3. **文節区切りの表示と編集**: ライブ変換の未確定文字列を文節ごとに下線を分け、背景を 1 つおきに薄く（`setComposingTextAfterEdit(segmentLengths=…)`）。未確定文字列の中をタップすると、そこに近い文節末に ◀▶ 吹き出し。押すと既存の文節セッション（Mozc 式）に入り、その文節より前は表示中の出力（チップで直したものを含む）を保持、その文節の末尾を 1 字動かし、後ろだけ Sumire で再変換・再分割（既存の `resizeFocusedBunsetsuSegment`／`BunsetsuRangeEditor`）。セッション中は注目文節の末尾に ◀▶ が出続ける。
+- テスト: `InlineChoicesTest`（吹き出しの対象・座標・重なり回避・文節長・区切り編集の対応付け・後ろだけ再分割）、`CommittedSpanTrackerTest`（記録・上限・重なり・照合・置換後のずれ）。
+- 未確認・既知の制約: 実機未確認。文字座標を返さない入力欄（独自描画のエディタ、一部の WebView・ゲーム・古いアプリ、Compose の古い版）は下段チップにフォールバック。確定後の吹き出しは挿入位置の座標が要る（無いと出ない、バーへの代替表示は未実装）。1 文字の語はカーソルでは入れないので範囲選択で。未確定文字列内タップで確定してしまうエディタ（Chrome 系の一部）では ◀▶ は出ない（その場合も矢印キーの文節伸縮は使える）。
