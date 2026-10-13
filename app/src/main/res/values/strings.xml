@@ -825,7 +825,9 @@
     <string name="settings_loading_retry">再試行</string>
     <string name="necookey_candidate_bar_category_title">necookey（2段候補バー）</string>
     <string name="necookey_two_row_candidate_bar_title">2段の候補バー</string>
-    <string name="necookey_two_row_candidate_bar_summary">上段に変換結果と最初の文節の別候補、下段に予測候補を表示します（通常のソフトウェアキーボードのみ）。</string>
+    <string name="necookey_two_row_candidate_bar_summary">上段に変換結果（自信のない文節に点線）、下段にその文節の同音異義の候補（違う部分だけ）を表示します。タップでその文節だけ置き換わります（通常のソフトウェアキーボードのみ）。</string>
+    <string name="necookey_prediction_row_title">下段に予測候補も表示</string>
+    <string name="necookey_prediction_row_summary">同音異義の候補の後ろに予測候補を並べます。</string>
     <string name="necookey_zenz_bunsetsu_gate_title">zenz で変換を補正（Zenzai）</string>
     <string name="necookey_zenz_bunsetsu_gate_summary">入力ごとに辞書の第一候補を端末内の zenz が 1 回だけ確認し、違うと判断した位置から辞書で探し直します。確定後の後続語候補も zenz で並べ替えます。</string>
     <string name="candidate_badge_zenz_gate">[Z]</string>

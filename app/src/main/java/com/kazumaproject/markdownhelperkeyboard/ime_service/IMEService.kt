@@ -196,6 +196,7 @@ import com.kazumaproject.markdownhelperkeyboard.converter.candidatebar.NextWordE
 import com.kazumaproject.markdownhelperkeyboard.converter.candidatebar.NextWordZenzReranker
 import com.kazumaproject.markdownhelperkeyboard.converter.candidatebar.TwoRowCandidateBar
 import com.kazumaproject.markdownhelperkeyboard.converter.candidatebar.TwoRowCandidateBarPlanner
+import com.kazumaproject.markdownhelperkeyboard.converter.candidatebar.HomophoneChips
 import com.kazumaproject.markdownhelperkeyboard.learning.session.BunsetsuLearningSplitter
 import com.kazumaproject.markdownhelperkeyboard.learning.session.LearnedBunsetsu
 import com.kazumaproject.markdownhelperkeyboard.learning.session.LearningReadingGuard
@@ -2338,6 +2339,24 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
     /** Input the bottom row currently belongs to; the row hides itself for any other input. */
     private var necookeyPredictionRowInput: String = ""
     private var necookeyPredictionRowCandidates: List<Candidate> = emptyList()
+    /** Homophone UI: the chip-edited top row and the focused bunsetsu, valid only for [necookeyHomophoneInput]. */
+    @Volatile
+    private var necookeyHomophoneInput: String = ""
+    @Volatile
+    private var necookeyHomophoneOverride: Candidate? = null
+    @Volatile
+    private var necookeyHomophoneFocus: Int? = null
+    /** What the last two-row bar was planned from; a chip tap re-plans it. */
+    @Volatile
+    private var necookeyLastBarInputs: NecookeyBarInputs? = null
+
+    private data class NecookeyBarInputs(
+        val input: String,
+        val conversion: List<Candidate>,
+        val analysis: BunsetsuAnalysis?,
+        val zenzOverride: Candidate?,
+        val predictions: List<Candidate>,
+    )
     /** (文脈, 読み, sumire 最良) -> (zenzai の結果（変更なしは null）, 引き継ぐ制約)。 */
     private val necookeyZenzOverrideCache =
         object : LinkedHashMap<String, Pair<Candidate?, ZenzaiConstraint?>>(16, 0.75f, true) {
@@ -10723,7 +10742,10 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         launch {
             inputString.collect { string ->
                 // 確定・全消去・モード切替で読みが空になったら Zenzai の引き継ぎ制約も捨てる。
-                if (string.isEmpty()) zenzaiCarry = null
+                if (string.isEmpty()) {
+                    zenzaiCarry = null
+                    clearNecookeyHomophone()
+                }
                 try {
                     measureDebugStage("IMEService.input.immediate") {
                         processInputString(string, mainView)
@@ -13448,6 +13470,10 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
             adapter.setOnItemClickListener { candidate, position ->
                 val insertString = inputString.value
                 if (insertString.isEmpty()) return@setOnItemClickListener
+                if (TwoRowCandidateBarPlanner.isHomophoneChip(candidate)) {
+                    onNecookeyHomophoneChipClick(candidate)
+                    return@setOnItemClickListener
+                }
                 setCandidateClick(
                     candidate = candidate,
                     insertString = insertString,
@@ -13458,7 +13484,9 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
             }
             adapter.setOnItemLongClickListener { candidate, position ->
                 val insertString = inputString.value
-                if (insertString.isEmpty() || isNecookeyActionCandidate(candidate)) {
+                if (insertString.isEmpty() || isNecookeyActionCandidate(candidate) ||
+                    TwoRowCandidateBarPlanner.isHomophoneChip(candidate)
+                ) {
                     return@setOnItemLongClickListener
                 }
                 if (shouldShowCandidateLongPressActions(candidate)) {
@@ -16444,15 +16472,7 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         } else {
             (carried + nextWordCandidates + predictions).distinctBy { it.string }
         }
-        val bar = TwoRowCandidateBarPlanner.plan(
-            input = insertString,
-            conversionCandidates = conversion,
-            analysis = baseAnalysis,
-            primaryOverride = cachedOverride,
-            predictionCandidates = barPredictions,
-            config = necookeyCandidateBarConfig,
-            isActionCandidate = ::isNecookeyActionCandidate,
-        )
+        val bar = planNecookeyBar(insertString, conversion, baseAnalysis, cachedOverride, barPredictions)
         publishNecookeyTwoRowBar(insertString, bar, token, applyLiveConversion = true)
 
         zenzaiScheduler.onInput(insertString, SystemClock.uptimeMillis())
@@ -16530,19 +16550,13 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
             suspend fun show(top: Candidate) {
                 if (!stillCurrent()) return
                 if (!shouldUseNecookeyTwoRowBar()) return
+                // A chip the user tapped wins over a later zenz/jinen result for the same reading.
+                if (necookeyHomophoneOverride != null && necookeyHomophoneInput == insertString) return
                 val override = top.takeIf {
                     it.string != sumireTop.string || it.zenzChecked || it.zenzAdjusted
                 }
                 if (override == shown) return
-                val bar = TwoRowCandidateBarPlanner.plan(
-                    input = insertString,
-                    conversionCandidates = conversion,
-                    analysis = analysis,
-                    primaryOverride = override,
-                    predictionCandidates = predictions,
-                    config = necookeyCandidateBarConfig,
-                    isActionCandidate = ::isNecookeyActionCandidate,
-                )
+                val bar = planNecookeyBar(insertString, conversion, analysis, override, predictions)
                 shown = override
                 publishNecookeyTwoRowBar(insertString, bar, necookeyZenzLatestToken ?: token, applyLiveConversion = false)
                 if (
@@ -16694,6 +16708,87 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         )
     }
 
+    private fun clearNecookeyHomophone() {
+        necookeyHomophoneInput = ""
+        necookeyHomophoneOverride = null
+        necookeyHomophoneFocus = null
+    }
+
+    /**
+     * Plans the two-row bar (homophone UI). A chip-edited sentence for this reading replaces the
+     * zenz/jinen override; the prediction row is shown only when its setting is on.
+     */
+    private fun planNecookeyBar(
+        insertString: String,
+        conversion: List<Candidate>,
+        analysis: BunsetsuAnalysis?,
+        zenzOverride: Candidate?,
+        predictions: List<Candidate>,
+    ): TwoRowCandidateBar {
+        if (necookeyHomophoneInput != insertString) {
+            necookeyHomophoneInput = insertString
+            necookeyHomophoneOverride = null
+            necookeyHomophoneFocus = null
+        }
+        necookeyLastBarInputs = NecookeyBarInputs(insertString, conversion, analysis, zenzOverride, predictions)
+        return TwoRowCandidateBarPlanner.plan(
+            input = insertString,
+            conversionCandidates = conversion,
+            analysis = analysis,
+            primaryOverride = necookeyHomophoneOverride ?: zenzOverride,
+            predictionCandidates = predictions,
+            config = necookeyCandidateBarConfig,
+            isActionCandidate = ::isNecookeyActionCandidate,
+            showPredictions = appPreference.necookey_prediction_row_preference,
+            focusSlot = necookeyHomophoneFocus,
+        )
+    }
+
+    /**
+     * Bottom-row chip tap (main thread). A diff chip replaces only its bunsetsu in the top-row
+     * sentence; a focus chip moves the chips to another marked bunsetsu. Nothing is committed here:
+     * the edited sentence is committed (and learned per bunsetsu) like any top-row primary.
+     */
+    private fun onNecookeyHomophoneChipClick(chip: Candidate) {
+        val insertString = inputString.value
+        val inputs = necookeyLastBarInputs?.takeIf { it.input == insertString } ?: return
+        val analysis = inputs.analysis ?: return
+        val current = planNecookeyBar(
+            insertString, inputs.conversion, analysis, inputs.zenzOverride, inputs.predictions,
+        ).homophone ?: return
+        val slot = chip.homophoneSlot
+        if (slot !in current.slotOutputs.indices) return
+        when (chip.type) {
+            TwoRowCandidateBarPlanner.CANDIDATE_TYPE_HOMOPHONE_FOCUS -> necookeyHomophoneFocus = slot
+            TwoRowCandidateBarPlanner.CANDIDATE_TYPE_HOMOPHONE_CHIP -> {
+                val outputs = HomophoneChips.replaced(current.slotOutputs, slot, chip.commitText)
+                necookeyHomophoneOverride = analysis.primaryWithOutputs(outputs)
+                necookeyHomophoneFocus = slot
+                // The user chose; a running zenz/jinen inference must not repaint over it.
+                necookeyZenzJob?.cancel()
+                necookeyZenzJob = null
+                necookeyZenzJobKey = null
+            }
+            else -> return
+        }
+        val bar = planNecookeyBar(insertString, inputs.conversion, analysis, inputs.zenzOverride, inputs.predictions)
+        val token = necookeyZenzLatestToken ?: return
+        scope.launch {
+            publishNecookeyTwoRowBar(insertString, bar, token, applyLiveConversion = false)
+            withContext(Dispatchers.Main.immediate) {
+                if (
+                    shouldStartLiveConversion(insertString) && !hasConvertedKatakana &&
+                    inputString.value == insertString
+                ) {
+                    val primary = bar.primary
+                    if (primary != null && getCandidateCommitString(primary) != lastCandidate) {
+                        applyFirstSuggestion(primary)
+                    }
+                }
+            }
+        }
+    }
+
     private suspend fun publishNecookeyTwoRowBar(
         insertString: String,
         bar: TwoRowCandidateBar,
@@ -16706,14 +16801,14 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
             if (!shouldApplyCandidateResult(insertString, token)) return@withContext
             necookeyPredictionRowInput = insertString
             necookeyTopRowInput = insertString
-            necookeyPredictionRowCandidates = bar.predictions
+            necookeyPredictionRowCandidates = bar.bottomRow
             bar.primary?.let { adoptZenzaiBunsetsuPath(insertString, it) }
         }
         if (!suppressSuggestions) {
             updateSuggestionAdaptersOnMain(
                 candidates = topRow,
                 insertString = insertString,
-                fullCandidates = topRow + bar.predictions,
+                fullCandidates = topRow + bar.conversionAlternatives + bar.predictions,
                 token = token,
             )
         }

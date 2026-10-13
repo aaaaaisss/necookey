@@ -2128,6 +2128,19 @@ class SuggestionAdapter internal constructor(
         holder.text.text = if (suggestion.type == (15).toByte()) {
             readingCorrectionString.first.padStart(readingCorrectionString.first.length + paddingLength)
                 .plus(" ".repeat(paddingLength))
+        } else if (suggestion.uncertainRanges.isNotEmpty()) {
+            // Two-row homophone UI: low-confidence bunsetsu get a dotted underline ("迷い印").
+            val padded = SpannableString(
+                suggestion.string.padStart(suggestion.string.length + paddingLength)
+                    .plus(" ".repeat(paddingLength))
+            )
+            for ((start, end) in suggestion.uncertainRanges) {
+                val s = start + paddingLength
+                val e = end + paddingLength
+                if (start < 0 || end <= start || end > suggestion.string.length) continue
+                padded.setSpan(DottedUnderlineSpan(), s, e, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+            }
+            padded
         } else {
             suggestion.string.padStart(suggestion.string.length + paddingLength)
                 .plus(" ".repeat(paddingLength))
@@ -2243,6 +2256,9 @@ class SuggestionAdapter internal constructor(
             (39).toByte() -> ""
             (40).toByte() -> "[AI]"
             QWERTY_GLIDE_CANDIDATE_TYPE -> ""
+            /** 同音異義の差分チップ / 別の迷い文節へ移るチップ（2段バー下段） **/
+            (70).toByte() -> ""
+            (71).toByte() -> "[▸]"
             else -> ""
         }
         val zenzBadgeRes = when {

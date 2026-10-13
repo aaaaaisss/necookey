@@ -154,6 +154,12 @@
                 app:defaultValue="true"
                 app:summary="@string/necookey_two_row_candidate_bar_summary"
                 app:iconSpaceReserved="false" />
+            <SwitchPreferenceCompat
+                android:key="necookey_prediction_row_preference"
+                android:title="@string/necookey_prediction_row_title"
+                app:defaultValue="false"
+                app:summary="@string/necookey_prediction_row_summary"
+                app:iconSpaceReserved="false" />
             <ListPreference
                 android:defaultValue="1"
                 android:dialogTitle="@string/preference_dialog_title_num_columns_conversion"

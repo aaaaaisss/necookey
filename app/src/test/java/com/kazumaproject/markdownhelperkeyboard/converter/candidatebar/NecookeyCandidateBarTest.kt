@@ -131,92 +131,95 @@ class NecookeyCandidateBarTest {
     )
 
     @Test
-    fun topRowIsPrimaryThenFirstBunsetsuAlternatives() {
+    fun topRowIsOnlyThePrimaryWithMarks() {
+        // 晴れ/腫れ gap 100 < threshold -> marked; 今日は vs きょうは gap 300 -> marked too.
         val bar = TwoRowCandidateBarPlanner.plan(input, conversionList, analysis(), null, emptyList())
-        assertEquals("今日は晴れ", bar.primary!!.string)
-        assertEquals(listOf("今日は", "きょうは", "京は", "今日歯"), bar.firstBunsetsuAlternatives.map { it.string })
-        assertTrue(bar.firstBunsetsuAlternatives.all { it.length.toInt() == 4 })
-        assertEquals("きょうは", bar.firstBunsetsuAlternatives[1].yomi)
+        assertEquals(listOf("今日は晴れ"), bar.topRow.map { it.string })
+        assertEquals(listOf(0 to 3, 3 to 5), bar.topRow.single().uncertainRanges)
+        assertTrue(bar.primary!!.uncertainRanges.isEmpty())
     }
 
     @Test
-    fun zenzOverrideReplacesLeftmostAndKeepsEnginePrimaryReachable() {
+    fun chipsShowTheMostUncertainBunsetsuThenFocusChips() {
+        val bar = TwoRowCandidateBarPlanner.plan(input, conversionList, analysis(), null, emptyList())
+        // slot 1 (晴れ, gap 100) is more uncertain than slot 0 (gap 300).
+        assertEquals(1, bar.homophone!!.focusSlot)
+        val chips = bar.chips.filter { it.type == TwoRowCandidateBarPlanner.CANDIDATE_TYPE_HOMOPHONE_CHIP }
+        assertEquals(listOf("晴", "腫"), chips.map { it.string })
+        assertEquals(listOf("晴れ", "腫れ"), chips.map { it.commitText })
+        assertEquals("はれ", chips[0].yomi)
+        val focus = bar.chips.single { it.type == TwoRowCandidateBarPlanner.CANDIDATE_TYPE_HOMOPHONE_FOCUS }
+        assertEquals(0, focus.homophoneSlot)
+        assertEquals("今日は", focus.string)
+        assertTrue(bar.chips.all(TwoRowCandidateBarPlanner::isHomophoneChip))
+    }
+
+    @Test
+    fun focusSlotMovesTheChips() {
+        val bar = TwoRowCandidateBarPlanner.plan(input, conversionList, analysis(), null, emptyList(), focusSlot = 0)
+        assertEquals(0, bar.homophone!!.focusSlot)
+        assertEquals(
+            listOf("今日は", "きょうは", "京は", "今日歯"),
+            bar.chips.filter { it.homophoneSlot == 0 && it.type == TwoRowCandidateBarPlanner.CANDIDATE_TYPE_HOMOPHONE_CHIP }
+                .map { it.commitText },
+        )
+    }
+
+    @Test
+    fun chipEditedOverrideKeepsTheRestOfTheSentence() {
         val a = analysis()
-        val override = a.primaryWithOutputs(listOf("今日は", "腫れ")).copy(zenzAdjusted = true)
+        val override = a.primaryWithOutputs(HomophoneChips.replaced(listOf("今日は", "晴れ"), 1, "腫れ"))
         val bar = TwoRowCandidateBarPlanner.plan(input, conversionList, a, override, emptyList())
         assertEquals("今日は腫れ", bar.primary!!.string)
-        assertTrue(bar.primary!!.zenzAdjusted)
-        assertEquals("今日は晴れ", bar.firstBunsetsuAlternatives[0].string)
-        assertFalse(bar.firstBunsetsuAlternatives[0].zenzAdjusted)
-        assertEquals(listOf("今日は", "きょうは", "京は", "今日歯"), bar.firstBunsetsuAlternatives.drop(1).map { it.string })
+        val current = bar.chips.first()
+        assertEquals("腫", current.string)
+        assertEquals(listOf(0 to 1), current.uncertainRanges)
+        assertEquals(listOf("今日は", "腫れ"), bar.homophone!!.slotOutputs)
     }
 
     @Test
-    fun firstBunsetsuFollowsZenzAcceptedPathSegments() {
-        val a = analysis()
-        val override = cand("今日歯晴れ", 0).copy(
-            zenzAdjusted = true,
-            conversionSegments = listOf(seg(0, 3, "今日"), seg(3, 6, "歯晴れ")),
-        )
-        val bar = TwoRowCandidateBarPlanner.plan(input, conversionList, a, override, emptyList())
-        assertEquals("今日歯晴れ", bar.primary!!.string)
-        // first bunsetsu = [0,3) of the accepted path, not Sumire's [0,4)
-        assertEquals(listOf("今日は晴れ", "今日"), bar.firstBunsetsuAlternatives.map { it.string })
-    }
-
-    @Test
-    fun learnedCandidateFirstWinsOverZenz() {
+    fun learnedCandidateFirstWinsOverOverride() {
         val learned = cand("今日葉晴れ", 100, type = 34)
         val a = analysis()
         val bar = TwoRowCandidateBarPlanner.plan(
             input, listOf(learned) + conversionList, a, a.primaryWithOutputs(listOf("今日は", "腫れ")), emptyList(),
         )
         assertEquals("今日葉晴れ", bar.primary!!.string)
+        // Not alignable with the analysis primary's segments -> no homophone UI.
+        assertNull(bar.homophone)
+        assertTrue(bar.chips.isEmpty())
     }
 
     @Test
-    fun bottomRowDedupesAgainstVisibleTopRowAndItself() {
+    fun predictionsAreHiddenUnlessEnabled() {
         val predictions = listOf(
-            cand("今日は晴れ", 1), cand("今日は晴れです", 2, length = 6), cand("京は", 3, length = 4),
-            cand("今日は晴れです", 4), cand("", 5), cand("今日は腫れ", 6),
+            cand("今日は晴れ", 1), cand("今日は晴れです", 2, length = 6),
+            cand("今日は晴れです", 4), cand("", 5), cand("京は", 6, length = 4),
         )
-        val bar = TwoRowCandidateBarPlanner.plan(input, conversionList, analysis(), null, predictions)
-        assertEquals(listOf("今日は晴れです", "今日は腫れ"), bar.predictions.map { it.string })
+        val off = TwoRowCandidateBarPlanner.plan(input, conversionList, analysis(), null, predictions)
+        assertTrue(off.predictions.isEmpty())
+        val on = TwoRowCandidateBarPlanner.plan(input, conversionList, analysis(), null, predictions, showPredictions = true)
+        assertEquals(listOf("今日は晴れです", "京は"), on.predictions.map { it.string })
+        assertEquals(on.chips + on.predictions, on.bottomRow)
     }
 
     @Test
-    fun truncatedTopRowItemsMayAppearInBottomRow() {
-        val config = NecookeyCandidateBarConfig(maxTopRowCandidates = 2)
-        val predictions = listOf(cand("京は", 3, length = 4))
-        val bar = TwoRowCandidateBarPlanner.plan(input, conversionList, analysis(), null, predictions, config)
-        assertEquals(listOf("今日は"), bar.firstBunsetsuAlternatives.map { it.string })
-        assertEquals(listOf("京は"), bar.predictions.map { it.string })
-    }
-
-    @Test
-    fun singleBunsetsuUsesWholeReadingAlternatives() {
-        val single = BunsetsuAnalyzer.analyze(input, nBest, segmentsByString, emptyList())!!
-        val bar = TwoRowCandidateBarPlanner.plan(input, conversionList, single, null, emptyList())
-        assertEquals(listOf("今日は腫れ", "きょうは晴れ", "きょうははれ"), bar.firstBunsetsuAlternatives.map { it.string })
-    }
-
-    @Test
-    fun withoutAnalysisTheBarStillWorks() {
-        val bar = TwoRowCandidateBarPlanner.plan(input, conversionList, null, null, listOf(cand("今日は晴れです", 1)))
+    fun conversionAlternativesExcludeThePrimary() {
+        val bar = TwoRowCandidateBarPlanner.plan(input, conversionList, null, null, emptyList())
         assertEquals("今日は晴れ", bar.primary!!.string)
-        assertEquals(listOf("今日は腫れ", "きょうは晴れ", "きょうははれ"), bar.firstBunsetsuAlternatives.map { it.string })
-        assertEquals(listOf("今日は晴れです"), bar.predictions.map { it.string })
+        assertFalse(bar.conversionAlternatives.any { it.string == "今日は晴れ" })
+        assertNull(bar.homophone)
     }
 
     @Test
-    fun actionCandidatesAreKeptButNeverAlternatives() {
+    fun actionCandidatesStayInTheBottomRow() {
         val macro = cand("今日は", 0, length = 4, type = 52)
         val bar = TwoRowCandidateBarPlanner.plan(
             input, listOf(macro) + conversionList, analysis(), null, listOf(macro),
             isActionCandidate = { it.type == 52.toByte() },
         )
         assertEquals("今日は晴れ", bar.primary!!.string)
-        assertFalse(bar.firstBunsetsuAlternatives.any { it === macro })
+        assertFalse(bar.conversionAlternatives.any { it === macro })
         assertEquals(listOf(macro), bar.predictions)
     }
 

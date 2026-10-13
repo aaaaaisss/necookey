@@ -602,6 +602,9 @@ object AppPreference {
     // necookey
     private val NECOOKEY_TWO_ROW_CANDIDATE_BAR_PREFERENCE =
         Pair("necookey_two_row_candidate_bar_preference", true)
+    /** 2段候補バーの下段に予測候補も出す（既定オフ: 下段は同音異義の差分チップ）。 */
+    private val NECOOKEY_PREDICTION_ROW_PREFERENCE =
+        Pair("necookey_prediction_row_preference", false)
     private val NECOOKEY_ZENZ_BUNSETSU_GATE_PREFERENCE =
         Pair("necookey_zenz_bunsetsu_gate_preference", true)
 
@@ -3135,6 +3138,15 @@ object AppPreference {
         )
         set(value) = preferences.edit {
             it.putBoolean(NECOOKEY_TWO_ROW_CANDIDATE_BAR_PREFERENCE.first, value)
+        }
+
+    var necookey_prediction_row_preference: Boolean
+        get() = preferences.getBoolean(
+            NECOOKEY_PREDICTION_ROW_PREFERENCE.first,
+            NECOOKEY_PREDICTION_ROW_PREFERENCE.second
+        )
+        set(value) = preferences.edit {
+            it.putBoolean(NECOOKEY_PREDICTION_ROW_PREFERENCE.first, value)
         }
 
     var necookey_zenz_bunsetsu_gate_preference: Boolean

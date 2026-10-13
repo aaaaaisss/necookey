@@ -22,4 +22,8 @@ data class Candidate(
     val zenzAdjusted: Boolean = false,
     /** zenz がこの変換を評価して同意した（判定キャッシュの再利用を含む）。表示は [z]。 */
     val zenzChecked: Boolean = false,
+    /** UTF-16 ranges (end exclusive) drawn with a dotted underline: low-confidence bunsetsu ("迷い印"). */
+    val uncertainRanges: List<Pair<Int, Int>> = emptyList(),
+    /** Homophone diff chip / focus chip: the bunsetsu slot it acts on (-1 = not a chip). */
+    val homophoneSlot: Int = -1,
 )

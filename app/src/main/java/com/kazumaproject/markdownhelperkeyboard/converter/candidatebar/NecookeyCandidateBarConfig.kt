@@ -16,7 +16,7 @@ data class NecookeyCandidateBarConfig(
     companion object {
         const val DEFAULT_MAX_LEFT_CONTEXT_CHARS = 40
         const val DEFAULT_MAX_RIGHT_CONTEXT_CHARS = 20
-        const val DEFAULT_CONVERSION_N_BEST = 8
+        const val DEFAULT_CONVERSION_N_BEST = 20
         const val DEFAULT_MAX_ZENZ_INPUT_LENGTH = 32
         const val DEFAULT_MAX_TOP_ROW_CANDIDATES = 32
         const val DEFAULT_MAX_BOTTOM_ROW_CANDIDATES = 48
