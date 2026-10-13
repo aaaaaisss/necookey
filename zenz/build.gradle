@@ -27,6 +27,12 @@ def zenzModelAssetName = providers.gradleProperty("zenzModelAssetName")
 def zenzModelAllowPatterns = providers.gradleProperty("zenzModelAllowPatterns")
         .orElse(localProperties.getProperty("zenzModelAllowPatterns") ?: zenzModelAssetName)
         .get()
+// The GGUF model is NOT bundled into the APK by default (too big). Conversion defaults to Sumire only;
+// users import a jinen / zenz model in settings. Pass -PzenzBundleModel=true to bundle it again.
+def zenzBundleModel = providers.gradleProperty("zenzBundleModel")
+        .orElse(localProperties.getProperty("zenzBundleModel") ?: "false")
+        .get()
+        .toBoolean()
 def zenzModelHfToken = providers.gradleProperty("zenzModelHfToken")
         .orElse(localProperties.getProperty("zenzModelHfToken") ?: System.getenv("HF_TOKEN") ?: "")
         .get()
@@ -126,7 +132,9 @@ android {
 
     sourceSets {
         main {
-            assets.srcDirs = [generatedZenzAssetsDir.get().asFile]
+            if (zenzBundleModel) {
+                assets.srcDirs = [generatedZenzAssetsDir.get().asFile]
+            }
         }
     }
 }
@@ -159,8 +167,10 @@ def prepareZenzModel = tasks.register("prepareZenzModel", Exec) {
     }
 }
 
-tasks.named("preBuild").configure {
-    dependsOn(prepareZenzModel)
+if (zenzBundleModel) {
+    tasks.named("preBuild").configure {
+        dependsOn(prepareZenzModel)
+    }
 }
 
 dependencies {

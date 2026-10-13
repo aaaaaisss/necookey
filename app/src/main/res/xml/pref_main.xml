@@ -195,7 +195,7 @@
             <ListPreference
                 android:key="zenz_engine_preference"
                 android:title="@string/zenz_engine_title"
-                android:defaultValue="jinen"
+                android:defaultValue="sumire"
                 android:entries="@array/zenz_engine_entries"
                 android:entryValues="@array/zenz_engine_values"
                 app:useSimpleSummaryProvider="true"

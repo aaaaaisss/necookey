@@ -407,10 +407,29 @@ class MainPreferenceFragment : AsyncPreferenceFragment() {
         val pref = findPreference<Preference>("zenz_model_select_preference") ?: return
         val uriStr = AppPreference.zenz_model_uri_preference
         pref.summary = if (uriStr.isBlank()) {
-            getString(R.string.zenz_model_source_default)
+            getString(R.string.zenz_model_source_default) + "\n" + getString(R.string.zenz_engine_needs_model)
         } else {
             getString(R.string.zenz_model_source_selected, uriStr)
         }
+        syncZenzEngineChoices()
+    }
+
+    // AI モデルは同梱しないので、モデルを読み込むまでは「Sumire（AI なし）」だけを選べる。
+    private fun syncZenzEngineChoices() {
+        val pref = findPreference<ListPreference>("zenz_engine_preference") ?: return
+        val hasModel = AppPreference.zenz_model_uri_preference.isNotBlank()
+        val entries = resources.getStringArray(R.array.zenz_engine_entries)
+        val values = resources.getStringArray(R.array.zenz_engine_values)
+        if (hasModel) {
+            pref.entries = entries
+            pref.entryValues = values
+            if (pref.value !in values) pref.value = values.first()
+        } else {
+            pref.entries = arrayOf(entries.first())
+            pref.entryValues = arrayOf(values.first())
+            pref.value = values.first()
+        }
+        pref.isEnabled = hasModel
     }
 
     // ---- 記号・クリップボード ----

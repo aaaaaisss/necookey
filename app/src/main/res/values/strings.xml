@@ -871,10 +871,12 @@
     <string name="settings_backup_imported">設定をインポートしました</string>
     <string name="settings_backup_import_failed">インポートに失敗しました: %1$s</string>
     <string name="zenz_engine_title">変換エンジン</string>
-    <string name="zenz_engine_jinen">jinen（内蔵・入力が止まったら文全体を変換）</string>
-    <string name="zenz_engine_zenz">zenz（読み込んだ zenz モデルが必要）</string>
+    <string name="zenz_engine_sumire">Sumire（AI を使わない）</string>
+    <string name="zenz_engine_jinen">jinen（読み込んだ jinen モデル・入力が止まったら文全体を変換）</string>
+    <string name="zenz_engine_zenz">zenz（読み込んだ zenz モデルの評価）</string>
+    <string name="zenz_engine_needs_model">AI モデルを読み込むと jinen / zenz を選べます</string>
     <string name="zenz_model_source_title">モデルの読み込み元</string>
-    <string name="zenz_model_source_default">デフォルト（アプリ内蔵 jinen-v2-small）</string>
+    <string name="zenz_model_source_default">なし（AI モデルは同梱していません）</string>
     <string name="zenz_model_source_pick">モデルファイルを選択する</string>
     <string name="zenz_model_source_selected">選択中: %1$s</string>
 

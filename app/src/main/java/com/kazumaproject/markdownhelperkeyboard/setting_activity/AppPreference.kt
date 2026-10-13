@@ -701,8 +701,11 @@ object AppPreference {
         Pair("qwerty_keyboard_margin_end_dp_landscape_preference", 0)
 
     private val ZENZ_MODEL_URI_PREFERENCE = Pair("zenz_model_uri_preference", "")
-    /** 変換エンジン: "jinen"（内蔵 jinen-v2-small の自由生成、既定）/ "zenz"（読み込んだ zenz モデルの評価ループ）。 */
-    private val ZENZ_ENGINE_PREFERENCE = Pair("zenz_engine_preference", "jinen")
+    /**
+     * 変換エンジン: "sumire"（AI なし、既定）/ "jinen"（読み込んだ jinen モデルの自由生成）/
+     * "zenz"（読み込んだ zenz モデルの評価ループ）。モデルは同梱しないので、AI はモデルを読み込んだときだけ動く。
+     */
+    private val ZENZ_ENGINE_PREFERENCE = Pair("zenz_engine_preference", "sumire")
     private val SUMINAGASHI_INK_EFFECT_ENABLE =
         Pair("suminagashi_ink_effect_preference", false)
     private val KEYBOARD_TOUCH_EFFECT_QUALITY =

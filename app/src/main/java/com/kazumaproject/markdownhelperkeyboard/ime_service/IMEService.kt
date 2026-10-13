@@ -2171,6 +2171,8 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         /** zenz の文脈長。左文脈 40 字 + 読み 32 字 + 候補で十分収まる。 */
         private const val ZENZ_N_CTX = 256
         private const val ZENZ_ENGINE_ZENZ = "zenz"
+        private const val ZENZ_ENGINE_JINEN = "jinen"
+        /** 以前同梱していた jinen モデルのコピー（今は同梱しないので消すだけ）。 */
         private const val DEFAULT_MODEL_ASSET_NAME = "jinen-v2-small-Q5_K_M.gguf"
         private const val LEGACY_ZENZ_MODEL_ASSET_NAME = "ggml-model-Q5_K_M.gguf"
         private const val NEXT_WORD_CANDIDATE_LIMIT = 6
@@ -10925,12 +10927,16 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
     }
 
     /**
-     * 変換エンジンが jinen-v2（内蔵モデルの自由生成）か。zenz を選んでもモデルを読み込んでいなければ
-     * 内蔵モデルは jinen なので jinen として扱う（zenz のプロンプトを jinen に渡さない）。
+     * AI（jinen / zenz）を使うか。モデルは同梱しないので、jinen か zenz を選び、かつモデルを読み込んだときだけ。
+     * 既定の "sumire" とモデル未読み込みは Sumire だけで変換する（zenz プロセスにも触れない）。
      */
+    private fun isAiEngineActive(): Boolean =
+        AppPreference.zenz_model_uri_preference.isNotBlank() &&
+            AppPreference.zenz_engine_preference.let { it == ZENZ_ENGINE_JINEN || it == ZENZ_ENGINE_ZENZ }
+
+    /** 変換エンジンが jinen（読み込んだ jinen モデルの自由生成）か。 */
     private fun isJinenEngine(): Boolean =
-        AppPreference.zenz_engine_preference != ZENZ_ENGINE_ZENZ ||
-            AppPreference.zenz_model_uri_preference.isBlank()
+        AppPreference.zenz_engine_preference == ZENZ_ENGINE_JINEN
 
     /** zenz を回す対象か（唯一の設定は zenz の ON/OFF）。 */
     private fun isZenzaiEligible(insertString: String): Boolean =
@@ -16353,7 +16359,7 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         if (isNecookeyTwoRowSurfaceAvailable()) NECOOKEY_PREDICTION_ROW_HEIGHT_DP else 0
 
     private fun necookeyZenzGateEnabled(): Boolean =
-        AppVariantConfig.hasZenz && appPreference.necookey_zenz_bunsetsu_gate_preference
+        AppVariantConfig.hasZenz && appPreference.necookey_zenz_bunsetsu_gate_preference && isAiEngineActive()
 
     private fun isNecookeyActionCandidate(candidate: Candidate): Boolean =
         candidate.type == CANDIDATE_TYPE_TEXT_MACRO || isSelectionActionCandidate(candidate)
@@ -19282,7 +19288,7 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
      * application UID.
      */
     private suspend fun resolveZenzRuntimeConfig(): ZenzRuntimeConfig? {
-        if (!AppVariantConfig.hasZenz) return null
+        if (!AppVariantConfig.hasZenz || !isAiEngineActive()) return null
 
         val modelSource = AppPreference.zenz_model_uri_preference
         val modelPath = zenzModelPathMutex.withLock {
@@ -19308,28 +19314,10 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
     }
 
     private fun resolveZenzModelPath(customUri: String): String? {
-        // 内蔵モデルは jinen-v2-small（zenz/build.gradle の zenzModelAssetName と一致させる）。
-        val defaultAssetFileName = DEFAULT_MODEL_ASSET_NAME
-        val defaultDestFile = File(filesDir, defaultAssetFileName)
-        // 以前の内蔵 zenz モデルのコピーは使わないので消す（容量）。
+        // AI モデルは同梱しない。以前の内蔵モデルのコピーが残っていれば消す（容量）。
+        File(filesDir, DEFAULT_MODEL_ASSET_NAME).takeIf { it.exists() }?.delete()
         File(filesDir, LEGACY_ZENZ_MODEL_ASSET_NAME).takeIf { it.exists() }?.delete()
-
-        fun ensureDefaultModelCopied(): File {
-            if (!defaultDestFile.exists()) {
-                // Copy to a temp file and rename, so an interrupted copy never leaves a truncated model.
-                val temporary = File(filesDir, "$defaultAssetFileName.tmp")
-                assets.open(defaultAssetFileName).use { input ->
-                    FileOutputStream(temporary).use { output ->
-                        input.copyTo(output)
-                    }
-                }
-                if (!temporary.renameTo(defaultDestFile)) {
-                    temporary.delete()
-                    error("Could not install the default Zenz model.")
-                }
-            }
-            return defaultDestFile
-        }
+        if (customUri.isBlank()) return null
 
         fun copyUriToInternalFile(uriString: String): File {
             val uri = uriString.toUri()
@@ -19359,18 +19347,10 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
                 Timber.d("Zenz custom model prepared: %s", customFile.absolutePath)
                 return customFile.absolutePath
             } catch (e: Exception) {
-                Timber.e(e, "Failed to prepare custom Zenz model. Falling back to default.")
+                Timber.e(e, "Failed to prepare custom Zenz model. Conversion stays Sumire-only.")
             }
         }
-
-        return try {
-            val defaultFile = ensureDefaultModelCopied()
-            Timber.d("Zenz default model prepared: %s", defaultFile.absolutePath)
-            defaultFile.absolutePath
-        } catch (e: Exception) {
-            Timber.e(e, "Failed to prepare the default Zenz model.")
-            null
-        }
+        return null
     }
 
     override val lifecycle: Lifecycle

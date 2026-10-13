@@ -33,7 +33,10 @@ class ZenzDiagnosticsFragment : Fragment(R.layout.fragment_zenz_diagnostics) {
         val preferences = PreferenceManager.getDefaultSharedPreferences(context)
         val enabled = AppVariantConfig.hasZenz &&
             preferences.getBoolean("necookey_two_row_candidate_bar_preference", true) &&
-            preferences.getBoolean("necookey_zenz_bunsetsu_gate_preference", true)
+            preferences.getBoolean("necookey_zenz_bunsetsu_gate_preference", true) &&
+            // AI モデルは同梱しない: jinen / zenz を選び、モデルを読み込んだときだけ動く。
+            !preferences.getString("zenz_model_uri_preference", "").isNullOrBlank() &&
+            preferences.getString("zenz_engine_preference", "sumire") in setOf("jinen", "zenz")
         view.findViewById<MaterialTextView>(R.id.zenz_diagnostics_gate_state).setText(
             if (enabled) R.string.zenz_diagnostics_gate_enabled
             else R.string.zenz_diagnostics_gate_disabled,

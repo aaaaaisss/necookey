@@ -154,10 +154,12 @@
         <item>@string/ng_word_match_mode_exact</item>
     </string-array>
     <string-array name="zenz_engine_entries">
+        <item>@string/zenz_engine_sumire</item>
         <item>@string/zenz_engine_jinen</item>
         <item>@string/zenz_engine_zenz</item>
     </string-array>
     <string-array name="zenz_engine_values" translatable="false">
+        <item>sumire</item>
         <item>jinen</item>
         <item>zenz</item>
     </string-array>
