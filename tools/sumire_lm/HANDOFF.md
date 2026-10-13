@@ -359,3 +359,28 @@ daily.tsv はこのサンドボックスにもリポジトリ（homophone-ui 含
 Reproduce: `python3 $T/lcsim.py run np=1000000 cu=20 qs=7 d=0.75 export=OUT.slc; python3 $T/lcverify.py OUT.slc`;
 CI: `ci/lattice_cost.txt`=1・`ci/n_auto.txt`=0 で trigger → `$WORK/dl_art.sh RUN`（$WORK/lcx/ci で）→ `python3 $T/lcx.py $WORK/lcx/ci/cands`。
 ダンプ設定は既定（N_AUTO=24000、lattice_cost=0）に戻した（trigger は変更していないので CI は走らない）。
+
+## 2026-10-13 ラティスコストを既定オン ＋ はいる→入る 対策（PosPairPenalty.hairuCost）
+- ユーザー判断で案2（LatticeLmCost）を既定で有効に: ダンプ CI は `ci/lattice_cost.txt` = 1（表は lm-data 63732f8 から sha256 照合で取得）。
+  アプリ（sumire-lm-app）はビルド時に同じ固定コミットから取得・sha256 照合（不一致でビルド失敗）してアセット `lattice_lm/lc_np1m.slc` に置き、
+  IME 起動時に IO スレッドで読み込む（設定「単語のつながりで変換を補正」で無効化可、表が無ければ従来どおり）。実機で遅ければ戻す。
+- はいる→入る: `PosPairPenalty.hairuCost`（`hairuPenalty`、既定 `HAIRU_PENALTY` = 8000、0 で無効。前向き DP・A*・Zenzai 制約付き探索で共通）。
+  読み「はい…」の「入…」に: 接続助詞「て」(id 348)/「で」(349) の直後の「入る」、「と」「そう」「こう」「ああ」「どう」の直後の「入っ」に追加コスト。
+  「入って」（熱くて入って・決して入ってみ）、格助詞「で」（車で入る）、副詞「ぐっと」「ちょっと」の後は対象外。ダンプは `NK_HAIRU=P` で上書き。
+- ローカル評価（サンドボックス gradle、JWTD 3000 + AJIMEE 200 + probe 30 + daily.tsv 3000、各条件 1 回、`hcmp.py OFF_DIR ON_DIR`）。P は tune で 3000 / 8000 を比較し 8000
+  （tune の はいる 誤りが 1 件多く減り、top1 は同じ）。Sumire top1:
+
+| | JWTD tune / held | AJIMEE | daily tune / held | probe |
+|---|---|---|---|---|
+| 表なし・対策なし | .309 / .319 | .525 | .535 / .555 | .867 |
+| 表あり・対策なし | .362 / .361 | .560 | .557 / .582 | .900 |
+| 表なし・対策 8000 | .309 / .319 | .525 | .535 / .555 | .933 |
+| 表あり・対策 8000（新既定） | .362 / .361 | .560 | .557 / .583 | .933 |
+
+  はいる→入る 誤り（tune / held / AJIMEE / daily tune / daily held / probe）: 表あり 3/1/0/2/5/2 → 表あり＋対策 2/0/0/1/3/0（表なし 3/1/0/5/5/2 → 2/0/0/4/3/0）。
+  対策で top1 が変わった文は全部で 7 文、**悪化 0**: 心がけて入るんですよ→心がけてはいる（+）、と入っても→とは言っても（+）、わかって入るけど→わかってはいる（+）、
+  わかって入るんですよ→わかってはいる（正解は「分かって」なので =）、採用して入るが→採用してはいるが（=、別の語の誤り）、ご趣旨はわかったと入ったが→…とはいったが（=）、そう入っても→そうはいっても（表あり、=）。
+  残る型: 名詞＋は＋いっ/いる（そんなこと入っても、頭皮ケア入っています、若い女性入っちゃ、ここ入って）。名詞の後は「ここ入って」が正しいこともあり今回は対象外。
+- 次: 実機で速度・メモリ（表 約 11MB ヒープ、+1.8 ms/文 CI）を確認、遅ければ Node 単位の語番号キャッシュか既定オフに戻す。名詞＋は＋いっ 型。リランカー再適用後の精度。
+Reproduce: `in_daily.tsv` = ajimee + jwtd_kc + probe + daily を NK_DUMP_IN に、NK_LATTICE_COST=lc_np1m.slc、NK_HAIRU=0 / 8000 で
+`./gradlew :app:testLiteStandardDebugUnitTest --rerun --tests '*SumireNbestDumpTest*'`（テストファイルを quality/ にコピー、各 ~2 分）→ `python3 $T/hcmp.py OFF ON`。

@@ -32,8 +32,40 @@ internal object PosPairPenalty {
     private const val NUMBER_PREFIX_FIRST = 2639
     private const val NUMBER_PREFIX_LAST = 2642
 
+    /**
+     * はいる→入る 対策（SUMIRE-LM、既定 [HAIRU_PENALTY]、0 で無効）。読み「はい…」の「入…」に対して:
+     *  - 接続助詞「て」「で」の直後の「入る」（わかって|入る → わかって|は|いる、心がけて|は|いる）。
+     *    「入って」（熱くて入って・決して入ってみ）は対象外。
+     *  - 「と」「そう」「こう」「ああ」「どう」の直後の「入っ」（そう|入っても → そうは言っても、とは言ったが）。
+     *    「ぐっと」「ちょっと」等の副詞は 1 ノードなので対象外。
+     * 語ごとの LM 補正（LatticeLmCost の MU）は 1 語の「入る」を有利にするので、ここで逆向きに足す。
+     */
+    const val HAIRU_PENALTY = 8000
+
+    @Volatile
+    @JvmStatic
+    var hairuPenalty: Int = HAIRU_PENALTY
+
+    private const val TE_CONJ_ID = 348 // 助詞,接続助詞,て
+    private const val DE_CONJ_ID = 349 // 助詞,接続助詞,で
+    private val HAIRU_QUOTE_PREV = setOf("と", "そう", "こう", "ああ", "どう")
+
+    fun hairuCost(prev: Node, node: Node): Int {
+        val p = hairuPenalty
+        if (p == 0) return 0
+        val t = node.tango
+        if (t.isEmpty() || t[0] != '入' || !node.yomiUsed.startsWith("はい")) return 0
+        if (t.startsWith("入る") && node.yomiUsed.startsWith("はいる")) {
+            val r = prev.r.toInt()
+            if ((r == TE_CONJ_ID && prev.tango == "て") || (r == DE_CONJ_ID && prev.tango == "で")) return p
+        } else if (t.startsWith("入っ") && prev.tango in HAIRU_QUOTE_PREV) {
+            return p
+        }
+        return 0
+    }
+
     fun cost(prev: Node, node: Node): Int {
-        var penalty = 0
+        var penalty = hairuCost(prev, node)
         if (isOneKanaNumeral(node) && !isNumberContext(prev)) penalty += ONE_KANA_NUMERAL_PENALTY
         if (node.l.toInt() in SURU_FIRST..SURU_LAST && VERB_RENYOU_IDS.binarySearch(prev.r.toInt()) >= 0) {
             penalty += RENYOU_SURU_PENALTY

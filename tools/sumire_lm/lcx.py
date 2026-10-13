@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""lcx.py DIR : evaluate a lattice-cost dump (NK_LATTICE_COST, 案2). DIR holds the dump artifacts: cands.*.tsv (with table),
+"""lcx.py DIR [DIR2] : evaluate a lattice-cost dump (NK_LATTICE_COST, 案2). DIR holds the dump artifacts: cands.*.tsv (with table),
 cands.*.tsv.base (without table), cands.*.tsv.time (id, reading length, ms without, ms with).
 Per variant (base / lc): Sumire top1 (exact match with any '|' alternative) and oracle@50 per split (tune / held / eval=AJIMEE /
 probe), はいる->入る errors (reading contains はい, top1 contains 入, no expected surface contains 入), and boundary misses via
@@ -11,6 +11,12 @@ meta = {}
 for fn in [f'{W0}/data/jwtd_kc.tsv', f'{W0}/data/ajimee.tsv', f'{T}/ci/probe_hairu.tsv']:
     for l in open(fn, encoding='utf-8'):
         f = l.rstrip('\n').split('\t'); meta[f[0]] = dict(sp=f[1], rd=f[3], exp=f[4].split('|'))
+# daily.tsv（homophone-ui 側の日常文 3000、split tune/held → dtune/dheld）。あれば読む。
+DAILY = os.environ.get('LCX_DAILY', f'{W0}/daily.tsv')
+if os.path.exists(DAILY):
+    for l in open(DAILY, encoding='utf-8'):
+        f = l.rstrip('\n').split('\t')
+        if len(f) >= 5 and f[3]: meta[f[0]] = dict(sp='d' + f[1], rd=f[3], exp=f[4].split('|'))
 res = {}; tops = {}
 for var, pat in (('base', 'cands.*.tsv.base'), ('lc', 'cands.*.tsv')):
     files = sorted(glob.glob(f'{D}/{pat}'))
@@ -34,7 +40,7 @@ for var, pat in (('base', 'cands.*.tsv.base'), ('lc', 'cands.*.tsv')):
         if 'はい' in m['rd'] and '入' in t1 and not any('入' in e for e in m['exp']): hai[m['sp']].append(sid)
     tops[var] = top
     res[var] = dict(acc={k: (v[0], v[1] / v[0], v[2] / v[0]) for k, v in acc.items()}, hai={k: len(v) for k, v in hai.items()}, hai_ids=dict(hai))
-    if any(meta[s]['sp'] in ('tune', 'held', 'eval') for s in rows):
+    if not os.environ.get('LCX_NOBUN') and any(meta[s]['sp'] in ('tune', 'held', 'eval') for s in rows):
         env = dict(os.environ, SLM_WORK=V)
         b = subprocess.run([sys.executable, f'{T}/bunseg.py', 'sumire'], env=env, capture_output=True, text=True)
         s = subprocess.run([sys.executable, f'{T}/bunsum.py', 'sumire'], env=env, capture_output=True, text=True)
@@ -54,7 +60,7 @@ if tm:
     for j, name in ((0, 'no table'), (1, 'with table')):
         x = a[:, j]; print(f'{name}: mean {x.mean():.2f} ms, median {np.median(x):.2f}, p90 {np.percentile(x, 90):.2f}, p99 {np.percentile(x, 99):.2f} (n={len(x)})')
 # はいる -> 入る examples
-for sp in ('probe', 'tune', 'held', 'eval'):
+for sp in ('probe', 'tune', 'held', 'eval', 'dtune', 'dheld'):
     b = set(res['base']['hai_ids'].get(sp, [])); l = set(res['lc']['hai_ids'].get(sp, []))
     print(f'はいる->入る {sp}: base {len(b)} -> lc {len(l)} (fixed {len(b - l)}, new {len(l - b)})')
     for sid in sorted(b | l)[:8]:

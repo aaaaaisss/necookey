@@ -24,6 +24,7 @@ import java.io.File
  *   ノード固定の最良経路を F 本）の追加候補を top-50 の後に rank 50.. で出力し、列 9 以降に X, 区切り順位, 語順位の最大,
  *   区切りが N-best 由来(1/0), 由来（A / F / AF）。
  *   .time に id, 読み長, 通常経路 ms, 追加処理 ms, 追加候補数, 区切り数, N-best 由来区切り数。
+ * NK_HAIRU=P（任意）: はいる→入る 対策の追加コスト（PosPairPenalty.hairuPenalty、0 = 無効、未設定 = 既定値）。
  * NK_LATTICE_COST=PATH（任意、案2）: SLC2 表を読み込み、各文を表なし / 表ありで 1 回ずつ変換（順序は文ごとに交互）。
  *   表ありの top-50 を NK_DUMP_OUT、表なしを NK_DUMP_OUT.base に同じ形式で出力し、.time に id, 読み長, 表なし ms, 表あり ms
  *   （NK_SPLIT_RECONV と同時には使わない）。
@@ -43,6 +44,10 @@ class SumireNbestDumpTest {
         val rcConfig = rc?.let {
             SplitReconversionConfig(maxPatterns = it[0], wordsPerSpan = it[1], perPattern = it[2], perPatternForced = it.getOrElse(3) { 0 })
         }
+        System.getenv("NK_HAIRU")?.takeIf { it.isNotBlank() }?.let {
+            com.kazumaproject.markdownhelperkeyboard.converter.path_algorithm.PosPairPenalty.hairuPenalty = it.trim().toInt()
+        }
+        println("hairu penalty: ${com.kazumaproject.markdownhelperkeyboard.converter.path_algorithm.PosPairPenalty.hairuPenalty}")
         val lcTable = System.getenv("NK_LATTICE_COST")?.takeIf { it.isNotBlank() }?.let { p ->
             File(p).inputStream().use { LatticeLmCost.load(it) }.also { println("lattice cost table: ${it.wordCount} words, ${it.pairCount} pairs") }
         }
