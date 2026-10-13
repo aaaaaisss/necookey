@@ -710,6 +710,8 @@ object AppPreference {
     private val SUMIRE_LM_ZENZ_MARGIN_PREFERENCE = Pair("sumire_lm_zenz_margin_preference", 50)
     /** 同音異義 UI の迷い印の判定にリランカーの文節マージン（SumireLmSpanMargin）を使う（既定オフ、設定画面なし）。 */
     private val SUMIRE_LM_HOMOPHONE_MARGIN_PREFERENCE = Pair("sumire_lm_homophone_margin_preference", false)
+    /** 案2: 経路探索の辺コストに単語 bigram LM 補正（LatticeLmCost、表はアセット）を足す（既定オン）。 */
+    private val LATTICE_LM_COST_PREFERENCE = Pair("lattice_lm_cost_preference", true)
     private val SUMINAGASHI_INK_EFFECT_ENABLE =
         Pair("suminagashi_ink_effect_preference", false)
     private val KEYBOARD_TOUCH_EFFECT_QUALITY =
@@ -3618,6 +3620,15 @@ object AppPreference {
         )
         set(value) = preferences.edit {
             it.putBoolean(SUMIRE_LM_HOMOPHONE_MARGIN_PREFERENCE.first, value)
+        }
+
+    var lattice_lm_cost_preference: Boolean
+        get() = preferences.getBoolean(
+            LATTICE_LM_COST_PREFERENCE.first,
+            LATTICE_LM_COST_PREFERENCE.second
+        )
+        set(value) = preferences.edit {
+            it.putBoolean(LATTICE_LM_COST_PREFERENCE.first, value)
         }
 
     var sumire_lm_zenz_margin_preference: Int

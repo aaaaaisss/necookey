@@ -209,6 +209,12 @@
                 app:min="0"
                 app:showSeekBarValue="true"
                 app:iconSpaceReserved="false" />
+            <SwitchPreferenceCompat
+                android:key="lattice_lm_cost_preference"
+                android:title="@string/lattice_lm_cost_title"
+                app:defaultValue="true"
+                app:summary="@string/lattice_lm_cost_summary"
+                app:iconSpaceReserved="false" />
             <Preference
                 android:key="zenz_model_select_preference"
                 android:title="@string/zenz_model_source_title"

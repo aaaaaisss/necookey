@@ -1,5 +1,6 @@
 package com.kazumaproject.markdownhelperkeyboard.ime_service
 
+import com.kazumaproject.markdownhelperkeyboard.converter.path_algorithm.LatticeLmCost
 import android.annotation.SuppressLint
 import android.Manifest
 import android.content.ClipDescription
@@ -2178,6 +2179,8 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         private const val SUMIRE_LM_TABLE_DIR = "sumire_lm"
         /** 表が見つからなかったときに次に探すまでの間隔。 */
         private const val SUMIRE_LM_RETRY_MS = 30_000L
+        /** 案2 ラティス辺コスト表（LatticeLmCost、SLC2）のアセット。ビルド時に lm-data から取得（無ければ従来どおり）。 */
+        private const val LATTICE_LM_ASSET = "lattice_lm/lc_np1m.slc"
         private const val DEFAULT_MODEL_ASSET_NAME = "jinen-v2-small-Q5_K_M.gguf"
         private const val LEGACY_ZENZ_MODEL_ASSET_NAME = "ggml-model-Q5_K_M.gguf"
         private const val NEXT_WORD_CANDIDATE_LIMIT = 6
@@ -2550,6 +2553,7 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         }
         Timber.d("onCreate")
         registerCrossWindowBlurListener()
+        syncLatticeLmCost()
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
             inlineAutofillController = InlineAutofillController(
                 context = this,
@@ -4177,6 +4181,7 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         syncRuntimeInputPreferences()
         syncCustomKeyboardSuggestionPreference()
         syncNgramDictionaryPreferences()
+        syncLatticeLmCost()
         isInputViewActive = true
         // A hidden input view must not carry the previous candidate-display phase into
         // the next render. The editor can restart the view without onStartInput().
@@ -10950,6 +10955,37 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
     private fun isZenzPromptModelLoaded(): Boolean =
         AppPreference.zenz_engine_preference.let { it == ZENZ_ENGINE_ZENZ || it == ZENZ_ENGINE_SUMIRE_LM } &&
             AppPreference.zenz_model_uri_preference.isNotBlank()
+
+    @Volatile private var latticeLmLoadStarted = false
+
+    /**
+     * 案2: ラティス辺コスト補正（[LatticeLmCost]）を設定に合わせる。有効（既定）なら初回だけアセットの表を IO スレッドで
+     * 読み込んで設定し、無効なら外す（表なし = 従来の変換）。アセットが無い・壊れている場合も表なしのまま。
+     */
+    private fun syncLatticeLmCost() {
+        if (!AppPreference.lattice_lm_cost_preference) {
+            LatticeLmCost.table = null
+            latticeLmLoadStarted = false
+            return
+        }
+        if (LatticeLmCost.table != null || latticeLmLoadStarted) return
+        latticeLmLoadStarted = true
+        ioScope.launch {
+            val table = try {
+                val t0 = SystemClock.uptimeMillis()
+                assets.open(LATTICE_LM_ASSET).use { LatticeLmCost.load(it) }.also {
+                    Timber.d("lattice-lm: %d words, %d pairs in %d ms", it.wordCount, it.pairCount, SystemClock.uptimeMillis() - t0)
+                }
+            } catch (e: java.io.FileNotFoundException) {
+                Timber.d("lattice-lm: no table asset")
+                null
+            } catch (e: Exception) {
+                Timber.w(e, "lattice-lm: table load failed")
+                null
+            }
+            if (table != null && AppPreference.lattice_lm_cost_preference && latticeLmLoadStarted) LatticeLmCost.table = table
+        }
+    }
 
     private val sumireLmLoadMutex = Mutex()
     @Volatile private var sumireLmReranker: SumireLmReranker? = null
