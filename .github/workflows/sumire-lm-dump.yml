@@ -9,7 +9,7 @@ on:
     paths: ['tools/sumire_lm/ci/trigger.txt']
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   prep:
@@ -109,7 +109,7 @@ jobs:
           LC_FILE=lc_np1m.slc
           LC_SHA256=1accd8c96f3df50761879e36e476f38911e9a8e29df5caabfd2dcf4a7c8a00b5
           if [ "$(cat tools/sumire_lm/ci/lattice_cost.txt 2>/dev/null)" = "1" ]; then
-            curl -sSfL -o "$RUNNER_TEMP/$LC_FILE" "https://raw.githubusercontent.com/${{ github.repository }}/$LC_COMMIT/$LC_FILE"
+            git fetch -q --depth 1 origin "$LC_COMMIT" && git show "$LC_COMMIT:$LC_FILE" > "$RUNNER_TEMP/$LC_FILE"
             echo "$LC_SHA256  $RUNNER_TEMP/$LC_FILE" | sha256sum -c - || { echo "lattice cost table sha256 mismatch"; exit 1; }
             export NK_LATTICE_COST="$RUNNER_TEMP/$LC_FILE"
           fi
@@ -126,6 +126,29 @@ jobs:
           name: sumire-lm-cands-${{ matrix.shard }}
           path: cands.${{ matrix.shard }}.tsv*
           retention-days: 3
+
+  # ダンプ結果を孤立ブランチ lm-out に xz で置く（private リポジトリ。artifact を取れない環境向け）
+  collect:
+    needs: dump
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/download-artifact@v7
+        with:
+          pattern: sumire-lm-cands-*
+          merge-multiple: true
+          path: out
+      - uses: actions/download-artifact@v7
+        with:
+          name: sumire-lm-inputs
+          path: out
+      - run: |
+          cd out && rm -f *.base && xz -T0 -6 * && ls -la
+          git init -q -b lm-out . && git config user.name ci && git config user.email ci@example.invalid
+          git add -A && git commit -qm "dump ${{ github.sha }}"
+          git push -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}" lm-out
 
   # 変換器の既存単体テスト（区切り固定の再変換は既定で無効。既存の動作が変わらないことの確認）
   unit:
