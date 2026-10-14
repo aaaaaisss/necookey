@@ -1509,7 +1509,8 @@ class FindPath(
         connectionMatrix: ConnectionMatrix.CostTable,
     ): Int {
         return connectionMatrix.cost(prev.r.toInt(), node.l.toInt()) + PosPairPenalty.cost(prev, node) +
-            LatticeLmCost.correction(prev, node) // 案2（表が null なら 0）
+            LatticeLmCost.correction(prev, node) + // 案2（表が null なら 0）
+            KanjiRunPenalty.cost(prev, node) // 連続漢字（継ぎはぎ）ペナルティ（既定オフ、NK_KANJIRUN）
     }
 
     private fun getStringFromNode(node: Node): String {
