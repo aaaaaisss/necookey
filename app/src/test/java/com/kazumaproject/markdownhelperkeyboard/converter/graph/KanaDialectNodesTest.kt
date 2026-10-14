@@ -22,7 +22,7 @@ class KanaDialectNodesTest {
 
     @After
     fun tearDown() {
-        KanaDialectNodes.enabled = false
+        KanaDialectNodes.enabled = true
         KanaDialectNodes.penalty = KanaDialectNodes.DEFAULT_PENALTY
     }
 

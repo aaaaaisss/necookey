@@ -447,3 +447,17 @@ top1 の増減 ctune +26 -4、cheld +24 -7、daily・JWTD 0、AJIMEE -1。
 Reproduce: `python3 $T/mkcolloq.py colloq.tsv 3000`; `cat in_daily.tsv colloq.tsv > in_all.tsv`; ダンプは NK_DUMP_IN=in_all.tsv NK_DUMP_SHARD=0/2, 1/2・NK_LATTICE_COST=lc_np1m.slc・
 NK_COLLOQ=-1 / 1000 で `./gradlew :app:testLiteStandardDebugUnitTest --rerun --tests '*SumireNbestDumpTest*'`（テストを quality/ にコピー、各シャード ~3 分）→
 `python3 $T/bdiag.py 'OFF/cands.[01].tsv' in_all.tsv 'ON/cands.[01].tsv'`（~3 分、BD_EX=N で型別の例）。`python3 $T/minelex.py out.pkl 150`（~5 分）。
+
+## 2026-10-14 方言・口語のかな語（kana-dialect ブランチ、KanaDialectNodes、既定オン P=1000）
+- d9bf21c で追加（GraphBuilder 3.06、構成語の品詞 ID・最小語コスト和＋共通 P、表なし）。今回: とる・とった（取る/撮る がかなに崩れるだけ）と ってゆう（言うたり→ゆうたり）を削除、ってゆうか 等は残す。
+- held のみ NK_DIALECT=1000 でダンプ（2 シャード）、基準は無効時（ev.py / perentry.py）:
+
+| セット | n | exact | lenient | 境界ミス | exact +/- |
+|---|---|---|---|---|---|
+| 方言 kheld | 1286 | .557→.561 | .885→.885 | 85→82 | +5/-0 |
+| daily held | 1500 | .583→.582 | .880→.881 | 58→57 | +0/-1 |
+| 口語 cheld | 1500 | .517→.517 | .887→.887 | 109→109 | 0/0 |
+| JWTD held | 1500 | .361→.361 | .460→.460 | 100→100 | 0/0 |
+| AJIMEE | 200 | .560→.560 | .615→.615 | 6→6 | 0/0 |
+
+- 直った語: けん 2・あかん・こうゆう・っちゅうか。壊れた 1 件 = daily「年とともに」→「ねんとともに」（文頭の ねん、over-kana）。±1 文の範囲なので既定オン。NK_DIALECT 未指定のダンプは以後オン（無効化は負の値）。残り: ねん を文頭・名詞直後で出さない条件を検討。

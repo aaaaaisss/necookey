@@ -170,3 +170,7 @@
   - `necookeyZenzGateEnabled` は main と同じ（AI 有無でなく「zenz ON/OFF」設定だけ）にし、AI を止めるのは `isAiEngineActive`（`resolveZenzRuntimeConfig`・`isZenzPromptModelLoaded`・`isJinenEngine`）。
 - 迷い印・差分チップの判定元: `SumireLmMarginSource`（`SumireLmSpanMargin` の `BunsetsuMarginSource` 実装、しきい値 `DEFAULT_THRESHOLD_CENTS`=50、未較正）を、設定 `sumire_lm_homophone_margin_preference`（既定オン、画面なし）がオンでその読みにリランカーが動いたときだけ使う。リランカー結果が届いたら同じ 1 位でもバーを描き直す。それ以外は Sumire の経路コスト差 800。
 - **注意**: リランカーの LM 表（`sumire_lm/`）はまだ同梱していない（リーダーが実用表を作成中）ので、今の APK ではリランカーは動かず、迷い印は Sumire 差 800 のまま。表を入れたら 50 の較正が必要。
+
+## 2026-10-14: 方言・口語のかな語を既定オン（kana-dialect）
+- KanaDialectNodes（じゃけん・あかん・そやねん・っちゅうか 等を 1 語のかなノードに）から とる・とった・ってゆう を削除し、既定オン（P=1000）。
+- held: 方言 exact .557→.561（+5/-0、境界ミス 85→82）、daily .583→.582（-1: 文頭「年」→ねん）、口語・JWTD・AJIMEE 不変。lenient はどのセットも低下なし。

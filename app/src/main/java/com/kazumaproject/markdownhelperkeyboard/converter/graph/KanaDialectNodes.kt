@@ -7,14 +7,15 @@ package com.kazumaproject.markdownhelperkeyboard.converter.graph
  * 各語は「標準形の構成語」（読み, 品詞 ID）の並びを持つ（じゃけん = じゃ[助動詞 特殊・ジャ] + から[接続助詞]）。
  * ノードの左 ID = 先頭の構成語、右 ID = 末尾の構成語、コスト = 各構成語のシステム辞書での最小語コスト（その品詞 ID の語、表記は問わない）の和
  * ＋ [penalty]（全語共通）。表記 = 読みそのまま（ひらがな）。品詞 ID は assets/id.def。構成語が辞書に無い語は足さない。辞書・表は使わない（追加サイズ 0）。
- * 除外（誤変換が多い/標準語と衝突）: いけん こんなん わし よる ゆう へん や やろう。
+ * 既定オン（P=1000）: held 5 セットで exact/lenient の低下なし（方言 held exact .557→.561、daily held -1 文 = 文頭 ねん→年 の 1 件）。
+ * 除外（誤変換が多い/標準語と衝突）: いけん こんなん わし よる ゆう へん や やろう とる とった（取る/撮る がかなに崩れる） ってゆう（言うたり→ゆうたり）。
  */
 internal object KanaDialectNodes {
     const val DEFAULT_PENALTY = 1000
 
     @Volatile
     @JvmStatic
-    var enabled: Boolean = false
+    var enabled: Boolean = true
 
     @Volatile
     @JvmStatic
@@ -81,8 +82,8 @@ internal object KanaDialectNodes {
         add(e("はる", p("いる", IRU), afterTe = true))
         add(e("しとる", p("し", SURU_REN), p("て", TE), p("いる", IRU)))
         add(e("しとった", p("し", SURU_REN), p("て", TE), p("い", I_REN), p("た", TA)))
-        for (r in listOf("とる", "ちょる")) add(e(r, p("いる", IRU)))
-        for (r in listOf("とった", "ちょった")) add(e(r, p("い", I_REN), p("た", TA)))
+        add(e("ちょる", p("いる", IRU)))
+        add(e("ちょった", p("い", I_REN), p("た", TA)))
         for (r in listOf("じゃろう", "だべ", "だっぺ")) add(e(r, p("だろ", DARO), p("う", U)))
         add(e("なまら", p("とても", ADV)))
         add(e("かもしれん", p("か", KA), p("も", MO), p("しれ", SHIRE), p("ん", N)))
@@ -93,7 +94,6 @@ internal object KanaDialectNodes {
         add(e("こうゆう", p("こう", KOU), p("いう", IU)))
         add(e("どうゆう", p("どう", DOU), p("いう", IU)))
         add(e("ああゆう", p("ああ", AA), p("いう", IU)))
-        add(e("ってゆう", p("って", TTE), p("いう", IU)))
         for (r in listOf("ってゆうか", "っちゅうか", "てゆうか", "ちゅうか")) add(e(r, p("って", TTE), p("いう", IU), p("か", KA)))
         add(e("っちゅう", p("って", TTE), p("いう", IU)))
         for (r in listOf("ゆって", "ゆうて")) add(e(r, p("いっ", ITT), p("て", TE)))

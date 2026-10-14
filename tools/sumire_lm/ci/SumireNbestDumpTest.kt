@@ -29,7 +29,7 @@ import java.io.File
  *   表ありの top-50 を NK_DUMP_OUT、表なしを NK_DUMP_OUT.base に同じ形式で出力し、.time に id, 読み長, 表なし ms, 表あり ms
  *   （NK_SPLIT_RECONV と同時には使わない）。
  * NK_COLLOQ=P（任意）: 口語かな語ノードの追加コスト（ColloquialKanaNodes.penalty）、負の値で無効、未設定 = 既定。
- * NK_DIALECT=P（任意）: 方言かな語ノードの追加コスト（KanaDialectNodes.penalty）、負の値で無効、未設定 = 既定（無効）。
+ * NK_DIALECT=P（任意）: 方言かな語ノードの追加コスト（KanaDialectNodes.penalty）、負の値で無効、未設定 = 既定（有効、P=1000）。
  */
 class SumireNbestDumpTest {
     @Test
