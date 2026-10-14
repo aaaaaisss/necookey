@@ -602,6 +602,7 @@ class GraphBuilder {
         )
         val learnedCostNow = System.currentTimeMillis()
         val colloquialActive = ColloquialKanaNodes.mayApply(str)
+        val dialectActive = KanaDialectNodes.mayApply(str)
         for (i in str.indices) {
             currentCoroutineContext().ensureActive()
             var subStrCache: String? = null
@@ -982,6 +983,40 @@ class GraphBuilder {
                             len = yomiStr.length.toShort(), sPos = i, mozcAttributes = mozcAttributesFor(bestL),
                         ),
                         graphNodeDedupMode, graphNodeTrace, str, "COLLOQUIAL",
+                    )
+                }
+            }
+
+            // 3.06 方言・口語のかな語（KanaDialectNodes.kt）: 標準形の構成語の品詞 ID・語コストの和＋共通ペナルティ
+            if (dialectActive && i < str.length) {
+                for (entry in KanaDialectNodes.entriesAt(str, i)) {
+                    val endIndex = i + entry.reading.length
+                    if (endIndex <= reusablePrefixLength) continue
+                    var sum = 0
+                    var ok = true
+                    for (part in entry.parts) {
+                        val idx = yomiTrie.getNodeIndex(part.yomi, succinctBitVectorLBSYomi)
+                        val termId = if (idx > 0) yomiTrie.getTermId(idx, succinctBitVectorIsLeafYomi) else -1
+                        var best = Int.MAX_VALUE
+                        if (termId >= 0) {
+                            tokenArray.forEachDictionaryByYomiTermId(termId, succinctBitVectorTokenArray) { posTableIndex, wordCost, _ ->
+                                if (tokenArray.leftIds[posTableIndex.toInt()] == part.posId && wordCost < best) best = wordCost.toInt()
+                            }
+                        }
+                        if (best == Int.MAX_VALUE) { ok = false; break }
+                        sum += best
+                    }
+                    if (!ok) continue
+                    val l = entry.parts.first().posId
+                    val r = entry.parts.last().posId
+                    val cost = sum + KanaDialectNodes.penalty
+                    addOrUpdateNode(
+                        graph, endIndex,
+                        Node(
+                            l = l, r = r, score = cost, f = cost, g = cost, tango = entry.reading, yomiUsed = entry.reading,
+                            len = entry.reading.length.toShort(), sPos = i, mozcAttributes = mozcAttributesFor(l),
+                        ),
+                        graphNodeDedupMode, graphNodeTrace, str, "DIALECT",
                     )
                 }
             }
