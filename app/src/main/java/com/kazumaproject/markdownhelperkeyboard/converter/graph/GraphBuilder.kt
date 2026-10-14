@@ -603,6 +603,7 @@ class GraphBuilder {
         val learnedCostNow = System.currentTimeMillis()
         val colloquialActive = ColloquialKanaNodes.mayApply(str)
         val dialectActive = KanaDialectNodes.mayApply(str)
+        val kanaSpanActive = KanaSpanNodes.mayApply(str)
         for (i in str.indices) {
             currentCoroutineContext().ensureActive()
             var subStrCache: String? = null
@@ -1017,6 +1018,24 @@ class GraphBuilder {
                             len = entry.reading.length.toShort(), sPos = i, mozcAttributes = mozcAttributesFor(l),
                         ),
                         graphNodeDedupMode, graphNodeTrace, str, "DIALECT",
+                    )
+                }
+            }
+
+            // 3.07 汎用ひらがなスパン（KanaSpanNodes.kt、既定オフ）: 全部ひらがなの区間を表記 = 読みの 1 ノードに
+            if (kanaSpanActive && i < str.length) {
+                val spanPos = KanaSpanNodes.posId
+                for (endIndex in KanaSpanNodes.ends(str, i)) {
+                    if (endIndex <= reusablePrefixLength) continue
+                    val yomiStr = str.substring(i, endIndex)
+                    val cost = KanaSpanNodes.cost(yomiStr.length)
+                    addOrUpdateNode(
+                        graph, endIndex,
+                        Node(
+                            l = spanPos, r = spanPos, score = cost, f = cost, g = cost, tango = yomiStr, yomiUsed = yomiStr,
+                            len = yomiStr.length.toShort(), sPos = i, mozcAttributes = mozcAttributesFor(spanPos),
+                        ),
+                        graphNodeDedupMode, graphNodeTrace, str, "KANASPAN",
                     )
                 }
             }

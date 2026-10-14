@@ -21,11 +21,20 @@ internal object KanaDialectNodes {
     @JvmStatic
     var penalty: Int = DEFAULT_PENALTY
 
+    /** 評価用: 読みがここにある語は出さない（NK_DIALECT_SKIP）。 */
+    @Volatile
+    @JvmStatic
+    var skip: Set<String> = emptySet()
+
     /** 標準形の構成語: 読み [yomi] の、左 ID が [posId] の語。 */
     data class Part(val yomi: String, val posId: Short)
 
-    /** [reading] = 方言形の読み（= 表記）。[afterTe] = 直前の読みが て/で のときだけ（はる）。 */
-    data class Entry(val reading: String, val parts: List<Part>, val afterTe: Boolean = false)
+    /**
+     * [reading] = 方言形の読み（= 表記）。[afterTe] = 直前の読みが て/で のときだけ（はる）。
+     * [after] != null なら文頭では出さず、直前の読みの 1 字が [after] のどれかのときだけ（ねん: 名詞の直後
+     * = 年とともに・記念・去年 を避け、用言・助動詞の語尾 ん/い/う/や/る/え/た/す の後だけ）。
+     */
+    data class Entry(val reading: String, val parts: List<Part>, val afterTe: Boolean = false, val after: String? = null)
 
     // 品詞 ID（assets/id.def）
     private const val KARA: Short = 330      // から 接続助詞
@@ -60,13 +69,16 @@ internal object KanaDialectNodes {
     private const val TTE: Short = 391       // って 格助詞 連語
 
     private fun p(y: String, id: Short) = Part(y, id)
-    private fun e(r: String, vararg parts: Part, afterTe: Boolean = false) = Entry(r, parts.toList(), afterTe)
+    private fun e(r: String, vararg parts: Part, afterTe: Boolean = false, after: String? = null) = Entry(r, parts.toList(), afterTe, after)
+
+    /** ねん の直前に許す字（用言・助動詞の語尾）。文頭・名詞の直後（年とともに・きねん・きょねん）では出さない。 */
+    const val NEN_AFTER = "んいうやるえたす"
 
     val ENTRIES: List<Entry> = buildList {
         for (r in listOf("けん", "けぇ")) add(e(r, p("から", KARA)))
         for (r in listOf("じゃけん", "じゃけぇ")) add(e(r, p("じゃ", JA), p("から", KARA)))
         add(e("やけん", p("だ", DA), p("から", KARA)))
-        add(e("ねん", p("の", NO), p("だ", DA)))
+        add(e("ねん", p("の", NO), p("だ", DA), after = NEN_AFTER))
         add(e("てんねん", p("て", TE), p("いる", IRU), p("の", NO), p("だ", DA)))
         for (r in listOf("せや", "そや")) {
             add(e(r, p("そう", SOU), p("だ", DA)))
@@ -108,8 +120,10 @@ internal object KanaDialectNodes {
     fun entriesAt(str: String, start: Int): List<Entry> {
         val cands = byFirst[str[start]] ?: return emptyList()
         return cands.filter { en ->
-            str.startsWith(en.reading, start) &&
-                (!en.afterTe || (start > 0 && (str[start - 1] == 'て' || str[start - 1] == 'で')))
+            en.reading !in skip &&
+                str.startsWith(en.reading, start) &&
+                (!en.afterTe || (start > 0 && (str[start - 1] == 'て' || str[start - 1] == 'で'))) &&
+                (en.after == null || (start > 0 && str[start - 1] in en.after))
         }
     }
 }

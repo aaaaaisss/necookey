@@ -30,6 +30,8 @@ import java.io.File
  *   （NK_SPLIT_RECONV と同時には使わない）。
  * NK_COLLOQ=P（任意）: 口語かな語ノードの追加コスト（ColloquialKanaNodes.penalty）、負の値で無効、未設定 = 既定。
  * NK_DIALECT=P（任意）: 方言かな語ノードの追加コスト（KanaDialectNodes.penalty）、負の値で無効、未設定 = 既定（有効、P=1000）。
+ * NK_DIALECT_SKIP=語,語（任意）: その方言語だけ無効（評価用）。
+ * NK_KANASPAN=base,perChar[,n|i[,maxLen]]（任意）: 汎用ひらがなスパンノード（KanaSpanNodes）、未設定 = 既定（無効）。
  */
 class SumireNbestDumpTest {
     @Test
@@ -59,6 +61,14 @@ class SumireNbestDumpTest {
             com.kazumaproject.markdownhelperkeyboard.converter.graph.KanaDialectNodes.enabled = p >= 0
             if (p >= 0) com.kazumaproject.markdownhelperkeyboard.converter.graph.KanaDialectNodes.penalty = p
         }
+        System.getenv("NK_DIALECT_SKIP")?.takeIf { it.isNotBlank() }?.let {
+            com.kazumaproject.markdownhelperkeyboard.converter.graph.KanaDialectNodes.skip = it.split(',').map { w -> w.trim() }.toSet()
+        }
+        System.getenv("NK_KANASPAN")?.takeIf { it.isNotBlank() }?.let {
+            com.kazumaproject.markdownhelperkeyboard.converter.graph.KanaSpanNodes.configure(it)
+        }
+        println("kanaspan: ${com.kazumaproject.markdownhelperkeyboard.converter.graph.KanaSpanNodes.enabled} ${com.kazumaproject.markdownhelperkeyboard.converter.graph.KanaSpanNodes.base} ${com.kazumaproject.markdownhelperkeyboard.converter.graph.KanaSpanNodes.perChar} ${com.kazumaproject.markdownhelperkeyboard.converter.graph.KanaSpanNodes.posId}")
+        println("dialect skip: ${com.kazumaproject.markdownhelperkeyboard.converter.graph.KanaDialectNodes.skip}")
         println("dialect: ${com.kazumaproject.markdownhelperkeyboard.converter.graph.KanaDialectNodes.enabled} ${com.kazumaproject.markdownhelperkeyboard.converter.graph.KanaDialectNodes.penalty}")
         println("colloquial: ${com.kazumaproject.markdownhelperkeyboard.converter.graph.ColloquialKanaNodes.enabled} ${com.kazumaproject.markdownhelperkeyboard.converter.graph.ColloquialKanaNodes.penalty}")
         println("hairu penalty: ${com.kazumaproject.markdownhelperkeyboard.converter.path_algorithm.PosPairPenalty.hairuPenalty}")

@@ -47,6 +47,11 @@ class KanaDialectNodesTest {
         assertTrue(KanaDialectNodes.entriesAt("じゃけん", 0).any { it.reading == "じゃけん" })
         assertTrue(KanaDialectNodes.entriesAt("きてはる", 2).any { it.reading == "はる" })
         assertTrue(KanaDialectNodes.entriesAt("はるがきた", 0).none { it.reading == "はる" })
+        // ねん: 文頭・名詞の直後では出さない
+        assertTrue(KanaDialectNodes.entriesAt("ねんとともに", 0).none { it.reading == "ねん" })
+        assertTrue(KanaDialectNodes.entriesAt("きねんび", 1).none { it.reading == "ねん" })
+        assertTrue(KanaDialectNodes.entriesAt("なにやねん", 3).any { it.reading == "ねん" })
+        assertTrue(KanaDialectNodes.entriesAt("あるねん", 2).any { it.reading == "ねん" })
     }
 
     @Test
@@ -71,6 +76,7 @@ class KanaDialectNodesTest {
             "いけん" to "意見",
             "ひろしまけん" to "広島県",
             "さんねん" to "年",
+            "ねんとともにかおがたるんできた" to "年とともに",
         )) {
             val t = top(input)
             assertTrue("$input -> $t", t.contains(want))
