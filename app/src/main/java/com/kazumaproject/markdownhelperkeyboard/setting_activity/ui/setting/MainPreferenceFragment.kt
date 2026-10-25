@@ -196,13 +196,6 @@ class MainPreferenceFragment : AsyncPreferenceFragment() {
     // ---- 変換候補 ----
 
     private fun bindCandidateSection() {
-        findPreference<SwitchPreferenceCompat>(AppPreference.INLINE_SUGGESTION_ENABLED_KEY)?.let {
-            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) {
-                it.isEnabled = false
-                it.summary = getString(R.string.inline_suggestion_unsupported_summary)
-            }
-        }
-
         findPreference<Preference>("candidate_view_height_setting_fragment_preference")?.setOnPreferenceClickListener {
             navigateSafely(R.id.candidateViewHeightSettingFragment)
             true

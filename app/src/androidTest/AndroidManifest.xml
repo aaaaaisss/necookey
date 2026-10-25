@@ -5,11 +5,5 @@
             android:name="com.kazumaproject.markdownhelperkeyboard.setting_activity.SettingsBackupTestProvider"
             android:authorities="io.github.aaaaaisss.necookey.settingsbackuptest"
             android:exported="true" />
-        <activity
-            android:name="com.kazumaproject.markdownhelperkeyboard.qa.InlineAutofillLoginActivity"
-            android:exported="true"
-            android:screenOrientation="portrait"
-            android:theme="@android:style/Theme.Material.Light.NoActionBar"
-            android:windowSoftInputMode="adjustResize|stateAlwaysVisible" />
     </application>
 </manifest>

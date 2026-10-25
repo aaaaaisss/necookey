@@ -161,7 +161,6 @@ class CandidateHeightStabilizationDeviceTest {
                     .putBoolean("shortcut_toolbar_integrated_in_suggestion_preference", case.integrated)
                     .putBoolean(AppPreference.STABILIZE_CANDIDATE_STRIP_HEIGHT_KEY, case.stable)
                     .putBoolean("live_conversion_preference", false)
-                    .putBoolean("inline_suggestion_enabled_preference", false)
                     .putString("keyboard_skin_preference", case.skin)
                     .commit())
                 if (host == null) {

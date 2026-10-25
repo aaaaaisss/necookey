@@ -6,7 +6,6 @@ object CandidateStripContentResolver {
         if (shouldShowExpandedShortcutEntry(state)) {
             return CandidateStripContent.ExpandedShortcutEntry(
                 shortcutItems = state.shortcutItems,
-                inlineSuggestionToggle = state.inlineSuggestionToggle,
             )
         }
         if (state.candidates.isNotEmpty()) {
@@ -14,24 +13,20 @@ object CandidateStripContentResolver {
                 return CandidateStripContent.SelectionActions(
                     actions = state.candidates,
                     showShortcutEntry = shouldShowShortcutEntryWithSelectionActions(state),
-                    inlineSuggestionToggle = state.inlineSuggestionToggle,
                 )
             }
             return CandidateStripContent.Candidates(
                 candidates = state.candidates,
-                inlineSuggestionToggle = state.inlineSuggestionToggle,
             )
         }
         if (shouldShowZeroQuerySuggestions(state)) {
             return CandidateStripContent.ZeroQuerySuggestions(
                 candidates = state.zeroQueryCandidates,
-                inlineSuggestionToggle = state.inlineSuggestionToggle,
             )
         }
         if (state.customLayoutPickerShown) {
             return CandidateStripContent.CustomLayoutPicker(
                 layouts = state.customLayouts,
-                inlineSuggestionToggle = state.inlineSuggestionToggle,
             )
         }
         val clipboardPreview = resolveClipboardPreviewOrNull(state)
@@ -50,8 +45,7 @@ object CandidateStripContentResolver {
             quickActions.hasAnyAction ||
             showShortcutEntry ||
             showIntegratedShortcuts ||
-            showZeroQueryToggle ||
-            state.inlineSuggestionToggle != null
+            showZeroQueryToggle
         ) {
             return CandidateStripContent.EmptyState(
                 showShortcutEntry = showShortcutEntry,
@@ -60,7 +54,6 @@ object CandidateStripContentResolver {
                 shortcutItems = state.shortcutItems,
                 showIntegratedShortcuts = showIntegratedShortcuts,
                 showZeroQueryToggle = showZeroQueryToggle,
-                inlineSuggestionToggle = state.inlineSuggestionToggle,
             )
         }
         return CandidateStripContent.Empty

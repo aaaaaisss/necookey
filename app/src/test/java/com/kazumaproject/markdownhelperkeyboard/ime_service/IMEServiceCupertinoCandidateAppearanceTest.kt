@@ -20,7 +20,6 @@ import com.kazumaproject.markdownhelperkeyboard.databinding.MainLayoutBinding
 import com.kazumaproject.markdownhelperkeyboard.ime_service.adapters.ShortcutAdapter
 import com.kazumaproject.markdownhelperkeyboard.ime_service.adapters.SuggestionAdapter
 import com.kazumaproject.markdownhelperkeyboard.ime_service.candidate.CandidateStripContent
-import com.kazumaproject.markdownhelperkeyboard.ime_service.candidate.InlineSuggestionToggle
 import com.kazumaproject.markdownhelperkeyboard.ime_service.composing_guide.CandidatePanelColors
 import com.kazumaproject.markdownhelperkeyboard.ime_service.state.CandidateTab
 import com.kazumaproject.markdownhelperkeyboard.setting_activity.AppPreference
@@ -137,57 +136,11 @@ class IMEServiceCupertinoCandidateAppearanceTest {
         } finally { fixture.close() }
     }
 
-    @Test fun returningFromSkinsRestoresDefaultAndCustomInlineColors() {
-        val fixture = Fixture()
-        try {
-            AppPreference.init(fixture.context)
-            val holder = fixture.adapter.onCreateViewHolder(FrameLayout(fixture.context),
-                SuggestionAdapter.VIEW_TYPE_INLINE_TOGGLE) as SuggestionAdapter.InlineSuggestionToggleViewHolder
-            fixture.adapter.submitContent(CandidateStripContent.Candidates(
-                listOf(Candidate("候補", 1, 2u, 0)),
-                InlineSuggestionToggle("切り替え", iconResId = R.drawable.inline_suggestion_key_24,
-                    iconBackgroundResId = com.kazumaproject.core.R.drawable.suggestion_icon_bg),
-            ))
-            drain(fixture.adapter, 2)
-            for (mode in listOf("default", "custom")) {
-                PreferenceManager.getDefaultSharedPreferences(fixture.context).edit()
-                    .putString("keyboard_theme_mode_preference", mode)
-                    .putInt("custom_theme_candidate_text_color", Color.MAGENTA).commit()
-                fixture.selectSkin(KeyboardSkinId.DEFAULT)
-                fixture.call("applyCandidateAppearance")
-                fixture.adapter.onBindViewHolder(holder, 0)
-                val original = iconPixels(holder.badgeIcon)
-                val originalButtonTint = fixture.binding.suggestionVisibility.imageTintList
-                for (skin in listOf(KeyboardSkinId.CUPERTINO_LIGHT,
-                    KeyboardSkinId.CUPERTINO_DARK, KeyboardSkinId.CUPERTINO_CLASSIC)) {
-                    fixture.selectSkin(skin)
-                    fixture.call("applyCandidateAppearance")
-                    fixture.adapter.onBindViewHolder(holder, 0)
-                }
-                fixture.selectSkin(KeyboardSkinId.DEFAULT)
-                fixture.call("applyCandidateAppearance")
-                fixture.adapter.onBindViewHolder(holder, 0)
-                val restored = iconPixels(holder.badgeIcon)
-                // Native vector tint removal changes a few antialiased edge channels by
-                // one level. Compare geometry and every color channel with that tolerance.
-                assertTrue("$mode inline colors did not restore", original.indices.all { index ->
-                    listOf(0, 8, 16, 24).all { shift ->
-                        kotlin.math.abs(((original[index] ushr shift) and 255) -
-                            ((restored[index] ushr shift) and 255)) <= 1
-                    }
-                })
-                assertNull(holder.badgeIcon.backgroundTintList)
-                assertNull(fixture.binding.suggestionVisibility.backgroundTintList)
-                assertEquals(originalButtonTint, fixture.binding.suggestionVisibility.imageTintList)
-            }
-        } finally { fixture.close() }
-    }
-
     @Test @Config(qualifiers = "notnight")
-    fun cupertinoCandidatesAndBothInlineIconsUseSkinColorsInDayMode() = checkSkinColors()
+    fun cupertinoCandidatesUseSkinColorsInDayMode() = checkSkinColors()
 
     @Test @Config(qualifiers = "night")
-    fun cupertinoCandidatesAndBothInlineIconsUseSkinColorsInNightMode() = checkSkinColors()
+    fun cupertinoCandidatesUseSkinColorsInNightMode() = checkSkinColors()
 
     private fun checkSkinColors() {
         val fixture = Fixture()
@@ -207,26 +160,10 @@ class IMEServiceCupertinoCandidateAppearanceTest {
                     cupertinoClassic = skin == KeyboardSkinId.CUPERTINO_CLASSIC)
                 for (adapter in listOf(fixture.adapter, fixture.fullAdapter)) {
                     val parent = FrameLayout(fixture.context)
-                    val toggleHolder = adapter.onCreateViewHolder(parent,
-                        SuggestionAdapter.VIEW_TYPE_INLINE_TOGGLE) as SuggestionAdapter.InlineSuggestionToggleViewHolder
-                    for (icon in listOf(R.drawable.more_horiz_24px, R.drawable.inline_suggestion_key_24)) {
-                        adapter.submitContent(CandidateStripContent.Candidates(
-                            listOf(Candidate("候補", 1, 2u, 0)),
-                            InlineSuggestionToggle("切り替え", iconResId = icon,
-                                iconBackgroundResId = if (icon == R.drawable.inline_suggestion_key_24)
-                                    com.kazumaproject.core.R.drawable.suggestion_icon_bg else null),
-                        ))
-                        drain(adapter, 2)
-                        val toggleIndex = (0 until adapter.itemCount).first {
-                            adapter.getItemViewType(it) == SuggestionAdapter.VIEW_TYPE_INLINE_TOGGLE
-                        }
-                        adapter.onBindViewHolder(toggleHolder, toggleIndex)
-                        assertEquals("$skin inline tint", colors.icon, toggleHolder.badgeIcon.imageTintList?.defaultColor)
-                        if (icon == R.drawable.inline_suggestion_key_24) {
-                            assertEquals("$skin inline badge background", KeyboardSkinRegistry.find(skin)!!.palette.key,
-                                toggleHolder.badgeIcon.backgroundTintList?.defaultColor)
-                        } else assertNull(toggleHolder.badgeIcon.background)
-                        assertTrue("$skin inline pixels", iconPixels(toggleHolder.badgeIcon).count { it == colors.icon } > 20)
+                    adapter.submitContent(CandidateStripContent.Candidates(
+                        listOf(Candidate("候補", 1, 2u, 0)),
+                    ))
+                    drain(adapter, 2)
                         val candidateIndex = (0 until adapter.itemCount).first {
                             adapter.getItemViewType(it) == SuggestionAdapter.VIEW_TYPE_SUGGESTION
                         }
@@ -234,7 +171,6 @@ class IMEServiceCupertinoCandidateAppearanceTest {
                             SuggestionAdapter.VIEW_TYPE_SUGGESTION) as SuggestionAdapter.SuggestionViewHolder
                         adapter.onBindViewHolder(candidateHolder, candidateIndex)
                         assertEquals("$skin candidate text", colors.text, candidateHolder.text.currentTextColor)
-                    }
                 }
                 fixture.shortcuts.submitList(listOf(ShortcutType.CLIP_BOARD))
                 shadowOf(Looper.getMainLooper()).idle()

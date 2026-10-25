@@ -76,7 +76,6 @@ object AppPreference {
     const val CUSTOM_KEYMAP_GUIDE_KEY = "flick_keymap_guide"
     const val CUSTOM_KEYBOARD_INPUT_IN_EMPTY_AREAS_KEY =
         "custom_keyboard_input_in_empty_areas_preference"
-    const val INLINE_SUGGESTION_ENABLED_KEY = "inline_suggestion_enabled_preference"
     internal const val CANDIDATE_HEIGHT_DEFAULTS_MIGRATION_VERSION_KEY =
         "candidate_height_defaults_migration_version_preference"
     private const val MIN_CANDIDATE_VISIBLE_HEIGHT_DP = 30
@@ -115,8 +114,6 @@ object AppPreference {
         TFBI_DIAGONAL_RECOGNITION_MODE_KEY,
         TfbiDiagonalRecognitionMode.LEGACY.preferenceValue
     )
-    private val INLINE_SUGGESTION_ENABLED_PREFERENCE =
-        Pair(INLINE_SUGGESTION_ENABLED_KEY, true)
     private val LEARN_DICTIONARY_PREFERENCE = Pair("learn_dictionary_preference", true)
     private val USER_DICTIONARY_PREFERENCE = Pair("user_dictionary_preference", true)
     private val USER_DICTIONARY_PREFIX_PREFERENCE = Pair("user_dictionary_prefix_match_number", 2)
@@ -1319,15 +1316,6 @@ object AppPreference {
         }
 
     val landscape_force_qwerty_preference: Boolean get() = false // S3: hardcoded, setting removed
-
-    var inline_suggestion_enabled_preference: Boolean
-        get() = preferences.getBoolean(
-            INLINE_SUGGESTION_ENABLED_PREFERENCE.first,
-            INLINE_SUGGESTION_ENABLED_PREFERENCE.second,
-        )
-        set(value) = preferences.edit {
-            it.putBoolean(INLINE_SUGGESTION_ENABLED_PREFERENCE.first, value)
-        }
 
     val landscape_force_qwerty_romaji_preference: Boolean get() = false // S3: hardcoded, setting removed
 

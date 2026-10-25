@@ -58,8 +58,6 @@ import android.view.inputmethod.InputConnection
 import android.view.inputmethod.InputContentInfo
 import android.view.inputmethod.InputMethodInfo
 import android.view.inputmethod.InputMethodManager
-import android.view.inputmethod.InlineSuggestionsRequest
-import android.view.inputmethod.InlineSuggestionsResponse
 import android.widget.ArrayAdapter
 import android.widget.EditText
 import android.widget.FrameLayout
@@ -71,7 +69,6 @@ import android.widget.RadioGroup
 import android.widget.Spinner
 import android.widget.TextView
 import android.widget.Toast
-import android.widget.inline.InlineContentView
 import android.window.OnBackInvokedCallback
 import android.window.OnBackInvokedDispatcher
 import androidx.annotation.ColorInt
@@ -239,18 +236,12 @@ import com.kazumaproject.core.ui.font.KeyboardFontApplicator
 import com.kazumaproject.core.ui.font.KeyboardFontGlyphDrawable
 import com.kazumaproject.core.ui.font.KeyboardFontSnapshot
 import com.kazumaproject.markdownhelperkeyboard.ime_service.adapters.GridSpacingItemDecoration
-import com.kazumaproject.markdownhelperkeyboard.ime_service.adapters.InlineSuggestionStripState
 import com.kazumaproject.markdownhelperkeyboard.ime_service.adapters.ShortcutAdapter
 import com.kazumaproject.markdownhelperkeyboard.ime_service.adapters.SuggestionAdapter
 import com.kazumaproject.markdownhelperkeyboard.ime_service.adapters.resolveCandidateEmptyPopupThemeColors
-import com.kazumaproject.markdownhelperkeyboard.ime_service.autofill.InlineAutofillController
-import com.kazumaproject.markdownhelperkeyboard.ime_service.autofill.InlineSuggestionDisplayState
-import com.kazumaproject.markdownhelperkeyboard.ime_service.autofill.InlineSuggestionSurface
-import com.kazumaproject.markdownhelperkeyboard.ime_service.autofill.InlineSuggestionsRequestFactory
 import com.kazumaproject.markdownhelperkeyboard.ime_service.candidate.CandidateStripContent
 import com.kazumaproject.markdownhelperkeyboard.ime_service.candidate.CandidateStripContentResolver
 import com.kazumaproject.markdownhelperkeyboard.ime_service.candidate.CandidateStripInputState
-import com.kazumaproject.markdownhelperkeyboard.ime_service.candidate.InlineSuggestionToggle
 import com.kazumaproject.markdownhelperkeyboard.ime_service.candidate.CandidateQueryModeResolver
 import com.kazumaproject.markdownhelperkeyboard.ime_service.candidate.CandidateRefreshCoordinator
 import com.kazumaproject.markdownhelperkeyboard.ime_service.candidate.CandidateRefreshRequest
@@ -693,10 +684,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
 
     private var suggestionAdapter: SuggestionAdapter? = null
     private var suggestionAdapterFull: SuggestionAdapter? = null
-    private var inlineAutofillController: InlineAutofillController? = null
-    private var inlineSuggestionEnabled: Boolean = true
-    private val inlineSuggestionDisplayState = InlineSuggestionDisplayState()
-    private var currentInlineSuggestionViews: List<View> = emptyList()
     private var currentCandidateStripCandidates: List<Candidate> = emptyList()
     private var currentCandidateStripFullCandidates: List<Candidate> = emptyList()
     private var currentCandidateStripContent: CandidateStripContent = CandidateStripContent.Empty
@@ -819,7 +806,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
     private lateinit var runtimeInputSharedPreferences: SharedPreferences
     private var runtimeInputPreferenceListenerRegistered = false
     private val runtimeInputPreferenceKeys = setOf(
-        AppPreference.INLINE_SUGGESTION_ENABLED_KEY,
         AppPreference.STABILIZE_CANDIDATE_STRIP_HEIGHT_KEY,
         AppPreference.FLICK_SENSITIVITY_KEY,
         AppPreference.TFBI_DIAGONAL_RECOGNITION_MODE_KEY,
@@ -992,17 +978,9 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
             candidates = currentCandidateStripFullCandidates,
             candidatesShown = effectiveCandidatesShown,
             includeZeroQuery = false,
-            includeInlineSuggestionToggle = false,
         )
         currentCandidateStripContent = content
-        val inlineSuggestionState = InlineSuggestionStripState(
-            views = currentInlineSuggestionViews,
-            showInlineSuggestions =
-                inlineSuggestionDisplayState.surface == InlineSuggestionSurface.Inline &&
-                    currentInlineSuggestionViews.isNotEmpty(),
-            toggle = inlineSuggestionToggleForCandidateStrip(),
-        )
-        suggestionAdapter?.submitContent(content, inlineSuggestionState)
+        suggestionAdapter?.submitContent(content)
         syncNecookeyPredictionRow(effectiveCandidatesShown)
         mainLayoutBinding?.let { binding ->
             setMainSuggestionColumn(binding)
@@ -1030,46 +1008,13 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         candidates: List<Candidate>,
         candidatesShown: Boolean,
         includeZeroQuery: Boolean,
-        includeInlineSuggestionToggle: Boolean = true,
     ): CandidateStripContent {
         val state = buildCandidateStripInputState(
             candidates = candidates,
             candidatesShown = candidatesShown,
             includeZeroQuery = includeZeroQuery,
         )
-        return CandidateStripContentResolver.resolve(
-            if (includeInlineSuggestionToggle) {
-                state
-            } else {
-                state.copy(inlineSuggestionToggle = null)
-            }
-        )
-    }
-
-    private fun inlineSuggestionToggleForCandidateStrip(): InlineSuggestionToggle? {
-        if (!inlineSuggestionEnabled || !inlineSuggestionDisplayState.hasSuggestions) {
-            return null
-        }
-        val contentDescription = when (inlineSuggestionDisplayState.surface) {
-            InlineSuggestionSurface.Inline ->
-                R.string.inline_suggestion_show_normal_candidates_content_description
-
-            InlineSuggestionSurface.NormalCandidates ->
-                R.string.inline_suggestion_show_inline_candidates_content_description
-        }
-        return InlineSuggestionToggle(
-            contentDescription = getString(contentDescription),
-            badge = null,
-            iconResId = when (inlineSuggestionDisplayState.surface) {
-                InlineSuggestionSurface.Inline -> R.drawable.more_horiz_24px
-                InlineSuggestionSurface.NormalCandidates -> R.drawable.inline_suggestion_key_24
-            },
-            iconBackgroundResId = when (inlineSuggestionDisplayState.surface) {
-                InlineSuggestionSurface.Inline -> null
-                InlineSuggestionSurface.NormalCandidates ->
-                    com.kazumaproject.core.R.drawable.suggestion_icon_bg
-            },
-        )
+        return CandidateStripContentResolver.resolve(state)
     }
 
     private fun buildCandidateStripInputState(
@@ -1121,7 +1066,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
             shortcutToolbarIntegratedInSuggestion = shortcutToolbarIntegratedInSuggestion == true,
             integratedShortcutEntryExpanded = integratedShortcutEntryExpanded,
             shortcutItems = currentShortcutItems,
-            inlineSuggestionToggle = inlineSuggestionToggleForCandidateStrip(),
         )
     }
 
@@ -2500,13 +2444,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         Timber.d("onCreate")
         registerCrossWindowBlurListener()
         syncLatticeLmCost()
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            inlineAutofillController = InlineAutofillController(
-                context = this,
-                onViewsChanged = ::renderInlineSuggestionViews,
-                maximumContentWidth = { null },
-            )
-        }
         lifecycleRegistry = LifecycleRegistry(this)
         lifecycleRegistry.currentState = Lifecycle.State.CREATED
         runtimeInputSharedPreferences =
@@ -2772,25 +2709,10 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         return keyboardContainer
     }
 
-    @RequiresApi(Build.VERSION_CODES.R)
-    override fun onCreateInlineSuggestionsRequest(uiExtras: Bundle): InlineSuggestionsRequest? {
-        if (!inlineSuggestionEnabled) return null
-        return InlineSuggestionsRequestFactory.create(this)
-    }
-
-    @RequiresApi(Build.VERSION_CODES.R)
-    override fun onInlineSuggestionsResponse(response: InlineSuggestionsResponse): Boolean {
-        if (!inlineSuggestionEnabled) return false
-        return inlineAutofillController?.handleResponse(response) ?: false
-    }
-
     override fun onStartInput(attribute: EditorInfo?, restarting: Boolean) {
         dismissKeyboardSelectionPopups()
         super.onStartInput(attribute, restarting)
         resetCustomToggleState()
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            inlineAutofillController?.startInputSession()
-        }
         forwardDeleteCoordinator.reset(attribute?.initialSelStart ?: -1, attribute?.initialSelEnd ?: -1)
         resetEditorSelectionSnapshot()
         textMacroExecutionRequestId.incrementAndGet()
@@ -2885,11 +2807,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         customDirectInputReplaceComposingPreference =
             appPreference.custom_direct_input_replace_composing_preference
 
-        val previousInlineSuggestionEnabled = inlineSuggestionEnabled
-        applyInlineSuggestionEnabled(appPreference.inline_suggestion_enabled_preference)
-        if (previousInlineSuggestionEnabled != inlineSuggestionEnabled) {
-            refreshShortcutAvailability()
-        }
 
 
         val sensitivity = (appPreference.flick_sensitivity_preference ?: 100).coerceIn(1, 200)
@@ -3056,7 +2973,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         qwertyRomajiHankakuSymbolPreference = preferences.qwertyRomajiHankakuSymbolPreference
         qwertyShowKutoutenButtonsPreference = preferences.qwertyShowKutoutenButtonsPreference
         showCandidateInPasswordPreference = preferences.showCandidateInPasswordPreference
-        applyInlineSuggestionEnabled(preferences.inlineSuggestionEnabled)
         qwertyShowKeymapSymbolsPreference = preferences.qwertyShowKeymapSymbolsPreference
         qwertyRomajiShiftConversionPreference = preferences.qwertyRomajiShiftConversionPreference
         isNgWordEnable = preferences.isNgWordEnable
@@ -3387,49 +3303,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
     ) {
     }
 
-    private fun applyInlineSuggestionEnabled(enabled: Boolean) {
-        if (inlineSuggestionEnabled == enabled) return
-        inlineSuggestionEnabled = enabled
-        if (!enabled) {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-                inlineAutofillController?.clear()
-            }
-            currentInlineSuggestionViews = emptyList()
-            inlineSuggestionDisplayState.updateAvailability(false)
-            updateShortcutActiveStates()
-            refreshCandidateStripContent()
-        }
-    }
-
-    @RequiresApi(Build.VERSION_CODES.R)
-    private fun renderInlineSuggestionViews(views: List<InlineContentView>) {
-        assertMainThread("renderInlineSuggestionViews")
-        if (!inlineSuggestionEnabled) {
-            currentInlineSuggestionViews = emptyList()
-            inlineSuggestionDisplayState.updateAvailability(false)
-            updateShortcutActiveStates()
-            refreshCandidateStripContent()
-            return
-        }
-        currentInlineSuggestionViews = views
-        views.forEach { view ->
-            view.setZOrderedOnTop(true)
-            view.clipBounds = null
-        }
-        inlineSuggestionDisplayState.updateAvailability(views.isNotEmpty())
-        updateShortcutActiveStates()
-        Timber.d("Rendering ${views.size} inline suggestion views")
-        refreshCandidateStripContent()
-    }
-
-    private fun toggleInlineSuggestionSurface() {
-        if (!inlineSuggestionEnabled) return
-        if (!inlineSuggestionDisplayState.toggleSurface()) return
-        refreshCandidateStripContent()
-        mainLayoutBinding?.suggestionRecyclerView?.scrollToPosition(0)
-        updateShortcutActiveStates()
-    }
-
     private fun createKeyboardBackgroundDrawable(
         @ColorInt color: Int,
         radiusDp: Int,
@@ -3721,9 +3594,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         dismissJob?.cancel()
         forwardDeleteCoordinator.cancel()
         resetCustomToggleState()
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            inlineAutofillController?.clear()
-        }
         super.onFinishInput()
     }
 
@@ -3734,9 +3604,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         imeSwitchPopupWindow?.dismiss()
         forwardDeleteCoordinator.cancel()
         resetCustomToggleState()
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            inlineAutofillController?.clear()
-        }
         flickInputPreviewCoordinator.cancel(restore = false)
         candidateRequestTracker.invalidate()
         candidateRefreshCoordinator.invalidate()
@@ -3757,9 +3624,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
     override fun onWindowHidden() {
         dismissKeyboardSelectionPopups()
         imeSwitchPopupWindow?.dismiss()
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            inlineAutofillController?.clear()
-        }
         flickInputPreviewCoordinator.cancel(restore = true)
         super.onWindowHidden()
     }
@@ -3784,10 +3648,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
     override fun onDestroy() {
         dismissKeyboardSelectionPopups()
         unregisterCrossWindowBlurListener()
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            inlineAutofillController?.destroy()
-            inlineAutofillController = null
-        }
         flickInputPreviewCoordinator.cancel(restore = false)
         resetEditorSelectionSnapshot()
         Timber.d("onUpdate onDestroy")
@@ -4434,15 +4294,8 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         val skinColors = skin?.let { resolveCandidatePanelColors() }
         val classic = keyboardSkinId == KeyboardSkinId.CUPERTINO_CLASSIC
         val custom = keyboardThemeMode == "custom" && skin == null
-        val inlineBackgroundTint = skin?.palette?.let { palette ->
-            android.content.res.ColorStateList(
-                arrayOf(intArrayOf(android.R.attr.state_pressed), intArrayOf()),
-                intArrayOf(palette.pressed, palette.key),
-            )
-        }
         listOfNotNull(suggestionAdapter, suggestionAdapterFull).forEach { adapter ->
             adapter.setCandidateTextColor(skinColors?.text ?: if (custom) customThemeCandidateTextColor ?: Color.BLACK else null)
-            adapter.setInlineSuggestionIconBackgroundTint(inlineBackgroundTint)
             adapter.setCandidateItemColors(
                 if (classic) Color.TRANSPARENT
                 else skin?.palette?.background ?: if (custom) customThemeCandidateItemBgColor ?: Color.TRANSPARENT else null,
@@ -12951,9 +12804,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
                 integratedShortcutEntryExpanded = !integratedShortcutEntryExpanded
                 refreshCandidateStripContent()
             }
-            adapter.setOnInlineSuggestionToggleClickListener {
-                toggleInlineSuggestionSurface()
-            }
             adapter.setOnZeroQueryCandidateClickListener { candidate ->
                 commitZeroQueryCandidate(candidate)
             }
@@ -13119,14 +12969,11 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
                 lastSuggestionLayoutKey = null
                 return@measureDebugSection
             }
-            val inlineSuggestionStripShown =
-                (adapter as? SuggestionAdapter)?.isInlineSuggestionStripShown() == true
 
             val key = SuggestionLayoutKey(
                 isPortrait = isPortrait,
                 columnNum = columnNum,
                 layoutKind = if (
-                    inlineSuggestionStripShown ||
                     columnNum == "1" ||
                     CandidateStripLayoutPolicy.shouldUseLinearHorizontalLayout(
                         currentCandidateStripContent
@@ -13173,9 +13020,7 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
                                 SuggestionAdapter.VIEW_TYPE_CLIPBOARD_PREVIEW,
                                 SuggestionAdapter.VIEW_TYPE_SHORTCUT_ENTRY,
                                 SuggestionAdapter.VIEW_TYPE_CUSTOM_LAYOUT_PICKER,
-                                SuggestionAdapter.VIEW_TYPE_SHORTCUT,
-                                SuggestionAdapter.VIEW_TYPE_INLINE_TOGGLE,
-                                SuggestionAdapter.VIEW_TYPE_INLINE_SUGGESTION -> spanCount
+                                SuggestionAdapter.VIEW_TYPE_SHORTCUT -> spanCount
                                 else -> 1
                             }
                         }
