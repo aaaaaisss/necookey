@@ -21,7 +21,6 @@
 #-renamesourcefileattribute SourceFile
 
 -keep class com.kazumaproject.markdownhelperkeyboard.user_dictionary.database.UserWord { *; }
--keep class com.kazumaproject.markdownhelperkeyboard.user_template.database.UserTemplate { *; }
 -keep class com.kazumaproject.markdownhelperkeyboard.custom_keyboard.data.** { *; }
 -keep class com.kazumaproject.markdownhelperkeyboard.custom_keyboard.import_export.** { *; }
 -keep class com.kazumaproject.custom_keyboard.data.** { *; }
@@ -60,10 +59,5 @@
 # Gson (de)serializes these reflectively: keep their fields so R8 does not drop "unread" ones.
 -keepclassmembers enum * { <fields>; }
 -keep class com.kazumaproject.markdownhelperkeyboard.dictionary_override.DictionaryOverrideMetadata { *; }
--keep class com.kazumaproject.markdownhelperkeyboard.repository.TextMacroBackup { *; }
--keep class com.kazumaproject.markdownhelperkeyboard.repository.TextMacroBackupEntry { *; }
 -keep class com.kazumaproject.markdownhelperkeyboard.setting_activity.circular_slot.CircularSlotActionSetting { *; }
 -keep class com.kazumaproject.markdownhelperkeyboard.clipboard_history.dto.** { *; }
-# JNI: zenz bridge entry points (native methods + their classes).
--keepclasseswithmembernames,includedescriptorclasses class * { native <methods>; }
--keep class com.kazumaproject.zenz.** { *; }

@@ -21,8 +21,6 @@ import com.kazumaproject.markdownhelperkeyboard.setting_activity.other.MozcLicen
 import com.kazumaproject.markdownhelperkeyboard.setting_activity.other.NeologdLicense
 import com.kazumaproject.markdownhelperkeyboard.setting_activity.other.WikiLicense
 import com.kazumaproject.markdownhelperkeyboard.setting_activity.other.WikiTextLicense
-import com.kazumaproject.markdownhelperkeyboard.setting_activity.other.ZenzLicense
-import com.kazumaproject.markdownhelperkeyboard.variant.AppVariantConfig
 import de.psdev.licensesdialog.LicensesDialog
 import de.psdev.licensesdialog.licenses.ApacheSoftwareLicense20
 import de.psdev.licensesdialog.licenses.MITLicense
@@ -224,48 +222,6 @@ class OpenSourceFragment : Fragment() {
                         "https://github.com/afollestad/material-dialogs",
                         "Copyright 2018 Aidan Follestad",
                         LicenseDialogLicense()
-                    )
-                )
-            }
-        }
-
-        if (AppVariantConfig.hasZenz) {
-            entries += LicenseEntry("togatogah/jinen-v2-small.gguf") {
-                showLicenseDialog(
-                    title = "togatogah/jinen-v2-small.gguf",
-                    notice = Notice(
-                        "togatogah/jinen-v2-small.gguf (jinen-v2-small, Q5_K_M)",
-                        "https://huggingface.co/togatogah/jinen-v2-small.gguf",
-                        "Copyright Hitoshi Togasaki. CC BY-SA 4.0.\n" +
-                            "出典：国立国会図書館「全国書誌データ」（2026年7月9日に取得）および" +
-                            " 国立国会図書館サーチの書誌データを加工して作成\n" +
-                            "加工および本モデルの作成は Hitoshi Togasaki によるものであり、" +
-                            "国立国会図書館が作成・提供・保証するものではありません。",
-                        ZenzLicense()
-                    )
-                )
-            }
-
-            entries += LicenseEntry("Miwa-Keita/zenz-v3.2-xsmall-gguf") {
-                showLicenseDialog(
-                    title = "Miwa-Keita/zenz-v3.2-xsmall-gguf",
-                    notice = Notice(
-                        "Miwa-Keita/zenz-v3.2-xsmall-gguf",
-                        "https://huggingface.co/Miwa-Keita/zenz-v3.2-xsmall-gguf",
-                        "Copyright 2025 Miwa-Keita",
-                        ZenzLicense()
-                    )
-                )
-            }
-
-            entries += LicenseEntry("azooKey/llama.cpp") {
-                showLicenseDialog(
-                    title = "azooKey/llama.cpp",
-                    notice = Notice(
-                        "azooKey/llama.cpp",
-                        "https://github.com/azooKey/llama.cpp.git",
-                        "Copyright (c) 2023-2024 The ggml authors",
-                        MITLicense()
                     )
                 )
             }

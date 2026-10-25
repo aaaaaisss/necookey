@@ -46,7 +46,6 @@ class ImeSelectionPopupBehaviorTest {
     private val service = spy(IMEService()).also { service ->
         ReflectionHelpers.callInstanceMethod<Unit>(service, "attachBaseContext",
             ClassParameter.from(Context::class.java, activity))
-        service.zenzRuntimeClient = mock()
         service.appPreference = mock<AppPreference>()
         ReflectionHelpers.setField(service, "mainLayoutBinding", binding)
         ReflectionHelpers.setField(service, "isInputViewActive", true)

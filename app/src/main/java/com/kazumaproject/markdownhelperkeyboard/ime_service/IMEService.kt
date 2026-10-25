@@ -186,7 +186,6 @@ import com.kazumaproject.markdownhelperkeyboard.converter.candidatebar.ZenzaiSch
 import com.kazumaproject.markdownhelperkeyboard.converter.candidatebar.ZenzaiGate
 import com.kazumaproject.markdownhelperkeyboard.converter.candidatebar.SumireLmGate
 import com.kazumaproject.markdownhelperkeyboard.converter.sumirelm.SumireLmReranker
-import com.kazumaproject.markdownhelperkeyboard.converter.candidatebar.JinenConversion
 import com.kazumaproject.markdownhelperkeyboard.converter.candidatebar.BunsetsuAnalysis
 import com.kazumaproject.markdownhelperkeyboard.converter.candidatebar.BunsetsuAnalyzer
 import com.kazumaproject.markdownhelperkeyboard.converter.candidatebar.BunsetsuRangeEditor
@@ -316,8 +315,6 @@ import com.kazumaproject.markdownhelperkeyboard.sumire_special_key.SumireSpecial
 import com.kazumaproject.markdownhelperkeyboard.sumire_special_key.database.SumireSpecialKeyActionOverrideEntity
 import com.kazumaproject.markdownhelperkeyboard.sumire_special_key.database.SumireSpecialKeyPlacementOverrideEntity
 import com.kazumaproject.markdownhelperkeyboard.variant.AppVariantConfig
-import com.kazumaproject.markdownhelperkeyboard.zenz.runtime.ZenzRuntimeClient
-import com.kazumaproject.markdownhelperkeyboard.zenz.runtime.ZenzRuntimeConfig
 import com.kazumaproject.symbol_keyboard.CustomSymbolKeyboardView
 import com.kazumaproject.core.domain.extensions.getDakutenFlickLeft
 import com.kazumaproject.core.domain.extensions.getDakutenFlickRight
@@ -514,9 +511,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
     lateinit var clipboardUtil: ClipboardUtil
 
     @Inject
-    lateinit var zenzRuntimeClient: ZenzRuntimeClient
-
-    @Inject
     lateinit var sumireSpecialKeyRepository: SumireSpecialKeyRepository
 
     private var shortcutAdapter: ShortcutAdapter? = null
@@ -553,9 +547,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
     private var cachedClipboardPreviewItem: ClipboardItem = ClipboardItem.Empty
     @Volatile
     private var cachedClipboardPreviewSensitive: Boolean = false
-    private val zenzModelPathMutex = Mutex()
-    private var cachedZenzModelSource: String? = null
-    private var cachedZenzModelPath: String? = null
     private var tenkeyQWERTYSwitchNumber: Boolean? = false
     private var tenkeyUseThreeStateKeyboard: Boolean = true
     private var tenkeyNumberSymbolKeyGapDp: Int = 4
@@ -3114,9 +3105,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         super.onTrimMemory(level)
         val release = level == android.content.ComponentCallbacks2.TRIM_MEMORY_RUNNING_CRITICAL ||
             level == android.content.ComponentCallbacks2.TRIM_MEMORY_COMPLETE
-        if (AppVariantConfig.hasZenz && release) {
-            zenzRuntimeClient.close()
-        }
     }
 
     override fun onDestroy() {
@@ -3140,11 +3128,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         mainLayoutBinding?.apply {
             keyboardSymbolView.release()
         }
-        if (AppVariantConfig.hasZenz) {
-            zenzRuntimeClient.close()
-        }
-        cachedZenzModelSource = null
-        cachedZenzModelPath = null
         kanaKanjiEngineActivationJob?.cancel()
         suggestionAdapter?.release()
         suggestionAdapter = null
@@ -9647,8 +9630,7 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         necookeyZenzGateEnabled() &&
             insertString.length >= 2 &&
             insertString.length <= (
-                if (isJinenEngine()) JinenConversion.MAX_INPUT_LENGTH
-                else necookeyCandidateBarConfig.maxZenzInputLength
+                necookeyCandidateBarConfig.maxZenzInputLength
                 ) &&
             insertString.isAllHiraganaWithSymbols() &&
             currentInputType !in passwordTypes
@@ -9674,225 +9656,9 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         onProvisional: suspend (Candidate) -> Unit,
         viaSumireLm: Boolean = false,
     ): ZenzaiOutcome? {
-        if (!viaSumireLm && isSumireLmEngine()) {
-            return runSumireLmStep(insertString, sumireTop, context, sumireGap, sumireCandidates, onProvisional)
-        }
-        val session = kanaKanjiConversionSession ?: return null
-        val request = lastKanaKanjiQueryRequest?.copy(input = insertString) ?: return null
-        val config = withContext(Dispatchers.Default) { resolveZenzRuntimeConfig() }
-        if (config == null) {
-            ZenzDiagnosticsStore.recordSkip(applicationContext, ZenzSkipReason.NOT_LOADED)
-            return null
-        }
-
-        // ユーザー辞書から来た文節は zenz に書き換えさせない（学習語は守らない）。候補全体がそうなら推論しない。
-        val topSegments = sumireTop.conversionSegments.ifEmpty {
-            if (latestCandidateSegmentInput == insertString) {
-                latestCandidateSegmentsByString[sumireTop.string].orEmpty()
-            } else {
-                emptyList()
-            }
-        }
-        val protectedSegments = zenzaiProtectedSegments(request, insertString, sumireTop, topSegments)
-        if (protectedSegments == null) {
-            zenzaiCarry = null
-            ZenzDiagnosticsStore.recordSkip(applicationContext, ZenzSkipReason.PROTECTED)
-            return null
-        }
-        if (isJinenEngine()) {
-            zenzaiCarry = null
-            return runJinenStep(insertString, sumireTop, context, config, sumireCandidates, protectedSegments)
-        }
-
-        // 前回の制約は、その読みが今の読みの先頭に残っている範囲だけ引き継ぐ（後退・途中編集で縮める/捨てる）。
-        var constraint = zenzaiCarry?.carriedFor(insertString, context.leftContext)
-        var draft = sumireTop
-        if (constraint != null) {
-            if (!constraint.isRealizedBy(topSegments)) {
-                val carried = constraint
-                val constrained = withContext(Dispatchers.Default) {
-                    session.queryConstrained(request, carried.surface)
-                }
-                // 表層が一致しても読みの範囲がずれた経路は制約として出さない。
-                if (constrained != null && carried.isRealizedBy(constrained.conversionSegments) &&
-                    ZenzaiConstraint.preserves(constrained.conversionSegments, protectedSegments)
-                ) {
-                    draft = constrained.copy(zenzAdjusted = true)
-                    onProvisional(draft)
-                } else {
-                    constraint = null
-                }
-            }
-        }
-        val prefix = constraint?.surface.orEmpty()
-
-        val key = zenzaiKey(context, insertString, draft.string)
-        val cached = synchronized(zenzaiVerdictCache) { zenzaiVerdictCache[key] }
-        // ZENZ-GATE: Sumire が十分に自信のある読みは評価しない（制約の引き継ぎ中・判定キャッシュありは対象外）。
-        if (constraint == null && cached == null &&
-            !ZenzaiGate.shouldEvaluate(insertString.length, context.leftContext.length, sumireGap)
-        ) {
-            zenzaiCarry = null
-            return ZenzaiOutcome(top = draft, changed = false, inferred = false, unverifiedFix = false)
-        }
-        val rawVerdict = cached ?: withContext(Dispatchers.Default) {
-            zenzRuntimeClient.evaluate(
-                config = config,
-                profile = "",
-                topic = "",
-                style = "",
-                preference = "",
-                leftContext = context.leftContext
-                    .takeLast(necookeyCandidateBarConfig.maxLeftContextChars),
-                rightContext = context.rightContext
-                    .take(necookeyCandidateBarConfig.maxRightContextChars),
-                input = insertString.hiraganaToKatakana(),
-                candidate = draft.string,
-            )
-        }
-        if (cached == null && !rawVerdict.startsWith("ERROR")) {
-            synchronized(zenzaiVerdictCache) { zenzaiVerdictCache[key] = rawVerdict }
-        }
-        // 判定の後ろに付いた信頼度（診断用）を外す。判定の扱いは信頼度で変えない。
-        val (verdict, confidence) = ZenzConfidence.split(rawVerdict)
-        if (verdict.startsWith("ERROR")) {
-            ZenzDiagnosticsStore.recordSkip(applicationContext, ZenzSkipReason.ERROR_VERDICT)
-        }
-
-        var top = draft
-        var fixedNow = false
-        // zenz が「この変換で良い」と判定した（PASS）ときだけ [z] を付ける。
-        // 以前は WHOLE や「同じ制約が再び出た（直せなかった）」も同意扱いで [z] が付いていた。
-        var agreed = verdict.startsWith("PASS")
-        val whole = verdict.startsWith("WHOLE:")
-        if (verdict.startsWith("FIX:") || whole) {
-            // FIX: その prefix で始まる経路を再探索。WHOLE: zenz がそこで文を終えたい
-            // （= 表層全体がその文字列）ので完全一致で再探索（azooKey の hasEOS 制約に相当）。
-            val fix = verdict.substringAfter(':')
-            if (fix.isEmpty() || fix == draft.string) {
-                agreed = whole && fix == draft.string
-            } else if (fix == prefix && !whole) {
-                // 同じ制約が続けて出た = 辞書の経路では直せない。azooKey 同様に制約を捨てる。
-                constraint = null
-            } else if (!whole && draft.string.startsWith(fix)) {
-                // 既に満たしている（トークン境界のずれ）。判定は同意ではない。
-            } else {
-                val corrected = withContext(Dispatchers.Default) {
-                    session.queryConstrained(request, fix, exact = whole)
-                }
-                val fixed = corrected?.let {
-                    ZenzaiConstraint.from(context.leftContext, insertString, fix, it.conversionSegments)
-                }
-                if (corrected != null && fixed != null &&
-                    ZenzaiConstraint.preserves(corrected.conversionSegments, protectedSegments)
-                ) {
-                    top = corrected.copy(zenzAdjusted = true)
-                    constraint = fixed
-                    fixedNow = true
-                } else if (corrected == null) {
-                    // 制約を満たす経路がない: azooKey 同様に制約は捨てる（直前のドラフトを使う）。
-                    constraint = null
-                }
-                // 直すとユーザー辞書の語が消える場合は FIX を採らない（印も付けない）。
-            }
-        }
-        if (agreed && !top.zenzAdjusted) {
-            top = top.copy(zenzChecked = true)
-        }
-        zenzaiCarry = constraint
-        Timber.d(
-            "zenzai: input=[%s] draft=[%s] verdict=[%s] top=[%s] constraint=[%s/%s] inferred=%s",
-            insertString, draft.string, verdict, top.string, constraint?.surface, constraint?.reading, cached == null,
-        )
-        val kind = when {
-            verdict.startsWith("PASS") -> ZenzConfidenceDiagnostics.Kind.PASS
-            verdict.startsWith("FIX:") -> ZenzConfidenceDiagnostics.Kind.FIX
-            verdict.startsWith("WHOLE:") -> ZenzConfidenceDiagnostics.Kind.WHOLE
-            else -> null
-        }
-        if (confidence != null && kind != null) {
-            Timber.d(
-                "zenzai confidence: input=[%s] kind=%s %s sumireGap=%s changed=%s",
-                insertString, kind, confidence.describe(), sumireGap, fixedNow,
-            )
-            lastZenzaiStepRecord = ZenzaiStepRecord(
-                input = insertString,
-                draft = draft.string,
-                top = top.string,
-                kind = kind,
-                confidence = confidence,
-                sumireGap = sumireGap,
-            )
-        }
-        return ZenzaiOutcome(
-            top = top,
-            changed = top.string != sumireTop.string,
-            inferred = cached == null,
-            unverifiedFix = fixedNow,
-        )
-    }
-
-    /**
-     * jinen-v2 の自由生成（評価・FIX ループは使わない）。出力を Sumire の表記・文節経路に戻して先頭候補にする
-     * （JinenConversion.restore: N-best の NFKC 一致 → 幅違いの完全一致経路 → 記号表で 1 文節）。
-     * ZENZ-GATE のしきい値は zenz 用に決めたものなので jinen には使わない。
-     * TODO(jinen): jinen 用のゲート（Sumire の経路コスト差で生成を省く）をオフライン評価で決める。
-     */
-    private suspend fun runJinenStep(
-        insertString: String,
-        sumireTop: Candidate,
-        context: ZenzContext,
-        config: ZenzRuntimeConfig,
-        sumireCandidates: List<Candidate>,
-        protectedSegments: List<CandidateConversionSegment>,
-    ): ZenzaiOutcome? {
-        val session = kanaKanjiConversionSession ?: return null
-        val request = lastKanaKanjiQueryRequest?.copy(input = insertString) ?: return null
-        val prompt = JinenConversion.buildPrompt(
-            leftContext = context.leftContext.takeLast(necookeyCandidateBarConfig.maxLeftContextChars),
-            readingHiragana = insertString,
-        )
-        val key = "jinen\u0001$prompt"
-        val cached = synchronized(zenzaiVerdictCache) { zenzaiVerdictCache[key] }
-        val output = cached ?: withContext(Dispatchers.Default) {
-            zenzRuntimeClient.generateRaw(
-                config = config,
-                prompt = prompt,
-                maxTokens = JinenConversion.maxTokensFor(insertString),
-            )
-        }
-        if (cached == null) synchronized(zenzaiVerdictCache) { zenzaiVerdictCache[key] = output }
-        if (output.isEmpty()) {
-            ZenzDiagnosticsStore.recordSkip(applicationContext, ZenzSkipReason.ERROR_VERDICT)
-            return null
-        }
-        val candidates = sumireCandidates.ifEmpty { listOf(sumireTop) }
-        val restored = withContext(Dispatchers.Default) {
-            JinenConversion.restore(
-                output = output,
-                input = insertString,
-                sumireCandidates = candidates,
-                fallbackType = sumireTop.type,
-                fallbackScore = sumireTop.score,
-            ) { surface -> session.queryConstrained(request, surface, exact = true) }
-        }
-        Timber.d(
-            "jinen: input=[%s] out=[%s] top=[%s] via=%s inferred=%s",
-            insertString, output, restored?.candidate?.string, restored?.via, cached == null,
-        )
-        // 出せない出力（読みと合わない）・ユーザー辞書の語を消す出力は採らない。
-        if (restored == null ||
-            !ZenzaiConstraint.preserves(restored.candidate.conversionSegments, protectedSegments)
-        ) {
-            return ZenzaiOutcome(top = sumireTop, changed = false, inferred = cached == null)
-        }
-        val same = restored.candidate.string == sumireTop.string
-        val top = if (same) {
-            sumireTop.copy(zenzChecked = true)
-        } else {
-            restored.candidate.copy(zenzAdjusted = true, zenzChecked = false)
-        }
-        return ZenzaiOutcome(top = top, changed = !same, inferred = cached == null, unverifiedFix = false)
+        // necookey: zenz/jinen は削除済み。SUMIRE-LM の「迷ったら zenz」も評価しない（リランカーの結果を使う）。
+        if (viaSumireLm) return null
+        return runSumireLmStep(insertString, sumireTop, context, sumireGap, sumireCandidates, onProvisional)
     }
 
     /**
@@ -10005,7 +9771,7 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
             } catch (e: Exception) {
                 Timber.e(e, "zenzai (list) failed")
                 ZenzDiagnosticsStore.recordFailure(applicationContext)
-                if (e is com.kazumaproject.markdownhelperkeyboard.zenz.runtime.ZenzProcessException ||
+                if (
                     e is android.os.RemoteException
                 ) {
                     ZenzDiagnosticsStore.recordSkip(applicationContext, ZenzSkipReason.BINDER_ERROR)
@@ -15122,7 +14888,7 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
             } catch (e: Exception) {
                 Timber.e(e, "zenzai (two-row) failed")
                 ZenzDiagnosticsStore.recordFailure(applicationContext)
-                if (e is com.kazumaproject.markdownhelperkeyboard.zenz.runtime.ZenzProcessException ||
+                if (
                     e is android.os.RemoteException
                 ) {
                     ZenzDiagnosticsStore.recordSkip(applicationContext, ZenzSkipReason.BINDER_ERROR)
@@ -17547,37 +17313,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         finishComposingText()
         setComposingText("", 0)
         _inputString.update { "" }
-    }
-
-    /**
-     * Resolves the model in the IME process, but does not load native code here. The returned
-     * internal-file path is readable by the private `:zenz` app process because it shares the
-     * application UID.
-     */
-    private suspend fun resolveZenzRuntimeConfig(): ZenzRuntimeConfig? {
-        if (!AppVariantConfig.hasZenz) return null
-
-        val modelSource = AppPreference.zenz_model_uri_preference
-        val modelPath = zenzModelPathMutex.withLock {
-            cachedZenzModelPath
-                ?.takeIf { cachedZenzModelSource == modelSource && File(it).isFile }
-                ?.let { return@withLock it }
-
-            // Not cancelled by a superseded keystroke: the next request would otherwise redo the copy.
-            val resolvedPath = withContext(Dispatchers.IO + NonCancellable) {
-                resolveZenzModelPath(modelSource)
-            }
-            cachedZenzModelSource = modelSource
-            cachedZenzModelPath = resolvedPath
-            resolvedPath
-        } ?: return null
-
-        return ZenzRuntimeConfig(
-            modelPath = modelPath,
-            nCtx = ZENZ_N_CTX,
-            // jinen は threads=2 固定（オフライン評価と同じ）。
-            nThreads = if (isJinenEngine()) 2 else (Runtime.getRuntime().availableProcessors() / 2).coerceIn(2, 4),
-        )
     }
 
     private fun resolveZenzModelPath(customUri: String): String? {
