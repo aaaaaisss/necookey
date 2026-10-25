@@ -160,3 +160,28 @@
 - 案2 ラティス辺コスト（`LatticeLmCost`、単語 bigram 補正、`FindPath.getEdgeCost` に加算）を既定オン。表（5.8MB, `lc_np1m.slc`）はリポジトリに入れず、ビルド時に孤立ブランチ `lm-data` の固定コミット 63732f8 から取り出し sha256 照合（不一致でビルド失敗）してアセット `lattice_lm/` に同梱。IME 起動時に IO スレッドで読み込み（ヒープ約 11MB）。設定「単語のつながりで変換を補正」で無効化、表が無ければ従来どおり。CI ランナーで +1.8ms/文、**実機速度は未確認（遅ければ既定オフに戻す）**。
 - はいる→入る 対策（`PosPairPenalty.hairuCost`）: 「わかって入る」→「わかってはいる」、「そう入っても」→「そうは言っても」型。評価で悪化 0。
 - Sumire top1（評価用データ）: JWTD held .319→.361、AJIMEE .525→.560、日常文 held .555→.583。詳細は `sumire-lm` ブランチの tools/sumire_lm/HANDOFF.md。
+
+## 2026-10-26: slim ブランチ（機能削除による軽量化、origin/main 66c912f から）
+
+kt 行数（`git ls-files '*.kt'` の合計）: 204,548 → 176,083（**-28,465 行**）。全ファイルの削除行合計は約 41,400 行（追加 131 行）。
+
+| commit | 削除した機能 | kt 行の増減 | 全体の削除行 |
+|---|---|---|---|
+| 74e76be | キーボードのタッチエフェクト（image_effect: 墨流し/リキッドインク/波紋/スプレー/光の膜/シネマティックウェーブ） | -16,329 | -16,577 |
+| d39d10c | Enter 挙動比較用の端末ラボ（enter-parity-lab モジュール、tools/enter_parity） | -40 | -9,318（java/py/データ含む） |
+| 72dee5c | ローカルフォント切り替え（local_font） | -1,329 | -1,549 |
+| ab71a15 | 自動入力のインライン候補（ime_service/autofill） | -1,738 | -1,945 |
+| f1057a0 | テキストマクロ（動的定型文 text_macro）と選択文字アクション。DB 51→52 で `text_macro` 表を破棄 | -1,966 | -2,063 |
+| 930b1ee | 定型文（user_template: ツールバー/候補/設定画面）。DB 52→53 で `user_template` 表を破棄 | -2,010 | -2,290 |
+| eb75d87 | ゼロクエリ（未入力時・確定直後の後続語/予測の表示、mozc zero_query アセット、後続語の zenz 並べ替え、打ち始めの後続語引き継ぎ NextWordCarry） | -2,379 | -2,423 |
+| f73d7d3 | zenz: `:zenz` モジュール、llama.cpp サブモジュール（.gitmodules）、ネイティブビルド（CMake/zenz_bridge.cpp）、prepareZenzModel、ZenzRuntimeService（full フレーバー）、zenz 設定（エンジン選択・モデル選択・診断画面・右文脈） | -1,000 | -3,545 |
+| 7321b2d | zenz の実行クライアント（ZenzRuntimeClient）、jinen 変換（JinenConversion）、zenz/jinen モデルのライセンス表示 | -1,674 | -1,686 |
+
+残したもの: NG ワード、カスタムキーボード、記号キーボード、クリップボード履歴、ショートカットツールバー、カスタムローマ字、ユーザー辞書、学習（後続語の学習と入力中の後続語予測を含む）、サイズ設定、変換エンジン（Sumire＋ラティス辺コスト補正＋SUMIRE-LM リランカー）。
+
+- 変換エンジン: 設定「変換エンジン」は削除。保存済みの `zenz`/`jinen` は読み出し時に `sumire_lm` として扱う（`AppPreference.zenz_engine_preference` は常に `sumire_lm`、`zenz_model_uri_preference` は常に空）。SUMIRE-LM リランカーは純 Kotlin で zenz モデルなしで動く（旧 zenz ゲート設定 `necookey_zenz_bunsetsu_gate_preference` が経路のオン/オフ。`HAS_ZENZ` に依存しなくなった）。リランカーが迷っても zenz には回さず、リランカーの 1 位を採用。設定の「zenz」カテゴリは「SUMIRE-LM」に改名し、文節ゲートとラティス補正だけ残した。
+- `HAS_ZENZ` は full/lite とも false。full/lite・standard/fdroid のフレーバー構成自体は変えていない。
+- ネイティブライブラリ: llama.cpp（libzenz / zenz_bridge）を削除。アプリに残るネイティブコードはなし（要 APK 確認）。
+- 未実施: 英語の単語変換・予測（EnglishEngine、英語読み辞書）。かな漢字変換のグラフ構築（english_reading 辞書）・辞書差し替え（dictionary_override の ENGLISH カテゴリ）・英字直接入力と絡み合っていて境界が明確でないため見送り。
+- 残課題: zenz 系の死んだコード（Zenzai の FIX 制約・ZenzDiagnosticsStore・ZenzConfidence・`necookey_zenz_*` 設定名など、リランカー経路と共用の部分）は残っている。CI ワークフロー（.github/workflows）の zenz モデルキャッシュ手順・`submodules: recursive` は未整理。androidTest は ImePopupInstrumentedTest（定型文ポップアップ前提）を削除、他は該当部分のみ修正（androidTest はコンパイル未確認）。
+- 確認: 各コミットで `:app:compileFullStandardReleaseUnitTestKotlin` が通ることを確認（テスト実行・実機確認は未実施）。
