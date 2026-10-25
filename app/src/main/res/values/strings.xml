@@ -744,34 +744,7 @@
     <string name="dictionary_prediction_candidate_limit_title">予測候補数</string>
     <string name="user_dictionary_prediction_candidate_limit_summary">ユーザー辞書から前方一致で取得する予測候補の最大数です。</string>
     <string name="learn_dictionary_prediction_candidate_limit_summary">学習辞書から前方一致で取得する予測候補の最大数です。</string>
-    <string name="text_macro_title">動的定型文（マクロ）</string>
-    <string name="text_macro_edit">マクロを編集</string>
-    <string name="text_macro_name">マクロ名</string>
-    <string name="text_macro_reading_optional">呼び出しキーワード（任意）</string>
-    <string name="text_macro_body">本文（最大10,000文字）</string>
-    <string name="text_macro_operation_failed">マクロ操作に失敗しました: %1$s</string>
-    <string name="text_macro_context_unavailable">必要な選択文字またはクリップボード文字列を取得できません</string>
-    <string name="text_macro_sensitive_context_blocked">パスワード欄またはプライベートモードではこのマクロを実行できません</string>
-    <string name="text_macro_clipboard_sensitive">機密指定されたクリップボードはマクロで使用できません</string>
-    <string name="shortcut_toolbar_summary_text_macro">動的定型文を選択して明示実行します</string>
-    <string name="text_macro_open_visual_editor">変数を見ながら配置・編集</string>
-    <string name="text_macro_visual_editor_title">マクロの構成</string>
-    <string name="text_macro_visual_editor_help">各行は通常テキストまたは変数です。↑↓で位置変更、「編集」で内容変更、×で削除、「ここに変数を挿入」で好きな位置へ配置できます。</string>
-    <string name="text_macro_visual_text_block">テキスト: %1$s</string>
-    <string name="text_macro_block_edit">編集</string>
-    <string name="text_macro_insert_here">＋ ここに変数を挿入</string>
-    <string name="text_macro_add_variable">変数を追加</string>
-    <string name="text_macro_apply_structure">本文へ反映</string>
-    <string name="text_macro_text_block">通常テキストを編集</string>
-    <string name="text_macro_choose_variable">変数を選択</string>
-    <string name="text_macro_pattern_optional">パターン（任意、例: yyyy-MM-dd）</string>
-    <string name="text_macro_date_pattern">日付パターンを編集</string>
-    <string name="text_macro_time_pattern">時刻パターンを編集</string>
 
-    <string name="text_macro_name_label">マクロ名</string>
-    <string name="text_macro_name_helper">候補に表示される名前です。例: 今日の日付（最大80文字）</string>
-    <string name="text_macro_call_keyword_label">呼び出しキーワード（任意）</string>
-    <string name="text_macro_call_keyword_helper">この文字列を入力し終えると、候補にマクロ名を表示します。例: ひづけ → 今日の日付。完全一致した場合だけ表示します。</string>
 
     <string name="keyboard_type_tenkey">日本語 - かな</string>
     <string name="keyboard_type_gojuon">日本語 - 50音</string>

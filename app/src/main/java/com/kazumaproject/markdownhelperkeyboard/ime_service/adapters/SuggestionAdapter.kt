@@ -42,7 +42,6 @@ import com.kazumaproject.markdownhelperkeyboard.converter.candidate.CANDIDATE_TY
 import com.kazumaproject.markdownhelperkeyboard.converter.candidate.CANDIDATE_TYPE_TIME
 import com.kazumaproject.markdownhelperkeyboard.converter.candidate.CANDIDATE_TYPE_USER_DICTIONARY
 import com.kazumaproject.markdownhelperkeyboard.converter.candidate.CANDIDATE_TYPE_USER_TEMPLATE
-import com.kazumaproject.markdownhelperkeyboard.converter.candidate.CANDIDATE_TYPE_TEXT_MACRO
 import com.kazumaproject.markdownhelperkeyboard.converter.candidate.Candidate
 import com.kazumaproject.markdownhelperkeyboard.converter.candidate.QWERTY_GLIDE_CANDIDATE_TYPE
 import com.kazumaproject.markdownhelperkeyboard.custom_keyboard.data.CustomKeyboardLayout
@@ -178,10 +177,6 @@ class SuggestionAdapter internal constructor(
                 KeyboardFontApplicator.apply(holder.yomiText, keyboardFontSnapshot)
                 KeyboardFontApplicator.apply(holder.typeText, keyboardFontSnapshot)
             }
-            is SelectionActionViewHolder -> {
-                KeyboardFontApplicator.apply(holder.badgeText, keyboardFontSnapshot)
-                KeyboardFontApplicator.apply(holder.actionText, keyboardFontSnapshot)
-            }
             is ZeroQueryViewHolder -> KeyboardFontApplicator.apply(holder.text, keyboardFontSnapshot)
             is ClipboardPreviewViewHolder -> {
                 holder.clipboardPreviewText?.let { KeyboardFontApplicator.apply(it, keyboardFontSnapshot) }
@@ -219,7 +214,6 @@ class SuggestionAdapter internal constructor(
 
     internal enum class SuggestionDisplayItemKind {
         CandidateItem,
-        SelectionActionItem,
         ZeroQueryCloseItem,
         ZeroQueryCandidateItem,
         QuickActionsItem,
@@ -249,11 +243,6 @@ class SuggestionAdapter internal constructor(
 
     private sealed class SuggestionDisplayItem {
         data class CandidateItem(
-            val candidate: Candidate,
-            val candidateIndex: Int,
-        ) : SuggestionDisplayItem()
-
-        data class SelectionActionItem(
             val candidate: Candidate,
             val candidateIndex: Int,
         ) : SuggestionDisplayItem()
@@ -663,10 +652,6 @@ class SuggestionAdapter internal constructor(
                     // of removals and insertions to DiffUtil.
                     oldItem.candidateIndex == newItem.candidateIndex
 
-                oldItem is SuggestionDisplayItem.SelectionActionItem &&
-                        newItem is SuggestionDisplayItem.SelectionActionItem ->
-                    oldItem.candidateIndex == newItem.candidateIndex
-
                 oldItem is SuggestionDisplayItem.ZeroQueryCloseItem &&
                         newItem is SuggestionDisplayItem.ZeroQueryCloseItem -> true
 
@@ -823,7 +808,6 @@ class SuggestionAdapter internal constructor(
     private fun buildDisplayItems(): List<SuggestionDisplayItem> {
         return when (val content = currentContent) {
             is CandidateStripContent.Candidates -> buildCandidateItems(content)
-            is CandidateStripContent.SelectionActions -> buildSelectionActionItems(content)
             is CandidateStripContent.ZeroQuerySuggestions -> buildZeroQueryItems(content)
             is CandidateStripContent.CustomLayoutPicker -> buildCustomLayoutItems(content)
             is CandidateStripContent.ExpandedShortcutEntry -> buildExpandedShortcutEntryItems(
@@ -851,18 +835,6 @@ class SuggestionAdapter internal constructor(
             add(SuggestionDisplayItem.ZeroQueryCloseItem)
             content.candidates.forEachIndexed { index, candidate ->
                 add(SuggestionDisplayItem.ZeroQueryCandidateItem(candidate, index))
-            }
-        }
-
-    private fun buildSelectionActionItems(
-        content: CandidateStripContent.SelectionActions
-    ): List<SuggestionDisplayItem> =
-        buildList {
-            if (content.showShortcutEntry) {
-                add(SuggestionDisplayItem.ShortcutEntryItem)
-            }
-            content.actions.forEachIndexed { index, candidate ->
-                add(SuggestionDisplayItem.SelectionActionItem(candidate, index))
             }
         }
 
@@ -933,7 +905,6 @@ class SuggestionAdapter internal constructor(
     private fun CandidateStripContent.candidatesForClicks(): List<Candidate> {
         return when (this) {
             is CandidateStripContent.Candidates -> candidates
-            is CandidateStripContent.SelectionActions -> actions
             else -> emptyList()
         }
     }
@@ -1010,9 +981,6 @@ class SuggestionAdapter internal constructor(
             is SuggestionDisplayItem.CandidateItem ->
                 SuggestionDisplayItemKind.CandidateItem
 
-            is SuggestionDisplayItem.SelectionActionItem ->
-                SuggestionDisplayItemKind.SelectionActionItem
-
             SuggestionDisplayItem.ZeroQueryCloseItem ->
                 SuggestionDisplayItemKind.ZeroQueryCloseItem
 
@@ -1066,11 +1034,6 @@ class SuggestionAdapter internal constructor(
         val text: MaterialTextView = itemView.findViewById(R.id.suggestion_item_text_view)
         val yomiText: MaterialTextView = itemView.findViewById(R.id.suggestion_item_yomi_text_view)
         val typeText: MaterialTextView = itemView.findViewById(R.id.suggestion_item_type_text_view)
-    }
-
-    inner class SelectionActionViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
-        val badgeText: MaterialTextView = itemView.findViewById(R.id.suggestion_selection_action_badge)
-        val actionText: MaterialTextView = itemView.findViewById(R.id.suggestion_selection_action_text)
     }
 
     inner class ZeroQueryViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
@@ -1134,7 +1097,6 @@ class SuggestionAdapter internal constructor(
             is SuggestionDisplayItem.CandidateItem -> VIEW_TYPE_SUGGESTION
             SuggestionDisplayItem.ZeroQueryCloseItem -> VIEW_TYPE_ZERO_QUERY_CLOSE
             is SuggestionDisplayItem.ZeroQueryCandidateItem -> VIEW_TYPE_ZERO_QUERY_CANDIDATE
-            is SuggestionDisplayItem.SelectionActionItem -> VIEW_TYPE_SELECTION_ACTION
             is SuggestionDisplayItem.QuickActionsItem -> VIEW_TYPE_EMPTY
             is SuggestionDisplayItem.ClipboardPreviewItem -> VIEW_TYPE_CLIPBOARD_PREVIEW
             SuggestionDisplayItem.ShortcutEntryItem -> VIEW_TYPE_SHORTCUT_ENTRY
@@ -1209,15 +1171,6 @@ class SuggestionAdapter internal constructor(
                 SuggestionViewHolder(itemView)
             }
 
-            VIEW_TYPE_SELECTION_ACTION -> {
-                val itemView = LayoutInflater.from(parent.context)
-                    .inflate(R.layout.suggestion_selection_action_item, parent, false)
-                itemView.setBackgroundResource(
-                    if (isDynamicColorEnable) com.kazumaproject.core.R.drawable.recyclerview_item_bg_material else com.kazumaproject.core.R.drawable.recyclerview_item_bg
-                )
-                SelectionActionViewHolder(itemView)
-            }
-
             VIEW_TYPE_SHORTCUT -> {
                 val itemView = LayoutInflater.from(parent.context)
                     .inflate(R.layout.item_shortcut, parent, false)
@@ -1271,13 +1224,6 @@ class SuggestionAdapter internal constructor(
                 holder as ZeroQueryViewHolder,
                 item as SuggestionDisplayItem.ZeroQueryCandidateItem,
             )
-
-            VIEW_TYPE_SELECTION_ACTION -> {
-                onBindSelectionActionViewHolder(
-                    holder as SelectionActionViewHolder,
-                    item as SuggestionDisplayItem.SelectionActionItem,
-                )
-            }
 
             VIEW_TYPE_SHORTCUT -> onBindShortcutViewHolder(
                 holder as ShortcutViewHolder,
@@ -1868,7 +1814,6 @@ class SuggestionAdapter internal constructor(
             CANDIDATE_TYPE_ERA -> ""
             CANDIDATE_TYPE_USER_TEMPLATE ->
                 if (showDictionaryCandidateLabels) "[定型]" else ""
-            CANDIDATE_TYPE_TEXT_MACRO -> "[マクロ]"
             /** 半角 **/
             (31).toByte() -> "[半]"
             /** 漢数字 **/
@@ -1971,34 +1916,6 @@ class SuggestionAdapter internal constructor(
         }
     }
 
-    private fun onBindSelectionActionViewHolder(
-        holder: SelectionActionViewHolder,
-        item: SuggestionDisplayItem.SelectionActionItem,
-    ) {
-        applyCandidateItemBackground(holder.itemView)
-        val suggestion = item.candidate
-        val position = item.candidateIndex
-        holder.actionText.visibility = View.VISIBLE
-        holder.itemView.contentDescription = null
-        holder.actionText.text = suggestion.string
-        holder.actionText.textSize = candidateTextSize
-        holder.badgeText.text = ""
-
-        candidateTextColor?.let { color ->
-            holder.actionText.setTextColor(color)
-            holder.badgeText.setTextColor(color)
-        }
-
-        holder.itemView.isPressed = position == highlightedPosition
-        holder.itemView.setOnClickListener {
-            onItemClickListener?.invoke(suggestion, position)
-        }
-        holder.itemView.setOnLongClickListener {
-            onItemLongClickListener?.invoke(suggestion, position)
-            true
-        }
-    }
-
     private fun onBindCustomLayoutViewHolder(
         holder: CustomLayoutViewHolder,
         item: SuggestionDisplayItem.CustomLayoutItem,
@@ -2070,7 +1987,6 @@ class SuggestionAdapter internal constructor(
         val displayIndex = displayItems.indexOfFirst { item ->
             when (item) {
                 is SuggestionDisplayItem.CandidateItem -> item.candidateIndex == candidateIndex
-                is SuggestionDisplayItem.SelectionActionItem -> item.candidateIndex == candidateIndex
                 else -> false
             }
         }

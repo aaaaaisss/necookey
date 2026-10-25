@@ -9,12 +9,6 @@ object CandidateStripContentResolver {
             )
         }
         if (state.candidates.isNotEmpty()) {
-            if (state.selectionActionsShown) {
-                return CandidateStripContent.SelectionActions(
-                    actions = state.candidates,
-                    showShortcutEntry = shouldShowShortcutEntryWithSelectionActions(state),
-                )
-            }
             return CandidateStripContent.Candidates(
                 candidates = state.candidates,
             )
@@ -65,10 +59,6 @@ object CandidateStripContentResolver {
         return hasSwitchableShortcutEntryContent(state)
     }
 
-    private fun shouldShowShortcutEntryWithSelectionActions(
-        state: CandidateStripInputState
-    ): Boolean = canShowShortcutEntry(state)
-
     private fun canShowShortcutEntry(state: CandidateStripInputState): Boolean {
         if (!state.shortcutToolbarVisible) return false
         if (!state.shortcutToolbarIntegratedInSuggestion) return false
@@ -82,9 +72,7 @@ object CandidateStripContentResolver {
     private fun hasSwitchableShortcutEntryContent(
         state: CandidateStripInputState
     ): Boolean {
-        val hasSelectionActions =
-            state.candidates.isNotEmpty() && state.selectionActionsShown
-        return hasSelectionActions || resolveClipboardPreviewOrNull(state) != null
+        return resolveClipboardPreviewOrNull(state) != null
     }
 
     private fun shouldShowZeroQuerySuggestions(state: CandidateStripInputState): Boolean {
@@ -103,7 +91,6 @@ object CandidateStripContentResolver {
         if (state.candidatesShown) return false
         if (state.symbolKeyboardShown) return false
         if (state.customLayoutPickerShown) return false
-        if (state.selectionActionsShown) return false
         if (state.editorTextSelected) return false
         return true
     }
@@ -117,7 +104,6 @@ object CandidateStripContentResolver {
         if (state.candidatesShown) return null
         if (state.symbolKeyboardShown) return null
         if (state.customLayoutPickerShown) return null
-        if (state.selectionActionsShown) return null
         if (state.editorTextSelected) return null
         val hasContent = state.clipboardBitmap != null || state.clipboardText.isNotBlank()
         if (!hasContent) return null
@@ -136,8 +122,7 @@ object CandidateStripContentResolver {
                 state.inputStringEmpty &&
                 state.tailEmpty &&
                 !state.candidatesShown &&
-                !state.customLayoutPickerShown &&
-                !state.selectionActionsShown
+                !state.customLayoutPickerShown
         return QuickActionsState(
             incognitoVisible = canShowQuickActions && state.incognitoVisible,
             undoEnabled = canShowQuickActions && state.undoEnabled,
@@ -171,7 +156,6 @@ object CandidateStripContentResolver {
         if (!state.tailEmpty) return false
         if (state.candidatesShown) return false
         if (state.customLayoutPickerShown) return false
-        if (state.selectionActionsShown) return false
         return true
     }
 }

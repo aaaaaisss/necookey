@@ -73,39 +73,11 @@ class CandidateStripPresentationPolicyTest {
     }
 
     @Test
-    fun integratedOnSelectionActionsShowShortcutEntryOnly() {
-        val presentation = CandidateStripPresentationPolicy.resolve(
-            baseState(selectionActionsShown = true, suggestionsEmpty = false)
-        )
-
-        assertFalse(presentation.showIndependentShortcutToolbar)
-        assertFalse(presentation.reserveIndependentShortcutToolbarSpace)
-        assertFalse(presentation.showIntegratedShortcutItems)
-        assertTrue(presentation.showIntegratedShortcutEntry)
-    }
-
-    @Test
     fun integratedOffClipboardPreviewDoesNotShowShortcutEntry() {
         val presentation = CandidateStripPresentationPolicy.resolve(
             baseState(
                 shortcutToolbarIntegratedInSuggestion = false,
                 clipboardPreviewShown = true
-            )
-        )
-
-        assertTrue(presentation.showIndependentShortcutToolbar)
-        assertFalse(presentation.reserveIndependentShortcutToolbarSpace)
-        assertFalse(presentation.showIntegratedShortcutItems)
-        assertFalse(presentation.showIntegratedShortcutEntry)
-    }
-
-    @Test
-    fun integratedOffSelectionActionsDoNotShowShortcutEntry() {
-        val presentation = CandidateStripPresentationPolicy.resolve(
-            baseState(
-                shortcutToolbarIntegratedInSuggestion = false,
-                selectionActionsShown = true,
-                suggestionsEmpty = false
             )
         )
 
@@ -421,7 +393,6 @@ class CandidateStripPresentationPolicyTest {
         inputStringEmpty: Boolean = true,
         tailEmpty: Boolean = true,
         clipboardPreviewShown: Boolean = false,
-        selectionActionsShown: Boolean = false,
         suggestionsEmpty: Boolean = true,
         customLayoutPickerShown: Boolean = false,
         symbolKeyboardShown: Boolean = false,
@@ -436,7 +407,6 @@ class CandidateStripPresentationPolicyTest {
             inputStringEmpty = inputStringEmpty,
             tailEmpty = tailEmpty,
             clipboardPreviewShown = clipboardPreviewShown,
-            selectionActionsShown = selectionActionsShown,
             suggestionsEmpty = suggestionsEmpty,
             customLayoutPickerShown = customLayoutPickerShown,
             symbolKeyboardShown = symbolKeyboardShown,

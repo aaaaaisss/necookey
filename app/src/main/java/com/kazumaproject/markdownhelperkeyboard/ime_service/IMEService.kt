@@ -204,7 +204,6 @@ import com.kazumaproject.markdownhelperkeyboard.converter.candidate.CANDIDATE_TY
 import com.kazumaproject.markdownhelperkeyboard.converter.candidate.CANDIDATE_TYPE_TIME
 import com.kazumaproject.markdownhelperkeyboard.converter.candidate.CANDIDATE_TYPE_USER_DICTIONARY
 import com.kazumaproject.markdownhelperkeyboard.converter.candidate.CANDIDATE_TYPE_USER_TEMPLATE
-import com.kazumaproject.markdownhelperkeyboard.converter.candidate.CANDIDATE_TYPE_TEXT_MACRO
 import com.kazumaproject.markdownhelperkeyboard.converter.candidate.Candidate
 import com.kazumaproject.markdownhelperkeyboard.converter.candidate.CandidateConversionSegment
 import com.kazumaproject.markdownhelperkeyboard.converter.candidate.ExactInputCandidatePromotionPolicy
@@ -310,12 +309,6 @@ import com.kazumaproject.markdownhelperkeyboard.repository.RomajiMapRepository
 import com.kazumaproject.markdownhelperkeyboard.repository.ShortcutRepository
 import com.kazumaproject.markdownhelperkeyboard.repository.UserDictionaryRepository
 import com.kazumaproject.markdownhelperkeyboard.repository.UserTemplateRepository
-import com.kazumaproject.markdownhelperkeyboard.repository.TextMacroRepository
-import com.kazumaproject.markdownhelperkeyboard.text_macro.TextMacroCompiler
-import com.kazumaproject.markdownhelperkeyboard.text_macro.TextMacroContext
-import com.kazumaproject.markdownhelperkeyboard.text_macro.TextMacroContextRequirement
-import com.kazumaproject.markdownhelperkeyboard.text_macro.ExpandedMacro
-import com.kazumaproject.markdownhelperkeyboard.text_macro.TextMacroInputConnectionExecutor
 import com.kazumaproject.markdownhelperkeyboard.setting_activity.AppPreference
 import com.kazumaproject.markdownhelperkeyboard.setting_activity.ui.keyboard_selection.getKeyboardDisplayName
 import com.kazumaproject.markdownhelperkeyboard.setting_activity.MainActivity
@@ -448,14 +441,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         val committedText: String = ""
     )
 
-    private data class TextMacroEditorSnapshot(
-        val connection: InputConnection,
-        val packageName: String,
-        val input: String,
-        val selectionStart: Int,
-        val selectionEnd: Int,
-        val selectedText: String,
-    )
 
     private data class CustomToggleEditorSelection(
         val connection: InputConnection,
@@ -515,9 +500,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
 
     @Inject
     lateinit var userTemplateRepository: UserTemplateRepository
-
-    @Inject
-    lateinit var textMacroRepository: TextMacroRepository
 
 
 
@@ -895,11 +877,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
                     handleSelectedTextSelection(text)
                 } else {
                     clearSelectedTextClipboardPreviewRefresh()
-                    if (selectionActionSession != null) {
-                        clearSelectionActionSession(
-                            clearSuggestions = hasSelectionActionCandidates()
-                        )
-                    }
                 }
                 refreshCandidateStripContent()
             }
@@ -1040,7 +1017,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
             symbolKeyboardShown = keyboardSymbolViewState.value.isShown,
             customLayoutPickerShown = isCustomLayoutPickerShownForCandidateStrip(),
             customLayouts = customLayouts,
-            selectionActionsShown = candidates.isSelectionActionCandidates(),
             editorTextSelected = shouldSuppressClipboardPreviewForSelectedText,
             clipboardPreviewEnabled = clipboardPreviewVisibility == true,
             clipboardPreviewDescriptionShown = clipboardPreviewTapToDelete != true,
@@ -1108,10 +1084,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
 
     // 候補欄のキーボード一覧表示は廃止（後続語・ゼロクエリ候補を常に優先）
     private fun isCustomLayoutPickerShownForCandidateStrip(): Boolean = false
-
-    private fun List<Candidate>.isSelectionActionCandidates(): Boolean {
-        return isNotEmpty() && all { isSelectionActionCandidate(it) }
-    }
 
     private fun rememberZeroQueryKeyAfterCommit(committedText: String) {
         if (committedText.isBlank()) return
@@ -1222,7 +1194,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         if (isCurrentInputTypePasswordOrEmailForZeroQuery()) return false
         // Custom layout picker is only a fallback for the empty strip; the resolver already
         // prefers zero-query (next-word) suggestions over it, so it must not block them here.
-        if (isSelectionActionsShownForCandidateStrip()) return false
         if (editorTextSelected) {
             return false
         }
@@ -1259,12 +1230,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         return currentInputType in passwordTypes ||
             currentInputType == InputTypeForIME.TextEmailAddress ||
             currentInputType == InputTypeForIME.TextWebEmailAddress
-    }
-
-    private fun isSelectionActionsShownForCandidateStrip(): Boolean {
-        return currentCandidateStripCandidates.isSelectionActionCandidates() ||
-            currentCandidateStripFullCandidates.isSelectionActionCandidates() ||
-            currentCandidateStripContent is CandidateStripContent.SelectionActions
     }
 
     private fun consumePendingZeroQueryAfterCommit() {
@@ -1558,8 +1523,7 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         lastFlickConvertedNextHiragana.set(true)
         if (!hasConvertedKatakana) {
             if (
-                candidate != null &&
-                candidate.type != CANDIDATE_TYPE_TEXT_MACRO
+                candidate != null
             ) {
                 applyFirstSuggestion(candidate)
             } else {
@@ -1615,9 +1579,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
     private val deleteLongPressConversionGate = DeleteLongPressConversionGate()
     private var rightLongPressJob: Job? = null
     private var leftLongPressJob: Job? = null
-    private val selectionActionMenuRequestId = AtomicLong(0L)
-    private val textMacroExecutionRequestId = AtomicLong(0L)
-    private var selectionActionSession: SelectionActionSession? = null
 
     private var mainLayoutBinding: MainLayoutBinding? = null
     private var lastKeyboardLayoutRootView: View? = null
@@ -1721,7 +1682,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
     private var isLearnDictionaryMode: Boolean? = false
     private var isUserDictionaryEnable: Boolean? = false
     private var isUserTemplateEnable: Boolean? = false
-    private var isTextMacroCandidateEnable: Boolean = true
     private var suppressHentaiganaCandidates: Boolean = false
     private var zeroQuerySuggestionPreference: Boolean = false
     private var hankakuPreference: Boolean? = false
@@ -2299,14 +2259,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
             override val previewText: String = beforeText
         }
 
-        data class MacroCommit(
-            val beforeText: String,
-            val prefix: String,
-            val suffix: String,
-        ) : EditHistoryEntry {
-            override val previewText: String = beforeText
-        }
-
     }
 
     private class EditHistoryBuffer {
@@ -2715,7 +2667,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         resetCustomToggleState()
         forwardDeleteCoordinator.reset(attribute?.initialSelStart ?: -1, attribute?.initialSelEnd ?: -1)
         resetEditorSelectionSnapshot()
-        textMacroExecutionRequestId.incrementAndGet()
         flickPreviewEditorSessionId += 1L
         flickInputPreviewCoordinator.resetForEditorSession()
         Timber.d("onStartInput: ${Build.MANUFACTURER}")
@@ -2919,7 +2870,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
             preferences.showLearnedCandidatesInIncognitoPreference
         isUserDictionaryEnable = preferences.isUserDictionaryEnable
         isUserTemplateEnable = preferences.isUserTemplateEnable
-        isTextMacroCandidateEnable = preferences.isTextMacroCandidateEnable
         SystemNgramRuntime.setEnabled(this, preferences.systemNgramDictionaryEnabled)
         listOfNotNull(suggestionAdapter, suggestionAdapterFull).forEach { adapter ->
             adapter.setShowDictionaryCandidateLabels(preferences.showDictionaryCandidateLabels)
@@ -3708,7 +3658,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         showLearnedCandidatesInIncognitoPreference = true
         isUserDictionaryEnable = null
         isUserTemplateEnable = null
-        isTextMacroCandidateEnable = true
         suppressHentaiganaCandidates = false
         hankakuPreference = null
         customDirectModeSpaceHankakuPreference = true
@@ -4616,11 +4565,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
             return
         }
         clearSelectedTextClipboardPreviewRefresh()
-        if (selectionActionSession != null) {
-            clearSelectionActionSession(
-                clearSuggestions = hasSelectionActionCandidates()
-            )
-        }
 
         val preservedPreEdit = preservePreEditOnNextSelectionUpdate
         if (preservedPreEdit != null) {
@@ -5619,7 +5563,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
     }
 
     private fun shouldShowCandidateLongPressActions(candidate: Candidate): Boolean {
-        if (candidate.type == CANDIDATE_TYPE_TEXT_MACRO) return false
         // Any text candidate may correspond to a learned entry (learning also feeds the
         // conversion lattice, so learned outputs do not always carry the learned type).
         return candidate.string.isNotEmpty()
@@ -5880,7 +5823,7 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
 
     /** Drops [candidate] from every list currently on screen (top row, full list, bottom row). */
     private fun removeCandidateFromVisibleLists(candidate: Candidate) {
-        val sameWord: (Candidate) -> Boolean = { it.string == candidate.string && it.type != CANDIDATE_TYPE_TEXT_MACRO }
+        val sameWord: (Candidate) -> Boolean = { it.string == candidate.string }
         currentCandidateStripCandidates = currentCandidateStripCandidates.filterNot(sameWord)
         currentCandidateStripFullCandidates = currentCandidateStripFullCandidates.filterNot(sameWord)
         necookeyPredictionRowCandidates = necookeyPredictionRowCandidates.filterNot(sameWord)
@@ -5893,138 +5836,24 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
 
     private fun handleSelectedTextSelection(selectedText: String) {
         if (selectedTextClipboardPreviewRefreshText == selectedText) {
-            clearSelectionActionSession(
-                clearSuggestions = hasSelectionActionCandidates()
-            )
+            clearZeroQueryAllState(refresh = false)
             updateClipboardPreview()
             return
         }
         clearSelectedTextClipboardPreviewRefresh()
-        if (selectionActionSession?.selectedText != null &&
-            selectionActionSession?.selectedText != selectedText
-        ) {
-            clearSelectionActionSession(
-                clearSuggestions = hasSelectionActionCandidates()
-            )
-        }
-        if (isTextMacroCandidateEnable) {
-            showSelectionActions(selectedText)
-        } else {
-            clearSelectionActionSession(
-                clearSuggestions = hasSelectionActionCandidates()
-            )
-        }
-    }
-
-    private fun showSelectionActions(selectedText: String) {
         clearZeroQueryAllState(refresh = false)
-        if (!isTextMacroCandidateEnable) {
-            clearSelectionActionSession(
-                clearSuggestions = hasSelectionActionCandidates()
-            )
-            return
-        }
-        if (selectionActionSession?.selectedText == selectedText &&
-            currentCandidateStripCandidates.any { isSelectionActionCandidate(it) }
-        ) {
-            return
-        }
-
-        val requestId = selectionActionMenuRequestId.incrementAndGet()
-        ioScope.launch {
-            val localMacroEntries = if (
-                isTextMacroCandidateEnable &&
-                !isPrivateMode &&
-                currentInputType !in passwordTypes
-            ) {
-                textMacroRepository.getEnabledSelectionMacros(limit = 8).mapNotNull { macro ->
-                    val compiled = runCatching { TextMacroCompiler.compile(macro.body) }
-                        .getOrNull() ?: return@mapNotNull null
-                    if (TextMacroContextRequirement.SELECTION !in compiled.requirements) {
-                        return@mapNotNull null
-                    }
-                    SelectionActionEntry(
-                        candidate = Candidate(
-                            string = macro.name,
-                            type = CANDIDATE_TYPE_TEXT_MACRO,
-                            length = selectedText.length
-                                .coerceAtMost(UByte.MAX_VALUE.toInt())
-                                .toUByte(),
-                            score = Int.MAX_VALUE,
-                            sourceId = macro.id,
-                        ),
-                        action = SelectionAction.TextMacro(macro.id),
-                    )
-                }
-            } else {
-                emptyList()
-            }
-            withContext(Dispatchers.Main) {
-                if (selectionActionMenuRequestId.get() != requestId) return@withContext
-                val currentSelection = selectedEditorText
-                if (currentSelection != selectedText) return@withContext
-
-                val session = SelectionActionSessionComposer.compose(
-                    selectedText = selectedText,
-                    localMacros = localMacroEntries,
-                )
-                if (session == null) {
-                    clearSelectionActionSession(
-                        clearSuggestions = hasSelectionActionCandidates()
-                    )
-                    return@withContext
-                }
-
-                selectionActionSession = session
-                setSuggestionAdaptersOnMain(
-                    session.entries.map(SelectionActionEntry::candidate)
-                )
-                suggestionAdapter?.updateHighlightPosition(RecyclerView.NO_POSITION)
-                suggestionAdapterFull?.updateHighlightPosition(RecyclerView.NO_POSITION)
-            }
-        }
-    }
-
-    private fun hasSelectionActionCandidates(): Boolean {
-        return currentCandidateStripCandidates.any(::isSelectionActionCandidate) ||
-            currentCandidateStripFullCandidates.any(::isSelectionActionCandidate)
     }
 
     private fun markClipboardPreviewRefreshAfterPrimaryClipChanged() {
         selectedTextClipboardPreviewRefreshText =
             selectedEditorText.takeIf { it.isNotEmpty() }
         if (selectedTextClipboardPreviewRefreshText != null) {
-            clearSelectionActionSession(
-                clearSuggestions = hasSelectionActionCandidates()
-            )
+            clearZeroQueryAllState(refresh = false)
         }
     }
 
     private fun clearSelectedTextClipboardPreviewRefresh() {
         selectedTextClipboardPreviewRefreshText = null
-    }
-
-    private fun clearSelectionActionSession(clearSuggestions: Boolean) {
-        clearZeroQueryAllState(refresh = false)
-        selectionActionMenuRequestId.incrementAndGet()
-        selectionActionSession = null
-        if (!clearSuggestions) return
-        setSuggestionAdaptersOnMain(emptyList())
-        suggestionAdapter?.updateHighlightPosition(RecyclerView.NO_POSITION)
-        suggestionAdapterFull?.updateHighlightPosition(RecyclerView.NO_POSITION)
-    }
-
-    private fun handleSelectionActionClick(candidate: Candidate, position: Int): Boolean {
-        val session = selectionActionSession ?: return false
-        val entry = session.entryFor(candidate, position) ?: return false
-        when (val action = entry.action) {
-            is SelectionAction.TextMacro -> executeTextMacro(action.id)
-        }
-        return true
-    }
-
-    private fun isSelectionActionCandidate(candidate: Candidate): Boolean {
-        return candidate.type == CANDIDATE_TYPE_TEXT_MACRO && candidate.yomi == null
     }
 
     private fun setSuggestionProgressVisible(
@@ -10072,7 +9901,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
                 currentCandidateStripFullCandidates.isNotEmpty() ||
                 filteredCandidateList?.isNotEmpty() == true ||
                 currentCandidateStripContent is CandidateStripContent.Candidates ||
-                currentCandidateStripContent is CandidateStripContent.SelectionActions ||
                 shortcutToolbarHiddenForCandidates ||
                 candidateRefreshRequests.value.flag != CandidateShowFlag.Idle
         if (hasStaleCandidateState) {
@@ -10305,7 +10133,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
                             segments[c.string] ?: necookeyLearningSegmentsByString[c.string].orEmpty()
                         }
                     },
-                    isExcluded = { it.type == CANDIDATE_TYPE_TEXT_MACRO },
                 )
             }
             if (decision != null) {
@@ -10569,7 +10396,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
             return null
         }
         val candidates = sumireCandidates.ifEmpty { listOf(sumireTop) }
-            .filter { it.type != CANDIDATE_TYPE_TEXT_MACRO }
         val restored = withContext(Dispatchers.Default) {
             JinenConversion.restore(
                 output = output,
@@ -10653,7 +10479,7 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         candidateToken: CandidateRequestToken,
     ) {
         val sumireTop = baseCandidates.firstOrNull {
-            it.type != CANDIDATE_TYPE_TEXT_MACRO && it.length.toInt() == insertString.length
+            it.length.toInt() == insertString.length
         } ?: return
         zenzaiScheduler.onInput(insertString, SystemClock.uptimeMillis())
         val sumireGap = sumireCostGap(insertString, baseCandidates, sumireTop)
@@ -12699,7 +12525,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
             }
             adapter.setOnItemLongClickListener { candidate, i ->
                 Timber.d("Candidate long tap: $candidate $i")
-                if (isSelectionActionCandidate(candidate)) return@setOnItemLongClickListener
                 val insertString = inputString.value
                 if (shouldShowCandidateLongPressActions(candidate)) {
                     val candidatePosition = resolveCandidateLongPressPosition(
@@ -12851,7 +12676,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
             }
             adapter.setOnItemLongClickListener { candidate, i ->
                 Timber.d("Candidate long tap: $candidate $i")
-                if (isSelectionActionCandidate(candidate)) return@setOnItemLongClickListener
                 val insertString = inputString.value
                 if (shouldShowCandidateLongPressActions(candidate)) {
                     val candidatePosition = resolveCandidateLongPressPosition(
@@ -13544,9 +13368,7 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
                 inputStringEmpty = inputString.value.isEmpty(),
                 tailEmpty = stringInTail.get().isEmpty(),
                 clipboardPreviewShown = content.hasClipboardPreview(),
-                selectionActionsShown = content is CandidateStripContent.SelectionActions,
                 suggestionsEmpty = content !is CandidateStripContent.Candidates &&
-                    content !is CandidateStripContent.SelectionActions &&
                     content !is CandidateStripContent.ZeroQuerySuggestions,
                 customLayoutPickerShown = content is CandidateStripContent.CustomLayoutPicker,
                 symbolKeyboardShown = symbolKeyboardShown,
@@ -13614,10 +13436,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
 
             ShortcutType.TEMPLATE -> {
                 showUserTemplateListPopup()
-            }
-
-            ShortcutType.TEXT_MACRO -> {
-                showTextMacroListPopup()
             }
 
             ShortcutType.KEYBOARD_PICKER -> {
@@ -13869,17 +13687,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         displayedCandidates: List<Candidate>
     ) {
         Timber.d("setCandidateClick: $candidate")
-        if (isSelectionActionCandidate(candidate) && handleSelectionActionClick(
-                candidate,
-                position,
-            )
-        ) {
-            return
-        }
-        if (candidate.type == CANDIDATE_TYPE_TEXT_MACRO) {
-            candidate.sourceId?.let(::executeTextMacro)
-            return
-        }
         if (
             handleBunsetsuCandidateClick(
                 candidate = candidate,
@@ -14422,19 +14229,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
                 true
             }
 
-            is EditHistoryEntry.MacroCommit -> {
-                val ic = currentInputConnection ?: return false
-                ic.beginBatchEdit()
-                try {
-                    val prefixDeleted = entry.prefix.isEmpty() ||
-                        deleteCommittedTextBeforeCursor(entry.prefix)
-                    val suffixDeleted = entry.suffix.isEmpty() ||
-                        deleteCommittedTextAfterCursor(entry.suffix)
-                    prefixDeleted && suffixDeleted && commitText(entry.beforeText, 1)
-                } finally {
-                    ic.endBatchEdit()
-                }
-            }
         }
     }
 
@@ -14467,21 +14261,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
                 true
             }
 
-            is EditHistoryEntry.MacroCommit -> {
-                if (entry.beforeText.isNotEmpty() && !deleteCommittedTextBeforeCursor(entry.beforeText)) {
-                    false
-                } else {
-                    currentInputConnection?.let { connection ->
-                        TextMacroInputConnectionExecutor.commit(
-                            connection,
-                            ExpandedMacro(
-                                text = entry.prefix + entry.suffix,
-                                cursorOffset = entry.prefix.length,
-                            ),
-                        )
-                    } == true
-                }
-            }
         }
     }
 
@@ -14589,9 +14368,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
                 insertString = inputString.value,
                 requestedIndex = requestedIndex
             ) ?: return inputString.value + stringInTail.get()
-            if (suggestions[selectedIndex].type == CANDIDATE_TYPE_TEXT_MACRO) {
-                return inputString.value + stringInTail.get()
-            }
             return getCandidateCommitString(suggestions[selectedIndex]) + stringInTail.get()
         }
 
@@ -14635,7 +14411,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         val candidate = suggestions[selectedIndex]
         val candidateLength = candidate.length.toInt()
         if (
-            candidate.type == CANDIDATE_TYPE_TEXT_MACRO ||
             candidate.commitText.isBlank() ||
             candidateLength <= 0
         ) return
@@ -15098,7 +14873,7 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         clearBunsetsuConversionSession()
         clearPendingReconversionEntry()
         clearBunsetsuReconversionDraft()
-        clearSelectionActionSession(clearSuggestions = true)
+        clearZeroQueryAllState(refresh = false)
         setSuggestionAdaptersOnMain(emptyList())
         suggestionAdapter?.updateHighlightPosition(RecyclerView.NO_POSITION)
         suggestionAdapterFull?.updateHighlightPosition(RecyclerView.NO_POSITION)
@@ -15411,10 +15186,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         ) ?: return
         suggestionClickNum = index + 1
         val nextSuggestion = suggestions[index]
-        if (nextSuggestion.type == CANDIDATE_TYPE_TEXT_MACRO) {
-            nextSuggestion.sourceId?.let(::executeTextMacro)
-            return
-        }
         withTopRowLearningInput(insertString) {
             processCandidate(
                 candidate = nextSuggestion,
@@ -15723,8 +15494,8 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
     private fun necookeyZenzGateEnabled(): Boolean =
         AppVariantConfig.hasZenz && appPreference.necookey_zenz_bunsetsu_gate_preference
 
-    private fun isNecookeyActionCandidate(candidate: Candidate): Boolean =
-        candidate.type == CANDIDATE_TYPE_TEXT_MACRO || isSelectionActionCandidate(candidate)
+    @Suppress("UNUSED_PARAMETER")
+    private fun isNecookeyActionCandidate(candidate: Candidate): Boolean = false
 
     private fun cancelNecookeyTwoRowBar() {
         necookeyZenzJob?.cancel()
@@ -16249,7 +16020,7 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
 
         val filteredCandidates = result.filter { candidate ->
             !NgWordMatcher.matchesAny(insertString, candidate.string, ngWords)
-        }.withoutHentaiganaCandidatesIfNeeded().distinctIncludingTextMacroActions()
+        }.withoutHentaiganaCandidatesIfNeeded().distinctBy { it.string }
 
         val orderedCandidates = applyMergedCandidateOrder(
             input = insertString,
@@ -16383,7 +16154,7 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         val filteredCandidates = measureDebugStage("IMEService.getSuggestionList.ngWordFilterDistinct") {
             result.filter { candidate ->
                 !NgWordMatcher.matchesAny(insertString, candidate.string, ngWords)
-            }.withoutHentaiganaCandidatesIfNeeded().distinctIncludingTextMacroActions()
+            }.withoutHentaiganaCandidatesIfNeeded().distinctBy { it.string }
         }
 
         val orderedCandidates = applyMergedCandidateOrder(
@@ -16512,7 +16283,7 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
 
         val filteredCandidates = result.filter { candidate ->
             !NgWordMatcher.matchesAny(insertString, candidate.string, ngWords)
-        }.withoutHentaiganaCandidatesIfNeeded().distinctIncludingTextMacroActions()
+        }.withoutHentaiganaCandidatesIfNeeded().distinctBy { it.string }
 
         val orderedCandidates = applyMergedCandidateOrder(
             input = insertString,
@@ -16549,20 +16320,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         }
         return promotedCandidates
     }
-
-    /**
-     * A macro action may deliberately have the same display label as a conversion candidate.
-     * Keep it as a separate executable item while preserving the legacy string de-duplication
-     * behavior for ordinary conversion candidates.
-     */
-    private fun List<Candidate>.distinctIncludingTextMacroActions(): List<Candidate> =
-        distinctBy { candidate ->
-            if (candidate.type == CANDIDATE_TYPE_TEXT_MACRO) {
-                "text-macro:${candidate.sourceId}"
-            } else {
-                "text:${candidate.string}"
-            }
-        }
 
     private suspend fun getSuggestionListEnglishKana(
         insertString: String,
@@ -16659,197 +16416,8 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
     private suspend fun getUserTemplateCandidates(insertString: String): List<Candidate> {
         return withContext(Dispatchers.IO) {
             val legacyTemplates = getLegacyUserTemplateCandidates(insertString)
-            val contextualMacrosAllowed = !isPrivateMode && currentInputType !in passwordTypes
-            val macros = if (isTextMacroCandidateEnable) {
-                textMacroRepository.getEnabledByReading(insertString, limit = 8)
-                    .mapNotNull { macro ->
-                        val compiled = runCatching { TextMacroCompiler.compile(macro.body) }
-                            .getOrNull() ?: return@mapNotNull null
-                        if (TextMacroContextRequirement.SELECTION in compiled.requirements) {
-                            return@mapNotNull null
-                        }
-                        if (!contextualMacrosAllowed && compiled.requirements.isNotEmpty()) {
-                            return@mapNotNull null
-                        }
-                        Candidate(
-                            string = macro.name,
-                            type = CANDIDATE_TYPE_TEXT_MACRO,
-                            length = insertString.length.coerceAtMost(UByte.MAX_VALUE.toInt()).toUByte(),
-                            score = Int.MIN_VALUE + 52,
-                            yomi = macro.reading,
-                            sourceId = macro.id,
-                        )
-                    }
-            } else {
-                emptyList()
-            }
-            legacyTemplates + macros
+            legacyTemplates
         }
-    }
-
-    private fun showTextMacroListPopup() {
-        val request = beginKeyboardPopupRequest() ?: return
-        ioScope.launch {
-            try {
-                val macros = textMacroRepository.getAllEnabled()
-                withContext(Dispatchers.Main.immediate) {
-                    if (!isKeyboardPopupRequestCurrent(request)) return@withContext
-                    if (macros.isEmpty()) {
-                        dismissKeyboardSelectionPopups()
-                        showToastMessage(getString(R.string.text_macro_context_unavailable))
-                        return@withContext
-                    }
-                    showKeyboardSelectionList(request, macros.map { it.name }, "text macros", maxVisibleItems = 8) { position ->
-                        executeTextMacro(macros[position].id)
-                    }
-                }
-            } catch (exception: CancellationException) {
-                throw exception
-            } catch (exception: Exception) {
-                reportKeyboardPopupFailure(request, exception)
-            }
-        }
-    }
-
-    /**
-     * Re-fetches and re-compiles by stable ID, then revalidates the editor immediately before
-     * committing. Definition/context text is intentionally never logged or sent to any model.
-     */
-    private fun executeTextMacro(id: Long) {
-        val connection = currentInputConnection ?: return
-        val packageName = currentInputEditorInfo?.packageName.orEmpty()
-        val input = inputString.value
-        val requestId = textMacroExecutionRequestId.incrementAndGet()
-        val sensitiveEditor = isPrivateMode || currentInputType in passwordTypes
-
-        ioScope.launch {
-            val result = runCatching {
-                val initial = readTextMacroEditorSnapshot(connection, packageName, input)
-                val macro = textMacroRepository.getById(id)
-                    ?.takeIf { it.enabled }
-                    ?: error("Macro is unavailable")
-                val compiled = TextMacroCompiler.compile(macro.body)
-                if (sensitiveEditor && compiled.requirements.isNotEmpty()) {
-                    error(getString(R.string.text_macro_sensitive_context_blocked))
-                }
-
-                val clipboard = if (TextMacroContextRequirement.CLIPBOARD in compiled.requirements) {
-                    if (clipboardUtil.isPrimaryClipSensitive()) {
-                        error(getString(R.string.text_macro_clipboard_sensitive))
-                    }
-                    clipboardUtil.getFirstClipboardTextOrNull()
-                        ?.takeIf(String::isNotEmpty)
-                        ?: error(getString(R.string.text_macro_context_unavailable))
-                } else {
-                    null
-                }
-                val selection = if (TextMacroContextRequirement.SELECTION in compiled.requirements) {
-                    initial.selectedText.takeIf(String::isNotEmpty)
-                        ?: error(getString(R.string.text_macro_context_unavailable))
-                } else {
-                    null
-                }
-                val expanded = compiled.expand(
-                    TextMacroContext(
-                        selection = selection,
-                        clipboard = clipboard,
-                    )
-                )
-                val latest = readTextMacroEditorSnapshot(connection, packageName, input)
-                require(initial.selectionStart == latest.selectionStart) { "Selection changed" }
-                require(initial.selectionEnd == latest.selectionEnd) { "Selection changed" }
-                require(initial.selectedText == latest.selectedText) { "Selection changed" }
-                Triple(initial, expanded, compiled.requirements.isNotEmpty())
-            }
-
-            withContext(Dispatchers.Main.immediate) {
-                if (requestId != textMacroExecutionRequestId.get()) return@withContext
-                result.onFailure { exception ->
-                    Toast.makeText(
-                        this@IMEService,
-                        exception.message ?: getString(R.string.text_macro_operation_failed, ""),
-                        Toast.LENGTH_SHORT,
-                    ).show()
-                }.onSuccess { (snapshot, expanded, readsSensitiveContext) ->
-                    if (
-                        currentInputConnection !== snapshot.connection ||
-                        currentInputEditorInfo?.packageName.orEmpty() != snapshot.packageName ||
-                        inputString.value != snapshot.input ||
-                        (readsSensitiveContext &&
-                            (isPrivateMode || currentInputType in passwordTypes))
-                    ) {
-                        return@onSuccess
-                    }
-                    val finalSnapshot = runCatching {
-                        readTextMacroEditorSnapshot(
-                            snapshot.connection,
-                            snapshot.packageName,
-                            snapshot.input,
-                        )
-                    }.getOrNull() ?: return@onSuccess
-                    if (
-                        finalSnapshot.selectionStart != snapshot.selectionStart ||
-                        finalSnapshot.selectionEnd != snapshot.selectionEnd ||
-                        finalSnapshot.selectedText != snapshot.selectedText
-                    ) {
-                        return@onSuccess
-                    }
-                    commitExpandedTextMacro(
-                        connection = snapshot.connection,
-                        expanded = expanded,
-                        replacedText = snapshot.selectedText.ifEmpty { snapshot.input },
-                    )
-                }
-            }
-        }
-    }
-
-    private fun readTextMacroEditorSnapshot(
-        connection: InputConnection,
-        packageName: String,
-        input: String,
-    ): TextMacroEditorSnapshot {
-        val extracted = connection.getExtractedText(ExtractedTextRequest(), 0)
-            ?: error("Editor state is unavailable")
-        return TextMacroEditorSnapshot(
-            connection = connection,
-            packageName = packageName,
-            input = input,
-            selectionStart = extracted.selectionStart,
-            selectionEnd = extracted.selectionEnd,
-            selectedText = connection.getSelectedText(0)?.toString().orEmpty(),
-        )
-    }
-
-    private fun commitExpandedTextMacro(
-        connection: InputConnection,
-        expanded: ExpandedMacro,
-        replacedText: String,
-    ) {
-        connection.beginBatchEdit()
-        val committed = try {
-            setComposingText("", 0)
-            finishComposingText()
-            TextMacroInputConnectionExecutor.commit(connection, expanded)
-        } finally {
-            connection.endBatchEdit()
-        }
-        if (!committed) return
-
-        val cursor = expanded.cursorOffset.coerceIn(0, expanded.text.length)
-        pushEditHistoryEntry(
-            EditHistoryEntry.MacroCommit(
-                beforeText = replacedText,
-                prefix = expanded.text.substring(0, cursor),
-                suffix = expanded.text.substring(cursor),
-            )
-        )
-        _inputString.update { "" }
-        stringInTail.set("")
-        clearSelectionActionSession(clearSuggestions = false)
-        clearSuggestionStateAfterCommit()
-        resetFlagsSuggestionClick()
-        consumePendingZeroQueryAfterCommit()
     }
 
     private fun getRomajiCandidates(insertString: String): List<Candidate> {
@@ -17679,7 +17247,10 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
     private fun performForwardDelete(selectionWasActive: Boolean) {
         invalidateZeroQueryForEditorMutation()
         if (selectionWasActive) {
-            clearSelectionActionSession(clearSuggestions = true)
+            clearZeroQueryAllState(refresh = false)
+            setSuggestionAdaptersOnMain(emptyList())
+            suggestionAdapter?.updateHighlightPosition(RecyclerView.NO_POSITION)
+            suggestionAdapterFull?.updateHighlightPosition(RecyclerView.NO_POSITION)
         }
         sendDownUpKeyEvents(KeyEvent.KEYCODE_FORWARD_DEL)
         resetEditorSelectionSnapshot()
@@ -18430,7 +18001,7 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         if (currentInputConnection == null) return
         if (!commitRawTextAndInsertSpace(inputString.value, stringInTail.get())) return
 
-        clearSelectionActionSession(clearSuggestions = false)
+        clearZeroQueryAllState(refresh = false)
         clearSuggestionStateAfterCommit()
         resetFlagsEnterKeyNotHenkan()
         consumePendingZeroQueryAfterCommit()
@@ -18494,25 +18065,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
 
         val nextSuggestion = suggestions[index]
         val candidateType = nextSuggestion.type.toInt()
-        if (nextSuggestion.type == CANDIDATE_TYPE_TEXT_MACRO) {
-            stringInTail.set("")
-            applyComposingText(
-                text = insertString,
-                highlightLength = insertString.length,
-                backgroundColor = if (customComposingTextPreference == true) {
-                    inputConversionBackgroundColor
-                        ?: getColor(com.kazumaproject.core.R.color.orange)
-                } else {
-                    getColor(com.kazumaproject.core.R.color.orange)
-                },
-                textColor = if (customComposingTextPreference == true) {
-                    inputCompositionTextColor
-                } else {
-                    null
-                },
-            )
-            return
-        }
         val suggestionText = nextSuggestion.string
         val suggestionLength = nextSuggestion.length.toInt()
         if (candidateType == 5 || candidateType == 7 || candidateType == 8) {

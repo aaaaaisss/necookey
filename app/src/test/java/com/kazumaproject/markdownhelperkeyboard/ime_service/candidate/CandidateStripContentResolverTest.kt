@@ -147,7 +147,6 @@ class CandidateStripContentResolverTest {
             candidatesShown = false,
             symbolKeyboardShown = false,
             customLayoutPickerShown = false,
-            selectionActionsShown = false,
             editorTextSelected = true,
             clipboardPreviewEnabled = true,
             clipboardText = "hello"
@@ -168,7 +167,6 @@ class CandidateStripContentResolverTest {
             candidatesShown = false,
             symbolKeyboardShown = false,
             customLayoutPickerShown = false,
-            selectionActionsShown = false,
             editorTextSelected = false,
             clipboardPreviewEnabled = true,
             clipboardText = "hello"
@@ -176,24 +174,6 @@ class CandidateStripContentResolverTest {
         val emptyState = CandidateStripContentResolver.resolve(state).asEmptyState()
 
         assertNotNull(emptyState.clipboardPreview)
-    }
-
-    @Test
-    fun selectionActionsWinOverClipboardPreview_whenEditorTextSelected() {
-        val actions = listOf(candidate("Translate"))
-        val state = baseState(
-            candidates = actions,
-            inputStringEmpty = true,
-            tailEmpty = true,
-            selectionActionsShown = true,
-            editorTextSelected = true,
-            clipboardPreviewEnabled = true,
-            clipboardText = "hello"
-        )
-        val content = CandidateStripContentResolver.resolve(state)
-
-        assertTrue(content is CandidateStripContent.SelectionActions)
-        assertTrue((content as CandidateStripContent.SelectionActions).actions == actions)
     }
 
     @Test
@@ -546,11 +526,6 @@ class CandidateStripContentResolverTest {
         )
         assertTrue(
             CandidateStripContentResolver.resolve(
-                base.copy(selectionActionsShown = true)
-            ) is CandidateStripContent.Empty
-        )
-        assertTrue(
-            CandidateStripContentResolver.resolve(
                 base.copy(editorTextSelected = true)
             ) is CandidateStripContent.Empty
         )
@@ -584,7 +559,6 @@ class CandidateStripContentResolverTest {
         symbolKeyboardShown: Boolean = false,
         customLayoutPickerShown: Boolean = false,
         customLayouts: List<CustomKeyboardLayout> = emptyList(),
-        selectionActionsShown: Boolean = false,
         editorTextSelected: Boolean = false,
         clipboardPreviewEnabled: Boolean = false,
         clipboardPreviewDescriptionShown: Boolean = true,
@@ -614,7 +588,6 @@ class CandidateStripContentResolverTest {
             symbolKeyboardShown = symbolKeyboardShown,
             customLayoutPickerShown = customLayoutPickerShown,
             customLayouts = customLayouts,
-            selectionActionsShown = selectionActionsShown,
             editorTextSelected = editorTextSelected,
             clipboardPreviewEnabled = clipboardPreviewEnabled,
             clipboardPreviewDescriptionShown = clipboardPreviewDescriptionShown,

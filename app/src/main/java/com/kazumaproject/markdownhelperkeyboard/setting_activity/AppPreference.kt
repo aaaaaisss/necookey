@@ -1710,8 +1710,6 @@ object AppPreference {
 
     val user_template_preference: Boolean? get() = true // S3: hardcoded, setting removed
 
-    val text_macro_candidate_preference: Boolean get() = true // S3: hardcoded, setting removed
-
     var system_ngram_dictionary_enable_preference: Boolean
         get() = preferences.getBoolean(
             SYSTEM_NGRAM_DICTIONARY_ENABLE_PREFERENCE.first,

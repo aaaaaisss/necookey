@@ -30,10 +30,6 @@ class SuggestionAdapterFontRebindTest {
         val scenarios = listOf(
             CandidateStripContent.Candidates(listOf(candidate("candidate"))) to 0,
             CandidateStripContent.ZeroQuerySuggestions(listOf(candidate("zero query"))) to 1,
-            CandidateStripContent.SelectionActions(
-                actions = listOf(candidate("selection action")),
-                showShortcutEntry = false,
-            ) to 0,
             CandidateStripContent.EmptyState(
                 showShortcutEntry = false,
                 quickActions = QuickActionsState(

@@ -10,18 +10,6 @@ import org.junit.Test
 class CandidateStripLayoutPolicyTest {
 
     @Test
-    fun selectionActionsUseLinearHorizontalLayout() {
-        assertTrue(
-            CandidateStripLayoutPolicy.shouldUseLinearHorizontalLayout(
-                CandidateStripContent.SelectionActions(
-                    actions = listOf(candidate("Translate")),
-                    showShortcutEntry = false
-                )
-            )
-        )
-    }
-
-    @Test
     fun visibleZeroQuerySuggestionsUseLinearHorizontalLayout() {
         assertTrue(
             CandidateStripLayoutPolicy.shouldUseLinearHorizontalLayout(

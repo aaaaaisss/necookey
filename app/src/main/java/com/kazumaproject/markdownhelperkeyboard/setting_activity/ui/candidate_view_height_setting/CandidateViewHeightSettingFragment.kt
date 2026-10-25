@@ -747,7 +747,6 @@ class CandidateViewHeightSettingFragment : Fragment() {
         val inputStringEmpty = !isCandidateListVisible
         val tailEmpty = true
         val clipboardPreviewShown = false
-        val selectionActionsShown = false
         val suggestionsEmpty = !isCandidateListVisible
         val customLayoutPickerShown = false
         val presentation = CandidateStripPresentationPolicy.resolve(
@@ -761,7 +760,6 @@ class CandidateViewHeightSettingFragment : Fragment() {
                 inputStringEmpty = inputStringEmpty,
                 tailEmpty = tailEmpty,
                 clipboardPreviewShown = clipboardPreviewShown,
-                selectionActionsShown = selectionActionsShown,
                 suggestionsEmpty = suggestionsEmpty,
                 customLayoutPickerShown = customLayoutPickerShown,
                 symbolKeyboardShown = false,

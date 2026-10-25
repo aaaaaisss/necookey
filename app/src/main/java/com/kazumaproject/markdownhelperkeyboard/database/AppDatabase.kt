@@ -38,8 +38,6 @@ import com.kazumaproject.markdownhelperkeyboard.sumire_special_key.database.Sumi
 import com.kazumaproject.markdownhelperkeyboard.sumire_special_key.database.SumireSpecialKeyActionOverrideEntity
 import com.kazumaproject.markdownhelperkeyboard.sumire_special_key.database.SumireSpecialKeyPlacementOverrideDao
 import com.kazumaproject.markdownhelperkeyboard.sumire_special_key.database.SumireSpecialKeyPlacementOverrideEntity
-import com.kazumaproject.markdownhelperkeyboard.text_macro.database.TextMacro
-import com.kazumaproject.markdownhelperkeyboard.text_macro.database.TextMacroDao
 import com.kazumaproject.markdownhelperkeyboard.user_dictionary.database.UserWord
 import com.kazumaproject.markdownhelperkeyboard.user_dictionary.database.UserWordDao
 import com.kazumaproject.markdownhelperkeyboard.user_template.database.UserTemplate
@@ -66,10 +64,9 @@ import com.kazumaproject.markdownhelperkeyboard.user_template.database.UserTempl
         SpacerDefinition::class,
         SumireSpecialKeyActionOverrideEntity::class,
         SumireSpecialKeyPlacementOverrideEntity::class,
-        TextMacro::class,
         NextWordEntity::class,
     ],
-    version = 51,
+    version = 52,
     exportSchema = false
 )
 @TypeConverters(
@@ -93,7 +90,6 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun deleteKeyFlickDeleteTargetDao(): DeleteKeyFlickDeleteTargetDao
     abstract fun sumireSpecialKeyActionOverrideDao(): SumireSpecialKeyActionOverrideDao
     abstract fun sumireSpecialKeyPlacementOverrideDao(): SumireSpecialKeyPlacementOverrideDao
-    abstract fun textMacroDao(): TextMacroDao
 
     companion object {
 
@@ -1245,6 +1241,13 @@ abstract class AppDatabase : RoomDatabase() {
                 db.execSQL(
                     "ALTER TABLE `ng_word` ADD COLUMN `matchMode` TEXT NOT NULL DEFAULT 'PARTIAL'"
                 )
+            }
+        }
+
+        /** necookey: テキストマクロ機能の削除に伴い text_macro 表を捨てる。 */
+        val MIGRATION_51_52 = object : Migration(51, 52) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("DROP TABLE IF EXISTS `text_macro`")
             }
         }
     }

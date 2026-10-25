@@ -46,7 +46,6 @@ class PasswordCandidatePresentationTest {
             inputStringEmpty = false,
             tailEmpty = true,
             clipboardPreviewShown = false,
-            selectionActionsShown = false,
             suggestionsEmpty = !active,
             customLayoutPickerShown = false,
             shortcutToolbarHiddenForCandidates = active,

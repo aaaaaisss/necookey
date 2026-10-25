@@ -9,7 +9,6 @@ data class CandidateStripPresentationState(
     val inputStringEmpty: Boolean,
     val tailEmpty: Boolean,
     val clipboardPreviewShown: Boolean,
-    val selectionActionsShown: Boolean,
     val suggestionsEmpty: Boolean,
     val customLayoutPickerShown: Boolean,
     val symbolKeyboardShown: Boolean = false,
@@ -85,7 +84,6 @@ object CandidateStripPresentationPolicy {
                 inputStringEmpty = state.inputStringEmpty,
                 tailEmpty = state.tailEmpty,
                 clipboardPreviewShown = state.clipboardPreviewShown,
-                selectionActionsShown = state.selectionActionsShown,
                 suggestionsEmpty = state.suggestionsEmpty,
                 customLayoutPickerShown = state.customLayoutPickerShown,
                 symbolKeyboardShown = state.symbolKeyboardShown

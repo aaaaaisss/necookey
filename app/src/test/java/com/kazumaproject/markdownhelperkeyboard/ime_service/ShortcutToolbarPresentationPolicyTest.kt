@@ -71,35 +71,9 @@ class ShortcutToolbarPresentationPolicyTest {
     }
 
     @Test
-    fun integratedOnSelectionActionsShowShortcutEntryOnly() {
-        val presentation = ShortcutToolbarPresentationPolicy.resolve(
-            baseState(selectionActionsShown = true, suggestionsEmpty = false)
-        )
-
-        assertFalse(presentation.showIndependentToolbar)
-        assertFalse(presentation.showIntegratedShortcutItems)
-        assertTrue(presentation.showIntegratedShortcutEntry)
-    }
-
-    @Test
     fun integratedOffClipboardPreviewDoesNotShowShortcutEntry() {
         val presentation = ShortcutToolbarPresentationPolicy.resolve(
             baseState(integratedInSuggestion = false, clipboardPreviewShown = true)
-        )
-
-        assertTrue(presentation.showIndependentToolbar)
-        assertFalse(presentation.showIntegratedShortcutItems)
-        assertFalse(presentation.showIntegratedShortcutEntry)
-    }
-
-    @Test
-    fun integratedOffSelectionActionsDoNotShowShortcutEntry() {
-        val presentation = ShortcutToolbarPresentationPolicy.resolve(
-            baseState(
-                integratedInSuggestion = false,
-                selectionActionsShown = true,
-                suggestionsEmpty = false
-            )
         )
 
         assertTrue(presentation.showIndependentToolbar)
@@ -146,7 +120,6 @@ class ShortcutToolbarPresentationPolicyTest {
         inputStringEmpty: Boolean = true,
         tailEmpty: Boolean = true,
         clipboardPreviewShown: Boolean = false,
-        selectionActionsShown: Boolean = false,
         suggestionsEmpty: Boolean = true,
         customLayoutPickerShown: Boolean = false,
         symbolKeyboardShown: Boolean = false
@@ -157,7 +130,6 @@ class ShortcutToolbarPresentationPolicyTest {
             inputStringEmpty = inputStringEmpty,
             tailEmpty = tailEmpty,
             clipboardPreviewShown = clipboardPreviewShown,
-            selectionActionsShown = selectionActionsShown,
             suggestionsEmpty = suggestionsEmpty,
             customLayoutPickerShown = customLayoutPickerShown,
             symbolKeyboardShown = symbolKeyboardShown

@@ -21,39 +21,6 @@ import org.robolectric.annotation.Config
 class CandidateStripClipboardPreviewRegressionTest {
 
     @Test
-    fun selectionActionsWinAndClipboardPreviewReturnsAfterSelectionCleared() {
-        val selectedContent = CandidateStripContentResolver.resolve(
-            baseState(
-                candidates = listOf(candidate("Translate")),
-                inputStringEmpty = true,
-                tailEmpty = true,
-                selectionActionsShown = true,
-                editorTextSelected = true,
-                clipboardPreviewEnabled = true,
-                clipboardText = "copied"
-            )
-        )
-
-        assertTrue(selectedContent is CandidateStripContent.SelectionActions)
-
-        val releasedContent = CandidateStripContentResolver.resolve(
-            baseState(
-                inputStringEmpty = true,
-                tailEmpty = true,
-                editorTextSelected = false,
-                clipboardPreviewEnabled = true,
-                clipboardText = "copied",
-                shortcutToolbarVisible = true,
-                shortcutToolbarIntegratedInSuggestion = true,
-                shortcutItems = listOf(ShortcutType.SETTINGS)
-            )
-        ).asEmptyState()
-
-        assertNotNull(releasedContent.clipboardPreview)
-        assertTrue(releasedContent.showShortcutEntry)
-    }
-
-    @Test
     fun primaryClipChangedPreviewCanShowAfterSelectionSuppressionIsReleased() {
         val content = CandidateStripContentResolver.resolve(
             baseState(
@@ -184,7 +151,6 @@ class CandidateStripClipboardPreviewRegressionTest {
         symbolKeyboardShown: Boolean = false,
         customLayoutPickerShown: Boolean = false,
         customLayouts: List<CustomKeyboardLayout> = emptyList(),
-        selectionActionsShown: Boolean = false,
         editorTextSelected: Boolean = false,
         clipboardPreviewEnabled: Boolean = false,
         clipboardPreviewDescriptionShown: Boolean = true,
@@ -211,7 +177,6 @@ class CandidateStripClipboardPreviewRegressionTest {
             symbolKeyboardShown = symbolKeyboardShown,
             customLayoutPickerShown = customLayoutPickerShown,
             customLayouts = customLayouts,
-            selectionActionsShown = selectionActionsShown,
             editorTextSelected = editorTextSelected,
             clipboardPreviewEnabled = clipboardPreviewEnabled,
             clipboardPreviewDescriptionShown = clipboardPreviewDescriptionShown,

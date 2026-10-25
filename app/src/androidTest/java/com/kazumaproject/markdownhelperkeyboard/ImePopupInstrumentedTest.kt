@@ -16,7 +16,6 @@ import androidx.test.platform.app.InstrumentationRegistry
 import com.kazumaproject.markdownhelperkeyboard.database.AppDatabase
 import com.kazumaproject.markdownhelperkeyboard.ng_word.database.NgWordMatchMode
 import com.kazumaproject.markdownhelperkeyboard.short_cut.data.ShortcutItem
-import com.kazumaproject.markdownhelperkeyboard.text_macro.database.TextMacro
 import com.kazumaproject.markdownhelperkeyboard.user_template.database.UserTemplate
 import dagger.hilt.android.EntryPointAccessors
 import kotlinx.coroutines.runBlocking
@@ -48,10 +47,6 @@ class ImePopupInstrumentedTest {
                 val date = row.text?.toString() ?: requireNotNull(row.getChild(0)).text.toString()
                 tap(row)
                 awaitText(host, date)
-                host.onActivity { it.editor.setText("") }
-                openShortcut("動的定型文（マクロ）")
-                tap(awaitNode(MACRO_NAME))
-                awaitText(host, MACRO_TEXT)
                 host.onActivity { assertEquals(losses, it.focusLosses) }
             }
         }
@@ -378,11 +373,6 @@ class ImePopupInstrumentedTest {
             assertNotNull(findNodeId("popup_listview"))
             tap(requireNotNull(awaitNodeId("popup_listview").getChild(0)))
             await { findNodeId("popup_listview") == null }
-            openShortcut("動的定型文（マクロ）")
-            awaitNode(MACRO_NAME)
-            SystemClock.sleep(500)
-            assertNotNull(findNode(MACRO_NAME))
-            tap(awaitNode(MACRO_NAME))
             if (!password) {
                 SystemClock.sleep(300)
                 shell("input keyevent 4") // Reveal the password field below Chrome's resized viewport.
@@ -550,8 +540,6 @@ class ImePopupInstrumentedTest {
 
     companion object {
         private const val TEMPLATE = "popup-qa@example.invalid"
-        private const val MACRO_NAME = "IME Popup QA Macro"
-        private const val MACRO_TEXT = "popup-qa-macro"
         private val instrumentation get() = InstrumentationRegistry.getInstrumentation()
         private val prefs get() = PreferenceManager.getDefaultSharedPreferences(instrumentation.targetContext)
         private lateinit var database: AppDatabase
@@ -561,7 +549,6 @@ class ImePopupInstrumentedTest {
         private var targetIme = ""
         private lateinit var oldShortcuts: List<ShortcutItem>
         private lateinit var originalNgWordIds: Set<Int>
-        private var macroId = 0L
         private var originalAutoRotation = ""
         private var originalRotation = ""
         private var templateId = 0
@@ -603,15 +590,10 @@ class ImePopupInstrumentedTest {
             runBlocking {
                 originalNgWordIds = database.ngWordDao().getAll().map { it.id }.toSet()
                 oldShortcuts = database.shortcutDao().getAllShortcuts()
-                database.shortcutDao().replaceAll(listOf("template", "select_date", "text_macro", "keyboard_picker", "floating_user_dictionary")
+                database.shortcutDao().replaceAll(listOf("template", "select_date", "keyboard_picker", "floating_user_dictionary")
                     .mapIndexed { index, type -> ShortcutItem(typeId = type, sortOrder = index) })
                 database.userTemplateDao().insert(UserTemplate(word = TEMPLATE, reading = "てすと", posIndex = 0, posScore = 0))
                 templateId = database.userTemplateDao().searchByReadingExactSuspend("てすと", 100).single { it.word == TEMPLATE }.id
-                // Recover our reserved record after an interrupted instrumentation process.
-                val existingMacro = database.textMacroDao().getByName(MACRO_NAME)
-                check(existingMacro == null || existingMacro.body == MACRO_TEXT)
-                macroId = existingMacro?.id
-                    ?: database.textMacroDao().insert(TextMacro(name = MACRO_NAME, body = MACRO_TEXT))
             }
             targetIme = "${instrumentation.targetContext.packageName}/com.kazumaproject.markdownhelperkeyboard.ime_service.IMEService"
             wasEnabled = shell("ime list -s").lines().any { it == targetIme }
@@ -630,7 +612,6 @@ class ImePopupInstrumentedTest {
             else if (originalHardware.isNotEmpty()) shell("settings put secure show_ime_with_hard_keyboard $originalHardware")
             if (::database.isInitialized) runBlocking {
                 database.userTemplateDao().delete(templateId)
-                database.textMacroDao().deleteById(macroId)
                 if (::oldShortcuts.isInitialized) database.shortcutDao().replaceAll(oldShortcuts)
                 if (::originalNgWordIds.isInitialized) {
                     // Editing can insert text anywhere in the fixture word, so a prefix check

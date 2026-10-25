@@ -16,7 +16,6 @@ data class CandidateStripInputState(
     val symbolKeyboardShown: Boolean,
     val customLayoutPickerShown: Boolean,
     val customLayouts: List<CustomKeyboardLayout>,
-    val selectionActionsShown: Boolean,
     val editorTextSelected: Boolean,
     val clipboardPreviewEnabled: Boolean,
     val clipboardPreviewDescriptionShown: Boolean,

@@ -233,7 +233,6 @@ fun ShortcutType.summary(context: android.content.Context): String =
         ShortcutType.SETTINGS -> context.getString(R.string.shortcut_toolbar_summary_settings)
         ShortcutType.EMOJI -> context.getString(R.string.shortcut_toolbar_summary_emoji)
         ShortcutType.TEMPLATE -> context.getString(R.string.shortcut_toolbar_summary_template)
-        ShortcutType.TEXT_MACRO -> context.getString(R.string.shortcut_toolbar_summary_text_macro)
         ShortcutType.KEYBOARD_PICKER -> context.getString(R.string.shortcut_toolbar_summary_keyboard_picker)
         ShortcutType.KEYBOARD_LAYOUT_EDIT -> context.getString(R.string.shortcut_toolbar_summary_keyboard_layout_edit)
         ShortcutType.INPUT_BEHAVIOR_TOGGLE -> context.getString(R.string.shortcut_toolbar_summary_input_behavior_toggle)

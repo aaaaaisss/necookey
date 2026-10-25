@@ -10,11 +10,6 @@ sealed interface CandidateStripContent {
         val candidates: List<Candidate>,
     ) : CandidateStripContent
 
-    /** Explicit actions for selected text: local macros first, then translation and prompts. */
-    data class SelectionActions(
-        val actions: List<Candidate>,
-        val showShortcutEntry: Boolean,
-    ) : CandidateStripContent
 
     data class ZeroQuerySuggestions(
         val candidates: List<Candidate>,

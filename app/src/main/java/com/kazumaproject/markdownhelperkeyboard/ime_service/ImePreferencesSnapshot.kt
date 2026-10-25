@@ -58,7 +58,6 @@ data class ImePreferencesSnapshot(
     val showLearnedCandidatesInIncognitoPreference: Boolean,
     val isUserDictionaryEnable: Boolean,
     val isUserTemplateEnable: Boolean,
-    val isTextMacroCandidateEnable: Boolean,
     val systemNgramDictionaryEnabled: Boolean,
     val showDictionaryCandidateLabels: Boolean,
     val suppressHentaiganaCandidates: Boolean,
@@ -329,7 +328,6 @@ data class ImePreferencesSnapshot(
                     appPreference.show_learned_candidates_in_incognito_preference,
                 isUserDictionaryEnable = appPreference.user_dictionary_preference ?: true,
                 isUserTemplateEnable = appPreference.user_template_preference ?: true,
-                isTextMacroCandidateEnable = appPreference.text_macro_candidate_preference,
                 systemNgramDictionaryEnabled =
                     appPreference.system_ngram_dictionary_enable_preference,
                 showDictionaryCandidateLabels =

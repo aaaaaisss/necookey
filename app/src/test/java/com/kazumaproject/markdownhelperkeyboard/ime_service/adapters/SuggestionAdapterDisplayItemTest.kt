@@ -5,7 +5,6 @@ import android.graphics.drawable.ColorDrawable
 import android.view.View
 import com.kazumaproject.markdownhelperkeyboard.converter.candidate.Candidate
 import com.kazumaproject.markdownhelperkeyboard.custom_keyboard.data.CustomKeyboardLayout
-import com.kazumaproject.markdownhelperkeyboard.converter.candidate.CANDIDATE_TYPE_TEXT_MACRO
 import com.kazumaproject.markdownhelperkeyboard.ime_service.candidate.CandidateStripContent
 import com.kazumaproject.markdownhelperkeyboard.ime_service.candidate.ClipboardPreviewState
 import com.kazumaproject.markdownhelperkeyboard.ime_service.candidate.QuickActionsState
@@ -312,79 +311,6 @@ class SuggestionAdapterDisplayItemTest {
     }
 
     @Test
-    fun integratedOffSelectionActionsDoNotShowShortcutEntry() {
-        val adapter = SuggestionAdapter()
-        adapter.submitContent(
-            CandidateStripContent.SelectionActions(
-                actions = selectionActions(),
-                showShortcutEntry = false
-            )
-        )
-
-        assertEquals(
-            listOf(
-                SuggestionAdapter.SuggestionDisplayItemKind.SelectionActionItem,
-                SuggestionAdapter.SuggestionDisplayItemKind.SelectionActionItem,
-            ),
-            adapter.buildDisplayItemKindsForTesting()
-        )
-        adapter.release()
-    }
-
-    @Test
-    fun integratedOnSelectionActionsShowShortcutEntry() {
-        val adapter = SuggestionAdapter()
-        adapter.submitContent(
-            CandidateStripContent.SelectionActions(
-                actions = selectionActions(),
-                showShortcutEntry = true
-            )
-        )
-
-        assertEquals(
-            listOf(
-                SuggestionAdapter.SuggestionDisplayItemKind.ShortcutEntryItem,
-                SuggestionAdapter.SuggestionDisplayItemKind.SelectionActionItem,
-                SuggestionAdapter.SuggestionDisplayItemKind.SelectionActionItem,
-            ),
-            adapter.buildDisplayItemKindsForTesting()
-        )
-        adapter.release()
-    }
-
-    @Test
-    fun expandedShortcutEntryReplacesSelectionActionsWithShortcutItems() {
-        val adapter = SuggestionAdapter()
-        adapter.submitContent(CandidateStripContent.ExpandedShortcutEntry(shortcuts()))
-
-        assertEquals(
-            listOf(
-                SuggestionAdapter.SuggestionDisplayItemKind.ShortcutEntryItem,
-                SuggestionAdapter.SuggestionDisplayItemKind.ShortcutItem,
-                SuggestionAdapter.SuggestionDisplayItemKind.ShortcutItem,
-            ),
-            adapter.buildDisplayItemKindsForTesting()
-        )
-
-        adapter.submitContent(
-            CandidateStripContent.SelectionActions(
-                actions = selectionActions(),
-                showShortcutEntry = true
-            )
-        )
-
-        assertEquals(
-            listOf(
-                SuggestionAdapter.SuggestionDisplayItemKind.ShortcutEntryItem,
-                SuggestionAdapter.SuggestionDisplayItemKind.SelectionActionItem,
-                SuggestionAdapter.SuggestionDisplayItemKind.SelectionActionItem,
-            ),
-            adapter.buildDisplayItemKindsForTesting()
-        )
-        adapter.release()
-    }
-
-    @Test
     fun normalCandidatesDoNotShowShortcutEntry() {
         val adapter = SuggestionAdapter()
         adapter.submitContent(
@@ -533,18 +459,6 @@ class SuggestionAdapterDisplayItemTest {
             ),
             shortcutItems = shortcuts(),
             showIntegratedShortcuts = false,
-        )
-
-    private fun selectionActions(): List<Candidate> =
-        listOf(
-            candidate(
-                string = "Quote",
-                type = CANDIDATE_TYPE_TEXT_MACRO
-            ),
-            candidate(
-                string = "Bold",
-                type = CANDIDATE_TYPE_TEXT_MACRO
-            )
         )
 
     private fun candidate(
