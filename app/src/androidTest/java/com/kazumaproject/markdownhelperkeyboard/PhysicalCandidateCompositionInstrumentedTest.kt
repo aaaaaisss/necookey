@@ -15,7 +15,6 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import com.kazumaproject.markdownhelperkeyboard.ng_word.database.NgWord
 import com.kazumaproject.markdownhelperkeyboard.ng_word.database.NgWordMatchMode
-import com.kazumaproject.markdownhelperkeyboard.user_template.database.UserTemplate
 import dagger.hilt.android.EntryPointAccessors
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.*
@@ -62,33 +61,6 @@ class PhysicalCandidateCompositionInstrumentedTest {
         awaitText("あしたはとうきょうにいきま")
     }
 
-    @Test fun bunsetsuTemplatesRemainSelectableAndCommitWithSurroundingSegments() {
-        val templates = listOf(
-            UserTemplate(word = "文節テスト定型文Ａ", reading = "とうきょうに", posIndex = 0, posScore = 100),
-            UserTemplate(word = "文節テスト定型文Ｂ", reading = "とうきょうに", posIndex = 0, posScore = 200),
-        )
-        withCandidateFixtures(templates = templates) {
-            withKeyboard(bunsetsu = true) {
-                type("ashitahatoukyouniikimasu")
-                awaitText("あしたはとうきょうにいきます")
-                key(KeyEvent.KEYCODE_SPACE)
-                awaitText("明日は東京に行きます")
-                key(KeyEvent.KEYCODE_DPAD_RIGHT)
-                await { focusedRange() == (3 until 6) }
-                key(KeyEvent.KEYCODE_SPACE)
-                awaitText("明日は文節テスト定型文Ａ行きます")
-                key(KeyEvent.KEYCODE_SPACE)
-                awaitText("明日は文節テスト定型文Ｂ行きます")
-                key(KeyEvent.KEYCODE_DPAD_RIGHT)
-                key(KeyEvent.KEYCODE_DPAD_LEFT)
-                assertEquals("明日は文節テスト定型文Ｂ行きます", text())
-                key(KeyEvent.KEYCODE_ENTER)
-                awaitText("明日は文節テスト定型文Ｂ行きます")
-                host.onActivity { assertEquals(-1, BaseInputConnection.getComposingSpanStart(it.editText.text)) }
-            }
-        }
-    }
-
     @Test fun bunsetsuExactNgWordIsExcludedFromUnfocusedSegmentAndCommit() {
         assertExactNgWordExcluded("とうきょうに", "東京に", moveRight = true)
     }
@@ -126,24 +98,15 @@ class PhysicalCandidateCompositionInstrumentedTest {
     }
 
     private fun withCandidateFixtures(
-        templates: List<UserTemplate> = emptyList(),
         ngWord: NgWord? = null,
         block: () -> Unit,
     ) {
         val db = EntryPointAccessors.fromApplication(
             instrumentation.targetContext.applicationContext, BunsetsuTestDatabaseEntryPoint::class.java,
         ).database()
-        val insertedTemplates = mutableListOf<Int>()
         var insertedNgWord: NgWord? = null
         try {
             runBlocking {
-                for (template in templates) {
-                    val existing = db.userTemplateDao().searchByReadingExactSuspend(template.reading, Int.MAX_VALUE)
-                    check(existing.none { it.word == template.word }) { "Fixture already exists" }
-                    db.userTemplateDao().insert(template)
-                    insertedTemplates += db.userTemplateDao().searchByReadingExactSuspend(template.reading, Int.MAX_VALUE)
-                        .single { it.word == template.word }.id
-                }
                 if (ngWord != null) {
                     check(db.ngWordDao().find(ngWord.yomi, ngWord.tango) == null) { "NG fixture already exists" }
                     insertedNgWord = ngWord.copy(id = db.ngWordDao().insert(ngWord).toInt())
@@ -152,7 +115,6 @@ class PhysicalCandidateCompositionInstrumentedTest {
             block()
         } finally {
             runBlocking {
-                insertedTemplates.forEach { db.userTemplateDao().delete(it) }
                 insertedNgWord?.let { db.ngWordDao().delete(it) }
             }
         }
@@ -415,7 +377,6 @@ class PhysicalCandidateCompositionInstrumentedTest {
             "conversion_bunsetsu_cursor_move_preference" to bunsetsu,
             "candidate_order_override_enable_preference" to candidateOrdering,
             "learn_dictionary_preference" to false,
-            "user_template_preference" to true,
             "ng_word_enable_preference" to true,
             "physical_keyboard_input_mode_preference" to if (kana) "kana" else "romaji",
             "live_conversion_preference" to false,

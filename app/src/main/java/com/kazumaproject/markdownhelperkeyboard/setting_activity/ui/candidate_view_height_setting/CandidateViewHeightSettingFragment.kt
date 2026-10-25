@@ -790,7 +790,6 @@ class CandidateViewHeightSettingFragment : Fragment() {
         listOf(
             ShortcutType.SETTINGS,
             ShortcutType.EMOJI,
-            ShortcutType.TEMPLATE,
             ShortcutType.KEYBOARD_PICKER,
             ShortcutType.PASTE
         )

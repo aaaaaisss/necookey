@@ -19,7 +19,6 @@ class ShortcutRepository @Inject constructor(
     val defaultShortcuts = listOf(
         ShortcutType.SETTINGS,
         ShortcutType.EMOJI,
-        ShortcutType.TEMPLATE,
         ShortcutType.COPY,
         ShortcutType.PASTE,
         ShortcutType.KEYBOARD_PICKER,

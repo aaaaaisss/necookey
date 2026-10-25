@@ -14,9 +14,7 @@ import android.widget.PopupWindow
 import com.kazumaproject.markdownhelperkeyboard.R
 import com.kazumaproject.markdownhelperkeyboard.databinding.MainLayoutBinding
 import com.kazumaproject.markdownhelperkeyboard.ime_service.KeyboardTouchDispatchFrameLayout
-import com.kazumaproject.markdownhelperkeyboard.repository.UserTemplateRepository
 import com.kazumaproject.markdownhelperkeyboard.setting_activity.AppPreference
-import com.kazumaproject.markdownhelperkeyboard.user_template.database.UserTemplate
 import kotlinx.coroutines.*
 import kotlinx.coroutines.test.*
 import org.junit.After
@@ -50,7 +48,6 @@ class ImeSelectionPopupBehaviorTest {
             ClassParameter.from(Context::class.java, activity))
         service.zenzRuntimeClient = mock()
         service.appPreference = mock<AppPreference>()
-        service.userTemplateRepository = mock<UserTemplateRepository>()
         ReflectionHelpers.setField(service, "mainLayoutBinding", binding)
         ReflectionHelpers.setField(service, "isInputViewActive", true)
         doReturn(Dialog(activity)).whenever(service).getWindow()
@@ -99,46 +96,6 @@ class ImeSelectionPopupBehaviorTest {
             ClassParameter.from(Int::class.javaPrimitiveType, KeyEvent.KEYCODE_ENTER))
         assertTrue(consumed)
         assertEquals("background$selected", appEditor.text.toString())
-        assertNull(popup)
-        assertFalse(ReflectionHelpers.getField<Boolean>(service, "onKeyboardSwitchLongPressUp"))
-    }
-
-    @Test fun lateTemplateResultCannotReplaceNewerDateMenu() = runTest {
-        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
-        ReflectionHelpers.getField<CoroutineScope>(service, "ioScope").cancel()
-        ReflectionHelpers.setField(service, "ioScope", CoroutineScope(SupervisorJob() + StandardTestDispatcher(testScheduler)))
-        whenever(service.userTemplateRepository.allTemplatesSuspend()).thenReturn(
-            listOf(UserTemplate(word = "late result", reading = "late", posIndex = 0, posScore = 0)))
-        call("showUserTemplateListPopup")
-        call("showCurrentDateListPopup")
-        val newer = requireNotNull(popup)
-        advanceUntilIdle()
-        assertSame(newer, popup)
-        assertTrue(newer.isShowing)
-    }
-
-    @Test fun templateResultIsDiscardedAfterConnectionChangesEvenWithinSameApp() = runTest {
-        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
-        ReflectionHelpers.getField<CoroutineScope>(service, "ioScope").cancel()
-        ReflectionHelpers.setField(service, "ioScope", CoroutineScope(SupervisorJob() + StandardTestDispatcher(testScheduler)))
-        whenever(service.userTemplateRepository.allTemplatesSuspend()).thenReturn(
-            listOf(UserTemplate(word = "old editor", reading = "old", posIndex = 0, posScore = 0)))
-        call("showUserTemplateListPopup")
-        appConnection = EditText(activity).onCreateInputConnection(android.view.inputmethod.EditorInfo())
-        advanceUntilIdle()
-        assertNull(popup)
-    }
-
-    @Test fun hidingBeforeTemplateReadFinishesPreventsReopening() = runTest {
-        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
-        ReflectionHelpers.getField<CoroutineScope>(service, "ioScope").cancel()
-        ReflectionHelpers.setField(service, "ioScope", CoroutineScope(SupervisorJob() + StandardTestDispatcher(testScheduler)))
-        whenever(service.userTemplateRepository.allTemplatesSuspend()).thenReturn(
-            listOf(UserTemplate(word = "stale", reading = "stale", posIndex = 0, posScore = 0)))
-        call("showUserTemplateListPopup")
-        call("dismissKeyboardSelectionPopups")
-        ReflectionHelpers.setField(service, "isInputViewActive", false)
-        advanceUntilIdle()
         assertNull(popup)
         assertFalse(ReflectionHelpers.getField<Boolean>(service, "onKeyboardSwitchLongPressUp"))
     }
@@ -262,18 +219,6 @@ class ImeSelectionPopupBehaviorTest {
         assertTrue(list.measuredHeight <= 240)
         assertTrue(list.lastVisiblePosition < list.count - 1)
         assertTrue(list.measuredWidth <= 480)
-    }
-
-    @Test fun editorMutationDiscardsPendingTemplateQuery() = runTest {
-        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
-        ReflectionHelpers.getField<CoroutineScope>(service, "ioScope").cancel()
-        ReflectionHelpers.setField(service, "ioScope", CoroutineScope(SupervisorJob() + StandardTestDispatcher(testScheduler)))
-        whenever(service.userTemplateRepository.allTemplatesSuspend()).thenReturn(
-            listOf(UserTemplate(word = "stale", reading = "stale", posIndex = 0, posScore = 0)))
-        call("showUserTemplateListPopup")
-        service.commitText("changed", 1)
-        advanceUntilIdle()
-        assertNull(popup)
     }
 
     @Test fun backClosesOnReleaseWithoutRemovingTheOverlayDuringKeyDown() {

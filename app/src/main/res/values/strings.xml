@@ -90,10 +90,8 @@
     <string name="edit_keyboard">キーボードを編集</string>
     <string name="edit_key">キーを編集</string>
     <string name="open_sorce_title">使用したライブラリ一覧</string>
-    <string name="user_template">定型文</string>
     <string name="user_dictionary_explanation">この画面では、キーボードの予測変換に表示させたい単語を自由に登録できます。\n登録した単語は、その「読み」を設定した文字数以上入力することで、キーボードの変換候補として表示されるようになります。\n\n例：\n単語:「お疲れ様です。」 読み:「おつかれさまです」\n→「おつ」と入力すると「お疲れ様です。」が候補に表示されます。</string>
     <string name="user_dictionary_about_title">ユーザー辞書とは</string>
-    <string name="user_template_explanation"><![CDATA[メールアドレスやコードスニペット、Markdownの表などを短い「読み」で登録できます。キーボードで登録した「読み」を正確に入力すると、変換候補に登録した全文が表示されます。\n\n例:\n- 読み: myemail\n 定型文: my.long.email.address@example.com\n- 読み: html5\n 定型文: <!DOCTYPE html><html>…</html>]]></string>
     <string name="clipboard_history_title">クリップボードの履歴</string>
     <string name="dialog_image_description">dialog_image_description</string>
     <string name="category_title_keyboard">キーボード</string>
@@ -129,7 +127,6 @@
     <string name="learn_dictionary_allow_mixed_symbols_numbers_title">記号・数字を含む日本語を学習</string>
     <string name="learn_dictionary_allow_mixed_symbols_numbers_summary">「令和8年」などを学習します。記号・数字だけの候補は学習しません。</string>
     <string name="category_user_dictionary_title">ユーザー辞書</string>
-    <string name="category_template_title">定型文</string>
 
     <string name="undo_enable_title">元に戻す機能</string>
     <string name="undo_enable_summary">元に戻す機能を無効にする</string>
@@ -199,9 +196,6 @@
     <string name="user_dictionary_summary_off">ユーザー辞書の予測変換を無効化</string>
     <string name="user_dictionary_prefix_match_title">予測変換</string>
 
-    <string name="user_template_title">定型文</string>
-    <string name="user_template_summary_on">定型文を有効化\n登録した単語を変換候補に表示します</string>
-    <string name="user_template_summary_off">定型文を無効化</string>
     <string name="zero_query_suggestion_title">確定後の後続語候補</string>
     <string name="zero_query_suggestion_summary_on">入力が空のとき、文字を確定した直後に後続語候補を表示します</string>
     <string name="zero_query_suggestion_summary_off">文字を確定した直後の後続語候補を表示しません</string>
@@ -253,7 +247,6 @@
     <string name="ng_word_empty_input_message">読みと単語を入力してください。</string>
     <string name="ng_word_already_registered_message">このNGワードは登録済みです。</string>
     <string name="clipboard_fragment_title">クリップボード履歴</string>
-    <string name="user_template_fragment_title">定型文</string>
 
     <string name="setting_fragment_title">設定</string>
     <string name="custom_layout_fragment_title">カスタムキーボード</string>
@@ -322,18 +315,10 @@
     <string name="search_dictionary_hint">検索</string>
     <string name="search_learn_dictionary_hint">学習辞書を検索</string>
     <string name="search_user_dictionary_hint">ユーザー辞書を検索</string>
-    <string name="search_user_template_hint">定型文を検索</string>
     <string name="confirm_to_delete_text"> を削除しますか？この操作は元に戻せません。</string>
-    <string name="user_template_hint_text">定型文 (スニペット)</string>
     <string name="register_string">登録</string>
-    <string name="about_user_template">定型文・スニペット機能とは</string>
-    <string name="registered_all_user_template">登録済み定型文一覧</string>
     <string name="confirm_all_delete_title">全件削除の確認</string>
     <string name="confirm_all_delete_message">登録されているすべての定型文を削除します。この操作は元に戻せません。よろしいですか？</string>
-    <string name="add_template_toast_text">定型文と読みを入力してください</string>
-    <string name="edit_template_title">定型文の編集</string>
-    <string name="deleted_all_templates">すべての定型文を削除しました。</string>
-    <string name="there_is_no_template_to_export">エクスポートする定型文がありません。</string>
     <string name="is_registered_string"> を登録しました。</string>
     <string name="user_dictionary_duplicate_entry">この単語と読みはすでに登録されています。</string>
     <string name="duplicate_item_exists">同じ項目が既に存在します</string>
@@ -687,7 +672,6 @@
     <string name="shortcut_toolbar_available">追加可能なショートカット</string>
     <string name="shortcut_toolbar_summary_settings">アプリの設定を開きます</string>
     <string name="shortcut_toolbar_summary_emoji">絵文字一覧を表示します</string>
-    <string name="shortcut_toolbar_summary_template">定型文を挿入します</string>
     <string name="shortcut_toolbar_summary_keyboard_picker">キーボードを切り替えます</string>
     <string name="shortcut_toolbar_summary_keyboard_layout_edit">キーボードレイアウトを編集します</string>
     <string name="shortcut_toolbar_summary_keyboard_floating_toggle">フローティングモードを切り替えます</string>
@@ -754,7 +738,6 @@
     <string name="keyboard_type_custom">カスタム - ユーザー定義</string>
     <string name="floating_keyboard_hide">キーボードを非表示</string>
     <string name="ime_popup_unavailable">一覧を表示できませんでした。もう一度お試しください。</string>
-    <string name="ime_no_templates_registered">定型文が登録されていません。</string>
     <string name="stabilize_candidate_strip_height_title">変換候補欄の高さを安定させる</string>
     <string name="stabilize_candidate_strip_height_summary">入力・確定時に入力欄の位置が変わりにくくなります。高さの差分は透明にし、背後へのタッチを通します。</string>
     <string name="dictionary_word_registration_category_title">単語の登録</string>

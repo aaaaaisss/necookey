@@ -16,11 +16,6 @@ enum class ShortcutType(
         com.kazumaproject.core.R.drawable.baseline_emoji_emotions_24,
         description = "絵文字"
     ),
-    TEMPLATE(
-        "template",
-        com.kazumaproject.core.R.drawable.book_3_24px,
-        description = "定型文"
-    ),
     KEYBOARD_PICKER(
         "keyboard_picker",
         com.kazumaproject.core.R.drawable.language_24dp,

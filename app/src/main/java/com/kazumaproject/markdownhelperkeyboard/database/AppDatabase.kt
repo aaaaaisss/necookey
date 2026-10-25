@@ -40,8 +40,6 @@ import com.kazumaproject.markdownhelperkeyboard.sumire_special_key.database.Sumi
 import com.kazumaproject.markdownhelperkeyboard.sumire_special_key.database.SumireSpecialKeyPlacementOverrideEntity
 import com.kazumaproject.markdownhelperkeyboard.user_dictionary.database.UserWord
 import com.kazumaproject.markdownhelperkeyboard.user_dictionary.database.UserWordDao
-import com.kazumaproject.markdownhelperkeyboard.user_template.database.UserTemplate
-import com.kazumaproject.markdownhelperkeyboard.user_template.database.UserTemplateDao
 
 @Database(
     entities = [
@@ -55,7 +53,6 @@ import com.kazumaproject.markdownhelperkeyboard.user_template.database.UserTempl
         TwoStepFlickMapping::class,
         LongPressFlickMapping::class,
         TwoStepLongPressMappingEntity::class,
-        UserTemplate::class,
         ClipboardHistoryItem::class,
         RomajiMapEntity::class,
         NgWord::class,
@@ -66,7 +63,7 @@ import com.kazumaproject.markdownhelperkeyboard.user_template.database.UserTempl
         SumireSpecialKeyPlacementOverrideEntity::class,
         NextWordEntity::class,
     ],
-    version = 52,
+    version = 53,
     exportSchema = false
 )
 @TypeConverters(
@@ -82,7 +79,6 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun clickedSymbolDao(): ClickedSymbolDao
     abstract fun userWordDao(): UserWordDao
     abstract fun keyboardLayoutDao(): KeyboardLayoutDao
-    abstract fun userTemplateDao(): UserTemplateDao
     abstract fun clipboardHistoryDao(): ClipboardHistoryDao
     abstract fun romajiMapDao(): RomajiMapDao
     abstract fun ngWordDao(): NgWordDao
@@ -1248,6 +1244,13 @@ abstract class AppDatabase : RoomDatabase() {
         val MIGRATION_51_52 = object : Migration(51, 52) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("DROP TABLE IF EXISTS `text_macro`")
+            }
+        }
+
+        /** necookey: 定型文（user_template）機能の削除に伴い user_template 表を捨てる。 */
+        val MIGRATION_52_53 = object : Migration(52, 53) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("DROP TABLE IF EXISTS `user_template`")
             }
         }
     }

@@ -11,15 +11,10 @@ import com.kazumaproject.markdownhelperkeyboard.learning.model.LearnResult
 import com.kazumaproject.markdownhelperkeyboard.repository.LearnRepository
 import com.kazumaproject.markdownhelperkeyboard.repository.LearnUpdateResult
 import com.kazumaproject.markdownhelperkeyboard.repository.UserDictionaryRepository
-import com.kazumaproject.markdownhelperkeyboard.repository.UserTemplateRepository
 import com.kazumaproject.markdownhelperkeyboard.setting_activity.ui.user_dictionary.UserDictionaryViewModel
 import com.kazumaproject.markdownhelperkeyboard.setting_activity.ui.user_dictionary.UserWordUpdateResult
 import com.kazumaproject.markdownhelperkeyboard.user_dictionary.database.UserWord
 import com.kazumaproject.markdownhelperkeyboard.user_dictionary.database.UserWordDao
-import com.kazumaproject.markdownhelperkeyboard.user_template.database.UserTemplate
-import com.kazumaproject.markdownhelperkeyboard.user_template.database.UserTemplateDao
-import com.kazumaproject.markdownhelperkeyboard.user_template.ui.UserTemplateUpdateResult
-import com.kazumaproject.markdownhelperkeyboard.user_template.ui.UserTemplateViewModel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.runTest
@@ -29,30 +24,6 @@ import org.mockito.kotlin.mock
 import org.mockito.kotlin.whenever
 
 class UserDictionarySafeUpdateTest {
-
-    @Test
-    fun userTemplateUpdateSafely_returnsDuplicateOnlyForDifferentItemWithSameKey() = runTest {
-        val dao = FakeUserTemplateDao(
-            mutableListOf(
-                UserTemplate(id = 1, word = "x", reading = "y", posIndex = 0, posScore = 4000),
-                UserTemplate(id = 2, word = "a", reading = "b", posIndex = 0, posScore = 4000)
-            )
-        )
-        val viewModel = UserTemplateViewModel(
-            UserTemplateRepository(dao),
-            fakeApplication()
-        )
-
-        val duplicateResult = viewModel.updateSafely(
-            UserTemplate(id = 2, word = "x", reading = "y", posIndex = 0, posScore = 4000)
-        )
-        val sameItemResult = viewModel.updateSafely(
-            UserTemplate(id = 1, word = "x", reading = "y", posIndex = 0, posScore = 4000)
-        )
-
-        assertEquals(UserTemplateUpdateResult.Duplicate, duplicateResult)
-        assertEquals(UserTemplateUpdateResult.Updated, sameItemResult)
-    }
 
     @Test
     fun learnUpdateSafely_returnsDuplicateOnlyForDifferentItemWithSameKey() = runTest {
@@ -109,66 +80,6 @@ class UserDictionarySafeUpdateTest {
     }
 }
 
-private class FakeUserTemplateDao(
-    private val templates: MutableList<UserTemplate>
-) : UserTemplateDao {
-    override suspend fun editEntry(entry: UserTemplate): Int {
-        if (templates.none { it.id == entry.id }) return 0
-        update(entry)
-        return 1
-    }
-
-    override suspend fun insertStrict(entry: UserTemplate) {
-        if (templates.any { it.reading == entry.reading && it.word == entry.word }) {
-            throw SQLiteConstraintException("duplicate")
-        }
-        templates.add(entry)
-    }
-
-    override fun getAll(): LiveData<List<UserTemplate>> = MutableLiveData(templates)
-
-    override suspend fun getAllSuspend(): List<UserTemplate> = templates
-
-    override fun searchByReadingExact(reading: String): LiveData<List<UserTemplate>> =
-        MutableLiveData(templates.filter { it.reading == reading })
-
-    override suspend fun searchByReadingExactSuspend(
-        reading: String,
-        limit: Int
-    ): List<UserTemplate> = templates.filter { it.reading == reading }.take(limit)
-
-    override suspend fun existsDuplicateForUpdate(
-        word: String,
-        reading: String,
-        excludeId: Int
-    ): Boolean = templates.any { it.word == word && it.reading == reading && it.id != excludeId }
-
-    override suspend fun insert(userTemplate: UserTemplate) {
-        if (templates.none { it.word == userTemplate.word && it.reading == userTemplate.reading }) {
-            templates.add(userTemplate)
-        }
-    }
-
-    override suspend fun insertAll(templates: List<UserTemplate>) {
-        templates.forEach { insert(it) }
-    }
-
-    override suspend fun update(userTemplate: UserTemplate) {
-        if (existsDuplicateForUpdate(userTemplate.word, userTemplate.reading, userTemplate.id)) {
-            throw SQLiteConstraintException()
-        }
-        val index = templates.indexOfFirst { it.id == userTemplate.id }
-        if (index >= 0) templates[index] = userTemplate
-    }
-
-    override suspend fun delete(id: Int) {
-        templates.removeAll { it.id == id }
-    }
-
-    override suspend fun deleteAll() {
-        templates.clear()
-    }
-}
 
 private class FakeLearnDao(
     private val entries: MutableList<LearnEntity>

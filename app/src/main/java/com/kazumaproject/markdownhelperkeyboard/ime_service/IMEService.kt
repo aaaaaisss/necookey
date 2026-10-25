@@ -203,7 +203,6 @@ import com.kazumaproject.markdownhelperkeyboard.converter.candidate.CANDIDATE_TY
 import com.kazumaproject.markdownhelperkeyboard.converter.candidate.CANDIDATE_TYPE_LEARNED_DICTIONARY
 import com.kazumaproject.markdownhelperkeyboard.converter.candidate.CANDIDATE_TYPE_TIME
 import com.kazumaproject.markdownhelperkeyboard.converter.candidate.CANDIDATE_TYPE_USER_DICTIONARY
-import com.kazumaproject.markdownhelperkeyboard.converter.candidate.CANDIDATE_TYPE_USER_TEMPLATE
 import com.kazumaproject.markdownhelperkeyboard.converter.candidate.Candidate
 import com.kazumaproject.markdownhelperkeyboard.converter.candidate.CandidateConversionSegment
 import com.kazumaproject.markdownhelperkeyboard.converter.candidate.ExactInputCandidatePromotionPolicy
@@ -214,7 +213,6 @@ import com.kazumaproject.markdownhelperkeyboard.ime_service.zenz.ZenzConfidenceD
 import com.kazumaproject.markdownhelperkeyboard.ime_service.zenz.ZenzDiagnosticsStore
 import com.kazumaproject.markdownhelperkeyboard.ime_service.zenz.ZenzSkipReason
 import com.kazumaproject.markdownhelperkeyboard.converter.candidate.buildRomajiCandidates
-import com.kazumaproject.markdownhelperkeyboard.converter.candidate.toUserTemplateCandidates
 import com.kazumaproject.markdownhelperkeyboard.converter.engine.EnglishEngine
 import com.kazumaproject.markdownhelperkeyboard.converter.engine.KanaKanjiEngine
 import com.kazumaproject.markdownhelperkeyboard.converter.engine.PredictionConfig
@@ -308,7 +306,6 @@ import com.kazumaproject.markdownhelperkeyboard.repository.NgWordRepository
 import com.kazumaproject.markdownhelperkeyboard.repository.RomajiMapRepository
 import com.kazumaproject.markdownhelperkeyboard.repository.ShortcutRepository
 import com.kazumaproject.markdownhelperkeyboard.repository.UserDictionaryRepository
-import com.kazumaproject.markdownhelperkeyboard.repository.UserTemplateRepository
 import com.kazumaproject.markdownhelperkeyboard.setting_activity.AppPreference
 import com.kazumaproject.markdownhelperkeyboard.setting_activity.ui.keyboard_selection.getKeyboardDisplayName
 import com.kazumaproject.markdownhelperkeyboard.setting_activity.MainActivity
@@ -497,9 +494,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
 
     @Inject
     lateinit var userDictionaryRepository: UserDictionaryRepository
-
-    @Inject
-    lateinit var userTemplateRepository: UserTemplateRepository
 
 
 
@@ -1681,7 +1675,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
     private var delayTime: Int? = 1000
     private var isLearnDictionaryMode: Boolean? = false
     private var isUserDictionaryEnable: Boolean? = false
-    private var isUserTemplateEnable: Boolean? = false
     private var suppressHentaiganaCandidates: Boolean = false
     private var zeroQuerySuggestionPreference: Boolean = false
     private var hankakuPreference: Boolean? = false
@@ -2869,7 +2862,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         showLearnedCandidatesInIncognitoPreference =
             preferences.showLearnedCandidatesInIncognitoPreference
         isUserDictionaryEnable = preferences.isUserDictionaryEnable
-        isUserTemplateEnable = preferences.isUserTemplateEnable
         SystemNgramRuntime.setEnabled(this, preferences.systemNgramDictionaryEnabled)
         listOfNotNull(suggestionAdapter, suggestionAdapterFull).forEach { adapter ->
             adapter.setShowDictionaryCandidateLabels(preferences.showDictionaryCandidateLabels)
@@ -3657,7 +3649,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         incognitoModeDetectionPreference = true
         showLearnedCandidatesInIncognitoPreference = true
         isUserDictionaryEnable = null
-        isUserTemplateEnable = null
         suppressHentaiganaCandidates = false
         hankakuPreference = null
         customDirectModeSpaceHankakuPreference = true
@@ -6081,31 +6072,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         return Color.argb(a, r, g, b)
     }
 
-
-    private fun showUserTemplateListPopup() {
-        if (inputString.value.isNotEmpty()) return
-        val request = beginKeyboardPopupRequest() ?: return
-        ioScope.launch {
-            try {
-                val templates = userTemplateRepository.allTemplatesSuspend()
-                withContext(Dispatchers.Main) {
-                    if (!isKeyboardPopupRequestCurrent(request)) return@withContext
-                    if (templates.isEmpty()) {
-                        dismissKeyboardSelectionPopups()
-                        showToastMessage(getString(R.string.ime_no_templates_registered))
-                        return@withContext
-                    }
-                    showKeyboardSelectionList(request, templates.map { it.word }, "templates", ImeSelectionPopupPlacement.TOOLBAR_DROPDOWN) { position ->
-                        commitText(templates[position].word, 1)
-                    }
-                }
-            } catch (exception: CancellationException) {
-                throw exception
-            } catch (exception: Exception) {
-                reportKeyboardPopupFailure(request, exception)
-            }
-        }
-    }
 
     private fun showCurrentDateListPopup() {
         if (inputString.value.isNotEmpty()) return
@@ -11700,9 +11666,8 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         } else {
             emptyList()
         }
-        val templateCandidates = getLegacyUserTemplateCandidates(input)
         val ngWords = if (isNgWordEnable == true) ngWordsList.value else emptyList()
-        val candidates = (templateCandidates + result.candidates + romajiCandidates).filter {
+        val candidates = (result.candidates + romajiCandidates).filter {
             it.length.toInt() == input.length &&
                 !NgWordMatcher.matchesAny(input, it.string, ngWords)
         }.withoutHentaiganaCandidatesIfNeeded().distinctBy { it.string }
@@ -13434,10 +13399,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
                 setComposingText("", 0)
             }
 
-            ShortcutType.TEMPLATE -> {
-                showUserTemplateListPopup()
-            }
-
             ShortcutType.KEYBOARD_PICKER -> {
                 showKeyboardPicker()
             }
@@ -14417,8 +14378,7 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         val excludedType = when (candidate.type.toInt()) {
             9, 11, 12, 13, 14, 15, 28, 30,
             CANDIDATE_TYPE_TIME.toInt(),
-            CANDIDATE_TYPE_ERA.toInt(),
-            CANDIDATE_TYPE_USER_TEMPLATE.toInt() -> true
+            CANDIDATE_TYPE_ERA.toInt() -> true
             else -> false
         }
         if (excludedType) return
@@ -14502,8 +14462,7 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
             28,
             30,
             CANDIDATE_TYPE_TIME.toInt(),
-            CANDIDATE_TYPE_ERA.toInt(),
-            CANDIDATE_TYPE_USER_TEMPLATE.toInt() -> {
+            CANDIDATE_TYPE_ERA.toInt() -> {
                 commitAndClearInput(candidate.string)
             }
 
@@ -15958,7 +15917,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
             emptyList()
         }
 
-        val resultFromUserTemplate = getUserTemplateCandidates(insertString)
 
         val suggestionLearnRepository = learnedRepositoryForSuggestion()
         val resultFromLearnDictionary =
@@ -16013,9 +15971,9 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
             val romajiConversionResultList: List<Candidate> = withContext(Dispatchers.Default) {
                 getRomajiCandidates(insertString = insertString)
             }
-            resultFromLearnDictionary + resultFromUserTemplate + resultFromUserDictionary + engineCandidates + romajiConversionResultList
+            resultFromLearnDictionary + resultFromUserDictionary + engineCandidates + romajiConversionResultList
         } else {
-            resultFromLearnDictionary + resultFromUserTemplate + resultFromUserDictionary + engineCandidates
+            resultFromLearnDictionary + resultFromUserDictionary + engineCandidates
         }
 
         val filteredCandidates = result.filter { candidate ->
@@ -16069,12 +16027,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
                 }
             } else {
                 emptyList()
-            }
-        }
-
-        val userTemplateDeferred = async {
-            measureDebugStage("IMEService.getSuggestionList.userTemplate") {
-                getUserTemplateCandidates(insertString)
             }
         }
 
@@ -16133,7 +16085,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         }
         val coreResult = coreResultDeferred.await()
         val resultFromUserDictionary = userDictionaryDeferred.await()
-        val resultFromUserTemplate = userTemplateDeferred.await()
         val resultFromLearnDictionary = learnDictionaryDeferred.await()
         val engineResult = coreResult.bunsetsuResult
         val engineCandidates = coreResult.candidates
@@ -16147,9 +16098,9 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
                         getRomajiCandidates(insertString = insertString)
                     }
                 }
-            resultFromLearnDictionary + resultFromUserTemplate + resultFromUserDictionary + engineCandidates + romajiConversionResultList
+            resultFromLearnDictionary + resultFromUserDictionary + engineCandidates + romajiConversionResultList
         } else {
-            resultFromLearnDictionary + resultFromUserTemplate + resultFromUserDictionary + engineCandidates
+            resultFromLearnDictionary + resultFromUserDictionary + engineCandidates
         }
         val filteredCandidates = measureDebugStage("IMEService.getSuggestionList.ngWordFilterDistinct") {
             result.filter { candidate ->
@@ -16232,7 +16183,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
             emptyList()
         }
 
-        val resultFromUserTemplate = getUserTemplateCandidates(insertString)
 
         val suggestionLearnRepository = learnedRepositoryForSuggestion()
         val resultFromLearnDictionary =
@@ -16276,9 +16226,9 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
             val romajiConversionResultList: List<Candidate> = withContext(Dispatchers.Default) {
                 getRomajiCandidates(insertString = insertString)
             }
-            resultFromLearnDictionary + resultFromUserTemplate + resultFromUserDictionary + engineCandidates + romajiConversionResultList
+            resultFromLearnDictionary + resultFromUserDictionary + engineCandidates + romajiConversionResultList
         } else {
-            resultFromLearnDictionary + resultFromUserTemplate + resultFromUserDictionary + engineCandidates
+            resultFromLearnDictionary + resultFromUserDictionary + engineCandidates
         }
 
         val filteredCandidates = result.filter { candidate ->
@@ -16403,21 +16353,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
     private fun List<Candidate>.withoutHentaiganaCandidatesIfNeeded(): List<Candidate> {
         if (!suppressHentaiganaCandidates) return this
         return filterNot { it.string.containsHentaigana() }
-    }
-
-    private suspend fun getLegacyUserTemplateCandidates(input: String): List<Candidate> {
-        if (isUserTemplateEnable != true) return emptyList()
-        return withContext(Dispatchers.IO) {
-            userTemplateRepository.searchByReading(reading = input, limit = 8)
-                .toUserTemplateCandidates()
-        }
-    }
-
-    private suspend fun getUserTemplateCandidates(insertString: String): List<Candidate> {
-        return withContext(Dispatchers.IO) {
-            val legacyTemplates = getLegacyUserTemplateCandidates(insertString)
-            legacyTemplates
-        }
     }
 
     private fun getRomajiCandidates(insertString: String): List<Candidate> {

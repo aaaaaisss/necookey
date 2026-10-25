@@ -64,6 +64,7 @@ import com.kazumaproject.markdownhelperkeyboard.database.AppDatabase.Companion.M
 import com.kazumaproject.markdownhelperkeyboard.database.AppDatabase.Companion.MIGRATION_49_50
 import com.kazumaproject.markdownhelperkeyboard.database.AppDatabase.Companion.MIGRATION_50_51
 import com.kazumaproject.markdownhelperkeyboard.database.AppDatabase.Companion.MIGRATION_51_52
+import com.kazumaproject.markdownhelperkeyboard.database.AppDatabase.Companion.MIGRATION_52_53
 import com.kazumaproject.markdownhelperkeyboard.database.AppDatabase.Companion.MIGRATION_46_47
 import com.kazumaproject.markdownhelperkeyboard.database.AppDatabase.Companion.MIGRATION_2_3
 import com.kazumaproject.markdownhelperkeyboard.database.AppDatabase.Companion.MIGRATION_3_4
@@ -90,7 +91,6 @@ import com.kazumaproject.markdownhelperkeyboard.short_cut.database.ShortcutDao
 import com.kazumaproject.markdownhelperkeyboard.sumire_special_key.database.SumireSpecialKeyActionOverrideDao
 import com.kazumaproject.markdownhelperkeyboard.sumire_special_key.database.SumireSpecialKeyPlacementOverrideDao
 import com.kazumaproject.markdownhelperkeyboard.user_dictionary.database.UserWordDao
-import com.kazumaproject.markdownhelperkeyboard.user_template.database.UserTemplateDao
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -167,6 +167,7 @@ object AppModule {
             MIGRATION_49_50,
             MIGRATION_50_51,
             MIGRATION_51_52,
+            MIGRATION_52_53,
         )
         .build()
 
@@ -189,10 +190,6 @@ object AppModule {
     @Singleton
     @Provides
     fun provideKeyboardLayoutDao(db: AppDatabase): KeyboardLayoutDao = db.keyboardLayoutDao()
-
-    @Singleton
-    @Provides
-    fun providesUserTemplateDao(db: AppDatabase): UserTemplateDao = db.userTemplateDao()
 
     @Singleton
     @Provides

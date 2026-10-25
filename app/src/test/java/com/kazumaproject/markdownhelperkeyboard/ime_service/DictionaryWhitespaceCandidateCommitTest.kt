@@ -7,7 +7,6 @@ import android.view.inputmethod.BaseInputConnection
 import androidx.test.core.app.ApplicationProvider
 import com.kazumaproject.core.domain.state.InputMode
 import com.kazumaproject.markdownhelperkeyboard.converter.candidate.CANDIDATE_TYPE_USER_DICTIONARY
-import com.kazumaproject.markdownhelperkeyboard.converter.candidate.CANDIDATE_TYPE_USER_TEMPLATE
 import com.kazumaproject.markdownhelperkeyboard.converter.candidate.Candidate
 import org.junit.Assert.assertEquals
 import org.junit.Test
@@ -29,7 +28,7 @@ class DictionaryWhitespaceCandidateCommitTest {
     }
 
     @Test fun userDictionaryAndTemplateCandidatesCommitAllStoredWhitespace() {
-        for (type in listOf(CANDIDATE_TYPE_USER_DICTIONARY, CANDIDATE_TYPE_USER_TEMPLATE)) {
+        for (type in listOf(CANDIDATE_TYPE_USER_DICTIONARY)) {
             for (word in listOf("き ", "　き  ", "き　")) {
                 val editor = Editor()
                 val service = spy(IMEService())

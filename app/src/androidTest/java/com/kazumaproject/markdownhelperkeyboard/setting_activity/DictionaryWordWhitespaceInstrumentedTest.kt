@@ -26,10 +26,7 @@ import java.util.UUID
 @RunWith(AndroidJUnit4::class)
 @SdkSuppress(minSdkVersion = 29)
 class DictionaryWordWhitespaceInstrumentedTest {
-    @Test fun userDictionaryAddsAndEditsWordsAccordingToTheCurrentSetting() = checkScreen(false)
-    @Test fun templatesAddAndEditWordsAccordingToTheCurrentSetting() = checkScreen(true)
-
-    private fun checkScreen(template: Boolean) {
+    @Test fun userDictionaryAddsAndEditsWordsAccordingToTheCurrentSetting() {
         val context = ApplicationProvider.getApplicationContext<Context>()
         val preferences = PreferenceManager.getDefaultSharedPreferences(context)
         val key = AppPreference.PRESERVE_DICTIONARY_WORD_WHITESPACE_KEY
@@ -40,9 +37,7 @@ class DictionaryWordWhitespaceInstrumentedTest {
         ).database()
         val readings = mutableListOf<String>()
         fun rows(reading: String): List<Pair<Int, String>> = runBlocking {
-            if (template) database.userTemplateDao().searchByReadingExactSuspend(reading, 100)
-                .map { it.id to it.word }
-            else database.userWordDao().searchByReadingExactSuspend(reading)
+            database.userWordDao().searchByReadingExactSuspend(reading)
                 .map { it.id to it.word }
         }
         try {
@@ -53,7 +48,7 @@ class DictionaryWordWhitespaceInstrumentedTest {
                         R.id.nav_host_fragment_activity_main,
                     ) as NavHostFragment
                     nav.navController.navigate(
-                        if (template) R.id.userTemplateFragment else R.id.navigation_user_dictionary,
+                        R.id.navigation_user_dictionary,
                     )
                 }
                 InstrumentationRegistry.getInstrumentation().waitForIdleSync()
@@ -84,8 +79,7 @@ class DictionaryWordWhitespaceInstrumentedTest {
                     assertEquals(initialWord, rows(reading).single().second)
                     scenario.onActivity { activity ->
                         activity.findViewById<EditText>(
-                            if (template) R.id.edit_text_search_user_template
-                            else R.id.edit_text_search_user_dictionary,
+                            R.id.edit_text_search_user_dictionary,
                         ).setText(reading)
                     }
                     for (editPreserve in listOf(true, false)) {
@@ -118,8 +112,7 @@ class DictionaryWordWhitespaceInstrumentedTest {
             runBlocking {
                 for (reading in readings) {
                     for ((id, _) in rows(reading)) {
-                        if (template) database.userTemplateDao().delete(id)
-                        else database.userWordDao().delete(id)
+                        database.userWordDao().delete(id)
                     }
                 }
             }

@@ -2,14 +2,12 @@ package com.kazumaproject.markdownhelperkeyboard.ime_service
 
 import com.kazumaproject.markdownhelperkeyboard.converter.candidate.Candidate
 import com.kazumaproject.markdownhelperkeyboard.converter.candidate.CandidateConversionSegment
-import com.kazumaproject.markdownhelperkeyboard.converter.candidate.CANDIDATE_TYPE_USER_TEMPLATE
 import com.kazumaproject.markdownhelperkeyboard.converter.engine.KanaKanjiEngine
 import com.kazumaproject.markdownhelperkeyboard.converter.session.KanaKanjiConversionSession
 import com.kazumaproject.markdownhelperkeyboard.converter.session.KanaKanjiQueryResult
 import com.kazumaproject.markdownhelperkeyboard.ime_service.romaji_kana.RomajiKanaConverter
 import com.kazumaproject.markdownhelperkeyboard.ng_word.database.NgWord
 import com.kazumaproject.markdownhelperkeyboard.ng_word.database.NgWordMatchMode
-import com.kazumaproject.markdownhelperkeyboard.user_template.database.UserTemplate
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExecutorCoroutineDispatcher
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -40,7 +38,6 @@ class BunsetsuRomajiCandidatesTest {
     @Before fun setUp() = runBlocking {
         service.appPreference = mock()
         service.userDictionaryRepository = mock()
-        service.userTemplateRepository = mock()
         ReflectionHelpers.getField<CompletableDeferred<KanaKanjiEngine>>(service, "kanaKanjiEngineReady")
             .complete(mock())
         ReflectionHelpers.setField(service, "kanaKanjiConversionSession", session)
@@ -94,40 +91,6 @@ class BunsetsuRomajiCandidatesTest {
         assertEquals(listOf(school), query().candidates)
     }
 
-    @Test fun templatesRemainSelectableWithoutReplacingSentenceDisplay() = runBlocking {
-        ReflectionHelpers.setField(service, "isUserTemplateEnable", true)
-        whenever(service.userTemplateRepository.searchByReading("がっこう", 8)).thenReturn(listOf(
-            template("学校への連絡です", 200), template("学校を欠席します", 100),
-        ))
-        val candidates = query().candidates
-        assertEquals(listOf("学校を欠席します", "学校への連絡です", "学校"), candidates.map { it.string })
-        assertTrue(candidates.take(2).all { it.type == CANDIDATE_TYPE_USER_TEMPLATE })
-        val loaded = mergeBunsetsuCandidates(
-            BunsetsuSegmentState("がっこう", "学校", hasConvertedDisplay = true), candidates,
-        )
-        assertEquals(listOf("学校", "学校を欠席します", "学校への連絡です"), loaded.candidates.map { it.string })
-        assertEquals("学校", loaded.displayText)
-    }
-
-    @Test fun disabledTemplatesAreNotQueried() = runBlocking {
-        ReflectionHelpers.setField(service, "isUserTemplateEnable", false)
-        assertEquals(listOf(school), query().candidates)
-        verifyNoInteractions(service.userTemplateRepository)
-    }
-
-    @Test fun templatesAreFilteredAndDeduplicatedWithEngineCandidates() = runBlocking {
-        ReflectionHelpers.setField(service, "isUserTemplateEnable", true)
-        ReflectionHelpers.setField(service, "isNgWordEnable", true)
-        whenever(service.userTemplateRepository.searchByReading("がっこう", 8)).thenReturn(listOf(
-            template("学校を欠席します", 100), template("学校", 200),
-        ))
-        ReflectionHelpers.getField<MutableStateFlow<List<NgWord>>>(service, "_ngWordsList").value =
-            listOf(NgWord(yomi = "がっこう", tango = "学校を欠席します", matchMode = NgWordMatchMode.EXACT))
-        val candidates = query().candidates
-        assertEquals(listOf("学校"), candidates.map { it.string })
-        assertEquals(CANDIDATE_TYPE_USER_TEMPLATE, candidates.single().type)
-    }
-
     @Test fun exactNgWordInvalidatesUnfocusedProjectedDisplayBeforeCandidateLoading() {
         ReflectionHelpers.setField(service, "isNgWordEnable", true)
         ReflectionHelpers.getField<MutableStateFlow<List<NgWord>>>(service, "_ngWordsList").value =
@@ -162,10 +125,6 @@ class BunsetsuRomajiCandidatesTest {
             listOf(NgWord(yomi = "いく", tango = "行く", matchMode = NgWordMatchMode.EXACT))
         assertEquals(listOf("学校に", "行く"), projectSchoolSentence().map { it.displayText })
     }
-
-    private fun template(text: String, score: Int) = UserTemplate(
-        word = text, reading = "がっこう", posIndex = 0, posScore = score,
-    )
 
     @Suppress("UNCHECKED_CAST")
     private fun projectSchoolSentence(): List<BunsetsuSegmentState> {
