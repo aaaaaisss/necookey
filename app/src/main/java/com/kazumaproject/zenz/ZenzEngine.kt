@@ -1,39 +1,32 @@
 package com.kazumaproject.zenz
 
+/** necookey: zenz（llama.cpp）ネイティブ実行系は削除済み。旧 API を何もしない実装で残す。 */
+
 object ZenzEngine {
+    fun initModel(modelPath: String) = Unit
 
-    init {
-        // CMake の add_library(zenz SHARED ...) と一致させる
-        System.loadLibrary("zenz")
-    }
-
-    external fun initModel(modelPath: String): Boolean
-    external fun cancelCurrent()
-    external fun closeModel()
-
-    external fun setRuntimeConfig(
+    fun setRuntimeConfig(
         nCtx: Int,
         nThreads: Int
-    )
+    ) = Unit
 
-    external fun generate(
+    fun generate(
         prompt: String,
         maxTokens: Int
-    ): String
+    ): String = ""
 
-    /** jinen-v2: 組み立て済み（NFKC 済み）のプロンプトをそのまま貪欲生成（空白の全角化なし・BOS なし）。 */
-    external fun generateRaw(
+    fun generateRaw(
         prompt: String,
         maxTokens: Int
-    ): String
+    ): String = ""
 
-    external fun generateWithContext(
+    fun generateWithContext(
         leftContext: String,
         input: String,
         maxTokens: Int
-    ): String
+    ): String = ""
 
-    external fun generateWithContextAndConditions(
+    fun generateWithContextAndConditions(
         profile: String,
         topic: String,
         style: String,
@@ -41,9 +34,9 @@ object ZenzEngine {
         leftContext: String,
         input: String,
         maxTokens: Int
-    ): String
+    ): String = ""
 
-    external fun generateWithContextAndConditionsV32(
+    fun generateWithContextAndConditionsV32(
         profile: String,
         topic: String,
         style: String,
@@ -52,9 +45,9 @@ object ZenzEngine {
         rightContext: String,
         input: String,
         maxTokens: Int
-    ): String
+    ): String = ""
 
-    external fun candidateEvaluate(
+    fun candidateEvaluate(
         profile: String?,
         topic: String?,
         style: String?,
@@ -62,9 +55,9 @@ object ZenzEngine {
         leftContext: String?,
         input: String,
         candidate: String
-    ): String
+    ): String = ""
 
-    external fun candidateEvaluateV32(
+    fun candidateEvaluateV32(
         profile: String?,
         topic: String?,
         style: String?,
@@ -73,9 +66,9 @@ object ZenzEngine {
         rightContext: String?,
         input: String,
         candidate: String
-    ): String
+    ): String = ""
 
-    external fun scoreCandidates(
+    fun scoreCandidates(
         profile: String?,
         topic: String?,
         style: String?,
@@ -83,9 +76,9 @@ object ZenzEngine {
         leftContext: String?,
         input: String,
         candidates: Array<String>
-    ): FloatArray
+    ): FloatArray = FloatArray(candidates.size)
 
-    external fun scoreCandidatesV32(
+    fun scoreCandidatesV32(
         profile: String?,
         topic: String?,
         style: String?,
@@ -94,5 +87,5 @@ object ZenzEngine {
         rightContext: String?,
         input: String?,
         candidates: Array<String>
-    ): FloatArray
+    ): FloatArray = FloatArray(candidates.size)
 }

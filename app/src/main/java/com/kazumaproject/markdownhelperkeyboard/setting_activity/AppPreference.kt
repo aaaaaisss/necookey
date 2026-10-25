@@ -3556,20 +3556,16 @@ object AppPreference {
             it.putInt(SUMIRE_LM_ZENZ_MARGIN_PREFERENCE.first, value)
         }
 
+    /** necookey: zenz/jinen は削除済み。保存済みの "zenz"/"jinen" も含め常に "sumire_lm" として扱う。 */
     var zenz_engine_preference: String
-        get() = preferences.getString(
-            ZENZ_ENGINE_PREFERENCE.first,
-            ZENZ_ENGINE_PREFERENCE.second
-        ) ?: ZENZ_ENGINE_PREFERENCE.second
+        get() = ZENZ_ENGINE_PREFERENCE.second
         set(value) = preferences.edit {
             it.putString(ZENZ_ENGINE_PREFERENCE.first, value)
         }
 
+    /** necookey: zenz モデルは読み込まない（常に未設定）。 */
     var zenz_model_uri_preference: String
-        get() = preferences.getString(
-            ZENZ_MODEL_URI_PREFERENCE.first,
-            ZENZ_MODEL_URI_PREFERENCE.second
-        ) ?: ""
+        get() = ""
         set(value) = preferences.edit {
             it.putString(ZENZ_MODEL_URI_PREFERENCE.first, value)
         }

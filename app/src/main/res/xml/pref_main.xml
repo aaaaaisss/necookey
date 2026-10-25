@@ -184,7 +184,7 @@
         </PreferenceCategory>
         <PreferenceCategory
             android:key="zenz_category"
-            android:title="zenz"
+            android:title="SUMIRE-LM"
             app:iconSpaceReserved="false">
             <SwitchPreferenceCompat
                 android:key="necookey_zenz_bunsetsu_gate_preference"
@@ -192,38 +192,11 @@
                 app:defaultValue="true"
                 app:summary="@string/necookey_zenz_bunsetsu_gate_summary"
                 app:iconSpaceReserved="false" />
-            <ListPreference
-                android:key="zenz_engine_preference"
-                android:title="@string/zenz_engine_title"
-                android:defaultValue="sumire_lm"
-                android:entries="@array/zenz_engine_entries"
-                android:entryValues="@array/zenz_engine_values"
-                app:useSimpleSummaryProvider="true"
-                app:iconSpaceReserved="false" />
-            <SeekBarPreference
-                android:defaultValue="50"
-                android:key="sumire_lm_zenz_margin_preference"
-                android:max="300"
-                android:title="@string/sumire_lm_zenz_margin_title"
-                android:summary="@string/sumire_lm_zenz_margin_summary"
-                app:min="0"
-                app:showSeekBarValue="true"
-                app:iconSpaceReserved="false" />
             <SwitchPreferenceCompat
                 android:key="lattice_lm_cost_preference"
                 android:title="@string/lattice_lm_cost_title"
                 app:defaultValue="true"
                 app:summary="@string/lattice_lm_cost_summary"
-                app:iconSpaceReserved="false" />
-            <Preference
-                android:key="zenz_model_select_preference"
-                android:title="@string/zenz_model_source_title"
-                app:summary="@string/zenz_model_source_default"
-                app:iconSpaceReserved="false" />
-            <Preference
-                android:key="zenz_diagnostics_preference"
-                android:title="@string/zenz_diagnostics_title"
-                app:summary="@string/zenz_diagnostics_entry_summary"
                 app:iconSpaceReserved="false" />
         </PreferenceCategory>
         <PreferenceScreen
@@ -316,17 +289,6 @@
                     app:seekBarIncrement="10"
                     app:showSeekBarValue="true"
                     app:summary="@string/omission_search_preference_offset_score_preference_summary"
-                    app:iconSpaceReserved="false" />
-            </PreferenceCategory>
-            <PreferenceCategory
-                android:key="zenz_advanced_category"
-                android:title="zenz"
-                app:iconSpaceReserved="false">
-                <SwitchPreferenceCompat
-                    android:key="enable_zenz_right_context_preference"
-                    android:title="@string/enable_zenz_right_context_preference_title"
-                    app:defaultValue="false"
-                    app:summary="@string/enable_zenz_right_context_preference_summary"
                     app:iconSpaceReserved="false" />
             </PreferenceCategory>
         </PreferenceScreen>

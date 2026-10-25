@@ -68,7 +68,7 @@ android {
     productFlavors {
         full {
             dimension "edition"
-            buildConfigField "boolean", "HAS_ZENZ", "true"
+            buildConfigField "boolean", "HAS_ZENZ", "false"
             buildConfigField "String", "APP_EDITION", "\"full\""
         }
         lite {
@@ -1167,7 +1167,6 @@ dependencies {
     implementation project(':core')
     implementation project(':symbol_keyboard')
     implementation project(':custom_keyboard')
-    fullImplementation project(':zenz')
 
     implementation 'androidx.fragment:fragment-ktx:1.8.8'
     implementation 'androidx.emoji2:emoji2:1.5.0'

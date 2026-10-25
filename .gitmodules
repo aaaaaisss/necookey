@@ -1,3 +1,0 @@
-[submodule "zenz/src/main/cpp/llama.cpp"]
-	path = zenz/src/main/cpp/llama.cpp
-	url = https://github.com/azooKey/llama.cpp.git

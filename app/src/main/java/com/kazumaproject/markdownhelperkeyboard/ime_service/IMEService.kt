@@ -9460,21 +9460,15 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
      * 変換エンジンが jinen-v2（内蔵モデルの自由生成）か。zenz を選んでもモデルを読み込んでいなければ
      * 内蔵モデルは jinen なので jinen として扱う（zenz のプロンプトを jinen に渡さない）。
      */
-    private fun isJinenEngine(): Boolean = when (AppPreference.zenz_engine_preference) {
-        ZENZ_ENGINE_ZENZ -> AppPreference.zenz_model_uri_preference.isBlank()
-        // sumire_lm は内蔵の jinen を使わない（zenz を読み込んでいなければリランカーだけ）。
-        ZENZ_ENGINE_SUMIRE_LM -> false
-        else -> true
-    }
+    /** jinen（内蔵 jinen-v2 の自由生成）は削除済み。 */
+    private fun isJinenEngine(): Boolean = false
 
     /** 変換エンジンが Sumire + SUMIRE-LM リランカー（迷った読みだけ zenz）か。 */
     private fun isSumireLmEngine(): Boolean =
         AppPreference.zenz_engine_preference == ZENZ_ENGINE_SUMIRE_LM
 
     /** zenz 用のプロンプト（評価）を渡せるモデル（読み込んだ zenz）があるか。内蔵モデルは jinen なので対象外。 */
-    private fun isZenzPromptModelLoaded(): Boolean =
-        AppPreference.zenz_engine_preference.let { it == ZENZ_ENGINE_ZENZ || it == ZENZ_ENGINE_SUMIRE_LM } &&
-            AppPreference.zenz_model_uri_preference.isNotBlank()
+    private fun isZenzPromptModelLoaded(): Boolean = false
 
     @Volatile private var latticeLmLoadStarted = false
 
@@ -14918,8 +14912,9 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
     private fun necookeyPredictionRowBudgetDp(): Int =
         if (isNecookeyTwoRowSurfaceAvailable()) NECOOKEY_PREDICTION_ROW_HEIGHT_DP else 0
 
+    /** SUMIRE-LM リランカーの経路（旧 zenz ゲート）。zenz 本体は削除済みで、迷っても zenz には回らない。 */
     private fun necookeyZenzGateEnabled(): Boolean =
-        AppVariantConfig.hasZenz && appPreference.necookey_zenz_bunsetsu_gate_preference
+        appPreference.necookey_zenz_bunsetsu_gate_preference
 
     @Suppress("UNUSED_PARAMETER")
     private fun isNecookeyActionCandidate(candidate: Candidate): Boolean = false

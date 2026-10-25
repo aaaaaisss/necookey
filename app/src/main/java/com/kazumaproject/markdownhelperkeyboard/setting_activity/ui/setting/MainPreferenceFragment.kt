@@ -81,12 +81,6 @@ class MainPreferenceFragment : AsyncPreferenceFragment() {
             }
         }
 
-    private val openModelLauncher =
-        registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri: Uri? ->
-            if (uri == null) return@registerForActivityResult
-            onZenzModelUriSelected(uri)
-        }
-
     override fun onViewCreated(view: android.view.View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
         setDivider(null)
@@ -330,21 +324,6 @@ class MainPreferenceFragment : AsyncPreferenceFragment() {
     // ---- zenz ----
 
     private fun bindZenzSection() {
-        if (!AppVariantConfig.hasZenz) {
-            findPreference<Preference>("zenz_category")?.isVisible = false
-            findPreference<Preference>("zenz_advanced_category")?.isVisible = false
-            // The bunsetsu gate lives in the zenz section but depends on the two-row bar.
-            return
-        }
-        findPreference<Preference>("zenz_diagnostics_preference")?.setOnPreferenceClickListener {
-            navigateSafely(R.id.zenzDiagnosticsFragment)
-            true
-        }
-        findPreference<Preference>("zenz_model_select_preference")?.setOnPreferenceClickListener {
-            showZenzModelSelectDialog()
-            true
-        }
-        updateZenzModelSummary()
         syncZenzBunsetsuGateEnabled()
     }
 
@@ -353,50 +332,6 @@ class MainPreferenceFragment : AsyncPreferenceFragment() {
     private fun syncZenzBunsetsuGateEnabled() {
         findPreference<Preference>("necookey_zenz_bunsetsu_gate_preference")?.isEnabled =
             appPreference.necookey_two_row_candidate_bar_preference
-    }
-
-    private fun showZenzModelSelectDialog() {
-        val items = arrayOf(
-            getString(R.string.zenz_model_source_default),
-            getString(R.string.zenz_model_source_pick),
-        )
-        AlertDialog.Builder(requireContext())
-            .setTitle(R.string.zenz_model_source_title)
-            .setItems(items) { _, which ->
-                when (which) {
-                    0 -> {
-                        AppPreference.zenz_model_uri_preference = ""
-                        updateZenzModelSummary()
-                    }
-
-                    1 -> openModelLauncher.launch(arrayOf("*/*"))
-                }
-            }
-            .setNegativeButton(android.R.string.cancel, null)
-            .show()
-    }
-
-    private fun onZenzModelUriSelected(uri: Uri) {
-        try {
-            requireContext().contentResolver.takePersistableUriPermission(
-                uri,
-                Intent.FLAG_GRANT_READ_URI_PERMISSION,
-            )
-            AppPreference.zenz_model_uri_preference = uri.toString()
-            updateZenzModelSummary()
-        } catch (e: Exception) {
-            Timber.e(e, "Failed to handle selected zenz model uri.")
-        }
-    }
-
-    private fun updateZenzModelSummary() {
-        val pref = findPreference<Preference>("zenz_model_select_preference") ?: return
-        val uriStr = AppPreference.zenz_model_uri_preference
-        pref.summary = if (uriStr.isBlank()) {
-            getString(R.string.zenz_model_source_default)
-        } else {
-            getString(R.string.zenz_model_source_selected, uriStr)
-        }
     }
 
     // ---- 記号・クリップボード ----
