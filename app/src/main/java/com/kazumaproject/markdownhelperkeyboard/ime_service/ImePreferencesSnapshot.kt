@@ -31,26 +31,6 @@ data class ImeKeyboardAppearance(
     val liquidGlassThemePreference: Boolean,
     val liquidGlassBlurRadiousPreference: Int,
     val liquidGlassKeyBlurRadiousPreference: Int,
-    val keyboardTouchEffectTypePreference: String,
-    val keyboardTouchEffectQualityPreference: String,
-    val suminagashiInkEffectPreference: Boolean,
-    val suminagashiInkColorModePreference: String,
-    val suminagashiInkColorPreference: Int,
-    val keyboardTouchEffectColorModePreference: String,
-    val keyboardTouchEffectColorPreference: Int,
-    val keyboardTouchEffectPalettePreference: String,
-    val liquidInkDensityPreference: Int,
-    val auroraInkDensityPreference: Int,
-    val cinematicWaveColorModePreference: String,
-    val cinematicWavePrimaryColorPreference: Int,
-    val cinematicWaveSecondaryColorPreference: Int,
-    val cinematicWaveSecondaryColorAutoPreference: Boolean,
-    val cinematicWaveTypePreference: String,
-    val cinematicWaveOpacityPercentPreference: Int,
-    val cinematicWaveIntensityPercentPreference: Int,
-    val cinematicWaveMotionPreference: String,
-    val cinematicWaveTouchResponsePreference: String,
-    val cinematicWaveQualityPreference: String,
     val customKeyBorderEnablePreference: Boolean,
     val customKeyBorderEnableColor: Int,
     val customComposingTextPreference: Boolean,
@@ -264,26 +244,6 @@ data class ImePreferencesSnapshot(
     val liquidGlassThemePreference get() = appearance.liquidGlassThemePreference
     val liquidGlassBlurRadiousPreference get() = appearance.liquidGlassBlurRadiousPreference
     val liquidGlassKeyBlurRadiousPreference get() = appearance.liquidGlassKeyBlurRadiousPreference
-    val keyboardTouchEffectTypePreference get() = appearance.keyboardTouchEffectTypePreference
-    val keyboardTouchEffectQualityPreference get() = appearance.keyboardTouchEffectQualityPreference
-    val suminagashiInkEffectPreference get() = appearance.suminagashiInkEffectPreference
-    val suminagashiInkColorModePreference get() = appearance.suminagashiInkColorModePreference
-    val suminagashiInkColorPreference get() = appearance.suminagashiInkColorPreference
-    val keyboardTouchEffectColorModePreference get() = appearance.keyboardTouchEffectColorModePreference
-    val keyboardTouchEffectColorPreference get() = appearance.keyboardTouchEffectColorPreference
-    val keyboardTouchEffectPalettePreference get() = appearance.keyboardTouchEffectPalettePreference
-    val liquidInkDensityPreference get() = appearance.liquidInkDensityPreference
-    val auroraInkDensityPreference get() = appearance.auroraInkDensityPreference
-    val cinematicWaveColorModePreference get() = appearance.cinematicWaveColorModePreference
-    val cinematicWavePrimaryColorPreference get() = appearance.cinematicWavePrimaryColorPreference
-    val cinematicWaveSecondaryColorPreference get() = appearance.cinematicWaveSecondaryColorPreference
-    val cinematicWaveSecondaryColorAutoPreference get() = appearance.cinematicWaveSecondaryColorAutoPreference
-    val cinematicWaveTypePreference get() = appearance.cinematicWaveTypePreference
-    val cinematicWaveOpacityPercentPreference get() = appearance.cinematicWaveOpacityPercentPreference
-    val cinematicWaveIntensityPercentPreference get() = appearance.cinematicWaveIntensityPercentPreference
-    val cinematicWaveMotionPreference get() = appearance.cinematicWaveMotionPreference
-    val cinematicWaveTouchResponsePreference get() = appearance.cinematicWaveTouchResponsePreference
-    val cinematicWaveQualityPreference get() = appearance.cinematicWaveQualityPreference
     val customKeyBorderEnablePreference get() = appearance.customKeyBorderEnablePreference
     val customKeyBorderEnableColor get() = appearance.customKeyBorderEnableColor
     val customComposingTextPreference get() = appearance.customComposingTextPreference
@@ -311,7 +271,6 @@ data class ImePreferencesSnapshot(
                 customThemeShortcutIconColor = palette.text,
                 liquidGlassThemePreference = false,
                 liquidGlassKeyBlurRadiousPreference = 255,
-                keyboardTouchEffectTypePreference = "none",
                 customKeyBorderEnablePreference = false,
             ),
         )
@@ -670,44 +629,6 @@ data class ImePreferencesSnapshot(
                     liquidGlassThemePreference = appPreference.liquid_glass_preference,
                     liquidGlassBlurRadiousPreference = appPreference.liquid_glass_blur_radius,
                     liquidGlassKeyBlurRadiousPreference = appPreference.liquid_glass_key_alpha,
-                    keyboardTouchEffectTypePreference =
-                        appPreference.keyboard_touch_effect_type_preference,
-                    keyboardTouchEffectQualityPreference =
-                        appPreference.keyboard_touch_effect_quality_preference,
-                    suminagashiInkEffectPreference = appPreference.suminagashi_ink_effect_preference,
-                    suminagashiInkColorModePreference =
-                        appPreference.keyboard_touch_effect_color_mode_preference,
-                    suminagashiInkColorPreference = appPreference.keyboard_touch_effect_color_preference,
-                    keyboardTouchEffectColorModePreference =
-                        appPreference.keyboard_touch_effect_color_mode_preference,
-                    keyboardTouchEffectColorPreference = appPreference.keyboard_touch_effect_color_preference,
-                    keyboardTouchEffectPalettePreference =
-                        appPreference.keyboard_touch_effect_palette_preference,
-                    liquidInkDensityPreference =
-                        appPreference.keyboard_touch_effect_liquid_ink_density_preference,
-                    auroraInkDensityPreference =
-                        appPreference.keyboard_touch_effect_aurora_ink_density_preference,
-                    cinematicWaveColorModePreference =
-                        appPreference.keyboard_touch_effect_cinematic_wave_color_mode_preference,
-                    cinematicWavePrimaryColorPreference =
-                        appPreference.keyboard_touch_effect_cinematic_wave_primary_color_preference,
-                    cinematicWaveSecondaryColorPreference =
-                        appPreference.keyboard_touch_effect_cinematic_wave_secondary_color_preference,
-                    cinematicWaveSecondaryColorAutoPreference =
-                        appPreference
-                            .keyboard_touch_effect_cinematic_wave_secondary_color_auto_preference,
-                    cinematicWaveTypePreference =
-                        appPreference.keyboard_touch_effect_cinematic_wave_type_preference,
-                    cinematicWaveOpacityPercentPreference =
-                        appPreference.keyboard_touch_effect_cinematic_wave_opacity_percent_preference,
-                    cinematicWaveIntensityPercentPreference =
-                        appPreference.keyboard_touch_effect_cinematic_wave_intensity_percent_preference,
-                    cinematicWaveMotionPreference =
-                        appPreference.keyboard_touch_effect_cinematic_wave_motion_preference,
-                    cinematicWaveTouchResponsePreference =
-                        appPreference.keyboard_touch_effect_cinematic_wave_touch_response_preference,
-                    cinematicWaveQualityPreference =
-                        appPreference.keyboard_touch_effect_cinematic_wave_quality_preference,
                     customKeyBorderEnablePreference = appPreference.custom_theme_border_enable,
                     customKeyBorderEnableColor = appPreference.custom_theme_border_color,
                     customComposingTextPreference = appPreference.custom_theme_input_color_enable,

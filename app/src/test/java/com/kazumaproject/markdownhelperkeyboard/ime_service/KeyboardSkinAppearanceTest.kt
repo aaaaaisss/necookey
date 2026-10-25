@@ -46,7 +46,7 @@ class KeyboardSkinAppearanceTest {
             "customThemeCandidateItemPressedBgColor", "customThemeCandidateEmptyPopupBgColor",
             "customThemeCandidateEmptyPopupTextColor", "customThemeShortcutIconColor",
             "liquidGlassThemePreference", "liquidGlassKeyBlurRadiousPreference",
-            "keyboardTouchEffectTypePreference", "customKeyBorderEnablePreference")
+            "customKeyBorderEnablePreference")
         for (id in listOf(KeyboardSkinId.CUPERTINO_LIGHT, KeyboardSkinId.CUPERTINO_DARK,
                 KeyboardSkinId.CUPERTINO_CLASSIC)) {
             AppPreference.keyboardSkin = id

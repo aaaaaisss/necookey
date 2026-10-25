@@ -13,7 +13,7 @@ import android.widget.ListView
 import android.widget.PopupWindow
 import com.kazumaproject.markdownhelperkeyboard.R
 import com.kazumaproject.markdownhelperkeyboard.databinding.MainLayoutBinding
-import com.kazumaproject.markdownhelperkeyboard.ime_service.image_effect.InkTouchDispatchFrameLayout
+import com.kazumaproject.markdownhelperkeyboard.ime_service.KeyboardTouchDispatchFrameLayout
 import com.kazumaproject.markdownhelperkeyboard.repository.UserTemplateRepository
 import com.kazumaproject.markdownhelperkeyboard.setting_activity.AppPreference
 import com.kazumaproject.markdownhelperkeyboard.user_template.database.UserTemplate
@@ -40,7 +40,7 @@ class ImeSelectionPopupBehaviorTest {
     }.setup().get()
     private val appEditor = EditText(activity).apply { setText("background"); setSelection(length()) }
     private var appConnection = appEditor.onCreateInputConnection(android.view.inputmethod.EditorInfo())
-    private val root = InkTouchDispatchFrameLayout(activity)
+    private val root = KeyboardTouchDispatchFrameLayout(activity)
     private val binding = mock<MainLayoutBinding>().apply {
         whenever(getRoot()).thenReturn(this@ImeSelectionPopupBehaviorTest.root)
         ReflectionHelpers.setField(this, "shortcutToolbarRecyclerview", androidx.recyclerview.widget.RecyclerView(activity))

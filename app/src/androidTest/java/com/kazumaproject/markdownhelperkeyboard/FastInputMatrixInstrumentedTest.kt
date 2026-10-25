@@ -431,7 +431,6 @@ class FastInputMatrixInstrumentedTest {
                             .putBoolean("theme_custom_input_color_enable", false)
                             .putString("sumire_keyboard_style_preference", style ?: "default")
                             .putString("sumire_input_method_preference", "switch-mode-effective")
-                            .putString("keyboard_touch_effect_type_preference", "none")
                             .commit()
                     )
                     ensureTargetImeSelected(session)
@@ -699,7 +698,6 @@ class FastInputMatrixInstrumentedTest {
                     check(
                         session.preferences.edit()
                             .putBoolean("flick_editor_preview_preference", enabled)
-                            .putString("keyboard_touch_effect_type_preference", "none")
                             .commit()
                     )
                     val candidateSamplesNs = LongArray(PREVIEW_CANDIDATE_SAMPLES)
@@ -857,7 +855,6 @@ class FastInputMatrixInstrumentedTest {
                         .putBoolean("tenkey_keymap_guide", false)
                         .putBoolean("tenkey_keymap_guide_english", false)
                         .putBoolean("tenkey_keymap_guide_number", true)
-                        .putString("keyboard_touch_effect_type_preference", "none")
                         .commit()
                 ) {
                     "Failed to prepare the TenKey number-guide scenario"
@@ -1111,7 +1108,6 @@ class FastInputMatrixInstrumentedTest {
                         session.preferences.edit()
                             .putBoolean("liquid_glass_preference", true)
                             .putInt("liquid_glass_blur_preference", 220)
-                            .putString("keyboard_touch_effect_type_preference", "none")
                             .commit()
                     )
 
@@ -1347,7 +1343,6 @@ class FastInputMatrixInstrumentedTest {
                         .putBoolean("flick_editor_preview_preference", false)
                         .putString("sumire_keyboard_style_preference", "default")
                         .putString("sumire_input_method_preference", "switch-mode-effective")
-                        .putString("keyboard_touch_effect_type_preference", "none")
                         .commit()
                 )
                 ensureTargetImeSelected(session)

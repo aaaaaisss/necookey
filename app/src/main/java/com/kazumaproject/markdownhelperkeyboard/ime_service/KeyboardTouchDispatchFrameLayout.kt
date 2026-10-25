@@ -1,19 +1,21 @@
-package com.kazumaproject.markdownhelperkeyboard.ime_service.image_effect
+package com.kazumaproject.markdownhelperkeyboard.ime_service
 
 import android.content.Context
 import android.util.AttributeSet
 import android.view.MotionEvent
 import android.view.View
 import android.widget.FrameLayout
-import timber.log.Timber
 
-class InkTouchDispatchFrameLayout @JvmOverloads constructor(
+/**
+ * Root of the IME main layout. Re-routes a DOWN to the keyboard view when the IME window
+ * relayout leaves event coordinates and child bounds in different layout generations.
+ */
+class KeyboardTouchDispatchFrameLayout @JvmOverloads constructor(
     context: Context,
     attrs: AttributeSet? = null,
     defStyleAttr: Int = 0
 ) : FrameLayout(context, attrs, defStyleAttr) {
 
-    private var keyboardTouchEffectMotionEventListener: ((MotionEvent) -> Unit)? = null
     private var fallbackTouchTarget: View? = null
     private val rootLocationOnScreen = IntArray(2)
     private val targetLocationOnScreen = IntArray(2)
@@ -37,29 +39,7 @@ class InkTouchDispatchFrameLayout @JvmOverloads constructor(
      */
     var fallbackTouchTargetProvider: (() -> View?)? = null
 
-    var touchEffectMotionEventListener: ((MotionEvent) -> Unit)?
-        get() = keyboardTouchEffectMotionEventListener
-        set(value) {
-            keyboardTouchEffectMotionEventListener = value
-        }
-
-    var inkMotionEventListener: ((MotionEvent) -> Unit)?
-        get() = keyboardTouchEffectMotionEventListener
-        set(value) {
-            keyboardTouchEffectMotionEventListener = value
-        }
-
-    var suppressTouchEffectMotionEvents: Boolean = false
-
     override fun dispatchTouchEvent(ev: MotionEvent): Boolean {
-        if (!suppressTouchEffectMotionEvents) {
-            runCatching {
-                keyboardTouchEffectMotionEventListener?.invoke(ev)
-            }.onFailure {
-                Timber.w(it, "Keyboard touch effect forwarding failed.")
-            }
-        }
-
         fallbackTouchTarget?.let { target ->
             return dispatchToFallbackTarget(target, ev)
         }

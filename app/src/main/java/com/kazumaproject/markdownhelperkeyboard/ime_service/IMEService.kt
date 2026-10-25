@@ -275,18 +275,6 @@ import com.kazumaproject.markdownhelperkeyboard.ime_service.flick_preview.Compos
 import com.kazumaproject.markdownhelperkeyboard.ime_service.flick_preview.FlickInputPreviewCoordinator
 import com.kazumaproject.markdownhelperkeyboard.ime_service.flick_preview.FlickPreviewContext
 import com.kazumaproject.markdownhelperkeyboard.ime_service.flick_preview.FlickPreviewSource
-import com.kazumaproject.markdownhelperkeyboard.ime_service.image_effect.CinematicWaveEffectView
-import com.kazumaproject.markdownhelperkeyboard.ime_service.image_effect.CinematicWaveSettings
-import com.kazumaproject.markdownhelperkeyboard.ime_service.image_effect.FluidInkTransportMode
-import com.kazumaproject.markdownhelperkeyboard.ime_service.image_effect.InkTouchDispatchFrameLayout
-import com.kazumaproject.markdownhelperkeyboard.ime_service.image_effect.KeyboardTouchEffectQuality
-import com.kazumaproject.markdownhelperkeyboard.ime_service.image_effect.KeyboardTouchEffectType
-import com.kazumaproject.markdownhelperkeyboard.ime_service.image_effect.LiquidRippleEffectView
-import com.kazumaproject.markdownhelperkeyboard.ime_service.image_effect.LuminousBlobEffectView
-import com.kazumaproject.markdownhelperkeyboard.ime_service.image_effect.LuminousBlobSettings
-import com.kazumaproject.markdownhelperkeyboard.ime_service.image_effect.SprayPaintEffectView
-import com.kazumaproject.markdownhelperkeyboard.ime_service.image_effect.SprayPaintSettings
-import com.kazumaproject.markdownhelperkeyboard.ime_service.image_effect.SuminagashiInkView
 import com.kazumaproject.markdownhelperkeyboard.ime_service.input_behavior.DirectCommitHandler
 import com.kazumaproject.markdownhelperkeyboard.ime_service.input_behavior.DirectCommitTransition
 import com.kazumaproject.markdownhelperkeyboard.ime_service.input_behavior.InputBehaviorResolver
@@ -626,8 +614,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
     private var flickGuideMaxCharactersPreference: Int? = 1
 
     private val inkRootLocation = IntArray(2)
-    private val inkTargetLocation = IntArray(2)
-    private val inkMappedPoint = FloatArray(2)
     private var isKeyboardRounded: Boolean? = false
     private var keyboardCornerRadiusDp: Int = 32
     private var keyboardCornerTopLeft: Boolean = true
@@ -1940,36 +1926,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
     private var liquidGlassThemePreference: Boolean? = false
     private var liquidGlassBlurRadiousPreference: Int? = 220
     private var liquidGlassKeyBlurRadiousPreference: Int? = 255
-
-    private var keyboardTouchEffectTypePreference: String = KeyboardTouchEffectType.NONE
-    private var keyboardTouchEffectQualityPreference: String = KeyboardTouchEffectQuality.HIGH
-    private var keyboardTouchEffectColorModePreference: String = "random"
-    private var keyboardTouchEffectPalettePreference: String = SprayPaintSettings.PALETTE_PAINT_SPLASH
-    private var liquidInkDensityPreference: Int = 100
-    private var auroraInkDensityPreference: Int = 100
-
-    @ColorInt
-    private var keyboardTouchEffectColorPreference: Int = Color.rgb(17, 17, 17)
-    private var cinematicWaveColorModePreference: String =
-        CinematicWaveSettings.COLOR_MODE_CINEMATIC_RANDOM
-
-    @ColorInt
-    private var cinematicWavePrimaryColorPreference: Int =
-        CinematicWaveSettings.DEFAULT_PRIMARY_COLOR
-
-    @ColorInt
-    private var cinematicWaveSecondaryColorPreference: Int =
-        CinematicWaveSettings.DEFAULT_SECONDARY_COLOR
-
-    private var cinematicWaveSecondaryColorAutoPreference: Boolean = true
-    private var cinematicWaveTypePreference: String =
-        CinematicWaveSettings.WAVE_TYPE_AURORA_MEMBRANE
-    private var cinematicWaveOpacityPercentPreference: Int = 46
-    private var cinematicWaveIntensityPercentPreference: Int = 100
-    private var cinematicWaveMotionPreference: String = CinematicWaveSettings.MOTION_ELEGANT
-    private var cinematicWaveTouchResponsePreference: String =
-        CinematicWaveSettings.TOUCH_RESPONSE_NORMAL
-    private var cinematicWaveQualityPreference: String = CinematicWaveSettings.QUALITY_BALANCED
 
     private var customKeyBorderEnablePreference: Boolean? = false
     private var customKeyBorderEnableColor: Int? = Color.BLACK
@@ -3287,33 +3243,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         liquidGlassThemePreference = preferences.liquidGlassThemePreference
         liquidGlassBlurRadiousPreference = preferences.liquidGlassBlurRadiousPreference
         liquidGlassKeyBlurRadiousPreference = preferences.liquidGlassKeyBlurRadiousPreference
-        keyboardTouchEffectTypePreference =
-            KeyboardTouchEffectType.normalize(preferences.keyboardTouchEffectTypePreference)
-        keyboardTouchEffectQualityPreference =
-            KeyboardTouchEffectQuality.normalize(preferences.keyboardTouchEffectQualityPreference)
-        keyboardTouchEffectColorModePreference = preferences.keyboardTouchEffectColorModePreference
-        keyboardTouchEffectColorPreference = preferences.keyboardTouchEffectColorPreference
-        keyboardTouchEffectPalettePreference = preferences.keyboardTouchEffectPalettePreference
-        liquidInkDensityPreference = preferences.liquidInkDensityPreference
-        auroraInkDensityPreference = preferences.auroraInkDensityPreference
-        cinematicWaveColorModePreference =
-            CinematicWaveSettings.normalizeColorMode(preferences.cinematicWaveColorModePreference)
-        cinematicWavePrimaryColorPreference = preferences.cinematicWavePrimaryColorPreference
-        cinematicWaveSecondaryColorPreference = preferences.cinematicWaveSecondaryColorPreference
-        cinematicWaveSecondaryColorAutoPreference =
-            preferences.cinematicWaveSecondaryColorAutoPreference
-        cinematicWaveTypePreference =
-            CinematicWaveSettings.normalizeWaveType(preferences.cinematicWaveTypePreference)
-        cinematicWaveOpacityPercentPreference = preferences.cinematicWaveOpacityPercentPreference
-        cinematicWaveIntensityPercentPreference = preferences.cinematicWaveIntensityPercentPreference
-        cinematicWaveMotionPreference =
-            CinematicWaveSettings.normalizeMotion(preferences.cinematicWaveMotionPreference)
-        cinematicWaveTouchResponsePreference =
-            CinematicWaveSettings.normalizeTouchResponse(
-                preferences.cinematicWaveTouchResponsePreference
-            )
-        cinematicWaveQualityPreference =
-            CinematicWaveSettings.normalizeQuality(preferences.cinematicWaveQualityPreference)
         customKeyBorderEnablePreference = preferences.customKeyBorderEnablePreference
         customKeyBorderEnableColor = preferences.customKeyBorderEnableColor
         customComposingTextPreference = preferences.customComposingTextPreference
@@ -3468,476 +3397,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
     ) {
     }
 
-    private fun setupSuminagashiInkEffect(mainView: MainLayoutBinding) {
-        setupKeyboardTouchEffect(mainView)
-    }
-
-    private fun clearAndPauseSuminagashiInkEffects() {
-        clearAndPauseKeyboardTouchEffects()
-    }
-
-    private fun releaseSuminagashiInkEffects() {
-        releaseKeyboardTouchEffects()
-    }
-
-    private fun setupKeyboardTouchEffect(mainView: MainLayoutBinding) {
-        refreshFluidInkDensityPreferences()
-        setupMainKeyboardTouchEffect(mainView)
-    }
-
-    private fun refreshFluidInkDensityPreferences() {
-        liquidInkDensityPreference =
-            appPreference.keyboard_touch_effect_liquid_ink_density_preference
-        auroraInkDensityPreference =
-            appPreference.keyboard_touch_effect_aurora_ink_density_preference
-    }
-
-    private fun resolveFluidInkDensityPercent(effectType: String): Int {
-        return when {
-            KeyboardTouchEffectType.isLiquidInk(effectType) ->
-                liquidInkDensityPreference.coerceIn(50, 300)
-
-            KeyboardTouchEffectType.isAuroraInk(effectType) ->
-                auroraInkDensityPreference.coerceIn(50, 300)
-
-            else -> 100
-        }
-    }
-
-    private fun clearAndPauseKeyboardTouchEffects() {
-        mainLayoutBinding?.suminagashiInkView?.apply {
-            clearInk()
-            pauseInk()
-        }
-        mainLayoutBinding?.liquidRippleEffectView?.apply {
-            clearRipple()
-            pauseRipple()
-        }
-        mainLayoutBinding?.sprayPaintEffectView?.apply {
-            clearSpray()
-            pauseSpray()
-        }
-        mainLayoutBinding?.luminousBlobEffectView?.apply {
-            clearBlob()
-            pauseBlob()
-        }
-        mainLayoutBinding?.cinematicWaveEffectView?.apply {
-            clearWave()
-            pauseWave()
-        }
-    }
-
-    private fun releaseKeyboardTouchEffects() {
-        mainLayoutBinding?.suminagashiInkView?.releaseInk()
-        mainLayoutBinding?.liquidRippleEffectView?.releaseRipple()
-        mainLayoutBinding?.sprayPaintEffectView?.releaseSpray()
-        mainLayoutBinding?.luminousBlobEffectView?.releaseBlob()
-        mainLayoutBinding?.cinematicWaveEffectView?.releaseWave()
-    }
-
-    private fun setupMainKeyboardTouchEffect(mainView: MainLayoutBinding) {
-        val effectType = KeyboardTouchEffectType.normalize(keyboardTouchEffectTypePreference)
-        val mainSurfaceActive = true
-        val liquidInkEnabled =
-            mainSurfaceActive && KeyboardTouchEffectType.isLiquidInk(effectType)
-        val auroraInkEnabled =
-            mainSurfaceActive && KeyboardTouchEffectType.isAuroraInk(effectType)
-        val inkEnabled = liquidInkEnabled || auroraInkEnabled
-        val inkTransportMode = if (auroraInkEnabled) {
-            FluidInkTransportMode.WATER_DRIFT
-        } else {
-            FluidInkTransportMode.PHYSICAL
-        }
-        val inkDensityPercent = resolveFluidInkDensityPercent(effectType)
-        val liquidRippleEnabled =
-            mainSurfaceActive && KeyboardTouchEffectType.isLiquidRipple(effectType)
-        val sprayPaintEnabled =
-            mainSurfaceActive && KeyboardTouchEffectType.isSprayPaint(effectType)
-        val luminousBlobEnabled =
-            mainSurfaceActive && KeyboardTouchEffectType.isLuminousBlob(effectType)
-        val cinematicWaveEnabled =
-            mainSurfaceActive && KeyboardTouchEffectType.isCinematicWave(effectType)
-        val effectBaseColor = resolveKeyboardTouchEffectBaseColor(mainView.root)
-
-        mainView.suminagashiInkView.configure(
-            enabled = inkEnabled,
-            colorMode = keyboardTouchEffectColorModePreference,
-            fixedColor = keyboardTouchEffectColorPreference,
-            quality = keyboardTouchEffectQualityPreference,
-            transportMode = inkTransportMode,
-            densityPercent = inkDensityPercent
-        )
-        mainView.liquidRippleEffectView.configure(
-            enabled = liquidRippleEnabled,
-            quality = keyboardTouchEffectQualityPreference
-        )
-        mainView.sprayPaintEffectView.configure(
-            enabled = sprayPaintEnabled,
-            colorMode = keyboardTouchEffectColorModePreference,
-            fixedColor = keyboardTouchEffectColorPreference,
-            palette = keyboardTouchEffectPalettePreference,
-            quality = keyboardTouchEffectQualityPreference
-        )
-        mainView.luminousBlobEffectView.configure(
-            enabled = luminousBlobEnabled,
-            colorMode = keyboardTouchEffectColorModePreference,
-            fixedColor = effectBaseColor,
-            quality = keyboardTouchEffectQualityPreference
-        )
-        mainView.cinematicWaveEffectView.configure(
-            enabled = cinematicWaveEnabled,
-            colorMode = cinematicWaveColorModePreference,
-            primaryColor = cinematicWavePrimaryColorPreference,
-            secondaryColor = cinematicWaveSecondaryColorPreference,
-            secondaryColorAuto = cinematicWaveSecondaryColorAutoPreference,
-            waveType = cinematicWaveTypePreference,
-            opacityPercent = cinematicWaveOpacityPercentPreference,
-            intensityPercent = cinematicWaveIntensityPercentPreference,
-            motion = cinematicWaveMotionPreference,
-            touchResponse = cinematicWaveTouchResponsePreference,
-            quality = cinematicWaveQualityPreference
-        )
-
-        val root = mainView.root as? InkTouchDispatchFrameLayout
-        root?.touchEffectMotionEventListener = when {
-            inkEnabled -> {
-                { event ->
-                    dispatchInkMotionEvent(
-                        event = event,
-                        sourceRoot = mainView.root,
-                        targetContainer = mainView.keyboardTouchEffectContainer,
-                        inkView = mainView.suminagashiInkView
-                    )
-                }
-            }
-
-            liquidRippleEnabled -> {
-                { event ->
-                    dispatchLiquidRippleMotionEvent(
-                        event = event,
-                        sourceRoot = mainView.root,
-                        targetContainer = mainView.keyboardTouchEffectContainer,
-                        rippleView = mainView.liquidRippleEffectView
-                    )
-                }
-            }
-
-            sprayPaintEnabled -> {
-                { event ->
-                    dispatchSprayPaintMotionEvent(
-                        event = event,
-                        sourceRoot = mainView.root,
-                        targetContainer = mainView.keyboardTouchEffectContainer,
-                        sprayView = mainView.sprayPaintEffectView
-                    )
-                }
-            }
-
-            luminousBlobEnabled -> {
-                { event ->
-                    dispatchLuminousBlobMotionEvent(
-                        event = event,
-                        sourceRoot = mainView.root,
-                        targetContainer = mainView.luminousBlobEffectView,
-                        blobView = mainView.luminousBlobEffectView
-                    )
-                }
-            }
-
-            cinematicWaveEnabled -> {
-                { event ->
-                    dispatchCinematicWaveMotionEvent(
-                        event = event,
-                        sourceRoot = mainView.root,
-                        targetContainer = mainView.keyboardTouchEffectContainer,
-                        waveView = mainView.cinematicWaveEffectView
-                    )
-                }
-            }
-
-            else -> null
-        }
-    }
-
-    @ColorInt
-    private fun resolveKeyboardTouchEffectBaseColor(host: View): Int {
-        if (keyboardTouchEffectColorModePreference != LuminousBlobSettings.COLOR_MODE_THEME) {
-            return keyboardTouchEffectColorPreference
-        }
-        val fallbackColor = LuminousBlobSettings.DEFAULT_BASE_COLOR
-        return when (keyboardThemeMode) {
-            "custom" -> customThemeSpecialKeyColor ?: fallbackColor
-            else -> host.context.getThemeColorOrFallback(
-                attrRes = AppCompatR.attr.colorPrimary,
-                fallbackColor = fallbackColor
-            )
-        }
-    }
-
-    private fun dispatchInkMotionEvent(
-        event: MotionEvent,
-        sourceRoot: View,
-        targetContainer: View,
-        inkView: SuminagashiInkView
-    ) {
-        dispatchTouchEffectMotionEvent(
-            event = event,
-            sourceRoot = sourceRoot,
-            targetContainer = targetContainer,
-            isEffectShown = { inkView.isShown },
-            onPointerDown = { pointerId, x, y ->
-                inkView.onPointerDown(pointerId = pointerId, x = x, y = y)
-            },
-            onPointerMove = { pointerId, x, y ->
-                inkView.onPointerMove(pointerId = pointerId, x = x, y = y)
-            },
-            onPointerUp = { pointerId, x, y ->
-                inkView.onPointerUp(pointerId = pointerId, x = x, y = y)
-            },
-            onPointerUpOutside = { pointerId ->
-                inkView.onPointerUp(pointerId)
-            },
-            onCancel = { inkView.onCancel() }
-        )
-    }
-
-    private fun dispatchLiquidRippleMotionEvent(
-        event: MotionEvent,
-        sourceRoot: View,
-        targetContainer: View,
-        rippleView: LiquidRippleEffectView
-    ) {
-        dispatchTouchEffectMotionEvent(
-            event = event,
-            sourceRoot = sourceRoot,
-            targetContainer = targetContainer,
-            isEffectShown = { rippleView.isShown },
-            onPointerDown = { pointerId, x, y ->
-                rippleView.onPointerDown(pointerId = pointerId, x = x, y = y)
-            },
-            onPointerMove = { pointerId, x, y ->
-                rippleView.onPointerMove(pointerId = pointerId, x = x, y = y)
-            },
-            onPointerUp = { pointerId, x, y ->
-                rippleView.onPointerUp(pointerId = pointerId, x = x, y = y)
-            },
-            onPointerUpOutside = { pointerId ->
-                rippleView.onPointerUp(pointerId)
-            },
-            onCancel = { rippleView.onCancel() }
-        )
-    }
-
-    private fun dispatchSprayPaintMotionEvent(
-        event: MotionEvent,
-        sourceRoot: View,
-        targetContainer: View,
-        sprayView: SprayPaintEffectView
-    ) {
-        dispatchTouchEffectMotionEvent(
-            event = event,
-            sourceRoot = sourceRoot,
-            targetContainer = targetContainer,
-            isEffectShown = { sprayView.isShown },
-            onPointerDown = { pointerId, x, y ->
-                sprayView.onPointerDown(pointerId = pointerId, x = x, y = y)
-            },
-            onPointerMove = { pointerId, x, y ->
-                sprayView.onPointerMove(pointerId = pointerId, x = x, y = y)
-            },
-            onPointerUp = { pointerId, x, y ->
-                sprayView.onPointerUp(pointerId = pointerId, x = x, y = y)
-            },
-            onPointerUpOutside = { pointerId ->
-                sprayView.onPointerUp(pointerId)
-            },
-            onCancel = { sprayView.onCancel() }
-        )
-    }
-
-    private fun dispatchLuminousBlobMotionEvent(
-        event: MotionEvent,
-        sourceRoot: View,
-        targetContainer: View,
-        blobView: LuminousBlobEffectView
-    ) {
-        dispatchTouchEffectMotionEvent(
-            event = event,
-            sourceRoot = sourceRoot,
-            targetContainer = targetContainer,
-            isEffectShown = { blobView.isShown },
-            onPointerDown = { pointerId, x, y ->
-                blobView.onPointerDown(pointerId = pointerId, x = x, y = y)
-            },
-            onPointerMove = { pointerId, x, y ->
-                blobView.onPointerMove(pointerId = pointerId, x = x, y = y)
-            },
-            onPointerUp = { pointerId, x, y ->
-                blobView.onPointerUp(pointerId = pointerId, x = x, y = y)
-            },
-            onPointerUpOutside = { pointerId ->
-                blobView.onPointerUp(pointerId)
-            },
-            onCancel = { blobView.onCancel() }
-        )
-    }
-
-    private fun dispatchCinematicWaveMotionEvent(
-        event: MotionEvent,
-        sourceRoot: View,
-        targetContainer: View,
-        waveView: CinematicWaveEffectView
-    ) {
-        if (!waveView.isShown) return
-
-        when (event.actionMasked) {
-            MotionEvent.ACTION_DOWN,
-            MotionEvent.ACTION_POINTER_DOWN -> {
-                val index = event.actionIndex
-                if (!mapMotionEventToTarget(event, index, sourceRoot, targetContainer, inkMappedPoint)) {
-                    return
-                }
-                waveView.onPointerDown(
-                    pointerId = event.getPointerId(index),
-                    x = inkMappedPoint[0],
-                    y = inkMappedPoint[1],
-                    pressure = event.getPressure(index)
-                )
-            }
-
-            MotionEvent.ACTION_MOVE -> {
-                for (index in 0 until event.pointerCount) {
-                    if (!mapMotionEventToTarget(
-                            event,
-                            index,
-                            sourceRoot,
-                            targetContainer,
-                            inkMappedPoint
-                        )
-                    ) {
-                        continue
-                    }
-                    waveView.onPointerMove(
-                        pointerId = event.getPointerId(index),
-                        x = inkMappedPoint[0],
-                        y = inkMappedPoint[1],
-                        pressure = event.getPressure(index)
-                    )
-                }
-            }
-
-            MotionEvent.ACTION_UP,
-            MotionEvent.ACTION_POINTER_UP -> {
-                val index = event.actionIndex
-                if (mapMotionEventToTarget(event, index, sourceRoot, targetContainer, inkMappedPoint)) {
-                    waveView.onPointerUp(
-                        pointerId = event.getPointerId(index),
-                        x = inkMappedPoint[0],
-                        y = inkMappedPoint[1],
-                        pressure = event.getPressure(index)
-                    )
-                } else {
-                    waveView.onPointerUp(event.getPointerId(index))
-                }
-            }
-
-            MotionEvent.ACTION_CANCEL -> {
-                waveView.onCancel()
-            }
-        }
-    }
-
-    private fun dispatchTouchEffectMotionEvent(
-        event: MotionEvent,
-        sourceRoot: View,
-        targetContainer: View,
-        isEffectShown: () -> Boolean,
-        onPointerDown: (pointerId: Int, x: Float, y: Float) -> Unit,
-        onPointerMove: (pointerId: Int, x: Float, y: Float) -> Unit,
-        onPointerUp: (pointerId: Int, x: Float, y: Float) -> Unit,
-        onPointerUpOutside: (pointerId: Int) -> Unit,
-        onCancel: () -> Unit
-    ) {
-        if (!isEffectShown()) return
-
-        when (event.actionMasked) {
-            MotionEvent.ACTION_DOWN,
-            MotionEvent.ACTION_POINTER_DOWN -> {
-                val index = event.actionIndex
-                if (!mapMotionEventToTarget(event, index, sourceRoot, targetContainer, inkMappedPoint)) {
-                    return
-                }
-                onPointerDown(
-                    event.getPointerId(index),
-                    inkMappedPoint[0],
-                    inkMappedPoint[1]
-                )
-            }
-
-            MotionEvent.ACTION_MOVE -> {
-                for (index in 0 until event.pointerCount) {
-                    if (!mapMotionEventToTarget(
-                            event,
-                            index,
-                            sourceRoot,
-                            targetContainer,
-                            inkMappedPoint
-                        )
-                    ) {
-                        continue
-                    }
-                    onPointerMove(
-                        event.getPointerId(index),
-                        inkMappedPoint[0],
-                        inkMappedPoint[1]
-                    )
-                }
-            }
-
-            MotionEvent.ACTION_UP,
-            MotionEvent.ACTION_POINTER_UP -> {
-                val index = event.actionIndex
-                if (mapMotionEventToTarget(event, index, sourceRoot, targetContainer, inkMappedPoint)) {
-                    onPointerUp(
-                        event.getPointerId(index),
-                        inkMappedPoint[0],
-                        inkMappedPoint[1]
-                    )
-                } else {
-                    onPointerUpOutside(event.getPointerId(index))
-                }
-            }
-
-            MotionEvent.ACTION_CANCEL -> {
-                onCancel()
-            }
-        }
-    }
-
-    private fun mapMotionEventToTarget(
-        event: MotionEvent,
-        pointerIndex: Int,
-        sourceRoot: View,
-        target: View,
-        outPoint: FloatArray
-    ): Boolean {
-        if (target.width <= 0 || target.height <= 0) return false
-
-        sourceRoot.getLocationInWindow(inkRootLocation)
-        target.getLocationInWindow(inkTargetLocation)
-
-        val x = event.getX(pointerIndex) + inkRootLocation[0] - inkTargetLocation[0]
-        val y = event.getY(pointerIndex) + inkRootLocation[1] - inkTargetLocation[1]
-
-        if (x < 0f || y < 0f || x > target.width || y > target.height) {
-            return false
-        }
-
-        outPoint[0] = x
-        outPoint[1] = y
-        return true
-    }
-
     private fun applyInlineSuggestionEnabled(enabled: Boolean) {
         if (inlineSuggestionEnabled == enabled) return
         inlineSuggestionEnabled = enabled
@@ -3979,36 +3438,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         refreshCandidateStripContent()
         mainLayoutBinding?.suggestionRecyclerView?.scrollToPosition(0)
         updateShortcutActiveStates()
-    }
-
-    private fun updateLuminousBlobEffectBounds(
-        blobView: LuminousBlobEffectView,
-        heightPx: Int
-    ) {
-        if (heightPx <= 0) return
-        val currentParams = blobView.layoutParams as? FrameLayout.LayoutParams
-        val params = currentParams ?: FrameLayout.LayoutParams(
-            ViewGroup.LayoutParams.MATCH_PARENT,
-            heightPx,
-            Gravity.BOTTOM
-        )
-        var changed = currentParams == null
-
-        if (params.width != ViewGroup.LayoutParams.MATCH_PARENT) {
-            params.width = ViewGroup.LayoutParams.MATCH_PARENT
-            changed = true
-        }
-        if (params.height != heightPx) {
-            params.height = heightPx
-            changed = true
-        }
-        if (params.gravity != Gravity.BOTTOM) {
-            params.gravity = Gravity.BOTTOM
-            changed = true
-        }
-        if (changed) {
-            blobView.layoutParams = params
-        }
     }
 
     private fun createKeyboardBackgroundDrawable(
@@ -4254,7 +3683,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
             mainView.apply {
                 applyNormalKeyboardChrome(mainView)
                 applyKeyboardBackgroundIfNeeded(mainView)
-                setupSuminagashiInkEffect(mainView)
 
                 suggestionRecyclerView.isVisible = true
                 suggestionVisibility.isVisible = false
@@ -4331,7 +3759,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         disableKeyboardLayoutEditMode()
         persistCurrentCustomKeyboardInputModeIfEnabled()
         isInputViewActive = false
-        clearAndPauseSuminagashiInkEffects()
         stopVoiceInput()
         collapseShortcutEntryExpansion()
         shortcutToolbarHiddenForCandidates = false
@@ -4344,7 +3771,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
             inlineAutofillController?.clear()
         }
         flickInputPreviewCoordinator.cancel(restore = true)
-        clearAndPauseSuminagashiInkEffects()
         super.onWindowHidden()
     }
 
@@ -4388,7 +3814,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         disableKeyboardLayoutEditMode(updateSurface = false)
         collapseShortcutEntryExpansion()
         isInputViewActive = false
-        releaseSuminagashiInkEffects()
         super.onDestroy()
         mainLayoutBinding?.apply {
             keyboardSymbolView.release()
@@ -4599,23 +4024,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         liquidGlassThemePreference = null
         liquidGlassBlurRadiousPreference = null
         liquidGlassKeyBlurRadiousPreference = null
-        keyboardTouchEffectTypePreference = KeyboardTouchEffectType.NONE
-        keyboardTouchEffectQualityPreference = KeyboardTouchEffectQuality.HIGH
-        keyboardTouchEffectColorModePreference = "random"
-        keyboardTouchEffectColorPreference = Color.rgb(17, 17, 17)
-        keyboardTouchEffectPalettePreference = SprayPaintSettings.PALETTE_PAINT_SPLASH
-        liquidInkDensityPreference = 100
-        auroraInkDensityPreference = 100
-        cinematicWaveColorModePreference = CinematicWaveSettings.COLOR_MODE_CINEMATIC_RANDOM
-        cinematicWavePrimaryColorPreference = CinematicWaveSettings.DEFAULT_PRIMARY_COLOR
-        cinematicWaveSecondaryColorPreference = CinematicWaveSettings.DEFAULT_SECONDARY_COLOR
-        cinematicWaveSecondaryColorAutoPreference = true
-        cinematicWaveTypePreference = CinematicWaveSettings.WAVE_TYPE_AURORA_MEMBRANE
-        cinematicWaveOpacityPercentPreference = 46
-        cinematicWaveIntensityPercentPreference = 100
-        cinematicWaveMotionPreference = CinematicWaveSettings.MOTION_ELEGANT
-        cinematicWaveTouchResponsePreference = CinematicWaveSettings.TOUCH_RESPONSE_NORMAL
-        cinematicWaveQualityPreference = CinematicWaveSettings.QUALITY_BALANCED
         customKeyBorderEnablePreference = null
         customKeyBorderEnableColor = null
 
@@ -5269,7 +4677,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
                     mainView.root.outlineProvider = ViewOutlineProvider.BACKGROUND
                     mainView.root.clipToOutline = keyboardSkinId != KeyboardSkinId.DEFAULT || isKeyboardRounded == true
                     applyKeyboardBackgroundIfNeeded(mainView)
-                    setupSuminagashiInkEffect(mainView)
                     ViewCompat.setOnApplyWindowInsetsListener(mainView.root) { _, windowInsets ->
                         val insets = windowInsets.getInsets(WindowInsetsCompat.Type.systemBars())
 
@@ -11836,31 +11243,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         }
     }
 
-    private fun updateNormalKeyboardTouchEffectBounds(
-        mainView: MainLayoutBinding,
-        keyboardBodyHeightPx: Int
-    ) {
-        if (keyboardBodyHeightPx <= 0) return
-
-        val container = mainView.keyboardTouchEffectContainer
-        val params = container.layoutParams as? FrameLayout.LayoutParams ?: return
-        var changed = false
-
-        if (params.height != keyboardBodyHeightPx) {
-            params.height = keyboardBodyHeightPx
-            changed = true
-        }
-
-        if (params.gravity != Gravity.BOTTOM) {
-            params.gravity = Gravity.BOTTOM
-            changed = true
-        }
-
-        if (changed) {
-            container.layoutParams = params
-        }
-    }
-
     private fun updateDockedCandidateContainerHeight(heightPx: Int?, stabilizeInsets: Boolean = false) {
         val container = keyboardContainer ?: return
         dockedCandidateContainerActive = heightPx != null
@@ -11968,14 +11350,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         updateNormalKeyboardBackgroundBounds(
             mainView = mainView,
             heightPx = backgroundSurfaceHeight
-        )
-        updateNormalKeyboardTouchEffectBounds(
-            mainView = mainView,
-            keyboardBodyHeightPx = heightPx
-        )
-        updateLuminousBlobEffectBounds(
-            blobView = mainView.luminousBlobEffectView,
-            heightPx = heightPx
         )
 
         if (
@@ -12133,14 +11507,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         updateNormalKeyboardBackgroundBounds(
             mainView = mainView,
             heightPx = backgroundSurfaceHeight
-        )
-        updateNormalKeyboardTouchEffectBounds(
-            mainView = mainView,
-            keyboardBodyHeightPx = heightPx
-        )
-        updateLuminousBlobEffectBounds(
-            blobView = mainView.luminousBlobEffectView,
-            heightPx = heightPx
         )
 
         // Adjust suggestion view constraints since it's no longer attached to the parent bottom
