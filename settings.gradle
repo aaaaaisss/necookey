@@ -19,8 +19,3 @@ include ':symbol_keyboard'
 include ':core'
 include ':custom_keyboard'
 include ':zenz'
-
-// Opt-in device laboratory; never packaged with the keyboard.
-if (providers.gradleProperty('enterParityLab').isPresent()) {
-    include ':enter-parity-lab'
-}
