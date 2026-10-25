@@ -16,7 +16,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import timber.log.Timber
 
-internal enum class SettingsLoadStage { PREFERENCES, FONT, XML, PACKAGE_INFO, MODELS, DATABASE, SEARCH, KEYBOARD_STATUS }
+internal enum class SettingsLoadStage { PREFERENCES, XML, PACKAGE_INFO, MODELS, DATABASE, SEARCH, KEYBOARD_STATUS }
 
 /** Test gates run at the real work boundary, never on the main thread. */
 internal object SettingsLoadDiagnostics {

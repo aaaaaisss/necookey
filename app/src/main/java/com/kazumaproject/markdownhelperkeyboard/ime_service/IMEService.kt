@@ -235,7 +235,6 @@ import com.kazumaproject.markdownhelperkeyboard.dictionary_override.DictionaryCa
 import com.kazumaproject.markdownhelperkeyboard.dictionary_override.DictionaryCategoryLoadState
 import com.kazumaproject.markdownhelperkeyboard.dictionary_override.DictionaryOverrideStore
 import com.kazumaproject.markdownhelperkeyboard.dictionary_override.DictionarySourceResolver
-import com.kazumaproject.markdownhelperkeyboard.local_font.LocalFontRepository
 import com.kazumaproject.core.ui.font.KeyboardFontApplicator
 import com.kazumaproject.core.ui.font.KeyboardFontGlyphDrawable
 import com.kazumaproject.core.ui.font.KeyboardFontSnapshot
@@ -491,9 +490,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
 
     @Inject
     lateinit var appPreference: AppPreference
-
-    @Inject
-    lateinit var localFontRepository: LocalFontRepository
 
     @Inject
     lateinit var inputMethodManager: InputMethodManager
@@ -756,7 +752,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
     private var kanaKanjiEngineActivationJob: Job? = null
 
     private val scope = CoroutineScope(Dispatchers.Main + SupervisorJob())
-    private val localFontScope = CoroutineScope(Dispatchers.Main.immediate + SupervisorJob())
     private val ioScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     private val horizontalCursorMoveHandler by lazy {
         HorizontalCursorMoveHandler(
@@ -2497,11 +2492,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
 
     override fun onCreate() {
         super.onCreate()
-        localFontScope.launch {
-            runCatching { localFontRepository.loadIfNeeded() }
-                .onFailure { Timber.w(it, "Unable to restore the saved local keyboard font") }
-            localFontRepository.state.collect { state -> applyLocalKeyboardFont(state.snapshot) }
-        }
         window.window?.let { imeWindow ->
             if (supportsNavbarExtension) {
                 WindowCompat.setDecorFitsSystemWindows(imeWindow, false)
@@ -3792,7 +3782,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
     }
 
     override fun onDestroy() {
-        localFontScope.cancel()
         dismissKeyboardSelectionPopups()
         unregisterCrossWindowBlurListener()
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
@@ -4264,9 +4253,7 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
             return false
         }
         return runCatching {
-            applyLocalFontToPopupContent(popupWindow.contentView)
             popupWindow.showAtLocation(anchorView, gravity, x, y)
-            popupWindow.contentView.post { applyLocalFontToPopupContent(popupWindow.contentView) }
             true
         }.onFailure { throwable ->
             Timber.w(throwable, "$source: showAtLocation failed")
@@ -4552,18 +4539,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         }
     }
 
-    private fun applyLocalKeyboardFont(snapshot: KeyboardFontSnapshot) {
-        mainLayoutBinding?.let { binding ->
-            KeyboardFontApplicator.applyToKeyboardViews(binding.customLayoutDefault, snapshot)
-            KeyboardFontApplicator.applyToKeyboardViews(binding.keyboardSymbolView, snapshot)
-            listOfNotNull(suggestionAdapter, suggestionAdapterFull).forEach { it.setKeyboardFont(snapshot) }
-        }
-        shortcutAdapter?.setKeyboardFont(snapshot)
-        listOfNotNull(keyboardSelectionPopupWindow, imeSwitchPopupWindow)
-            .distinct()
-            .forEach { applyLocalFontToPopupContent(it.contentView) }
-    }
-
     private fun setupKeyboardView() {
         Timber.d("setupKeyboardView: Called")
         val isDynamicColorsEnable = DynamicColors.isDynamicColorAvailable()
@@ -4617,7 +4592,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
             }
         }
 
-        applyLocalKeyboardFont(localFontRepository.state.value.snapshot)
 
         keyboardContainer?.let { container ->
             container.removeAllViews()
@@ -5681,7 +5655,7 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         val popupView = layoutInflater.inflate(R.layout.popup_list_layout, request.mainView.root, false)
         val list = popupView.findViewById<ListView>(R.id.popup_listview).apply {
             choiceMode = ListView.CHOICE_MODE_SINGLE
-            adapter = createKeyboardFontArrayAdapter(this@IMEService, R.layout.list_item_layout, items)
+            adapter = ArrayAdapter(this@IMEService, R.layout.list_item_layout, items)
         }
         val reference = when (placement) {
             ImeSelectionPopupPlacement.TOOLBAR_DROPDOWN -> resolveSelectionToolbarAnchor(request.mainView)
@@ -5761,24 +5735,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         imeSwitchPopupWindow = null
         updateKeyboardSelectionPopupBackInvokedCallback(registered = false)
         keyboardSelectionPopupWindow = popupWindow
-        applyLocalFontToPopupContent(popupWindow.contentView)
-    }
-
-    private fun applyLocalFontToPopupContent(root: View) {
-        KeyboardFontApplicator.applyToKeyboardViews(root, KeyboardFontApplicator.processSnapshot)
-    }
-
-    /** ArrayAdapter creates rows lazily, so style each row when ListView/Spinner asks for it. */
-    private fun <T> createKeyboardFontArrayAdapter(
-        context: Context,
-        layout: Int,
-        items: List<T>,
-    ): ArrayAdapter<T> = object : ArrayAdapter<T>(context, layout, items) {
-        override fun getView(position: Int, convertView: View?, parent: ViewGroup): View =
-            super.getView(position, convertView, parent).also(::applyLocalFontToPopupContent)
-
-        override fun getDropDownView(position: Int, convertView: View?, parent: ViewGroup): View =
-            super.getDropDownView(position, convertView, parent).also(::applyLocalFontToPopupContent)
     }
 
     private fun updateKeyboardSelectionPopupBackInvokedCallback(
@@ -6314,7 +6270,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
                         }
                     }
 
-                    applyLocalFontToPopupContent(view)
                     return view
                 }
             }

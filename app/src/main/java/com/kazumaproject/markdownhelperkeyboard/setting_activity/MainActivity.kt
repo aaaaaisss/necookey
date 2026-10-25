@@ -22,7 +22,6 @@ import androidx.navigation.ui.AppBarConfiguration
 import androidx.navigation.ui.setupActionBarWithNavController
 import com.google.android.material.color.DynamicColors
 import com.google.android.material.color.DynamicColorsOptions
-import com.kazumaproject.markdownhelperkeyboard.local_font.LocalFontRepository
 import com.kazumaproject.markdownhelperkeyboard.R
 import com.kazumaproject.markdownhelperkeyboard.databinding.ActivityMainBinding
 import dagger.hilt.android.AndroidEntryPoint
@@ -40,8 +39,6 @@ class MainActivity : AppCompatActivity() {
 
     @Inject
     lateinit var appPreferenceProvider: Provider<AppPreference>
-    @Inject
-    lateinit var localFontRepositoryProvider: Provider<LocalFontRepository>
     private var initializationJob: Job? = null
     private lateinit var initializationUi: SettingsLoadingUi
     private lateinit var contentContainer: FrameLayout
@@ -144,7 +141,6 @@ class MainActivity : AppCompatActivity() {
                         it.awaitInitializationSuspending()
                     }
                 }
-                settingsIo(SettingsLoadStage.FONT) { localFontRepositoryProvider.get().loadIfNeeded() }
                 val initializedWhileStarted = lifecycle.withStarted {
                     initializeSettingsContentIfSafe()
                 }

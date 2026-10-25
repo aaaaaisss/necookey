@@ -5,10 +5,6 @@
             android:name="com.kazumaproject.markdownhelperkeyboard.setting_activity.SettingsBackupTestProvider"
             android:authorities="io.github.aaaaaisss.necookey.settingsbackuptest"
             android:exported="true" />
-        <provider
-            android:name="com.kazumaproject.markdownhelperkeyboard.local_font.LocalFontBlockingTestProvider"
-            android:authorities="io.github.aaaaaisss.necookey.localfonttest"
-            android:exported="true" />
         <activity
             android:name="com.kazumaproject.markdownhelperkeyboard.qa.InlineAutofillLoginActivity"
             android:exported="true"

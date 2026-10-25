@@ -15,7 +15,6 @@ import androidx.preference.SwitchPreferenceCompat
 import com.kazumaproject.markdownhelperkeyboard.R
 import com.kazumaproject.markdownhelperkeyboard.learning.nextword.NextWordEntity
 import com.kazumaproject.markdownhelperkeyboard.learning.nextword.NextWordRepository
-import com.kazumaproject.markdownhelperkeyboard.local_font.LocalFontRepository
 import com.kazumaproject.markdownhelperkeyboard.setting_activity.AppPreference
 import com.kazumaproject.markdownhelperkeyboard.variant.AppVariantConfig
 import dagger.hilt.android.AndroidEntryPoint
@@ -44,16 +43,12 @@ class MainPreferenceFragment : AsyncPreferenceFragment() {
     @Inject
     lateinit var nextWordRepository: NextWordRepository
 
-    @Inject
-    lateinit var localFontRepositoryProvider: javax.inject.Provider<LocalFontRepository>
-
     private lateinit var packageInfo: android.content.pm.PackageInfo
 
     override suspend fun preparePreferenceData(context: android.content.Context) {
         packageInfo = settingsIo(SettingsLoadStage.PACKAGE_INFO) {
             context.packageManager.getPackageInfo(context.packageName, 0)
         }
-        settingsIo(SettingsLoadStage.FONT) { localFontRepositoryProvider.get().loadIfNeeded() }
     }
 
     private val exportLauncher =
@@ -75,8 +70,6 @@ class MainPreferenceFragment : AsyncPreferenceFragment() {
                 try {
                     val json = withContext(Dispatchers.IO) { readTextFromUri(uri) }
                     AppPreference.importAllFromJson(json, replaceAll = true)
-                    // Reset device-local display assets only after the JSON has been applied.
-                    settingsIo(SettingsLoadStage.FONT) { localFontRepositoryProvider.get().restoreStandard() }
                     AppPreference.migrateSumirePreferenceIfNeeded()
                     AppPreference.migratePredictionLookaheadPreferenceIfNeeded()
                     toast(getString(R.string.settings_backup_imported))
