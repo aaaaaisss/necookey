@@ -196,9 +196,6 @@
     <string name="user_dictionary_summary_off">ユーザー辞書の予測変換を無効化</string>
     <string name="user_dictionary_prefix_match_title">予測変換</string>
 
-    <string name="zero_query_suggestion_title">確定後の後続語候補</string>
-    <string name="zero_query_suggestion_summary_on">入力が空のとき、文字を確定した直後に後続語候補を表示します</string>
-    <string name="zero_query_suggestion_summary_off">文字を確定した直後の後続語候補を表示しません</string>
     <string name="candidate_action_close">閉じる</string>
 
     <string name="category_mozc_ut_title">Mozc UT</string>

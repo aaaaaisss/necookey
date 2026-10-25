@@ -176,7 +176,6 @@ class SuggestionAdapter internal constructor(
                 KeyboardFontApplicator.apply(holder.yomiText, keyboardFontSnapshot)
                 KeyboardFontApplicator.apply(holder.typeText, keyboardFontSnapshot)
             }
-            is ZeroQueryViewHolder -> KeyboardFontApplicator.apply(holder.text, keyboardFontSnapshot)
             is ClipboardPreviewViewHolder -> {
                 holder.clipboardPreviewText?.let { KeyboardFontApplicator.apply(it, keyboardFontSnapshot) }
                 holder.clipboardPreviewTextDescription?.let { KeyboardFontApplicator.apply(it, keyboardFontSnapshot) }
@@ -196,8 +195,6 @@ class SuggestionAdapter internal constructor(
         const val VIEW_TYPE_SHORTCUT = 4
         const val VIEW_TYPE_CLIPBOARD_PREVIEW = 5
         const val VIEW_TYPE_SHORTCUT_ENTRY = 6
-        const val VIEW_TYPE_ZERO_QUERY_CLOSE = 7
-        const val VIEW_TYPE_ZERO_QUERY_CANDIDATE = 8
 
         private val diffThreadIndex = AtomicInteger(0)
         private val diffExecutor: Executor = Executors.newFixedThreadPool(2) { runnable ->
@@ -213,8 +210,6 @@ class SuggestionAdapter internal constructor(
 
     internal enum class SuggestionDisplayItemKind {
         CandidateItem,
-        ZeroQueryCloseItem,
-        ZeroQueryCandidateItem,
         QuickActionsItem,
         ClipboardPreviewItem,
         ShortcutEntryItem,
@@ -246,12 +241,7 @@ class SuggestionAdapter internal constructor(
             val candidateIndex: Int,
         ) : SuggestionDisplayItem()
 
-        object ZeroQueryCloseItem : SuggestionDisplayItem()
 
-        data class ZeroQueryCandidateItem(
-            val candidate: Candidate,
-            val candidateIndex: Int,
-        ) : SuggestionDisplayItem()
 
         data class QuickActionsItem(
             val state: QuickActionsState,
@@ -309,8 +299,6 @@ class SuggestionAdapter internal constructor(
     private var onCustomLayoutItemClickListener: ((Int) -> Unit)? = null
     private var onShortcutItemClickListener: ((ShortcutType) -> Unit)? = null
     private var onShortcutEntryClickListener: ((View) -> Unit)? = null
-    private var onZeroQueryCandidateClickListener: ((Candidate) -> Unit)? = null
-    private var onZeroQueryCloseClickListener: (() -> Unit)? = null
     private var onShowSoftKeyboardClick: (() -> Unit)? = null
 
     private val adapterScope = CoroutineScope(Dispatchers.Main + SupervisorJob())
@@ -399,8 +387,6 @@ class SuggestionAdapter internal constructor(
         onItemHelperIconLongClickListener = { a -> source.onItemHelperIconLongClickListener?.invoke(a) }
         onShortcutItemClickListener = { a -> source.onShortcutItemClickListener?.invoke(a) }
         onShortcutEntryClickListener = { a -> source.onShortcutEntryClickListener?.invoke(a) }
-        onZeroQueryCandidateClickListener = { a -> source.onZeroQueryCandidateClickListener?.invoke(a) }
-        onZeroQueryCloseClickListener = { source.onZeroQueryCloseClickListener?.invoke() }
         onShowSoftKeyboardClick = { source.onShowSoftKeyboardClick?.invoke() }
         val content = if (source.currentContent is CandidateStripContent.CustomLayoutPicker)
             CandidateStripContent.Empty else source.currentContent
@@ -436,14 +422,6 @@ class SuggestionAdapter internal constructor(
         this.onShortcutEntryClickListener = listener
     }
 
-    fun setOnZeroQueryCandidateClickListener(listener: (Candidate) -> Unit) {
-        this.onZeroQueryCandidateClickListener = listener
-    }
-
-    fun setOnZeroQueryCloseClickListener(listener: () -> Unit) {
-        this.onZeroQueryCloseClickListener = listener
-    }
-
     fun setOnPhysicalKeyboardListener(listener: () -> Unit) {
         this.onShowSoftKeyboardClick = listener
     }
@@ -457,8 +435,6 @@ class SuggestionAdapter internal constructor(
         onCustomLayoutItemClickListener = null
         onShortcutItemClickListener = null
         onShortcutEntryClickListener = null
-        onZeroQueryCandidateClickListener = null
-        onZeroQueryCloseClickListener = null
         onShowSoftKeyboardClick = null
         onListUpdated = null
         onStartAnchoredContentCommitted = null
@@ -651,12 +627,7 @@ class SuggestionAdapter internal constructor(
                     // of removals and insertions to DiffUtil.
                     oldItem.candidateIndex == newItem.candidateIndex
 
-                oldItem is SuggestionDisplayItem.ZeroQueryCloseItem &&
-                        newItem is SuggestionDisplayItem.ZeroQueryCloseItem -> true
 
-                oldItem is SuggestionDisplayItem.ZeroQueryCandidateItem &&
-                        newItem is SuggestionDisplayItem.ZeroQueryCandidateItem ->
-                    oldItem.candidateIndex == newItem.candidateIndex
 
                 oldItem is SuggestionDisplayItem.QuickActionsItem &&
                         newItem is SuggestionDisplayItem.QuickActionsItem -> true
@@ -807,7 +778,6 @@ class SuggestionAdapter internal constructor(
     private fun buildDisplayItems(): List<SuggestionDisplayItem> {
         return when (val content = currentContent) {
             is CandidateStripContent.Candidates -> buildCandidateItems(content)
-            is CandidateStripContent.ZeroQuerySuggestions -> buildZeroQueryItems(content)
             is CandidateStripContent.CustomLayoutPicker -> buildCustomLayoutItems(content)
             is CandidateStripContent.ExpandedShortcutEntry -> buildExpandedShortcutEntryItems(
                 content
@@ -827,16 +797,6 @@ class SuggestionAdapter internal constructor(
             }
         }
 
-    private fun buildZeroQueryItems(
-        content: CandidateStripContent.ZeroQuerySuggestions
-    ): List<SuggestionDisplayItem> =
-        buildList {
-            add(SuggestionDisplayItem.ZeroQueryCloseItem)
-            content.candidates.forEachIndexed { index, candidate ->
-                add(SuggestionDisplayItem.ZeroQueryCandidateItem(candidate, index))
-            }
-        }
-
     private fun buildCustomLayoutItems(
         content: CandidateStripContent.CustomLayoutPicker
     ): List<SuggestionDisplayItem> = buildList {
@@ -849,9 +809,6 @@ class SuggestionAdapter internal constructor(
         content: CandidateStripContent.EmptyState
     ): List<SuggestionDisplayItem> =
         buildList {
-            if (content.showZeroQueryToggle) {
-                add(SuggestionDisplayItem.ZeroQueryCloseItem)
-            }
             if (content.showShortcutEntry) {
                 add(SuggestionDisplayItem.ShortcutEntryItem)
             }
@@ -912,16 +869,6 @@ class SuggestionAdapter internal constructor(
         return buildDisplayItems().map { it.kind() }
     }
 
-    internal fun buildZeroQueryDisplayTextsForTesting(): List<String> {
-        return buildDisplayItems().mapNotNull { item ->
-            when (item) {
-                SuggestionDisplayItem.ZeroQueryCloseItem -> "[ ... ]"
-                is SuggestionDisplayItem.ZeroQueryCandidateItem -> item.candidate.string
-                else -> null
-            }
-        }
-    }
-
     internal fun buildClickCandidatesForTesting(): List<Candidate> {
         return currentContent.candidatesForClicks()
     }
@@ -980,12 +927,6 @@ class SuggestionAdapter internal constructor(
             is SuggestionDisplayItem.CandidateItem ->
                 SuggestionDisplayItemKind.CandidateItem
 
-            SuggestionDisplayItem.ZeroQueryCloseItem ->
-                SuggestionDisplayItemKind.ZeroQueryCloseItem
-
-            is SuggestionDisplayItem.ZeroQueryCandidateItem ->
-                SuggestionDisplayItemKind.ZeroQueryCandidateItem
-
             is SuggestionDisplayItem.QuickActionsItem ->
                 SuggestionDisplayItemKind.QuickActionsItem
 
@@ -1004,9 +945,7 @@ class SuggestionAdapter internal constructor(
 
     private fun startAnchorSignatureFor(items: List<SuggestionDisplayItem>): StartAnchorSignature? {
         return when (
-            val first = items.firstOrNull {
-                it !is SuggestionDisplayItem.ZeroQueryCloseItem
-            }
+            val first = items.firstOrNull()
         ) {
             is SuggestionDisplayItem.QuickActionsItem ->
                 StartAnchorSignature(
@@ -1035,9 +974,6 @@ class SuggestionAdapter internal constructor(
         val typeText: MaterialTextView = itemView.findViewById(R.id.suggestion_item_type_text_view)
     }
 
-    inner class ZeroQueryViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
-        val text: MaterialTextView = itemView.findViewById(R.id.zero_query_item_text_view)
-    }
 
     inner class QuickActionsViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
         val undoIconParent: ConstraintLayout? = itemView.findViewById(R.id.undo_icon_parent)
@@ -1094,8 +1030,6 @@ class SuggestionAdapter internal constructor(
     private fun viewTypeFor(item: SuggestionDisplayItem): Int {
         return when (item) {
             is SuggestionDisplayItem.CandidateItem -> VIEW_TYPE_SUGGESTION
-            SuggestionDisplayItem.ZeroQueryCloseItem -> VIEW_TYPE_ZERO_QUERY_CLOSE
-            is SuggestionDisplayItem.ZeroQueryCandidateItem -> VIEW_TYPE_ZERO_QUERY_CANDIDATE
             is SuggestionDisplayItem.QuickActionsItem -> VIEW_TYPE_EMPTY
             is SuggestionDisplayItem.ClipboardPreviewItem -> VIEW_TYPE_CLIPBOARD_PREVIEW
             SuggestionDisplayItem.ShortcutEntryItem -> VIEW_TYPE_SHORTCUT_ENTRY
@@ -1149,16 +1083,6 @@ class SuggestionAdapter internal constructor(
                 val customView = LayoutInflater.from(parent.context)
                     .inflate(R.layout.suggestion_custom_layout_item, parent, false)
                 CustomLayoutViewHolder(customView)
-            }
-
-            VIEW_TYPE_ZERO_QUERY_CLOSE,
-            VIEW_TYPE_ZERO_QUERY_CANDIDATE -> {
-                val itemView = LayoutInflater.from(parent.context)
-                    .inflate(R.layout.suggestion_zero_query_item, parent, false)
-                itemView.setBackgroundResource(
-                    if (isDynamicColorEnable) com.kazumaproject.core.R.drawable.recyclerview_item_bg_material else com.kazumaproject.core.R.drawable.recyclerview_item_bg
-                )
-                ZeroQueryViewHolder(itemView)
             }
 
             VIEW_TYPE_SUGGESTION -> {
@@ -1215,15 +1139,6 @@ class SuggestionAdapter internal constructor(
         }
     }
 
-            VIEW_TYPE_ZERO_QUERY_CLOSE -> onBindZeroQueryCloseViewHolder(
-                holder as ZeroQueryViewHolder,
-            )
-
-            VIEW_TYPE_ZERO_QUERY_CANDIDATE -> onBindZeroQueryCandidateViewHolder(
-                holder as ZeroQueryViewHolder,
-                item as SuggestionDisplayItem.ZeroQueryCandidateItem,
-            )
-
             VIEW_TYPE_SHORTCUT -> onBindShortcutViewHolder(
                 holder as ShortcutViewHolder,
                 item as SuggestionDisplayItem.ShortcutItem,
@@ -1268,10 +1183,9 @@ class SuggestionAdapter internal constructor(
             root.background = null
             return
         }
-        val selected = position == 0 && (holder is SuggestionViewHolder || holder is ZeroQueryViewHolder)
+        val selected = position == 0 && holder is SuggestionViewHolder
         val candidateText = when (holder) {
             is SuggestionViewHolder -> holder.text
-            is ZeroQueryViewHolder -> holder.text
             else -> null
         }
         if (candidateText != null) {
@@ -1447,8 +1361,7 @@ class SuggestionAdapter internal constructor(
 
     private fun CandidateStripContent.EmptyState.shouldCenterClipboardPreview(): Boolean {
         return !quickActions.hasAnyAction &&
-                !showIntegratedShortcuts &&
-                !showZeroQueryToggle
+                !showIntegratedShortcuts
     }
 
     private fun CandidateStripContent.EmptyState.shouldOffsetCenteredClipboardPreview(): Boolean {
@@ -1456,7 +1369,7 @@ class SuggestionAdapter internal constructor(
     }
 
     private fun CandidateStripContent.EmptyState.shouldAddClipboardPreviewStartMargin(): Boolean {
-        return !shouldCenterClipboardPreview() && (quickActions.hasAnyAction || showZeroQueryToggle)
+        return !shouldCenterClipboardPreview() && quickActions.hasAnyAction
     }
 
     private fun View.updateClipboardPreviewLayout(
@@ -1849,67 +1762,6 @@ class SuggestionAdapter internal constructor(
         holder.itemView.setOnLongClickListener {
             onItemLongClickListener?.invoke(suggestion, position)
             true
-        }
-    }
-
-    private fun onBindZeroQueryCloseViewHolder(
-        holder: ZeroQueryViewHolder,
-    ) {
-        applyCandidateItemBackground(holder.itemView)
-        holder.text.text = "[ ... ]"
-        holder.text.textSize = candidateTextSize
-        candidateTextColor?.let { color ->
-            holder.text.setTextColor(color)
-        }
-        holder.itemView.isPressed = false
-        holder.itemView.setOnClickListener {
-            onZeroQueryCloseClickListener?.invoke()
-        }
-        holder.itemView.setOnLongClickListener {
-            true
-        }
-    }
-
-    private fun onBindZeroQueryCandidateViewHolder(
-        holder: ZeroQueryViewHolder,
-        item: SuggestionDisplayItem.ZeroQueryCandidateItem,
-    ) {
-        applyCandidateItemBackground(holder.itemView)
-        holder.text.text = formatZeroQueryCandidateText(
-            suggestion = item.candidate,
-            position = item.candidateIndex,
-        )
-        holder.text.textSize = candidateTextSize
-        candidateTextColor?.let { color ->
-            holder.text.setTextColor(color)
-        }
-        holder.itemView.isPressed = false
-        holder.itemView.setOnClickListener {
-            onZeroQueryCandidateClickListener?.invoke(item.candidate)
-        }
-        holder.itemView.setOnLongClickListener {
-            true
-        }
-    }
-
-    private fun formatZeroQueryCandidateText(
-        suggestion: Candidate,
-        position: Int,
-    ): CharSequence {
-        val paddingLength = if (floatingPanelWidth > 0) 0 else when {
-            position == 0 -> 4
-            suggestion.string.length == 1 -> 4
-            suggestion.string.length == 2 -> 2
-            else -> 1
-        }
-        return if (suggestion.type == (15).toByte()) {
-            val readingCorrectionString = suggestion.string.correctReading()
-            readingCorrectionString.first.padStart(
-                readingCorrectionString.first.length + paddingLength
-            ).plus(" ".repeat(paddingLength))
-        } else {
-            suggestion.string.padStart(suggestion.string.length + paddingLength)
-                .plus(" ".repeat(paddingLength))
         }
     }
 

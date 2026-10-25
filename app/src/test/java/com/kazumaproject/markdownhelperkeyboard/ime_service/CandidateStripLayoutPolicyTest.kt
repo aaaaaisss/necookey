@@ -10,45 +10,11 @@ import org.junit.Test
 class CandidateStripLayoutPolicyTest {
 
     @Test
-    fun visibleZeroQuerySuggestionsUseLinearHorizontalLayout() {
-        assertTrue(
-            CandidateStripLayoutPolicy.shouldUseLinearHorizontalLayout(
-                CandidateStripContent.ZeroQuerySuggestions(
-                    candidates = listOf(candidate("候補1"), candidate("候補2"))
-                )
-            )
-        )
-    }
-
-    @Test
     fun normalCandidatesStillUseConfiguredCandidateRows() {
         assertFalse(
             CandidateStripLayoutPolicy.shouldUseLinearHorizontalLayout(
                 CandidateStripContent.Candidates(
                     candidates = listOf(candidate("候補1"), candidate("候補2"))
-                )
-            )
-        )
-    }
-
-    @Test
-    fun hiddenZeroQueryToggleUsesLinearHorizontalLayout() {
-        assertTrue(
-            CandidateStripLayoutPolicy.shouldUseLinearHorizontalLayout(
-                CandidateStripContent.EmptyState(
-                    showShortcutEntry = false,
-                    quickActions = QuickActionsState(
-                        incognitoVisible = false,
-                        undoEnabled = false,
-                        redoEnabled = false,
-                        reconvertEnabled = false,
-                        undoText = "",
-                        redoText = "",
-                    ),
-                    clipboardPreview = null,
-                    shortcutItems = emptyList(),
-                    showIntegratedShortcuts = false,
-                    showZeroQueryToggle = true,
                 )
             )
         )

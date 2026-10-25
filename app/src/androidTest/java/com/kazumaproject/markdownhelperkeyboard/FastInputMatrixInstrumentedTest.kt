@@ -2700,7 +2700,6 @@ class FastInputMatrixInstrumentedTest {
             .putBoolean("live_conversion_preference", false)
             .putBoolean("qwerty_glide_input_preference", false)
             .putBoolean("qwerty_show_emoji_button_preference", true)
-            .putBoolean("zero_query_suggestion_preference", false)
             .putBoolean("enable_typo_correction_japanese_flick_keyboard_preference", false)
             .putBoolean("enable_typo_correction_qwerty_english_keyboard_preference", false)
             .putBoolean("learn_dictionary_preference", false)
@@ -2939,7 +2938,6 @@ class FastInputMatrixInstrumentedTest {
             .putBoolean("enable_typo_correction_japanese_flick_keyboard_preference", false)
             .putBoolean("enable_typo_correction_qwerty_english_keyboard_preference", false)
             .putBoolean("learn_dictionary_preference", false)
-            .putBoolean("zero_query_suggestion_preference", false)
         check(editor.commit()) { "Failed to persist preferences for $case" }
 
         check(

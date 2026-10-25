@@ -92,11 +92,6 @@ class AppPreferenceFlickGuideTest {
     }
 
     @Test
-    fun zeroQuerySuggestionPreference_defaultOff() {
-        assertFalse(AppPreference.zero_query_suggestion_preference)
-    }
-
-    @Test
     fun tfbiDiagonalMode_defaultsToLegacyAndPersistsStable() {
         assertEquals(
             TfbiDiagonalRecognitionMode.LEGACY,

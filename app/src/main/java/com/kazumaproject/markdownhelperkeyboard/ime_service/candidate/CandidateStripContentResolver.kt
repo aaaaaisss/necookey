@@ -13,11 +13,6 @@ object CandidateStripContentResolver {
                 candidates = state.candidates,
             )
         }
-        if (shouldShowZeroQuerySuggestions(state)) {
-            return CandidateStripContent.ZeroQuerySuggestions(
-                candidates = state.zeroQueryCandidates,
-            )
-        }
         if (state.customLayoutPickerShown) {
             return CandidateStripContent.CustomLayoutPicker(
                 layouts = state.customLayouts,
@@ -33,13 +28,11 @@ object CandidateStripContentResolver {
             state = state,
             clipboardPreview = clipboardPreview
         )
-        val showZeroQueryToggle = shouldShowZeroQueryToggle(state)
         if (
             clipboardPreview != null ||
             quickActions.hasAnyAction ||
             showShortcutEntry ||
-            showIntegratedShortcuts ||
-            showZeroQueryToggle
+            showIntegratedShortcuts
         ) {
             return CandidateStripContent.EmptyState(
                 showShortcutEntry = showShortcutEntry,
@@ -47,7 +40,6 @@ object CandidateStripContentResolver {
                 clipboardPreview = clipboardPreview,
                 shortcutItems = state.shortcutItems,
                 showIntegratedShortcuts = showIntegratedShortcuts,
-                showZeroQueryToggle = showZeroQueryToggle,
             )
         }
         return CandidateStripContent.Empty
@@ -73,26 +65,6 @@ object CandidateStripContentResolver {
         state: CandidateStripInputState
     ): Boolean {
         return resolveClipboardPreviewOrNull(state) != null
-    }
-
-    private fun shouldShowZeroQuerySuggestions(state: CandidateStripInputState): Boolean {
-        return state.zeroQueryVisible && canShowZeroQuerySurface(state)
-    }
-
-    private fun shouldShowZeroQueryToggle(state: CandidateStripInputState): Boolean {
-        return !state.zeroQueryVisible && canShowZeroQuerySurface(state)
-    }
-
-    private fun canShowZeroQuerySurface(state: CandidateStripInputState): Boolean {
-        if (!state.includeZeroQuery) return false
-        if (state.zeroQueryCandidates.isEmpty()) return false
-        if (!state.inputStringEmpty) return false
-        if (!state.tailEmpty) return false
-        if (state.candidatesShown) return false
-        if (state.symbolKeyboardShown) return false
-        if (state.customLayoutPickerShown) return false
-        if (state.editorTextSelected) return false
-        return true
     }
 
     private fun resolveClipboardPreviewOrNull(

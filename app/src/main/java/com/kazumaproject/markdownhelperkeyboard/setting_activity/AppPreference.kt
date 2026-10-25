@@ -1728,8 +1728,6 @@ object AppPreference {
 
     val suppress_hentaigana_candidates_preference: Boolean get() = false // S3: hardcoded, setting removed
 
-    val zero_query_suggestion_preference: Boolean get() = true // 確定後の後続語/ゼロクエリ候補を常時表示（false 固定だと後続語が出ない）
-
     val time_same_pronounce_typing_preference: Int? get() = 1000 // S3: hardcoded, setting removed
 
     /** 設定「辞書と学習 › 詳細設定」の UT 辞書オン/オフ（既定オン）。 */

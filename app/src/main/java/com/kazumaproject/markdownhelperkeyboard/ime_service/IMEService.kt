@@ -182,7 +182,6 @@ import com.kazumaproject.markdownhelperkeyboard.clipboard_history.database.Clipb
 import com.kazumaproject.markdownhelperkeyboard.clipboard_history.database.ItemType
 import com.kazumaproject.markdownhelperkeyboard.converter.candidate.BunsetsuCandidateResult
 import com.kazumaproject.markdownhelperkeyboard.converter.candidatebar.ZenzaiConstraint
-import com.kazumaproject.markdownhelperkeyboard.converter.candidatebar.NextWordCarry
 import com.kazumaproject.markdownhelperkeyboard.converter.candidatebar.ZenzaiScheduler
 import com.kazumaproject.markdownhelperkeyboard.converter.candidatebar.ZenzaiGate
 import com.kazumaproject.markdownhelperkeyboard.converter.candidatebar.SumireLmGate
@@ -192,8 +191,6 @@ import com.kazumaproject.markdownhelperkeyboard.converter.candidatebar.BunsetsuA
 import com.kazumaproject.markdownhelperkeyboard.converter.candidatebar.BunsetsuAnalyzer
 import com.kazumaproject.markdownhelperkeyboard.converter.candidatebar.BunsetsuRangeEditor
 import com.kazumaproject.markdownhelperkeyboard.converter.candidatebar.NecookeyCandidateBarConfig
-import com.kazumaproject.markdownhelperkeyboard.converter.candidatebar.NextWordExtras
-import com.kazumaproject.markdownhelperkeyboard.converter.candidatebar.NextWordZenzReranker
 import com.kazumaproject.markdownhelperkeyboard.converter.candidatebar.TwoRowCandidateBar
 import com.kazumaproject.markdownhelperkeyboard.converter.candidatebar.TwoRowCandidateBarPlanner
 import com.kazumaproject.markdownhelperkeyboard.learning.session.BunsetsuLearningSplitter
@@ -319,11 +316,6 @@ import com.kazumaproject.markdownhelperkeyboard.sumire_special_key.SumireSpecial
 import com.kazumaproject.markdownhelperkeyboard.sumire_special_key.database.SumireSpecialKeyActionOverrideEntity
 import com.kazumaproject.markdownhelperkeyboard.sumire_special_key.database.SumireSpecialKeyPlacementOverrideEntity
 import com.kazumaproject.markdownhelperkeyboard.variant.AppVariantConfig
-import com.kazumaproject.markdownhelperkeyboard.zeroquery.AndroidZeroQueryAssetReader
-import com.kazumaproject.markdownhelperkeyboard.zeroquery.LazyZeroQueryProvider
-import com.kazumaproject.markdownhelperkeyboard.zeroquery.ZERO_QUERY_CANDIDATE_TYPE
-import com.kazumaproject.markdownhelperkeyboard.zeroquery.ZeroQueryLookupUseCase
-import com.kazumaproject.markdownhelperkeyboard.zeroquery.ZeroQueryProvider
 import com.kazumaproject.markdownhelperkeyboard.zenz.runtime.ZenzRuntimeClient
 import com.kazumaproject.markdownhelperkeyboard.zenz.runtime.ZenzRuntimeConfig
 import com.kazumaproject.symbol_keyboard.CustomSymbolKeyboardView
@@ -663,26 +655,7 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
     private var currentCandidateStripCandidates: List<Candidate> = emptyList()
     private var currentCandidateStripFullCandidates: List<Candidate> = emptyList()
     private var currentCandidateStripContent: CandidateStripContent = CandidateStripContent.Empty
-    private var pendingZeroQueryKeyAfterCommit: String? = null
-    private var zeroQueryCandidates: List<Candidate> = emptyList()
-    private var zeroQueryVisible: Boolean = false
-    private var zeroQuerySelectionUpdateSuppressCount: Int = 0
-    private var zeroQueryLookupJob: Job? = null
-    /** 後続語候補の zenz 並べ替え（1 推論・非同期、入力・再確定でキャンセル）。 */
-    private var zeroQueryZenzJob: Job? = null
 
-    /** 確定後に表示した後続語（並べ替え後）。続けて打ち始めたら読みで絞って予測欄の先頭に出す（[NextWordCarry]）。 */
-    @Volatile private var carriedNextWords: List<Candidate> = emptyList()
-    /** [carriedNextWords] を出したときの確定文字列。 */
-    @Volatile private var carriedNextWordsKey: String = ""
-    private val zeroQueryProviderHolder = LazyZeroQueryProvider {
-        ZeroQueryProvider(AndroidZeroQueryAssetReader(assets))
-    }
-    private val zeroQueryLookupUseCase: ZeroQueryLookupUseCase by lazy {
-        ZeroQueryLookupUseCase(
-            bundledProviderHolder = zeroQueryProviderHolder,
-        )
-    }
     private var configuredShortcutItems: List<ShortcutType> = emptyList()
     private var currentShortcutItems: List<ShortcutType> = emptyList()
     private var candidateStripIncognitoIconDrawable: Drawable? = null
@@ -942,13 +915,11 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
 
         val content = resolveCandidateStripContent(
             candidates = currentCandidateStripCandidates,
-            candidatesShown = effectiveCandidatesShown,
-            includeZeroQuery = true
+            candidatesShown = effectiveCandidatesShown
         )
         val fullContent = resolveCandidateStripContent(
             candidates = currentCandidateStripFullCandidates,
-            candidatesShown = effectiveCandidatesShown,
-            includeZeroQuery = false,
+            candidatesShown = effectiveCandidatesShown
         )
         currentCandidateStripContent = content
         suggestionAdapter?.submitContent(content)
@@ -978,12 +949,10 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
     private fun resolveCandidateStripContent(
         candidates: List<Candidate>,
         candidatesShown: Boolean,
-        includeZeroQuery: Boolean,
     ): CandidateStripContent {
         val state = buildCandidateStripInputState(
             candidates = candidates,
             candidatesShown = candidatesShown,
-            includeZeroQuery = includeZeroQuery,
         )
         return CandidateStripContentResolver.resolve(state)
     }
@@ -991,7 +960,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
     private fun buildCandidateStripInputState(
         candidates: List<Candidate>,
         candidatesShown: Boolean,
-        includeZeroQuery: Boolean
     ): CandidateStripInputState {
         val clipboardPreview = resolveClipboardPreviewSnapshot()
         val shouldSuppressClipboardPreviewForSelectedText =
@@ -1002,9 +970,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         val hasRedoHistory = isEditHistoryEnabled() && deletedBuffer.hasRedoHistory()
         return CandidateStripInputState(
             candidates = candidates,
-            zeroQueryVisible = zeroQueryVisible,
-            zeroQueryCandidates = zeroQueryCandidates,
-            includeZeroQuery = includeZeroQuery,
             inputStringEmpty = inputString.value.isEmpty(),
             tailEmpty = stringInTail.get().isEmpty(),
             candidatesShown = candidatesShown,
@@ -1078,430 +1043,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
 
     // 候補欄のキーボード一覧表示は廃止（後続語・ゼロクエリ候補を常に優先）
     private fun isCustomLayoutPickerShownForCandidateStrip(): Boolean = false
-
-    private fun rememberZeroQueryKeyAfterCommit(committedText: String) {
-        if (committedText.isBlank()) return
-        pendingZeroQueryKeyAfterCommit = committedText
-        pendingZeroQueryLastWord = committedLastWord(committedText)
-    }
-
-    /** 確定した最後の語（読み・表記）。後続の助詞を辞書の接続コストで並べるのに使う。 */
-    private var pendingZeroQueryLastWord: Pair<String, String>? = null
-
-    /** 読み・表記 → 助詞・句読点の接続コスト（同じ語の後は毎回同じなので覚えておく）。 */
-    private val followingWordCostCache = object : LinkedHashMap<Pair<String, String>, Map<String, Int>>(64, 0.75f, true) {
-        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<Pair<String, String>, Map<String, Int>>?): Boolean = size > 128
-    }
-
-    private fun committedLastWord(committedText: String): Pair<String, String>? {
-        val input = latestCandidateSegmentInput
-        val last = latestCandidateSegmentsByString[committedText]?.lastOrNull()
-        if (last != null && last.inputStart in 0 until last.inputEnd && last.inputEnd <= input.length &&
-            last.output.isNotEmpty() && committedText.endsWith(last.output)
-        ) {
-            return input.substring(last.inputStart, last.inputEnd) to last.output
-        }
-        // ひらがなのまま確定した短い語は、読み＝表記。
-        return committedText.takeIf { t -> t.length <= 8 && t.all { it in '\u3041'..'\u309F' } }?.let { it to it }
-    }
-
-    /** [word]（読み・表記）の後に続く助詞・句読点を接続コストで並べたもの。辞書に無ければ null。 */
-    private suspend fun connectionRankedFunctionWords(key: String, word: Pair<String, String>?): List<String>? {
-        if (word == null || !::kanaKanjiEngine.isInitialized) return null
-        val costs = synchronized(followingWordCostCache) { followingWordCostCache[word] }
-            ?: withContext(Dispatchers.Default) {
-                try {
-                    kanaKanjiEngine.followingWordCosts(word.first, word.second, NextWordExtras.CONNECTION_POOL)
-                } catch (e: CancellationException) {
-                    throw e
-                } catch (e: Exception) {
-                    Timber.w(e, "following word costs failed")
-                    null
-                }
-            }?.also { synchronized(followingWordCostCache) { followingWordCostCache[word] = it } }
-            ?: return null
-        if (costs.isEmpty()) return null
-        return NextWordExtras.functionWordsByConnection(key, costs)
-    }
-
-    private fun cancelZeroQueryLookup() {
-        zeroQueryLookupJob?.cancel()
-        zeroQueryLookupJob = null
-        zeroQueryZenzJob?.cancel()
-        zeroQueryZenzJob = null
-    }
-
-    private fun clearZeroQueryShownState(refresh: Boolean = true) {
-        val changed = zeroQueryVisible || zeroQueryCandidates.isNotEmpty() ||
-            zeroQuerySelectionUpdateSuppressCount != 0
-        cancelZeroQueryLookup()
-        zeroQueryVisible = false
-        zeroQueryCandidates = emptyList()
-        zeroQuerySelectionUpdateSuppressCount = 0
-        if (refresh && changed) {
-            refreshCandidateStripContent()
-        }
-    }
-
-    private fun clearZeroQueryAllState(refresh: Boolean = true) {
-        val changed = pendingZeroQueryKeyAfterCommit != null ||
-            zeroQueryVisible ||
-            zeroQueryCandidates.isNotEmpty() ||
-            zeroQuerySelectionUpdateSuppressCount != 0
-        cancelZeroQueryLookup()
-        pendingZeroQueryKeyAfterCommit = null
-        zeroQueryVisible = false
-        zeroQueryCandidates = emptyList()
-        zeroQuerySelectionUpdateSuppressCount = 0
-        if (refresh && changed) {
-            refreshCandidateStripContent()
-        }
-    }
-
-    private fun invalidateZeroQueryForEditorMutation() {
-        editorMutationRevision.advance()
-        clearZeroQueryAllState(refresh = true)
-    }
-
-    private fun toggleZeroQueryVisibility() {
-        if (zeroQueryCandidates.isEmpty()) {
-            clearZeroQueryAllState(refresh = true)
-            return
-        }
-
-        zeroQueryVisible = !zeroQueryVisible
-        zeroQuerySelectionUpdateSuppressCount = 0
-        refreshCandidateStripContent(candidatesShown = false)
-    }
-
-    private fun canShowZeroQueryAfterCommit(committedText: String): Boolean {
-        if (!zeroQuerySuggestionPreference) return false
-        if (inputString.value.isNotEmpty()) return false
-        if (stringInTail.get().isNotEmpty()) return false
-        if (keyboardSymbolViewState.value.isShown) return false
-        if (
-            currentInputModeForSession != InputMode.ModeJapanese &&
-            !committedText.isZeroQueryNumberKey()
-        ) {
-            return false
-        }
-        if (isCurrentInputTypePasswordOrEmailForZeroQuery()) return false
-        // Custom layout picker is only a fallback for the empty strip; the resolver already
-        // prefers zero-query (next-word) suggestions over it, so it must not block them here.
-        if (editorTextSelected) {
-            return false
-        }
-        return true
-    }
-
-    private fun String.isZeroQueryNumberKey(): Boolean {
-        if (isEmpty()) return false
-
-        var index = 0
-        while (index < length) {
-            val codePoint = codePointAt(index)
-            if (Character.digit(codePoint, 10) < 0) {
-                return false
-            }
-            index += Character.charCount(codePoint)
-        }
-        return true
-    }
-
-    private fun canCommitZeroQueryCandidate(): Boolean {
-        if (!zeroQuerySuggestionPreference) return false
-        if (zeroQueryCandidates.isEmpty()) return false
-        if (inputString.value.isNotEmpty()) return false
-        if (stringInTail.get().isNotEmpty()) return false
-        if (isCurrentInputTypePasswordOrEmailForZeroQuery()) return false
-        if (editorTextSelected) {
-            return false
-        }
-        return true
-    }
-
-    private fun isCurrentInputTypePasswordOrEmailForZeroQuery(): Boolean {
-        return currentInputType in passwordTypes ||
-            currentInputType == InputTypeForIME.TextEmailAddress ||
-            currentInputType == InputTypeForIME.TextWebEmailAddress
-    }
-
-    private fun consumePendingZeroQueryAfterCommit() {
-        val key = pendingZeroQueryKeyAfterCommit ?: return
-        pendingZeroQueryKeyAfterCommit = null
-        val lastWord = pendingZeroQueryLastWord
-        pendingZeroQueryLastWord = null
-        cancelZeroQueryLookup()
-
-        if (!canShowZeroQueryAfterCommit(key)) {
-            clearZeroQueryShownState(refresh = true)
-            return
-        }
-
-        val learnedEnabled = isLearnDictionaryMode == true
-        val leftContext = if (learnedEnabled) {
-            currentInputConnection?.getTextBeforeCursor(NextWordPolicy.MAX_CONTEXT_LENGTH * 2, 0)
-                ?.toString().orEmpty()
-        } else {
-            ""
-        }
-        // 後続語・絵文字の並べ替えは zenz のプロンプト（評価）専用。jinen では使わない。
-        val zenzLeftContext = if (
-            necookeyZenzGateEnabled() && isZenzPromptModelLoaded() && currentInputType !in passwordTypes
-        ) {
-            leftContext.ifEmpty {
-                currentInputConnection
-                    ?.getTextBeforeCursor(necookeyCandidateBarConfig.maxLeftContextChars, 0)
-                    ?.toString().orEmpty()
-            }
-        } else {
-            ""
-        }
-        zeroQueryLookupJob = scope.launch {
-            val candidates = withContext(Dispatchers.IO) {
-                val learned = if (learnedEnabled) learnedFollowingWords(key, leftContext) else emptyList()
-                learned + zeroQueryLookupUseCase.lookup(key)
-            }
-                .filter { it.string.isNotBlank() }
-                .distinctBy { it.string }
-            fun asCandidates(words: List<String>): List<Candidate> = words.map { word ->
-                Candidate(
-                    string = word,
-                    type = ZERO_QUERY_CANDIDATE_TYPE,
-                    length = word.length.toUByte(),
-                    score = 0,
-                    yomi = word,
-                )
-            }
-            // 助詞・句読点: 直前の語が辞書で分かれば品詞のつながり（接続コスト）で並べる（zenz で採点しない）。
-            // 分からなければ従来どおり直前の文字で絞って zenz で採点する。
-            val connectionRanked = connectionRankedFunctionWords(key, lastWord)
-            val rankedFunctionWords: List<Candidate> = connectionRanked
-                ?.let { NextWordExtras.withoutBase(candidates, asCandidates(it)) }
-                .orEmpty()
-            val functionWords: List<Candidate> = if (connectionRanked != null) {
-                emptyList()
-            } else {
-                NextWordExtras.withoutBase(candidates, asCandidates(NextWordExtras.functionWordsAfter(key)))
-            }
-
-            if (!canShowZeroQueryAfterCommit(key)) {
-                clearZeroQueryShownState(refresh = true)
-                return@launch
-            }
-
-            if (candidates.isEmpty() && functionWords.isEmpty() && rankedFunctionWords.isEmpty()) {
-                clearZeroQueryShownState(refresh = true)
-                return@launch
-            }
-            val shown = NextWordExtras.initial(candidates, rankedFunctionWords.ifEmpty { functionWords })
-            zeroQueryCandidates = shown
-            carriedNextWords = shown
-            carriedNextWordsKey = key
-            zeroQueryVisible = true
-            zeroQuerySelectionUpdateSuppressCount += 1
-            zeroQueryLookupJob = null
-            refreshCandidateStripContent(candidatesShown = false)
-            launchZeroQueryZenzRerank(key, zenzLeftContext, candidates, functionWords, shown, rankedFunctionWords)
-        }
-    }
-
-    /**
-     * 後続語の上位 [NextWordZenzReranker.TOP_K] 件＋助詞・句読点を左文脈つきで zenz が 1 回採点し、並べ替える。
-     */
-    private fun launchZeroQueryZenzRerank(
-        key: String,
-        leftContext: String,
-        candidates: List<Candidate>,
-        functionWords: List<Candidate>,
-        shown: List<Candidate>,
-        rankedFunctionWords: List<Candidate> = emptyList(),
-    ) {
-        zeroQueryZenzJob?.cancel()
-        val left = leftContext.takeLast(necookeyCandidateBarConfig.maxLeftContextChars)
-        if (left.isBlank() || shown.size < 2) return
-        val head = NextWordExtras.scoringTargets(candidates, functionWords)
-        zeroQueryZenzJob = scope.launch {
-            val scores = try {
-                withContext(Dispatchers.Default) {
-                    val config = resolveZenzRuntimeConfig() ?: return@withContext null
-                    zenzRuntimeClient.score(
-                        config = config,
-                        profile = "",
-                        topic = "",
-                        style = "",
-                        preference = "",
-                        leftContext = left,
-                        rightContext = "",
-                        input = "",
-                        candidates = head.toTypedArray(),
-                    )
-                }
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Exception) {
-                Timber.w(e, "zenz next-word rerank failed")
-                null
-            } ?: return@launch
-            val reranked = NextWordExtras.rerank(candidates, scores, functionWords, rankedFunctionWords)
-            if (zeroQueryVisible && zeroQueryCandidates == shown &&
-                canShowZeroQueryAfterCommit(key) && reranked != shown
-            ) {
-                Timber.d("zenz next-word rerank: %s -> %s", head, reranked.take(head.size).map { it.string })
-                zeroQueryCandidates = reranked
-                if (carriedNextWordsKey == key) carriedNextWords = reranked
-                refreshCandidateStripContent(candidatesShown = false)
-            }
-            zeroQueryZenzJob = null
-        }
-    }
-
-    /**
-     * Following-word candidates from learning: learned next words for the left context, then
-     * learned phrases that continue the committed text (their remainder).
-     */
-    private suspend fun learnedFollowingWords(committedText: String, leftContext: String): List<Candidate> {
-        return try {
-            val context = leftContext.ifEmpty { committedText }
-            val nextWords = nextWordRepository.lookup(context, "", NEXT_WORD_CANDIDATE_LIMIT).map {
-                Candidate(
-                    string = it.output,
-                    type = CANDIDATE_TYPE_NEXT_WORD,
-                    length = it.reading.length.toUByte(),
-                    score = 0,
-                    yomi = it.reading,
-                )
-            }
-            val tail = committedText.takeLast(NextWordPolicy.MAX_CONTEXT_LENGTH)
-            val continuations = learnRepository.findByOutputPrefix(
-                outputPrefix = tail,
-                limit = NEXT_WORD_CANDIDATE_LIMIT,
-            ).mapNotNull { entry ->
-                NextWordPolicy.remainderAfter(tail, entry.out)?.let { rest ->
-                    Candidate(
-                        string = rest,
-                        type = CANDIDATE_TYPE_LEARNED_DICTIONARY,
-                        length = 0u,
-                        score = entry.score,
-                    )
-                }
-            }
-            nextWords + continuations
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Exception) {
-            Timber.w(e, "learned following word lookup failed")
-            emptyList()
-        }
-    }
-
-    private fun handleZeroQueryOnUpdateSelection(
-        oldSelStart: Int,
-        oldSelEnd: Int,
-        newSelStart: Int,
-        newSelEnd: Int,
-    ) {
-        if (!zeroQueryVisible && zeroQueryCandidates.isEmpty() &&
-            pendingZeroQueryKeyAfterCommit == null &&
-            zeroQuerySelectionUpdateSuppressCount == 0
-        ) {
-            return
-        }
-
-        val inputAndSelectionAreEmpty =
-            inputString.value.isEmpty() &&
-                stringInTail.get().isEmpty() &&
-                !editorTextSelected &&
-                newSelStart == newSelEnd
-        if (zeroQuerySelectionUpdateSuppressCount > 0 && inputAndSelectionAreEmpty) {
-            zeroQuerySelectionUpdateSuppressCount -= 1
-            return
-        }
-
-        val cursorMoved = oldSelStart != newSelStart || oldSelEnd != newSelEnd
-        if (cursorMoved && inputAndSelectionAreEmpty) {
-            // 入力なしでカーソルだけ動いた = 別の場所。引き継いだ後続語は使わない。
-            carriedNextWords = emptyList()
-            carriedNextWordsKey = ""
-        }
-        if (
-            editorTextSelected ||
-            newSelStart != newSelEnd ||
-            inputString.value.isNotEmpty() ||
-            stringInTail.get().isNotEmpty() ||
-            cursorMoved
-        ) {
-            clearZeroQueryAllState(refresh = false)
-        }
-    }
-
-    private fun commitZeroQueryCandidate(candidate: Candidate) {
-        if (!canCommitZeroQueryCandidate()) {
-            clearZeroQueryAllState(refresh = true)
-            return
-        }
-        val inputConnection = currentInputConnection
-        val leftBefore = if (isLearningWriteEnabled()) {
-            inputConnection?.getTextBeforeCursor(NextWordPolicy.MAX_CONTEXT_LENGTH * 2, 0)?.toString()
-        } else {
-            null
-        }
-        val shownKey = carriedNextWordsKey
-        inputConnection?.commitText(candidate.string, 1)
-        clearZeroQueryAllState(refresh = true)
-        // タップした後続語も通常の確定と同じく後続語として学習する（この確定は変換セッションを通らないので二重にならない）。
-        persistZeroQueryNextWord(candidate, leftBefore, shownKey)
-        // 続けて、タップした語の後続語を出す（後続語 → 後続語のつながり）。
-        rememberZeroQueryKeyAfterCommit(candidate.string)
-        zeroQueryCandidateReading(candidate)?.let { pendingZeroQueryLastWord = it to candidate.string }
-        consumePendingZeroQueryAfterCommit()
-    }
-
-    /** 後続語候補の読み。学習済み後続語は保存した読み、ひらがなだけの語（助詞など）は表記そのもの。分からなければ null。 */
-    private fun zeroQueryCandidateReading(candidate: Candidate): String? {
-        if (candidate.type == CANDIDATE_TYPE_NEXT_WORD) {
-            return candidate.yomi?.takeIf { it.isNotEmpty() }
-        }
-        val text = candidate.string
-        return text.takeIf { t -> t.isNotEmpty() && t.all { it in '\u3041'..'\u309F' || it == 'ー' } }
-    }
-
-    /**
-     * タップした後続語を (直前の文節 → この語) として学習する。直前の文節は通常の確定で覚えた最後の文節、
-     * 無ければ後続語を出したときの確定文字列。どちらもカーソルの直前に残っているときだけ使う。
-     */
-    private fun persistZeroQueryNextWord(candidate: Candidate, leftBefore: String?, shownKey: String) {
-        val previous = lastLearnedBunsetsuOutput
-        lastLearnedBunsetsuOutput = candidate.string.takeIf { it.isNotBlank() }
-        val revert = if (isLearningWriteEnabled() && candidate.string.isNotEmpty()) {
-            LearningRevert(candidate.string, previous)
-        } else {
-            null
-        }
-        setPendingLearningRevert(revert)
-        if (leftBefore == null || !isLearningWriteEnabled()) return
-        val reading = zeroQueryCandidateReading(candidate) ?: return
-        val preceding = previous?.takeIf { it.isNotBlank() && leftBefore.endsWith(it) }
-            ?: shownKey.takeIf { it.isNotBlank() && leftBefore.endsWith(it) }
-            ?: return
-        val pairs = NextWordPolicy.pairs(
-            precedingBunsetsu = preceding,
-            bunsetsu = listOf(reading to candidate.string),
-            timestamp = System.currentTimeMillis(),
-        )
-        if (pairs.isEmpty()) return
-        val job = ioScope.launch {
-            try {
-                val recorded = nextWordRepository.record(pairs)
-                revert?.nextWords = recorded
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Exception) {
-                Timber.e(e, "Saving tapped next word failed")
-            }
-        }
-        revert?.jobs?.add(job)
-    }
 
     private suspend fun applyFirstSuggestionOnMainIfCurrent(
         insertString: String,
@@ -1676,7 +1217,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
     private var isLearnDictionaryMode: Boolean? = false
     private var isUserDictionaryEnable: Boolean? = false
     private var suppressHentaiganaCandidates: Boolean = false
-    private var zeroQuerySuggestionPreference: Boolean = false
     private var hankakuPreference: Boolean? = false
     private var customDirectModeSpaceHankakuPreference: Boolean = true
     private var isLiveConversionEnable: Boolean? = false
@@ -2601,7 +2141,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         forwardDeleteCoordinator.reset(editor?.selectionStart ?: -1, editor?.selectionEnd ?: -1)
         resetEditorSelectionSnapshot()
         resetCustomToggleState()
-        clearZeroQueryAllState(refresh = false)
         currentInputType = getCurrentInputTypeForIME2(currentInputEditorInfo)
         suppressSuggestions = showCandidateInPasswordPreference == true && currentInputType.isPassword()
         if (targetChanged) {
@@ -2665,7 +2204,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         Timber.d("onStartInput: ${Build.MANUFACTURER}")
         Timber.d("onUpdate onStartInput called $restarting ${attribute?.imeOptions}")
         isTablet = resources.getBoolean(com.kazumaproject.core.R.bool.isTablet)
-        clearZeroQueryAllState(refresh = false)
         resetAllFlags()
         shortcutToolbarHiddenForCandidates = false
         modeSwitchAwaitingCursorPosition = false
@@ -2867,10 +2405,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
             adapter.setShowDictionaryCandidateLabels(preferences.showDictionaryCandidateLabels)
         }
         suppressHentaiganaCandidates = preferences.suppressHentaiganaCandidates
-        zeroQuerySuggestionPreference = preferences.zeroQuerySuggestionPreference
-        if (!zeroQuerySuggestionPreference) {
-            clearZeroQueryAllState(refresh = true)
-        }
         hankakuPreference = preferences.hankakuPreference
         customDirectModeSpaceHankakuPreference =
             preferences.customDirectModeSpaceHankakuPreference
@@ -3409,7 +2943,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
     override fun onStartInputView(editorInfo: EditorInfo?, restarting: Boolean) {
         super.onStartInputView(editorInfo, restarting)
         flickInputPreviewCoordinator.cancel(restore = true)
-        clearZeroQueryAllState(refresh = false)
         // The input view can restart without onStartInput() after returning from settings.
         // Re-read preferences that may change while the existing input session is retained.
         syncRuntimeInputPreferences()
@@ -3553,7 +3086,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         defaultInputFinalizeJob = null
         super.onFinishInputView(finishingInput)
         Timber.d("onUpdate onFinishInputView")
-        clearZeroQueryAllState(refresh = false)
         stopAllOngoingKeyLongPresses()
         disableKeyboardLayoutEditMode()
         persistCurrentCustomKeyboardInputModeIfEnabled()
@@ -3600,7 +3132,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
             runtimeInputPreferenceListenerRegistered = false
         }
         updateKeyboardSelectionPopupBackInvokedCallback(registered = false)
-        clearZeroQueryAllState(refresh = false)
         stopAllOngoingKeyLongPresses()
         disableKeyboardLayoutEditMode(updateSurface = false)
         collapseShortcutEntryExpansion()
@@ -3953,7 +3484,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         } finally {
             dictionaryConfigurationChanging = false
         }
-        clearZeroQueryAllState(refresh = false)
         collapseShortcutEntryExpansion()
         when (newConfig.orientation) {
             Configuration.ORIENTATION_PORTRAIT -> {
@@ -4536,12 +4066,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
             newSelEnd = newSelEnd,
         )
 
-        handleZeroQueryOnUpdateSelection(
-            oldSelStart = oldSelStart,
-            oldSelEnd = oldSelEnd,
-            newSelStart = newSelStart,
-            newSelEnd = newSelEnd,
-        )
 
         if (suppressedSelectionCleanupCount > 0) {
             suppressedSelectionCleanupCount -= 1
@@ -5827,20 +5351,15 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
 
     private fun handleSelectedTextSelection(selectedText: String) {
         if (selectedTextClipboardPreviewRefreshText == selectedText) {
-            clearZeroQueryAllState(refresh = false)
             updateClipboardPreview()
             return
         }
         clearSelectedTextClipboardPreviewRefresh()
-        clearZeroQueryAllState(refresh = false)
     }
 
     private fun markClipboardPreviewRefreshAfterPrimaryClipChanged() {
         selectedTextClipboardPreviewRefreshText =
             selectedEditorText.takeIf { it.isNotEmpty() }
-        if (selectedTextClipboardPreviewRefreshText != null) {
-            clearZeroQueryAllState(refresh = false)
-        }
     }
 
     private fun clearSelectedTextClipboardPreviewRefresh() {
@@ -8668,7 +8187,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
      * クリップボードからの貼り付けアクション。テキストと画像の両方に対応。
      */
     private fun pasteAction() {
-        clearZeroQueryAllState(refresh = false)
         val inputConnection = currentInputConnection ?: return
         scope.launch {
             val item = withContext(Dispatchers.IO) {
@@ -8723,7 +8241,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
     }
 
     private fun pasteImageAction(bitmap: Bitmap) {
-        clearZeroQueryAllState(refresh = false)
         commitBitmap(bitmap)
         clearDeletedBufferWithoutResetLayout()
         refreshEditHistoryUi()
@@ -8743,7 +8260,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
     }
 
     private fun pasteClipboardItemContent(item: ClipboardItem) {
-        clearZeroQueryAllState(refresh = false)
         when (item) {
             is ClipboardItem.Image -> {
                 commitBitmap(item.bitmap)
@@ -9454,7 +8970,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
                         input = insertString,
                     )
                 ) {
-                    clearZeroQueryAllState(refresh = false)
                     shortcutToolbarHiddenForCandidates = true
                     refreshCandidateStripContent(candidatesShown = true)
                     if (mainView.customLayoutDefault.isVisible) {
@@ -9507,7 +9022,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
                             inputStringEmpty = insertString.isEmpty(),
                             suggestionsSuppressed = suppressSuggestions,
                         )
-                        clearZeroQueryAllState(refresh = false)
                         shortcutToolbarHiddenForCandidates = candidateStripActive
                         refreshCandidateStripContent(candidatesShown = candidateStripActive)
                         val normalKeyboardSurfaceVisible = mainView.customLayoutDefault.isVisible
@@ -9550,7 +9064,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         launch {
             keyboardSymbolViewState.collectLatest { isSymbolKeyboardShow ->
                 Timber.d("keyboardSymbolViewState: $isSymbolKeyboardShow")
-                clearZeroQueryAllState(refresh = false)
                 applySymbolKeyboardAppearance()
                 setKeyboardSizeSwitchKeyboard(mainView)
                 setKeyboardSizeForHeightSymbol(mainView, isSymbolKeyboardShow.isShown)
@@ -9766,8 +9279,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
     private fun beginZenzRerankRequest(): Long {
         zenzRerankJob?.cancel()
         zenzRerankJob = null
-        zeroQueryZenzJob?.cancel()
-        zeroQueryZenzJob = null
         zenzRerankRequestToken += 1L
         return zenzRerankRequestToken
     }
@@ -11268,7 +10779,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         defaultInputFinalizeJob?.cancel()
         defaultInputFinalizeJob = null
         if (string.isNotEmpty()) {
-            clearZeroQueryAllState(refresh = false)
             hasConvertedKatakana = false
             if (isRestoringReconversionInput) {
                 isRestoringReconversionInput = false
@@ -12024,7 +11534,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
 
     private fun restoreRawInputFromBunsetsuSession() {
         val session = bunsetsuConversionSession ?: return
-        clearZeroQueryAllState(refresh = false)
         val rawInput = session.rawInput
         val shouldForceRefresh = inputString.value == rawInput
         clearBunsetsuConversionSession()
@@ -12219,15 +11728,11 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
             complete = tailText.isEmpty(),
             explicitlySelected = explicitlySelected,
         )
-        val shouldRememberZeroQuery = tailText.isEmpty() && commitString.isNotBlank()
         if (tailText.isEmpty()) {
             finalizeBunsetsuReconversion(
                 originalReading = session.rawInput,
                 committedText = commitString
             )
-        }
-        if (shouldRememberZeroQuery) {
-            rememberZeroQueryKeyAfterCommit(commitString)
         }
         beginBatchEdit()
         try {
@@ -12273,9 +11778,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         stringInTail.set("")
         _inputString.update { tailText }
         clearBunsetsuConversionSession()
-        if (shouldRememberZeroQuery) {
-            consumePendingZeroQueryAfterCommit()
-        }
         return true
     }
 
@@ -12580,7 +12082,7 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
                 }
             }
             adapter.setOnCustomLayoutItemClickListener { position ->
-                clearZeroQueryAllState(refresh = false)
+                Unit
                 selectCustomKeyboardTab(
                     index = position,
                     reason = CustomKeyboardSelectionReason.UserTabClick
@@ -12590,15 +12092,8 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
                 handleShortcutAction(type, mainView)
             }
             adapter.setOnShortcutEntryClickListener {
-                clearZeroQueryAllState(refresh = false)
                 integratedShortcutEntryExpanded = !integratedShortcutEntryExpanded
                 refreshCandidateStripContent()
-            }
-            adapter.setOnZeroQueryCandidateClickListener { candidate ->
-                commitZeroQueryCandidate(candidate)
-            }
-            adapter.setOnZeroQueryCloseClickListener {
-                toggleZeroQueryVisibility()
             }
         }
         necookeyPredictionAdapter?.let { adapter ->
@@ -13333,8 +12828,7 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
                 inputStringEmpty = inputString.value.isEmpty(),
                 tailEmpty = stringInTail.get().isEmpty(),
                 clipboardPreviewShown = content.hasClipboardPreview(),
-                suggestionsEmpty = content !is CandidateStripContent.Candidates &&
-                    content !is CandidateStripContent.ZeroQuerySuggestions,
+                suggestionsEmpty = content !is CandidateStripContent.Candidates,
                 customLayoutPickerShown = content is CandidateStripContent.CustomLayoutPicker,
                 symbolKeyboardShown = symbolKeyboardShown,
                 shortcutToolbarHiddenForCandidates = shortcutToolbarHiddenForCandidates,
@@ -13384,7 +12878,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
     }
 
     private fun handleShortcutAction(type: ShortcutType, mainView: MainLayoutBinding) {
-        clearZeroQueryAllState(refresh = false)
         when (type) {
             ShortcutType.SETTINGS -> {
                 launchSettingsActivity("setting_fragment_request")
@@ -13676,7 +13169,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
             setCursorLeftAfterCommitPair(candidate.string)
         }
         resetFlagsSuggestionClick()
-        consumePendingZeroQueryAfterCommit()
     }
 
     private fun handleBunsetsuCandidateClick(
@@ -13752,7 +13244,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         } else {
             ""
         }
-        val shouldRememberZeroQuery = nextInput.isEmpty() && committedText.isNotBlank()
 
         recordBunsetsuLearning(
             originalReading = session.rawInput,
@@ -13771,9 +13262,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
                 committedText = committedText
             )
             preserveBunsetsuReconversionDraftOnNextProcessInput = true
-        }
-        if (shouldRememberZeroQuery) {
-            rememberZeroQueryKeyAfterCommit(committedText)
         }
 
         beginBatchEdit()
@@ -13831,9 +13319,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
             }
         } else {
             stringInTail.set("")
-            if (shouldRememberZeroQuery) {
-                consumePendingZeroQueryAfterCommit()
-            }
         }
         return true
     }
@@ -13913,7 +13398,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
     }
 
     private fun clearPendingReconversionEntry() {
-        clearZeroQueryAllState(refresh = false)
         pendingReconversionEntry = null
         refreshReconversionUi()
     }
@@ -14013,7 +13497,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
     }
 
     private fun performPendingReconversion() {
-        clearZeroQueryAllState(refresh = false)
         val entry = pendingReconversionEntry ?: return
         val mainView = mainLayoutBinding ?: return
         if (!pendingReconversionValid) {
@@ -14113,7 +13596,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
     }
 
     private fun restoreCompositionState(input: String, tail: String) {
-        clearZeroQueryAllState(refresh = false)
         beginBatchEdit()
         try {
             _inputString.update { input }
@@ -14226,7 +13708,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
     }
 
     private fun undoLastHistoryEntry() {
-        clearZeroQueryAllState(refresh = false)
         val entry = deletedBuffer.popUndo() ?: return
         if (performUndo(entry)) {
             deletedBuffer.pushRedo(entry)
@@ -14237,7 +13718,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
     }
 
     private fun redoLastHistoryEntry() {
-        clearZeroQueryAllState(refresh = false)
         val entry = deletedBuffer.popRedo() ?: return
         if (performRedo(entry)) {
             deletedBuffer.pushUndoFromRedo(entry)
@@ -14248,7 +13728,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
     }
 
     private fun undoAllHistoryEntries() {
-        clearZeroQueryAllState(refresh = false)
         while (deletedBuffer.hasUndoHistory()) {
             val entry = deletedBuffer.popUndo() ?: break
             if (performUndo(entry)) {
@@ -14262,7 +13741,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
     }
 
     private fun redoAllHistoryEntries() {
-        clearZeroQueryAllState(refresh = false)
         while (deletedBuffer.hasRedoHistory()) {
             val entry = deletedBuffer.popRedo() ?: break
             if (performRedo(entry)) {
@@ -14303,9 +13781,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
                 reading = reading,
                 committedText = candidateString
             )
-        }
-        if (candidateString.isNotBlank() && stringInTail.get().isEmpty()) {
-            rememberZeroQueryKeyAfterCommit(candidateString)
         }
         _inputString.update { "" }
         commitText(candidateString, 1)
@@ -14495,9 +13970,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
                 reading = insertString,
                 committedText = candidateString
             )
-        }
-        if (candidateString.isNotBlank() && stringInTail.get().isEmpty()) {
-            rememberZeroQueryKeyAfterCommit(candidateString)
         }
         _inputString.update { "" }
         commitText(candidateString, 1)
@@ -14758,7 +14230,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
 
     private fun resetAllFlags() {
         Timber.d("onUpdate resetAllFlags called")
-        clearZeroQueryAllState(refresh = false)
         customKeyboardRenderJob?.cancel()
         customKeyboardRenderJob = null
         _inputString.update { "" }
@@ -14816,7 +14287,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
     }
 
     private fun clearDirectCommitCompositionState(reason: String) {
-        clearZeroQueryAllState(refresh = false)
         _inputString.update { "" }
         stringInTail.set("")
         isHenkan.set(false)
@@ -14832,7 +14302,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         clearBunsetsuConversionSession()
         clearPendingReconversionEntry()
         clearBunsetsuReconversionDraft()
-        clearZeroQueryAllState(refresh = false)
         setSuggestionAdaptersOnMain(emptyList())
         suggestionAdapter?.updateHighlightPosition(RecyclerView.NO_POSITION)
         suggestionAdapterFull?.updateHighlightPosition(RecyclerView.NO_POSITION)
@@ -15156,7 +14625,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         }
         clearSuggestionStateAfterCommit()
         resetFlagsEnterKey()
-        consumePendingZeroQueryAfterCommit()
     }
 
     private fun updateUIinHenkan(mainView: MainLayoutBinding, insertString: String) {
@@ -15529,13 +14997,8 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         cached?.let { (_, carry) -> zenzaiCarry = carry }
         val cachedOverride = cached?.first
 
-        val carried = carriedNextWordsFor(insertString)
         if (!shouldApplyCandidateResult(insertString, token)) return
-        val barPredictions = if (carried.isEmpty()) {
-            nextWordCandidates + predictions
-        } else {
-            (carried + nextWordCandidates + predictions).distinctBy { it.string }
-        }
+        val barPredictions = nextWordCandidates + predictions
         val bar = TwoRowCandidateBarPlanner.plan(
             input = insertString,
             conversionCandidates = conversion,
@@ -15716,30 +15179,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
                 last = result
                 if (!seenDrafts.add(result.top.string)) return@launch
             }
-        }
-    }
-
-    /**
-     * 直前の確定後に表示した後続語のうち、読みが [insertString] で始まるもの（[NextWordCarry]）。
-     * 入力の直前がその確定文字列で終わっているときだけ（カーソル移動・削除後は使わない）。
-     */
-    private suspend fun carriedNextWordsFor(insertString: String): List<Candidate> {
-        val key = carriedNextWordsKey
-        val matches = NextWordCarry.filter(carriedNextWords, insertString)
-        if (matches.isEmpty() || key.isEmpty()) return emptyList()
-        return try {
-            val (inputConnection, liveLength) = withContext(Dispatchers.Main.immediate) {
-                currentInputConnection to lastCandidate?.length
-            }
-            // 未確定文字列はそのまま（ひらがな）か、ライブ変換後の表記のどちらかで出ている。
-            val composingLengths = listOfNotNull(insertString.length, liveLength).distinct()
-            val raw = getLeftContext(inputConnection, composingLengths.max())
-            if (composingLengths.any { NextWordCarry.contextMatches(key, raw.dropLast(it)) }) matches else emptyList()
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Exception) {
-            Timber.w(e, "carried next words failed")
-            emptyList()
         }
     }
 
@@ -16369,7 +15808,7 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
      * - カーソル直前の文字がそれ以外の場合：その単語を末尾まで削除します。
      */
     private fun deleteWordOrSymbolsBeforeCursor(insertString: String) {
-        invalidateZeroQueryForEditorMutation()
+        editorMutationRevision.advance()
         val inputConnection = currentInputConnection ?: return
         if (isHenkan.get()) return
         if (stringInTail.get().isNotEmpty()) return
@@ -16415,7 +15854,7 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
      * - PreEdit / stringInTail がある場合は committed text を消さず、stringInTail を削除します。
      */
     private fun deleteWordOrSymbolsAfterCursor(insertString: String) {
-        invalidateZeroQueryForEditorMutation()
+        editorMutationRevision.advance()
         val inputConnection = currentInputConnection ?: return
         if (isHenkan.get()) return
         if (insertString.isNotEmpty()) {
@@ -16456,7 +15895,7 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
     }
 
     private fun deleteLongPress() {
-        invalidateZeroQueryForEditorMutation()
+        editorMutationRevision.advance()
         if (isKeyboardLayoutEditModeActive()) return
         if (deleteLongPressJob?.isActive == true) return
         val behavior = deleteLongPressConversionBehavior
@@ -16649,7 +16088,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
     }
 
     private fun handleDeleteKeyTap(insertString: String, suggestions: List<Candidate>) {
-        clearZeroQueryAllState(refresh = false)
         if (dispatchDirectBackspaceIfNeeded()) {
             stopDeleteLongPress()
             return
@@ -16704,7 +16142,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
             handleSpaceKeyClickInCustomRomaji(insertString, mainView, suggestions)
             return
         }
-        clearZeroQueryAllState(refresh = false)
         if (dispatchDirectSpaceIfNeeded()) {
             resetFlagsKeySpace()
             return
@@ -16734,7 +16171,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         insertString: String, mainView: MainLayoutBinding, suggestions: List<Candidate>,
     ) {
         val englishSpace = " "
-        clearZeroQueryAllState(refresh = false)
         if (dispatchDirectTextIfNeeded(englishSpace)) {
             resetFlagsKeySpace()
             return
@@ -16836,7 +16272,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         space: String,
         mainView: MainLayoutBinding,
     ) {
-        clearZeroQueryAllState(refresh = false)
         if (dispatchDirectSpaceIfNeeded()) {
             resetFlagsKeySpace()
             return
@@ -16975,12 +16410,10 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
 
     private fun handleLeftCursorMoveAction() {
         Timber.d("handleLeftCursorMoveAction: called")
-        clearZeroQueryAllState(refresh = false)
         sendDpadLeftIfPossible()
     }
 
     private fun handleRightCursorMoveAction() {
-        clearZeroQueryAllState(refresh = false)
         sendDpadRightIfPossible()
     }
 
@@ -17013,7 +16446,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
     }
 
     private fun handleEmptyInputEnterKey(mainView: MainLayoutBinding) {
-        clearZeroQueryAllState(refresh = false)
         if (dispatchDirectEnterIfNeeded(editorFacing = true)) {
             refreshCandidateStripContent(
                 candidatesShown = false,
@@ -17042,7 +16474,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
     }
 
     private fun forceNewLine(mainView: MainLayoutBinding) {
-        clearZeroQueryAllState(refresh = false)
         if (dispatchDirectEnterIfNeeded()) {
             refreshCandidateStripContent(
                 candidatesShown = false,
@@ -17106,7 +16537,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
     }
 
     private fun finishInputEnterKey() {
-        clearZeroQueryAllState(refresh = false)
         _inputString.update { "" }
         finishComposingText()
         clearSuggestionStateAfterCommit()
@@ -17122,7 +16552,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
      * [stringInTail], and must therefore be edited before delegating to the editor.
      */
     private fun handleDeleteAfterCursor() {
-        clearZeroQueryAllState(refresh = false)
         if (currentInputConnection == null) return
         if (forwardDeleteCoordinator.hasSelection) {
             forwardDeleteCoordinator.enqueue()
@@ -17148,7 +16577,7 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
 
         val deletedText = beforeTail.substring(0, nextOffset)
         val afterTail = beforeTail.substring(nextOffset)
-        invalidateZeroQueryForEditorMutation()
+        editorMutationRevision.advance()
         stringInTail.set(afterTail)
         setComposingTextAfterEdit(
             inputString = beforeInput,
@@ -17180,9 +16609,8 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
     }
 
     private fun performForwardDelete(selectionWasActive: Boolean) {
-        invalidateZeroQueryForEditorMutation()
+        editorMutationRevision.advance()
         if (selectionWasActive) {
-            clearZeroQueryAllState(refresh = false)
             setSuggestionAdaptersOnMain(emptyList())
             suggestionAdapter?.updateHighlightPosition(RecyclerView.NO_POSITION)
             suggestionAdapterFull?.updateHighlightPosition(RecyclerView.NO_POSITION)
@@ -17198,13 +16626,12 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
      * This correctly handles complex emojis and user text selections.
      */
     private fun deleteLastGraphemeOrSelection() {
-        invalidateZeroQueryForEditorMutation()
+        editorMutationRevision.advance()
         sendDownUpKeyEvents(KeyEvent.KEYCODE_DEL)
     }
 
     private fun handleLeftKeyPress(gestureType: GestureType, insertString: String) {
         Timber.d("called handleLeftKeyPress $insertString ${stringInTail.get()} $gestureType")
-        clearZeroQueryAllState(refresh = false)
         if (insertString.isEmpty() && stringInTail.get().isEmpty()) {
             when (gestureType) {
                 GestureType.FlickRight -> {
@@ -17354,7 +16781,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
     }
 
     private fun actionInRightKeyPressed(gestureType: GestureType, insertString: String) {
-        clearZeroQueryAllState(refresh = false)
         when {
             insertString.isEmpty() -> {
                 if (selectMode.value) {
@@ -17369,7 +16795,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
     }
 
     private fun actionInRightKeyPressed(insertString: String) {
-        clearZeroQueryAllState(refresh = false)
         when {
             insertString.isEmpty() -> handleEmptyInputString()
             !isHenkan.get() -> handleNonHenkan(insertString)
@@ -17473,7 +16898,7 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
     }
 
     private fun deleteStringCommon(insertString: String) {
-        invalidateZeroQueryForEditorMutation()
+        editorMutationRevision.advance()
         val length = insertString.length
         when {
             length > 1 -> {
@@ -17936,10 +17361,8 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         if (currentInputConnection == null) return
         if (!commitRawTextAndInsertSpace(inputString.value, stringInTail.get())) return
 
-        clearZeroQueryAllState(refresh = false)
         clearSuggestionStateAfterCommit()
         resetFlagsEnterKeyNotHenkan()
-        consumePendingZeroQueryAfterCommit()
     }
 
     private fun setSpaceKeyActionEnglishAndNumberEmpty(isFlick: Boolean) {

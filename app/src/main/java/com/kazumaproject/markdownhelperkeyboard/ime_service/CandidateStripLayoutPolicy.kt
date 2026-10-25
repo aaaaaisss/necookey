@@ -5,7 +5,7 @@ import com.kazumaproject.markdownhelperkeyboard.ime_service.candidate.CandidateS
 object CandidateStripLayoutPolicy {
 
     fun shouldUseLinearHorizontalLayout(content: CandidateStripContent): Boolean {
-        return content is CandidateStripContent.ZeroQuerySuggestions ||
-            (content is CandidateStripContent.EmptyState && content.showZeroQueryToggle)
+        @Suppress("UNUSED_PARAMETER") val unused = content
+        return false
     }
 }

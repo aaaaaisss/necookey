@@ -60,7 +60,6 @@ data class ImePreferencesSnapshot(
     val systemNgramDictionaryEnabled: Boolean,
     val showDictionaryCandidateLabels: Boolean,
     val suppressHentaiganaCandidates: Boolean,
-    val zeroQuerySuggestionPreference: Boolean,
     val hankakuPreference: Boolean,
     val customDirectModeSpaceHankakuPreference: Boolean,
     val isLiveConversionEnable: Boolean,
@@ -332,7 +331,6 @@ data class ImePreferencesSnapshot(
                     appPreference.show_dictionary_candidate_labels_preference,
                 suppressHentaiganaCandidates =
                     appPreference.suppress_hentaigana_candidates_preference,
-                zeroQuerySuggestionPreference = appPreference.zero_query_suggestion_preference,
                 hankakuPreference = appPreference.space_hankaku_preference ?: false,
                 customDirectModeSpaceHankakuPreference =
                     appPreference.custom_direct_mode_space_hankaku_preference ?: true,

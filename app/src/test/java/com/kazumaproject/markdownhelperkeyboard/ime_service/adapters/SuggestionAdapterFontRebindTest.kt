@@ -29,7 +29,6 @@ class SuggestionAdapterFontRebindTest {
     fun everyTextHolderUsesFontChangesWhenTheSameHolderIsRebound() {
         val scenarios = listOf(
             CandidateStripContent.Candidates(listOf(candidate("candidate"))) to 0,
-            CandidateStripContent.ZeroQuerySuggestions(listOf(candidate("zero query"))) to 1,
             CandidateStripContent.EmptyState(
                 showShortcutEntry = false,
                 quickActions = QuickActionsState(

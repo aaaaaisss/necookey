@@ -122,16 +122,6 @@ class CandidateStripPresentationPolicyTest {
     }
 
     @Test
-    fun zeroQuerySuggestionsAreTreatedAsNonEmptySuggestions() {
-        val presentation = CandidateStripPresentationPolicy.resolve(
-            baseState(suggestionsEmpty = false)
-        )
-
-        assertFalse(presentation.showIntegratedShortcutItems)
-        assertFalse(presentation.showIntegratedShortcutEntry)
-    }
-
-    @Test
     fun candidateTabVisibilityFalseDisablesCandidateTab() {
         val presentation = CandidateStripPresentationPolicy.resolve(
             baseState(candidateTabVisible = false, candidatesShown = true)
