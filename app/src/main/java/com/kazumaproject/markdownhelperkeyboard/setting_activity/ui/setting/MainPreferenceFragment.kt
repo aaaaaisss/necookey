@@ -106,7 +106,7 @@ class MainPreferenceFragment : AsyncPreferenceFragment() {
         bindInputSection()
         bindCandidateSection()
         bindDictionarySection()
-        bindZenzSection()
+        bindRerankSection()
         bindSymbolSection()
         bindClipboardSection()
         bindBackupAndAboutSection()
@@ -116,7 +116,7 @@ class MainPreferenceFragment : AsyncPreferenceFragment() {
         syncDefaultEmojiSkinTonePreference()
         updateCursorMoveTargetPairsSummary()
         refreshNextWordSummary()
-        syncZenzBunsetsuGateEnabled()
+        syncRerankEnabled()
     }
 
     override fun onDestroyView() {
@@ -321,15 +321,15 @@ class MainPreferenceFragment : AsyncPreferenceFragment() {
 
     private fun NextWordEntity.label(): String = "…$context → $output（$reading）×$usageCount"
 
-    // ---- zenz ----
+    // ---- 変換補正（SUMIRE-LM） ----
 
-    private fun bindZenzSection() {
-        syncZenzBunsetsuGateEnabled()
+    private fun bindRerankSection() {
+        syncRerankEnabled()
     }
 
     // 文節ゲートは「2段候補バー」(変換・予測カテゴリ) に依存する。別画面にあるため XML の
     // android:dependency ではなくコードで有効/無効を切り替える。
-    private fun syncZenzBunsetsuGateEnabled() {
+    private fun syncRerankEnabled() {
         findPreference<Preference>("necookey_zenz_bunsetsu_gate_preference")?.isEnabled =
             appPreference.necookey_two_row_candidate_bar_preference
     }

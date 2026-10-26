@@ -1743,18 +1743,7 @@ class SuggestionAdapter internal constructor(
             QWERTY_GLIDE_CANDIDATE_TYPE -> ""
             else -> ""
         }
-        val zenzBadgeRes = when {
-            suggestion.zenzAdjusted -> R.string.candidate_badge_zenz_gate
-            suggestion.zenzChecked -> R.string.candidate_badge_zenz_checked
-            else -> null
-        }
-        holder.typeText.text = if (zenzBadgeRes != null) {
-            val badge = holder.itemView.context.getString(zenzBadgeRes)
-            if (typeLabel.toString().isBlank()) badge
-            else SpannableStringBuilder(typeLabel).append(" ").append(badge)
-        } else {
-            typeLabel
-        }
+        holder.typeText.text = typeLabel
         holder.itemView.isPressed = position == highlightedPosition
         holder.itemView.setOnClickListener {
             onItemClickListener?.invoke(suggestion, position)

@@ -693,14 +693,6 @@ object AppPreference {
     private val QWERTY_KEYBOARD_MARGIN_END_DP_LANDSCAPE =
         Pair("qwerty_keyboard_margin_end_dp_landscape_preference", 0)
 
-    private val ZENZ_MODEL_URI_PREFERENCE = Pair("zenz_model_uri_preference", "")
-    /**
-     * 変換エンジン: "sumire_lm"（Sumire + SUMIRE-LM リランカー、迷った読みだけ読み込んだ zenz で判断。sumire-lm-app の既定）/
-     * "jinen"（内蔵 jinen-v2-small の自由生成）/ "zenz"（読み込んだ zenz モデルの評価ループ）。
-     */
-    private val ZENZ_ENGINE_PREFERENCE = Pair("zenz_engine_preference", "sumire_lm")
-    /** sumire_lm: リランカーの 1 位と 2 位のスコア差がこれ（百分の一単位）未満なら zenz に回す。 */
-    private val SUMIRE_LM_ZENZ_MARGIN_PREFERENCE = Pair("sumire_lm_zenz_margin_preference", 50)
     /** 同音異義 UI の迷い印の判定にリランカーの文節マージン（SumireLmSpanMargin）を使う（既定オフ、設定画面なし）。 */
     private val SUMIRE_LM_HOMOPHONE_MARGIN_PREFERENCE = Pair("sumire_lm_homophone_margin_preference", false)
     /** 案2: 経路探索の辺コストに単語 bigram LM 補正（LatticeLmCost、表はアセット）を足す（既定オン）。 */
@@ -708,9 +700,6 @@ object AppPreference {
 
     private val SAVE_LAST_USED_KEYBOARD = Pair("save_last_used_keyboard", false)
     private val SAVE_LAST_USED_KEYBOARD_POSITION = Pair("save_last_used_keyboard_int", 0)
-
-    private val ENABLE_ZENZ_RIGHT_CONTEXT_PREFERENCE =
-        Pair("enable_zenz_right_context_preference", false)
 
     private val TYPO_CORRECTION_JA_FLICK =
         Pair("enable_typo_correction_japanese_flick_keyboard_preference", false)
@@ -3547,29 +3536,6 @@ object AppPreference {
             it.putBoolean(LATTICE_LM_COST_PREFERENCE.first, value)
         }
 
-    var sumire_lm_zenz_margin_preference: Int
-        get() = preferences.getInt(
-            SUMIRE_LM_ZENZ_MARGIN_PREFERENCE.first,
-            SUMIRE_LM_ZENZ_MARGIN_PREFERENCE.second
-        )
-        set(value) = preferences.edit {
-            it.putInt(SUMIRE_LM_ZENZ_MARGIN_PREFERENCE.first, value)
-        }
-
-    /** necookey: zenz/jinen は削除済み。保存済みの "zenz"/"jinen" も含め常に "sumire_lm" として扱う。 */
-    var zenz_engine_preference: String
-        get() = ZENZ_ENGINE_PREFERENCE.second
-        set(value) = preferences.edit {
-            it.putString(ZENZ_ENGINE_PREFERENCE.first, value)
-        }
-
-    /** necookey: zenz モデルは読み込まない（常に未設定）。 */
-    var zenz_model_uri_preference: String
-        get() = ""
-        set(value) = preferences.edit {
-            it.putString(ZENZ_MODEL_URI_PREFERENCE.first, value)
-        }
-
     var save_last_used_keyboard_enable_preference: Boolean
         get() = preferences.getBoolean(
             SAVE_LAST_USED_KEYBOARD.first,
@@ -3586,15 +3552,6 @@ object AppPreference {
         )
         set(value) = preferences.edit {
             it.putInt(SAVE_LAST_USED_KEYBOARD_POSITION.first, value)
-        }
-
-    var enable_zenz_right_context_preference: Boolean
-        get() = preferences.getBoolean(
-            ENABLE_ZENZ_RIGHT_CONTEXT_PREFERENCE.first,
-            ENABLE_ZENZ_RIGHT_CONTEXT_PREFERENCE.second
-        )
-        set(value) = preferences.edit {
-            it.putBoolean(ENABLE_ZENZ_RIGHT_CONTEXT_PREFERENCE.first, value)
         }
 
     var enable_typo_correction_japanese_flick_keyboard_preference: Boolean

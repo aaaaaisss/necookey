@@ -206,7 +206,6 @@ data class ImePreferencesSnapshot(
     val appearance: ImeKeyboardAppearance,
     val sumireEnglishQwertyPreference: Boolean,
     val conversionCandidatesRomajiEnablePreference: Boolean,
-    val enableZenzRightContextPreference: Boolean,
     val learnFirstCandidateDictionaryPreference: Boolean,
     val learnDictionaryAllowMixedSymbolsNumbersPreference: Boolean,
     val enablePredictionSearchLearnDictionaryPreference: Boolean,
@@ -633,8 +632,6 @@ data class ImePreferencesSnapshot(
                     appPreference.sumire_english_qwerty_preference,
                 conversionCandidatesRomajiEnablePreference =
                     appPreference.conversion_candidates_romaji_enable_preference,
-                enableZenzRightContextPreference =
-                    AppVariantConfig.hasZenz && appPreference.enable_zenz_right_context_preference,
                 learnFirstCandidateDictionaryPreference =
                     appPreference.learn_first_candidate_dictionary_preference,
                 learnDictionaryAllowMixedSymbolsNumbersPreference =

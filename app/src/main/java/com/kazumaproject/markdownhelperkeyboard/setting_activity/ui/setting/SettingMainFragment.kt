@@ -63,7 +63,7 @@ class SettingMainFragment : Fragment() {
                 "screen_conversion",
                 R.string.home_category_conversion,
                 R.string.home_category_conversion_summary,
-                if (AppVariantConfig.hasZenz) R.drawable.ic_home_zenz else R.drawable.ic_home_conversion,
+                R.drawable.ic_home_conversion,
             ),
             Category("screen_dictionary", R.string.home_category_dictionary, R.string.home_category_dictionary_summary, com.kazumaproject.core.R.drawable.dictionary_24px),
             Category("screen_other", R.string.home_category_other, R.string.home_category_other_summary, R.drawable.ic_home_info),

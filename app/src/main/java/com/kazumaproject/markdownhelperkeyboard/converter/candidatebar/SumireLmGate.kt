@@ -1,5 +1,7 @@
 package com.kazumaproject.markdownhelperkeyboard.converter.candidatebar
 
+import com.kazumaproject.markdownhelperkeyboard.converter.candidate.CANDIDATE_TYPE_USER_DICTIONARY
+
 import com.kazumaproject.markdownhelperkeyboard.converter.candidate.Candidate
 import com.kazumaproject.markdownhelperkeyboard.converter.candidate.CandidateConversionSegment
 import com.kazumaproject.markdownhelperkeyboard.converter.sumirelm.SumireLmReranker
@@ -49,7 +51,7 @@ object SumireLmGate {
             .filter { it.length.toInt() == input.length && !isExcluded(it) && seen.add(it.string) }
             .take(POOL_SIZE)
             .toList()
-        if (pool.isEmpty() || ZenzaiConstraint.isProtectedCandidateType(pool[0].type)) return null
+        if (pool.isEmpty() || pool[0].type == CANDIDATE_TYPE_USER_DICTIONARY) return null
         val inputs = pool.mapIndexed { rank, c ->
             val segs = segmentsOf(c)
             SumireLmReranker.Input(
@@ -68,7 +70,4 @@ object SumireLmGate {
         return Decision(top = pool[order[0]], margin = margin, ranked = order.map { pool[it] }, scores = order.map { scores[it] })
     }
 
-    /** zenz に回すか。マージンが取れない（候補 1 つ・リランカーなし）ときは回さない。 */
-    fun needsZenz(margin: Double?, thresholdCents: Int): Boolean =
-        margin != null && margin < thresholdCents / 100.0
 }

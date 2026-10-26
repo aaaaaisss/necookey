@@ -59,8 +59,6 @@ class SumireLmGateTest {
         assertEquals("とうきょうに", d.top.string)
         assertEquals(listOf("とうきょうに", "トウキョウに", "東京に"), d.ranked.map { it.string })
         assertEquals(1.0, d.margin!!, 1e-9)
-        assertFalse(SumireLmGate.needsZenz(d.margin, 50))
-        assertTrue(SumireLmGate.needsZenz(d.margin, 150))
     }
 
     @Test
@@ -71,7 +69,6 @@ class SumireLmGateTest {
         val d = SumireLmGate.rerank(reranker, input, "きのうは", listOf(c("東京に", input.length, 10)), { segs })!!
         assertEquals("東京に", d.top.string)
         assertNull(d.margin)
-        assertFalse(SumireLmGate.needsZenz(d.margin, 300))
     }
 
     @Test
@@ -101,11 +98,4 @@ class SumireLmGateTest {
         assertTrue("false hits $other", other <= 1)
     }
 
-    @Test
-    fun marginThresholdBoundary() {
-        assertTrue(SumireLmGate.needsZenz(0.49, 50))
-        assertFalse(SumireLmGate.needsZenz(0.5, 50))
-        assertFalse(SumireLmGate.needsZenz(0.1, 0))
-        assertFalse(SumireLmGate.needsZenz(null, 300))
-    }
 }

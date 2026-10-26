@@ -743,10 +743,8 @@
     <string name="necookey_candidate_bar_category_title">necookey（2段候補バー）</string>
     <string name="necookey_two_row_candidate_bar_title">2段の候補バー</string>
     <string name="necookey_two_row_candidate_bar_summary">上段に変換結果と最初の文節の別候補、下段に予測候補を表示します（通常のソフトウェアキーボードのみ）。</string>
-    <string name="necookey_zenz_bunsetsu_gate_title">zenz で変換を補正（Zenzai）</string>
-    <string name="necookey_zenz_bunsetsu_gate_summary">入力ごとに辞書の第一候補を端末内の zenz が 1 回だけ確認し、違うと判断した位置から辞書で探し直します。確定後の後続語候補も zenz で並べ替えます。</string>
-    <string name="candidate_badge_zenz_gate">[Z]</string>
-    <string name="candidate_badge_zenz_checked">[z]</string>
+    <string name="necookey_zenz_bunsetsu_gate_title">リランカーで変換を補正（SUMIRE-LM）</string>
+    <string name="necookey_zenz_bunsetsu_gate_summary">辞書の候補を端末内の軽量モデル（SUMIRE-LM）で並べ替えて、第一候補を選び直します。2段候補バーが必要です。</string>
     <string name="cursor_move_target_pairs_not_set">未設定</string>
     <string name="next_word_learning_category_title">後続語</string>
     <string name="next_word_learning_view_title">後続語の学習を表示</string>
@@ -772,8 +770,8 @@
     <!-- 設定ホーム（UI 再設計） -->
     <string name="home_category_keyboard">キーボード</string>
     <string name="home_category_keyboard_summary">配列・サイズ・キー操作</string>
-    <string name="home_category_conversion">変換とzenz</string>
-    <string name="home_category_conversion_summary">候補の出し方とAI変換</string>
+    <string name="home_category_conversion">変換</string>
+    <string name="home_category_conversion_summary">候補の出し方と変換補正</string>
     <string name="home_category_dictionary">辞書と学習</string>
     <string name="home_category_dictionary_summary">ユーザー辞書・学習・NGワード</string>
     <string name="home_category_symbol_clipboard">クリップボード・記号</string>
@@ -811,5 +809,5 @@
     <string name="settings_ut_places_summary">地名を変換候補に出します</string>
     <string name="settings_ut_wiki_title">Wikipedia 辞書</string>
     <string name="settings_ut_wiki_summary">固有名詞や用語を増やします</string>
-    <string name="home_hero_subtitle">zenz 搭載の日本語キーボード</string>
+    <string name="home_hero_subtitle">AIなしで賢い日本語キーボード</string>
 </resources>

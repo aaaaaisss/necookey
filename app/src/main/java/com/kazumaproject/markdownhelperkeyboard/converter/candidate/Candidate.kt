@@ -18,8 +18,4 @@ data class Candidate(
     val commitText: String = string,
     /** Exact conversion path used only to align live candidate readings. */
     val conversionSegments: List<CandidateConversionSegment> = emptyList(),
-    /** True when the two-row bar's primary was selected by the zenz bunsetsu gate. */
-    val zenzAdjusted: Boolean = false,
-    /** zenz がこの変換を評価して同意した（判定キャッシュの再利用を含む）。表示は [z]。 */
-    val zenzChecked: Boolean = false,
 )

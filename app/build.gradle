@@ -68,14 +68,12 @@ android {
     productFlavors {
         full {
             dimension "edition"
-            buildConfigField "boolean", "HAS_ZENZ", "false"
             buildConfigField "String", "APP_EDITION", "\"full\""
         }
         lite {
             dimension "edition"
             applicationIdSuffix ".lite"
             versionNameSuffix "-lite"
-            buildConfigField "boolean", "HAS_ZENZ", "false"
             buildConfigField "String", "APP_EDITION", "\"lite\""
         }
         standard {

@@ -181,8 +181,6 @@ import com.kazumaproject.markdownhelperkeyboard.R
 import com.kazumaproject.markdownhelperkeyboard.clipboard_history.database.ClipboardHistoryItem
 import com.kazumaproject.markdownhelperkeyboard.clipboard_history.database.ItemType
 import com.kazumaproject.markdownhelperkeyboard.converter.candidate.BunsetsuCandidateResult
-import com.kazumaproject.markdownhelperkeyboard.converter.candidatebar.ZenzaiConstraint
-import com.kazumaproject.markdownhelperkeyboard.converter.candidatebar.ZenzaiGate
 import com.kazumaproject.markdownhelperkeyboard.converter.candidatebar.SumireLmGate
 import com.kazumaproject.markdownhelperkeyboard.converter.sumirelm.SumireLmReranker
 import com.kazumaproject.markdownhelperkeyboard.converter.candidatebar.BunsetsuAnalysis
@@ -270,7 +268,6 @@ import com.kazumaproject.markdownhelperkeyboard.ime_service.keyboard_layout_edit
 import com.kazumaproject.markdownhelperkeyboard.ime_service.keyboard_layout_edit.KeyboardLayoutEditTarget
 import com.kazumaproject.markdownhelperkeyboard.ime_service.keyboard_layout_edit.KeyboardLayoutEditValues
 import com.kazumaproject.markdownhelperkeyboard.ime_service.keyboard_layout_edit.NormalKeyboardLayoutEditSurface
-import com.kazumaproject.markdownhelperkeyboard.ime_service.models.CandidateEvaluationResult
 import com.kazumaproject.markdownhelperkeyboard.ime_service.models.CandidateShowFlag
 import com.kazumaproject.markdownhelperkeyboard.ime_service.models.SymbolKeyboardState
 import com.kazumaproject.markdownhelperkeyboard.ime_service.romaji_kana.CustomRomajiScreenConverter
@@ -428,9 +425,8 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         val selectionEnd: Int,
     )
 
-    private data class ZenzContext(
+    private data class ConversionContext(
         val leftContext: String,
-        val rightContext: String
     )
 
     private data class SuggestionLayoutKey(
@@ -1388,8 +1384,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
     private var sumireEnglishQwertyPreference: Boolean? = false
     private var conversionCandidatesRomajiEnablePreference: Boolean? = false
 
-    private var enableZenzRightContextPreference: Boolean? = false
-
     private var learnFirstCandidateDictionaryPreference: Boolean? = false
     private var learnDictionaryAllowMixedSymbolsNumbersPreference: Boolean = true
     private var enablePredictionSearchLearnDictionaryPreference: Boolean? = false
@@ -1530,7 +1524,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         const val CANDIDATE_TYPE_NEXT_WORD: Byte = 53
         /** 文脈絵文字の事前スコア（モデルごとに一度だけ計算）の保存先。 */
 
-        private const val ZENZ_ENGINE_SUMIRE_LM = "sumire_lm"
         /** SUMIRE-LM の表（tools/sumire_lm/export_od.py の出力）を置くディレクトリ名（外部ファイル領域 / 内部 / アセット）。 */
         private const val SUMIRE_LM_TABLE_DIR = "sumire_lm"
         /** 表が見つからなかったときに次に探すまでの間隔。 */
@@ -1544,16 +1537,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         private const val PAGE_SIZE: Int = 5
         /** Height of necookey's bottom (prediction) candidate row. */
         private const val NECOOKEY_PREDICTION_ROW_HEIGHT_DP = 44
-        private const val ZENZ_LIVE_SLOT_EMPTY_TEXT = "..."
-        private val ZENZ_LIVE_SLOT_TYPE = (33).toByte()
-        private val ZENZ_LIVE_SLOT_TYPES = setOf(
-            (33).toByte(),
-            (36).toByte(),
-            (37).toByte(),
-            (38).toByte(),
-            (39).toByte(),
-            (40).toByte()
-        )
         private val DEFAULT_DELETE_KEY_FLICK_TARGETS =
             DeleteKeyFlickDeleteTargetRepository.DEFAULT_TARGET_SYMBOLS.toSet()
         private val ALWAYS_DELETE_KEY_FLICK_BOUNDARIES = setOf(' ', '　', '\n')
@@ -1640,18 +1623,18 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
     private var addUserDictionaryPopup: PopupWindow? = null
 
     private var filteredCandidateList: List<Candidate>? = emptyList()
-    private var zenzRerankJob: Job? = null
-    private var zenzRerankRequestToken: Long = 0L
+    private var rerankJob: Job? = null
+    private var rerankRequestToken: Long = 0L
 
-    // necookey: two-row candidate bar + Zenzai (zenz verifies Sumire's draft, one inference per key).
+    // necookey: two-row candidate bar + SUMIRE-LM rerank of Sumire's draft.
     private val necookeyCandidateBarConfig = NecookeyCandidateBarConfig.DEFAULT
-    private var necookeyZenzJob: Job? = null
+    private var necookeyRerankJob: Job? = null
 
-    /** Zenzai cache key of [necookeyZenzJob]; a repeat request for the same key keeps the running job. */
-    private var necookeyZenzJobKey: String? = null
-    private var necookeyZenzJobInput: String? = null
-    /** Newest candidate token for [necookeyZenzJobInput]; the running job publishes with it. */
-    private var necookeyZenzLatestToken: CandidateRequestToken? = null
+    /** Rerank cache key of [necookeyRerankJob]; a repeat request for the same key keeps the running job. */
+    private var necookeyRerankJobKey: String? = null
+    private var necookeyRerankJobInput: String? = null
+    /** Newest candidate token for [necookeyRerankJobInput]; the running job publishes with it. */
+    private var necookeyRerankLatestToken: CandidateRequestToken? = null
     /** Bunsetsu analysis + paths of the latest two-row conversion; used to learn per bunsetsu. */
     /** Editor text left of the composition, captured for [necookeyLeftContextInput]. */
     @Volatile
@@ -1694,11 +1677,12 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
     /** Input the bottom row currently belongs to; the row hides itself for any other input. */
     private var necookeyPredictionRowInput: String = ""
     private var necookeyPredictionRowCandidates: List<Candidate> = emptyList()
-    /** (文脈, 読み, sumire 最良) -> (zenzai の結果（変更なしは null）, 引き継ぐ制約)。 */
-    private val necookeyZenzOverrideCache =
-        object : LinkedHashMap<String, Pair<Candidate?, ZenzaiConstraint?>>(16, 0.75f, true) {
+    /** (文脈, 読み, sumire 最良) -> リランカーの結果（変更なしは override = null）。 */
+    private data class RerankCacheEntry(val override: Candidate?)
+    private val necookeyRerankOverrideCache =
+        object : LinkedHashMap<String, RerankCacheEntry>(16, 0.75f, true) {
             override fun removeEldestEntry(
-                eldest: MutableMap.MutableEntry<String, Pair<Candidate?, ZenzaiConstraint?>>?,
+                eldest: MutableMap.MutableEntry<String, RerankCacheEntry>?,
             ): Boolean = size > 32
         }
     @Volatile
@@ -2597,7 +2581,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         sumireEnglishQwertyPreference = preferences.sumireEnglishQwertyPreference
         conversionCandidatesRomajiEnablePreference =
             preferences.conversionCandidatesRomajiEnablePreference
-        enableZenzRightContextPreference = preferences.enableZenzRightContextPreference
         learnFirstCandidateDictionaryPreference =
             preferences.learnFirstCandidateDictionaryPreference
         learnDictionaryAllowMixedSymbolsNumbersPreference =
@@ -3100,10 +3083,10 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         kanaKanjiEngineActivationJob?.cancel()
         suggestionAdapter?.release()
         suggestionAdapter = null
-        necookeyZenzJob?.cancel()
-        necookeyZenzJob = null
-        necookeyZenzJobKey = null
-        necookeyZenzJobInput = null
+        necookeyRerankJob?.cancel()
+        necookeyRerankJob = null
+        necookeyRerankJobKey = null
+        necookeyRerankJobInput = null
         necookeyPredictionAdapter?.release()
         necookeyPredictionAdapter = null
         shortcutAdapter = null
@@ -3310,7 +3293,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
 
         sumireEnglishQwertyPreference = null
         conversionCandidatesRomajiEnablePreference = null
-        enableZenzRightContextPreference = null
         learnFirstCandidateDictionaryPreference = null
         learnDictionaryAllowMixedSymbolsNumbersPreference = true
         enablePredictionSearchLearnDictionaryPreference = null
@@ -5129,7 +5111,7 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
                             )
                         }
                         withContext(Dispatchers.Main) {
-                            necookeyZenzOverrideCacheClear()
+                            necookeyRerankOverrideCacheClear()
                             requestCandidateRefresh(CandidateShowFlag.Updating)
                         }
                     }
@@ -5297,8 +5279,8 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         refreshCandidateStripContent()
     }
 
-    private fun necookeyZenzOverrideCacheClear() {
-        synchronized(necookeyZenzOverrideCache) { necookeyZenzOverrideCache.clear() }
+    private fun necookeyRerankOverrideCacheClear() {
+        synchronized(necookeyRerankOverrideCache) { necookeyRerankOverrideCache.clear() }
     }
 
     private fun handleSelectedTextSelection(selectedText: String) {
@@ -9226,56 +9208,34 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
     }
 
 
-    private fun beginZenzRerankRequest(): Long {
-        zenzRerankJob?.cancel()
-        zenzRerankJob = null
-        zenzRerankRequestToken += 1L
-        return zenzRerankRequestToken
+    private fun beginRerankRequest(): Long {
+        rerankJob?.cancel()
+        rerankJob = null
+        rerankRequestToken += 1L
+        return rerankRequestToken
     }
 
-    private suspend fun getZenzContext(
+    private suspend fun getConversionContext(
         insertString: String,
         leftContextOverride: String? = null
-    ): ZenzContext {
+    ): ConversionContext {
         return try {
-            val (inputConnection, lastCandidateLength, enableRightContext) =
+            val (inputConnection, lastCandidateLength) =
                 withContext(Dispatchers.Main.immediate) {
-                    Triple(
-                        currentInputConnection,
-                        if (isLiveConversionEnable == true) {
-                            lastCandidate?.length ?: 0
-                        } else {
-                            insertString.length
-                        },
-                        enableZenzRightContextPreference == true,
-                    )
+                    currentInputConnection to if (isLiveConversionEnable == true) {
+                        lastCandidate?.length ?: 0
+                    } else {
+                        insertString.length
+                    }
                 }
             val leftContext = leftContextOverride ?: getLeftContext(
                 inputConnection = inputConnection,
                 inputLength = lastCandidateLength,
             ).dropLast(lastCandidateLength)
-            val rawRightContext = if (enableRightContext) {
-                getRightContext(
-                    inputConnection = inputConnection,
-                    inputLength = lastCandidateLength,
-                )
-            } else {
-                ""
-            }
-            withContext(Dispatchers.Main.immediate) {
-                val resolvedContext = resolveZenzContext(
-                    leftContext = leftContext,
-                    rawRightContext = rawRightContext,
-                    enableRightContext = enableRightContext
-                )
-                ZenzContext(
-                    leftContext = resolvedContext.leftContext,
-                    rightContext = resolvedContext.rightContext
-                )
-            }
+            ConversionContext(leftContext = leftContext)
         } catch (e: Exception) {
-            Timber.e(e, "Error getZenzContext")
-            ZenzContext("", "")
+            Timber.e(e, "Error getConversionContext")
+            ConversionContext("")
         }
     }
 
@@ -9288,8 +9248,8 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
             return
         }
         val localCandidates = candidates
-        val displayedCandidatesWithZenz = localCandidates
-        val displayedCandidates = displayedCandidatesWithZenz
+        val displayedCandidatesWithRerank = localCandidates
+        val displayedCandidates = displayedCandidatesWithRerank
         if (!suppressSuggestions) {
             updateSuggestionAdaptersOnMain(
                 candidates = displayedCandidates,
@@ -9349,23 +9309,11 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         }
     }
 
-    private data class ZenzaiOutcome(
+    private data class RerankOutcome(
         val top: Candidate,
         val changed: Boolean,
         val inferred: Boolean,
-        /** FIX/WHOLE で直した結果をまだ zenz が確認していない（入力が止まったら追加で判定する対象）。 */
-        val unverifiedFix: Boolean = false,
     )
-
-    /**
-     * Sumire の 1 位と 2 位（読み全体を覆う別表記のシステム辞書経路の最小コスト）の差。ZENZ-GATE と診断に使う。
-     */
-    private fun sumireCostGap(insertString: String, candidates: List<Candidate>, top: Candidate): Int? =
-        ZenzaiGate.pathCostGap(insertString, candidates, top)
-
-    /** 変換エンジンが Sumire + SUMIRE-LM リランカー（迷った読みだけ zenz）か。 */
-    private fun isSumireLmEngine(): Boolean =
-        AppPreference.zenz_engine_preference == ZENZ_ENGINE_SUMIRE_LM
 
     @Volatile private var latticeLmLoadStarted = false
 
@@ -9460,11 +9408,10 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
     private suspend fun runSumireLmStep(
         insertString: String,
         sumireTop: Candidate,
-        context: ZenzContext,
-        sumireGap: Int?,
+        context: ConversionContext,
         sumireCandidates: List<Candidate>,
         onProvisional: suspend (Candidate) -> Unit,
-    ): ZenzaiOutcome? {
+    ): RerankOutcome? {
         val session = kanaKanjiConversionSession ?: return null
         val request = lastKanaKanjiQueryRequest?.copy(input = insertString) ?: return null
         val leftContext = context.leftContext.takeLast(necookeyCandidateBarConfig.maxLeftContextChars)
@@ -9516,28 +9463,28 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
             "sumire-lm: input=[%s] sumire=[%s] rerank=[%s] margin=%s",
             insertString, sumireTop.string, top.string, margin,
         )
-        return ZenzaiOutcome(top = top, changed = top.string != sumireTop.string, inferred = false)
+        return RerankOutcome(top = top, changed = top.string != sumireTop.string, inferred = false)
     }
 
-    /** zenz を回す対象か（唯一の設定は zenz の ON/OFF）。 */
-    private fun isZenzaiEligible(insertString: String): Boolean =
-        necookeyZenzGateEnabled() &&
+    /** リランカーを回す対象か。 */
+    private fun isRerankEligible(insertString: String): Boolean =
+        necookeyRerankEnabled() &&
             insertString.length >= 2 &&
             insertString.length <= (
-                necookeyCandidateBarConfig.maxZenzInputLength
+                necookeyCandidateBarConfig.maxRerankInputLength
                 ) &&
             insertString.isAllHiraganaWithSymbols() &&
             currentInputType !in passwordTypes
 
-    private fun zenzaiKey(context: ZenzContext, input: String, draft: String): String =
-        listOf(context.leftContext, context.rightContext, input, draft)
+    private fun rerankKey(context: ConversionContext, input: String, draft: String): String =
+        listOf(context.leftContext, input, draft)
             .joinToString("\u0001") { "${it.length}:$it" }
 
     /** ユーザー辞書の候補: 読みが入力と完全一致する語を先に、その中はスコア（小さいほど強い）順。 */
     private fun userDictionaryExactFirst(input: String): Comparator<Candidate> =
         compareBy<Candidate>({ it.length.toInt() != input.length }, { it.score })
 
-    private fun promoteZenzaiCandidate(candidates: List<Candidate>, top: Candidate?): List<Candidate> {
+    private fun promoteRerankedCandidate(candidates: List<Candidate>, top: Candidate?): List<Candidate> {
         if (top == null) return candidates
         val index = candidates.indexOfFirst { it.string == top.string }
         if (index == 0) {
@@ -9551,30 +9498,29 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
     }
 
     /** 1 段バー（従来の候補欄）用。結果で先頭を差し替えて再表示する。 */
-    private fun launchZenzaiForList(
+    private fun launchRerankForList(
         requestToken: Long,
         insertString: String,
         baseCandidates: List<Candidate>,
-        context: ZenzContext,
+        context: ConversionContext,
         mainView: MainLayoutBinding,
         candidateToken: CandidateRequestToken,
     ) {
         val sumireTop = baseCandidates.firstOrNull {
             it.length.toInt() == insertString.length
         } ?: return
-        val sumireGap = sumireCostGap(insertString, baseCandidates, sumireTop)
-        zenzRerankJob = scope.launch {
+        rerankJob = scope.launch {
             // 待たずに始める（次の打鍵でキャンセル）。
-            if (requestToken != zenzRerankRequestToken ||
+            if (requestToken != rerankRequestToken ||
                 !shouldApplyCandidateResult(insertString, candidateToken)
             ) return@launch
             suspend fun show(top: Candidate) {
-                if (requestToken != zenzRerankRequestToken ||
+                if (requestToken != rerankRequestToken ||
                     !shouldApplyCandidateResult(insertString, candidateToken)
                 ) return
-                val reranked = promoteZenzaiCandidate(baseCandidates, top)
+                val reranked = promoteRerankedCandidate(baseCandidates, top)
                 if (reranked == baseCandidates) return
-                withContext(Dispatchers.Main.immediate) { adoptZenzaiBunsetsuPath(insertString, top) }
+                withContext(Dispatchers.Main.immediate) { adoptRerankBunsetsuPath(insertString, top) }
                 updateDisplayedCandidates(
                     insertString = insertString,
                     candidates = reranked,
@@ -9592,7 +9538,7 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
                 }
             }
             val outcome = try {
-                runSumireLmStep(insertString, sumireTop, context, sumireGap, baseCandidates, ::show)
+                runSumireLmStep(insertString, sumireTop, context, baseCandidates, ::show)
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
@@ -10625,9 +10571,9 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
      * Zenzai が採用した（FIX 制約で再探索した）経路を文節区切りの基準にする。矢印での文節伸縮・
      * 文節変換は Sumire の元の最良経路ではなく、この経路の conversionSegments に従う。
      */
-    private fun adoptZenzaiBunsetsuPath(input: String, accepted: Candidate) {
+    private fun adoptRerankBunsetsuPath(input: String, accepted: Candidate) {
         // sumire_lm ではリランカーの 1 位（zenz の印なし）も、その文節経路を採る。
-        if (!(accepted.zenzAdjusted || isSumireLmEngine()) || accepted.length.toInt() != input.length) return
+        if (accepted.length.toInt() != input.length) return
         val segments = accepted.conversionSegments
         if (segments.isEmpty() || segments.last().inputEnd != input.length) return
         val splits = sanitizeSplitPositions(input, segments.map { it.inputEnd }.dropLast(1))
@@ -14209,14 +14155,14 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         mainView: MainLayoutBinding,
         token: CandidateRequestToken,
     ) {
-        val requestToken = beginZenzRerankRequest()
+        val requestToken = beginRerankRequest()
         val candidates = getSuggestionList(insertString, mainView, token)
         val filtered = if (stringInTail.get().isNotEmpty()) {
             candidates.filter { it.length.toInt() == insertString.length }
         } else {
             candidates
         }
-        val zenzaiContext = if (isZenzaiEligible(insertString)) getZenzContext(insertString) else null
+        val rerankContext = if (isRerankEligible(insertString)) getConversionContext(insertString) else null
         val displayedCandidates = filtered
         if (!shouldApplyCandidateResult(insertString, token)) {
             return
@@ -14269,12 +14215,12 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         Timber.d("setCandidates called: $bunsetusMultipleDetect $bunsetsuPositionList i:[$insertString] s:[$stringInTail]")
         updateBunsetsuSpaceKeyIfNeededOnMain(mainView, displayedCandidates, insertString)
 
-        if (zenzaiContext != null) {
-            launchZenzaiForList(
+        if (rerankContext != null) {
+            launchRerankForList(
                 requestToken = requestToken,
                 insertString = insertString,
                 baseCandidates = filtered,
-                context = zenzaiContext,
+                context = rerankContext,
                 mainView = mainView,
                 candidateToken = token,
             )
@@ -14287,14 +14233,14 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         mainView: MainLayoutBinding,
         token: CandidateRequestToken,
     ) {
-        val requestToken = beginZenzRerankRequest()
+        val requestToken = beginRerankRequest()
         val candidates = getSuggestionListOriginal(insertString, mainView, token)
         val filtered = if (stringInTail.get().isNotEmpty()) {
             candidates.filter { it.length.toInt() == insertString.length }
         } else {
             candidates
         }
-        val zenzaiContext = if (isZenzaiEligible(insertString)) getZenzContext(insertString) else null
+        val rerankContext = if (isRerankEligible(insertString)) getConversionContext(insertString) else null
         val displayedCandidates = filtered
         if (!shouldApplyCandidateResult(insertString, token)) {
             return
@@ -14345,12 +14291,12 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         Timber.d("setCandidates called: $bunsetusMultipleDetect $bunsetsuPositionList i:[$insertString] s:[$stringInTail]")
         updateBunsetsuSpaceKeyIfNeededOnMain(mainView, displayedCandidates, insertString)
 
-        if (zenzaiContext != null) {
-            launchZenzaiForList(
+        if (rerankContext != null) {
+            launchRerankForList(
                 requestToken = requestToken,
                 insertString = insertString,
                 baseCandidates = filtered,
-                context = zenzaiContext,
+                context = rerankContext,
                 mainView = mainView,
                 candidateToken = token,
             )
@@ -14362,7 +14308,7 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         mainView: MainLayoutBinding,
         token: CandidateRequestToken,
     ) {
-        beginZenzRerankRequest()
+        beginRerankRequest()
         val candidates = getSuggestionListWithoutPrediction(insertString, token)
         val filtered = if (stringInTail.get().isNotEmpty()) {
             candidates.filter { it.length.toInt() == insertString.length }
@@ -14448,18 +14394,18 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
     private fun necookeyPredictionRowBudgetDp(): Int =
         if (isNecookeyTwoRowSurfaceAvailable()) NECOOKEY_PREDICTION_ROW_HEIGHT_DP else 0
 
-    /** SUMIRE-LM リランカーの経路（旧 zenz ゲート）。zenz 本体は削除済みで、迷っても zenz には回らない。 */
-    private fun necookeyZenzGateEnabled(): Boolean =
+    /** SUMIRE-LM リランカーの経路を使うか（設定キーは旧 zenz ゲートのまま）。 */
+    private fun necookeyRerankEnabled(): Boolean =
         appPreference.necookey_zenz_bunsetsu_gate_preference
 
     @Suppress("UNUSED_PARAMETER")
     private fun isNecookeyActionCandidate(candidate: Candidate): Boolean = false
 
     private fun cancelNecookeyTwoRowBar() {
-        necookeyZenzJob?.cancel()
-        necookeyZenzJob = null
-        necookeyZenzJobKey = null
-        necookeyZenzJobInput = null
+        necookeyRerankJob?.cancel()
+        necookeyRerankJob = null
+        necookeyRerankJobKey = null
+        necookeyRerankJobInput = null
         if (necookeyPredictionRowInput.isNotEmpty() || necookeyPredictionRowCandidates.isNotEmpty()) {
             necookeyPredictionRowInput = ""
             necookeyPredictionRowCandidates = emptyList()
@@ -14472,17 +14418,17 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         mainView: MainLayoutBinding,
         token: CandidateRequestToken,
     ) {
-        beginZenzRerankRequest()
+        beginRerankRequest()
         // Latest-wins, but only a request for a different reading cancels the running inference.
         // A refresh for the same reading (selection update, live-conversion echo) may return early
         // below; cancelling here would drop the final keystroke's zenz result.
-        if (necookeyZenzJobInput != insertString) {
-            necookeyZenzJob?.cancel()
-            necookeyZenzJob = null
-            necookeyZenzJobKey = null
-            necookeyZenzJobInput = insertString
+        if (necookeyRerankJobInput != insertString) {
+            necookeyRerankJob?.cancel()
+            necookeyRerankJob = null
+            necookeyRerankJobKey = null
+            necookeyRerankJobInput = insertString
         }
-        necookeyZenzLatestToken = token
+        necookeyRerankLatestToken = token
 
         // Prediction first: both lookups update the shared bunsetsu state, and the conversion
         // result must be the one left behind for space / henkan handling.
@@ -14501,15 +14447,15 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         val baseAnalysis = core?.let { result -> analyzeNecookeyBunsetsu(insertString, result) }
         necookeyLearningAnalysis = baseAnalysis
         necookeyLearningSegmentsByString = core?.candidateSegmentsByString.orEmpty()
-        val zenzaiOn = baseAnalysis != null && isZenzaiEligible(insertString)
+        val rerankOn = baseAnalysis != null && isRerankEligible(insertString)
         // Capture editor context before publishing the initial bar, which may apply live
         // conversion and mutate the composing text.
-        val context = if (zenzaiOn) getZenzContext(insertString) else null
+        val context = if (rerankOn) getConversionContext(insertString) else null
         if (!shouldApplyCandidateResult(insertString, token)) return
         val leftContext = when {
             isLearnDictionaryMode != true -> ""
             context != null -> context.leftContext
-            else -> getZenzContext(insertString).leftContext
+            else -> getConversionContext(insertString).leftContext
         }
         necookeyLeftContext = leftContext
         necookeyLeftContextInput = insertString
@@ -14518,14 +14464,14 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
 
         val sumireTop = baseAnalysis?.primary
         val cacheKey = if (sumireTop != null && context != null) {
-            zenzaiKey(context, insertString, sumireTop.string)
+            rerankKey(context, insertString, sumireTop.string)
         } else {
             null
         }
         val cached = cacheKey?.let { key ->
-            synchronized(necookeyZenzOverrideCache) { necookeyZenzOverrideCache[key] }
+            synchronized(necookeyRerankOverrideCache) { necookeyRerankOverrideCache[key] }
         }
-        val cachedOverride = cached?.first
+        val cachedOverride = cached?.override
 
         if (!shouldApplyCandidateResult(insertString, token)) return
         val barPredictions = nextWordCandidates + predictions
@@ -14541,15 +14487,15 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         publishNecookeyTwoRowBar(insertString, bar, token, applyLiveConversion = true)
 
         // Keep a running rerank for exactly this context/reading/draft; anything else is superseded.
-        val keepRunning = cacheKey != null && necookeyZenzJobKey == cacheKey && necookeyZenzJob?.isActive == true
+        val keepRunning = cacheKey != null && necookeyRerankJobKey == cacheKey && necookeyRerankJob?.isActive == true
         if (!keepRunning) {
-            necookeyZenzJob?.cancel()
-            necookeyZenzJob = null
-            necookeyZenzJobKey = null
+            necookeyRerankJob?.cancel()
+            necookeyRerankJob = null
+            necookeyRerankJobKey = null
         }
         if (sumireTop != null && cacheKey != null && cached == null && context != null && !keepRunning) {
-            necookeyZenzJobKey = cacheKey
-            launchZenzaiForTwoRow(
+            necookeyRerankJobKey = cacheKey
+            launchRerankForTwoRow(
                 insertString = insertString,
                 analysis = baseAnalysis,
                 sumireTop = if (sumireTop.conversionSegments.isNotEmpty()) sumireTop else sumireTop.copy(
@@ -14564,27 +14510,26 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         }
     }
 
-    private fun launchZenzaiForTwoRow(
+    private fun launchRerankForTwoRow(
         insertString: String,
         analysis: BunsetsuAnalysis,
         sumireTop: Candidate,
         cacheKey: String,
-        context: ZenzContext,
+        context: ConversionContext,
         conversion: List<Candidate>,
         predictions: List<Candidate>,
         token: CandidateRequestToken,
     ) {
-        val sumireGap = sumireCostGap(insertString, conversion, sumireTop)
-        necookeyZenzJob = scope.launch {
+        necookeyRerankJob = scope.launch {
             var shown: Candidate? = null
             fun stillCurrent(): Boolean =
-                necookeyZenzJobKey == cacheKey && shouldApplyCandidateResult(insertString)
+                necookeyRerankJobKey == cacheKey && shouldApplyCandidateResult(insertString)
             if (!stillCurrent()) return@launch
             suspend fun show(top: Candidate) {
                 if (!stillCurrent()) return
                 if (!shouldUseNecookeyTwoRowBar()) return
                 val override = top.takeIf {
-                    it.string != sumireTop.string || it.zenzChecked || it.zenzAdjusted
+                    it.string != sumireTop.string
                 }
                 if (override == shown) return
                 val bar = TwoRowCandidateBarPlanner.plan(
@@ -14597,7 +14542,7 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
                     isActionCandidate = ::isNecookeyActionCandidate,
                 )
                 shown = override
-                publishNecookeyTwoRowBar(insertString, bar, necookeyZenzLatestToken ?: token, applyLiveConversion = false)
+                publishNecookeyTwoRowBar(insertString, bar, necookeyRerankLatestToken ?: token, applyLiveConversion = false)
                 if (
                     shouldStartLiveConversion(insertString) && !hasConvertedKatakana &&
                     inputString.value == insertString
@@ -14609,7 +14554,7 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
                 }
             }
             val outcome = try {
-                runSumireLmStep(insertString, sumireTop, context, sumireGap, conversion, ::show)
+                runSumireLmStep(insertString, sumireTop, context, conversion, ::show)
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
@@ -14618,10 +14563,10 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
             } ?: return@launch
             if (!stillCurrent()) return@launch
             shown = null // a same-reading refresh may have repainted the bar since the provisional
-            fun remember(result: ZenzaiOutcome) {
-                synchronized(necookeyZenzOverrideCache) {
-                    necookeyZenzOverrideCache[cacheKey] =
-                        (result.top.takeIf { result.changed || it.zenzChecked || it.zenzAdjusted }) to null
+            fun remember(result: RerankOutcome) {
+                synchronized(necookeyRerankOverrideCache) {
+                    necookeyRerankOverrideCache[cacheKey] =
+                        RerankCacheEntry(result.top.takeIf { result.changed })
                 }
             }
             remember(outcome)
@@ -14685,7 +14630,7 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
             necookeyPredictionRowInput = insertString
             necookeyTopRowInput = insertString
             necookeyPredictionRowCandidates = bar.predictions
-            bar.primary?.let { adoptZenzaiBunsetsuPath(insertString, it) }
+            bar.primary?.let { adoptRerankBunsetsuPath(insertString, it) }
         }
         if (!suppressSuggestions) {
             updateSuggestionAdaptersOnMain(
@@ -14745,7 +14690,7 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         insertString: String,
         token: CandidateRequestToken,
     ) {
-        beginZenzRerankRequest()
+        beginRerankRequest()
         val candidates = getSuggestionListEnglishKana(insertString)
         val filtered = if (stringInTail.get().isNotEmpty()) {
             candidates.filter { it.length.toInt() == insertString.length }
