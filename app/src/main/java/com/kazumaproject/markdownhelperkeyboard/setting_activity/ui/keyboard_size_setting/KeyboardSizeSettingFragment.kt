@@ -88,11 +88,7 @@ class KeyboardSettingFragment : Fragment() {
                 applyCurrentPageDimensions()
                 updateTooltipUI(position)
 
-                isRightAligned = if (position == KeyboardViewPagerAdapter.TEN_KEY_PAGE_POSITION) {
-                    appPreference.keyboard_position ?: true
-                } else {
-                    appPreference.qwerty_keyboard_position ?: true
-                }
+                isRightAligned = appPreference.keyboard_position ?: true
 
                 updateKeyboardAlignment()
             }
@@ -101,12 +97,6 @@ class KeyboardSettingFragment : Fragment() {
         binding.tenkeyTooltipButton.setOnClickListener {
             binding.keyboardViewPager.setCurrentItem(
                 KeyboardViewPagerAdapter.TEN_KEY_PAGE_POSITION,
-                true
-            )
-        }
-        binding.qwertyTooltipButton.setOnClickListener {
-            binding.keyboardViewPager.setCurrentItem(
-                KeyboardViewPagerAdapter.QWERTY_PAGE_POSITION,
                 true
             )
         }
@@ -124,21 +114,12 @@ class KeyboardSettingFragment : Fragment() {
         val marginStartDpPref: Int
         val marginEndDpPref: Int
 
-        if (position == KeyboardViewPagerAdapter.TEN_KEY_PAGE_POSITION) {
-            heightPref = appPreference.keyboard_height ?: 220
-            widthPref = appPreference.keyboard_width ?: 100
-            marginBottomPref = appPreference.keyboard_vertical_margin_bottom ?: 0
-            positionPref = appPreference.keyboard_position ?: true
-            marginStartDpPref = appPreference.keyboard_margin_start_dp ?: 0
-            marginEndDpPref = appPreference.keyboard_margin_end_dp ?: 0
-        } else {
-            heightPref = appPreference.qwerty_keyboard_height ?: 220
-            widthPref = appPreference.qwerty_keyboard_width ?: 100
-            marginBottomPref = appPreference.qwerty_keyboard_vertical_margin_bottom ?: 0
-            positionPref = appPreference.qwerty_keyboard_position ?: true
-            marginStartDpPref = appPreference.qwerty_keyboard_margin_start_dp ?: 0
-            marginEndDpPref = appPreference.qwerty_keyboard_margin_end_dp ?: 0
-        }
+        heightPref = appPreference.keyboard_height ?: 220
+        widthPref = appPreference.keyboard_width ?: 100
+        marginBottomPref = appPreference.keyboard_vertical_margin_bottom ?: 0
+        positionPref = appPreference.keyboard_position ?: true
+        marginStartDpPref = appPreference.keyboard_margin_start_dp ?: 0
+        marginEndDpPref = appPreference.keyboard_margin_end_dp ?: 0
 
         isRightAligned = positionPref
 
@@ -321,26 +302,14 @@ class KeyboardSettingFragment : Fragment() {
                         val currentPage = binding.keyboardViewPager.currentItem
                         if (lp.bottomMargin != initialBottomMarginPx) {
                             val value = (lp.bottomMargin / density).roundToInt()
-                            if (currentPage == KeyboardViewPagerAdapter.TEN_KEY_PAGE_POSITION) {
-                                appPreference.keyboard_vertical_margin_bottom = value
-                            } else {
-                                appPreference.qwerty_keyboard_vertical_margin_bottom = value
-                            }
+                            appPreference.keyboard_vertical_margin_bottom = value
                         }
                         if (isRightAligned && lp.marginEnd != initialMarginEndPx) {
                             val value = (lp.marginEnd / density).roundToInt()
-                            if (currentPage == KeyboardViewPagerAdapter.TEN_KEY_PAGE_POSITION) {
-                                appPreference.keyboard_margin_end_dp = value
-                            } else {
-                                appPreference.qwerty_keyboard_margin_end_dp = value
-                            }
+                            appPreference.keyboard_margin_end_dp = value
                         } else if (!isRightAligned && lp.marginStart != initialMarginStartPx) {
                             val value = (lp.marginStart / density).roundToInt()
-                            if (currentPage == KeyboardViewPagerAdapter.TEN_KEY_PAGE_POSITION) {
-                                appPreference.keyboard_margin_start_dp = value
-                            } else {
-                                appPreference.qwerty_keyboard_margin_start_dp = value
-                            }
+                            appPreference.keyboard_margin_start_dp = value
                         }
                     } else if (gestureStarted) {
                         applyCurrentPageDimensions()
@@ -463,27 +432,15 @@ class KeyboardSettingFragment : Fragment() {
                         val currentPage = binding.keyboardViewPager.currentItem
                         if ((edge == ResizeEdge.TOP || edge == ResizeEdge.BOTTOM) && lp.height != initialHeight) {
                             val value = (lp.height / density).roundToInt()
-                            if (currentPage == KeyboardViewPagerAdapter.TEN_KEY_PAGE_POSITION) {
-                                appPreference.keyboard_height = value
-                            } else {
-                                appPreference.qwerty_keyboard_height = value
-                            }
+                            appPreference.keyboard_height = value
                         }
                         if (edge == ResizeEdge.BOTTOM && lp.bottomMargin != initialBottomMargin) {
                             val value = (lp.bottomMargin / density).roundToInt()
-                            if (currentPage == KeyboardViewPagerAdapter.TEN_KEY_PAGE_POSITION) {
-                                appPreference.keyboard_vertical_margin_bottom = value
-                            } else {
-                                appPreference.qwerty_keyboard_vertical_margin_bottom = value
-                            }
+                            appPreference.keyboard_vertical_margin_bottom = value
                         }
                         if ((edge == ResizeEdge.LEFT || edge == ResizeEdge.RIGHT) && lp.width != initialWidth) {
                             val value = KeyboardPreviewGeometry.percentForWidth(lp.width, targetScreen.widthPx)
-                            if (currentPage == KeyboardViewPagerAdapter.TEN_KEY_PAGE_POSITION) {
-                                appPreference.keyboard_width = value
-                            } else {
-                                appPreference.qwerty_keyboard_width = value
-                            }
+                            appPreference.keyboard_width = value
                         }
                     } else if (gestureStarted) {
                         applyCurrentPageDimensions()
@@ -513,11 +470,7 @@ class KeyboardSettingFragment : Fragment() {
             isRightAligned = !isRightAligned
             val currentPage = binding.keyboardViewPager.currentItem
             previewGeneration++
-            if (currentPage == KeyboardViewPagerAdapter.TEN_KEY_PAGE_POSITION) {
-                appPreference.keyboard_position = isRightAligned
-            } else {
-                appPreference.qwerty_keyboard_position = isRightAligned
-            }
+            appPreference.keyboard_position = isRightAligned
             updateKeyboardAlignment()
         }
     }
@@ -527,25 +480,14 @@ class KeyboardSettingFragment : Fragment() {
             val currentPage = binding.keyboardViewPager.currentItem
             previewGeneration++
 
-            if (currentPage == KeyboardViewPagerAdapter.TEN_KEY_PAGE_POSITION) {
-                appPreference.keyboard_height = 220
-                appPreference.keyboard_width = 100
-                appPreference.keyboard_vertical_margin_bottom = 0
-                appPreference.keyboard_position = true
+            appPreference.keyboard_height = 220
+            appPreference.keyboard_width = 100
+            appPreference.keyboard_vertical_margin_bottom = 0
+            appPreference.keyboard_position = true
 
-                // 追加: 左右 margin も reset
-                appPreference.keyboard_margin_start_dp = 0
-                appPreference.keyboard_margin_end_dp = 0
-            } else {
-                appPreference.qwerty_keyboard_height = 220
-                appPreference.qwerty_keyboard_width = 100
-                appPreference.qwerty_keyboard_vertical_margin_bottom = 0
-                appPreference.qwerty_keyboard_position = true
-
-                // 追加: 左右 margin も reset
-                appPreference.qwerty_keyboard_margin_start_dp = 0
-                appPreference.qwerty_keyboard_margin_end_dp = 0
-            }
+            // 追加: 左右 margin も reset
+            appPreference.keyboard_margin_start_dp = 0
+            appPreference.keyboard_margin_end_dp = 0
 
             applyCurrentPageDimensions()
             updateKeyboardAlignment()
@@ -591,17 +533,9 @@ class KeyboardSettingFragment : Fragment() {
         constraintSet.applyTo(constraintLayout)
 
         val marginDp = if (isRightAligned) {
-            if (currentPage == KeyboardViewPagerAdapter.TEN_KEY_PAGE_POSITION) {
-                appPreference.keyboard_margin_end_dp ?: 0
-            } else {
-                appPreference.qwerty_keyboard_margin_end_dp ?: 0
-            }
+            appPreference.keyboard_margin_end_dp ?: 0
         } else {
-            if (currentPage == KeyboardViewPagerAdapter.TEN_KEY_PAGE_POSITION) {
-                appPreference.keyboard_margin_start_dp ?: 0
-            } else {
-                appPreference.qwerty_keyboard_margin_start_dp ?: 0
-            }
+            appPreference.keyboard_margin_start_dp ?: 0
         }
         val lp = binding.keyboardContainer.layoutParams as ConstraintLayout.LayoutParams
         val maxMargin = (targetScreen.widthPx - lp.width).coerceAtLeast(0)
@@ -621,9 +555,6 @@ class KeyboardSettingFragment : Fragment() {
         binding.tenkeyTooltipButton.setBackgroundColor(
             if (selectedPosition == KeyboardViewPagerAdapter.TEN_KEY_PAGE_POSITION) selectedColor else defaultColor
         )
-        binding.qwertyTooltipButton.setBackgroundColor(
-            if (selectedPosition == KeyboardViewPagerAdapter.QWERTY_PAGE_POSITION) selectedColor else defaultColor
-        )
     }
 
     private fun updateControlsVisibility() {
@@ -632,7 +563,6 @@ class KeyboardSettingFragment : Fragment() {
         binding.keyboardPositionButton.visibility = visibility
         binding.resetLayoutButton.visibility = visibility
         binding.tenkeyTooltipButton.visibility = visibility
-        binding.qwertyTooltipButton.visibility = visibility
     }
 
     override fun onDestroyView() {

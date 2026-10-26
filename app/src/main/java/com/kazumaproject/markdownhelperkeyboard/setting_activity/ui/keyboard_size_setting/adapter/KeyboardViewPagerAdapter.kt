@@ -18,8 +18,6 @@ class KeyboardViewPagerAdapter : RecyclerView.Adapter<KeyboardViewPagerAdapter.V
 
     companion object {
         const val TEN_KEY_PAGE_POSITION = 0
-        /** No QWERTY page any more; kept only so callers compile (never selected). */
-        const val QWERTY_PAGE_POSITION = -1
     }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ViewHolder {

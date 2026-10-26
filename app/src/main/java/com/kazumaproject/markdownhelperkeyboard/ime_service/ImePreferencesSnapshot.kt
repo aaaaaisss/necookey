@@ -75,70 +75,26 @@ data class ImePreferencesSnapshot(
     val flickThresholdShapePreferenceValue: String,
     val tfbiDiagonalRecognitionModePreferenceValue: String,
     val longPressTimeoutPreferenceValue: Int,
-    val qwertyShowIMEButtonPreference: Boolean,
-    val qwertyShowEmojiButtonPreference: Boolean,
     val tenkeyShowIMEButtonPreference: Boolean,
-    val qwertyShowCursorButtonsPreference: Boolean,
-    val qwertyShowNumberButtonsPreference: Boolean,
-    val qwertyShowSwitchRomajiEnglishPreference: Boolean,
-    val qwertyEnglishDirectInputPreference: Boolean,
-    val qwertyGlideInputPreference: Boolean,
-    val qwertyGlideCommitPreviousCandidateOnNewGlidePreference: Boolean,
-    val qwertyGlideInsertSpaceAfterCommittingPreviousCandidatePreference: Boolean,
-    val qwertyShowPopupWindowPreference: Boolean,
     val tenkeySpaceFlickPreference: Boolean,
-    val qwertyRomajiSpaceFlickPreference: Boolean,
-    val qwertyEnglishSpaceFlickPreference: Boolean,
-    val qwertyEnableFlickUpPreference: Boolean,
-    val qwertyEnableFlickDownPreference: Boolean,
-    val qwertyNumberKeyFlickUpChars: Map<String, String>,
-    val qwertyNumberKeyFlickDownChars: Map<String, String>,
     val qwertyEnableZenkakuSpacePreference: Boolean,
     val qwertyRomajiHankakuNumberPreference: Boolean,
     val qwertyRomajiHankakuSymbolPreference: Boolean,
-    val qwertyShowKutoutenButtonsPreference: Boolean,
     val showCandidateInPasswordPreference: Boolean,
-    val qwertyShowKeymapSymbolsPreference: Boolean,
-    val qwertyRomajiShiftConversionPreference: Boolean,
     val isNgWordEnable: Boolean,
     val deleteKeyHighLight: Boolean,
     val customKeyboardSuggestionPreference: Boolean,
     val customDirectInputReplaceComposingPreference: Boolean,
     val userDictionaryPrefixMatchNumber: Int,
-    val sumireInputKeyType: String,
-    val sumireInputKeyLayoutType: String,
-    val sumireInputStyle: String,
     val candidateColumns: String,
     val candidateColumnsLandscape: String,
     val candidateTabVisibility: Boolean,
     val stabilizeCandidateStripHeightPreference: Boolean,
     val symbolKeyboardFirstItem: SymbolMode,
     val defaultEmojiSkinTone: String,
-    val tenkeyQWERTYSwitchNumber: Boolean,
     val tenkeyUseThreeStateKeyboard: Boolean,
     val independentMultiTouchEnabled: Boolean,
     val tenkeyNumberSymbolKeyGapDp: Int,
-    val tenkeySwitchNumberToQwertyNumberPreference: Boolean,
-    val tenkeyRestoreInputModeOnRestart: Boolean,
-    val sumireRestoreInputModeOnRestart: Boolean,
-    val tenkeyRestoreInputModeOnlyWithinTime: Boolean,
-    val tenkeyRestoreInputModeTimeoutMinutes: Int,
-    val tenkeyLastInputModeSavedAtEpochMillis: Long,
-    val sumireRestoreInputModeOnlyWithinTime: Boolean,
-    val sumireRestoreInputModeTimeoutMinutes: Int,
-    val sumireLastInputModeSavedAtEpochMillis: Long,
-    val tenkeyLastInputModePreference: String,
-    val tenkeyLastInputModePresentationPreference: String,
-    val tenkeyLastQwertyNumberReturnTargetPreference: String,
-    val sumireLastInputModePreference: String,
-    val sumireLastInputModePresentationPreference: String,
-    val tabletTenkeyQwertySwitchEnglish: Boolean,
-    val tenkeyJapaneseKeymapGuide: Boolean,
-    val tenkeyEnglishKeymapGuide: Boolean,
-    val tenkeyNumberKeymapGuide: Boolean,
-    val sumireJapaneseKeymapGuide: Boolean,
-    val sumireEnglishKeymapGuide: Boolean,
-    val sumireNumberKeymapGuide: Boolean,
     val customKeymapGuide: Boolean,
     val flickGuideTextSizeSp: Int,
     val flickGuideMaxCharacters: Int,
@@ -152,9 +108,6 @@ data class ImePreferencesSnapshot(
     val reconversionEnabled: Boolean,
     val conversionKeySwipePreference: Boolean,
     val physicalKeyboardInputMode: String,
-    val switchQWERTYPassword: Boolean,
-    val landscapeForceQwertyPreference: Boolean,
-    val landscapeForceQwertyRomajiPreference: Boolean,
     val shortcutTollbarVisibility: Boolean,
     val shortcutToolbarIntegratedInSuggestion: Boolean,
     val shortcutToolbarHeightDp: Int,
@@ -166,45 +119,23 @@ data class ImePreferencesSnapshot(
     val clipboardPreviewTapToDelete: Boolean,
     val tenkeyHeightPreferenceValue: Int,
     val tenkeyWidthPreferenceValue: Int,
-    val qwertyHeightPreferenceValue: Int,
-    val qwertyWidthPreferenceValue: Int,
     val candidateViewHeightPreferenceValue: Int,
     val candidateViewHeightEmptyPreferenceValue: Int,
     val tenkeyPositionPreferenceValue: Boolean,
     val tenkeyBottomMarginPreferenceValue: Int,
-    val qwertyPositionPreferenceValue: Boolean,
-    val qwertyBottomMarginPreferenceValue: Int,
     val tenkeyStartMarginPreferenceValue: Int,
     val tenkeyEndMarginPreferenceValue: Int,
-    val qwertyStartMarginPreferenceValue: Int,
-    val qwertyEndMarginPreferenceValue: Int,
     val tenkeyLandscapeStartMarginPreferenceValue: Int,
     val tenkeyLandscapeEndMarginPreferenceValue: Int,
-    val qwertyLandscapeStartMarginPreferenceValue: Int,
-    val qwertyLandscapeEndMarginPreferenceValue: Int,
     val enableShowLastShownKeyboardInRestart: Boolean,
     val lastSavedKeyboardPosition: Int,
     val tenkeyHeightLandscapePreferenceValue: Int,
     val tenkeyWidthLandscapePreferenceValue: Int,
-    val qwertyHeightLandscapePreferenceValue: Int,
-    val qwertyWidthLandscapePreferenceValue: Int,
     val candidateViewLandscapeHeightPreferenceValue: Int,
     val candidateViewLandscapeHeightEmptyPreferenceValue: Int,
     val tenkeyLandscapePositionPreferenceValue: Boolean,
     val tenkeyLandscapeBottomMarginPreferenceValue: Int,
-    val qwertyLandscapePositionPreferenceValue: Boolean,
-    val qwertyLandscapeBottomMarginPreferenceValue: Int,
-    val qwertyKeyVerticalMargin: Float,
-    val qwertyKeyHorizontalGap: Float,
-    val qwertyKeyIndentLarge: Float,
-    val qwertyKeyIndentSmall: Float,
-    val qwertyKeySideMargin: Float,
-    val qwertyKeyTextSize: Float,
-    val qwertySymbolKeymapTextSize: Float,
-    val qwertySpecialKeyTextSize: Float,
-    val qwertySpecialKeyIconSize: Float,
     val appearance: ImeKeyboardAppearance,
-    val sumireEnglishQwertyPreference: Boolean,
     val conversionCandidatesRomajiEnablePreference: Boolean,
     val learnFirstCandidateDictionaryPreference: Boolean,
     val learnDictionaryAllowMixedSymbolsNumbersPreference: Boolean,
@@ -216,12 +147,10 @@ data class ImePreferencesSnapshot(
     val circularFlickDirectionCount: Int,
     val hierarchicalFlickModeSwitchAngleMargin: Int,
     val customKeyBorderWidth: Int,
-    val qwertySwitchNumberKeyWithoutNumberPreference: Boolean,
     val customRomajiZenkakuConversionEnablePreference: Boolean,
     val omissionSearchOffsetScorePreference: Int,
     val enableTypoCorrectionJapaneseFlickKeyboardOffsetScorePreference: Int,
     val enableTypoCorrectionJapaneseFlickKeyboardPreference: Boolean,
-    val enableTypoCorrectionQwertyEnglishKeyboardPreference: Boolean,
     val keyboardSkin: KeyboardSkinId = KeyboardSkinId.DEFAULT,
 ) {
     val keyboardThemeMode get() = appearance.keyboardThemeMode
@@ -388,46 +317,16 @@ data class ImePreferencesSnapshot(
                     appPreference.tfbi_diagonal_recognition_mode_preference.preferenceValue,
                 longPressTimeoutPreferenceValue =
                     appPreference.long_press_timeout_preference ?: 300,
-                qwertyShowIMEButtonPreference = appPreference.qwerty_show_ime_button ?: true,
-                qwertyShowEmojiButtonPreference = appPreference.qwerty_show_emoji_button ?: false,
                 tenkeyShowIMEButtonPreference =
                     appPreference.tenkey_show_language_button_preference,
-                qwertyShowCursorButtonsPreference = appPreference.qwerty_show_cursor_buttons
-                    ?: false,
-                qwertyShowNumberButtonsPreference = appPreference.qwerty_show_number_buttons
-                    ?: false,
-                qwertyShowSwitchRomajiEnglishPreference =
-                    appPreference.qwerty_show_switch_romaji_english_button ?: true,
-                qwertyEnglishDirectInputPreference =
-                    appPreference.qwerty_english_direct_input_preference,
-                qwertyGlideInputPreference = appPreference.qwerty_glide_input_preference,
-                qwertyGlideCommitPreviousCandidateOnNewGlidePreference =
-                    appPreference.qwerty_glide_commit_previous_candidate_on_new_glide_preference,
-                qwertyGlideInsertSpaceAfterCommittingPreviousCandidatePreference =
-                    appPreference.qwerty_glide_insert_space_after_committing_previous_candidate_preference,
-                qwertyShowPopupWindowPreference = appPreference.qwerty_show_popup_window ?: true,
                 tenkeySpaceFlickPreference = appPreference.tenkey_space_flick_preference,
-                qwertyRomajiSpaceFlickPreference = appPreference.qwerty_romaji_space_flick_preference,
-                qwertyEnglishSpaceFlickPreference = appPreference.qwerty_english_space_flick_preference,
-                qwertyEnableFlickUpPreference =
-                    appPreference.qwerty_enable_flick_up_preference ?: false,
-                qwertyEnableFlickDownPreference =
-                    appPreference.qwerty_enable_flick_down_preference ?: false,
-                qwertyNumberKeyFlickUpChars = appPreference.getQwertyNumberKeyFlickUpChars(),
-                qwertyNumberKeyFlickDownChars = appPreference.getQwertyNumberKeyFlickDownChars(),
                 qwertyEnableZenkakuSpacePreference =
                     appPreference.qwerty_enable_zenkaku_space_preference ?: false,
                 qwertyRomajiHankakuNumberPreference =
                     appPreference.qwerty_romaji_hankaku_number_preference ?: false,
                 qwertyRomajiHankakuSymbolPreference =
                     appPreference.qwerty_romaji_hankaku_symbol_preference ?: false,
-                qwertyShowKutoutenButtonsPreference =
-                    appPreference.qwerty_show_kutouten_buttons ?: false,
                 showCandidateInPasswordPreference = appPreference.show_candidates_password ?: true,
-                qwertyShowKeymapSymbolsPreference =
-                    appPreference.qwerty_show_keymap_symbols ?: false,
-                qwertyRomajiShiftConversionPreference =
-                    appPreference.qwerty_romaji_shift_conversion_preference,
                 isNgWordEnable = appPreference.ng_word_preference ?: true,
                 deleteKeyHighLight = appPreference.delete_key_high_light_preference ?: true,
                 customDirectInputReplaceComposingPreference =
@@ -436,10 +335,6 @@ data class ImePreferencesSnapshot(
                     appPreference.custom_keyboard_suggestion_preference ?: true,
                 userDictionaryPrefixMatchNumber =
                     appPreference.user_dictionary_prefix_match_number_preference ?: 2,
-                sumireInputKeyType =
-                    appPreference.sumire_input_selection_preference ?: "flick-default",
-                sumireInputKeyLayoutType = appPreference.sumire_input_method,
-                sumireInputStyle = appPreference.sumire_keyboard_style,
                 candidateColumns = appPreference.candidate_column_preference,
                 candidateColumnsLandscape = appPreference.candidate_column_landscape_preference,
                 candidateTabVisibility = appPreference.candidate_tab_preference,
@@ -447,50 +342,11 @@ data class ImePreferencesSnapshot(
                     appPreference.stabilize_candidate_strip_height_preference,
                 symbolKeyboardFirstItem = appPreference.symbol_mode_preference,
                 defaultEmojiSkinTone = appPreference.default_emoji_skin_tone_preference,
-                tenkeyQWERTYSwitchNumber =
-                    appPreference.tenkey_qwerty_switch_number_layout ?: false,
                 independentMultiTouchEnabled = appPreference.independent_multi_touch_preference,
                 tenkeyUseThreeStateKeyboard =
                     appPreference.tenkey_use_three_state_keyboard_preference,
                 tenkeyNumberSymbolKeyGapDp =
                     appPreference.tenkey_number_symbol_key_gap_preference,
-                tenkeySwitchNumberToQwertyNumberPreference =
-                    appPreference.tenkey_switch_number_to_qwerty_number_preference,
-                tenkeyRestoreInputModeOnRestart =
-                    appPreference.tenkey_restore_input_mode_on_restart_preference,
-                sumireRestoreInputModeOnRestart =
-                    appPreference.sumire_restore_input_mode_on_restart_preference,
-                tenkeyRestoreInputModeOnlyWithinTime =
-                    appPreference.tenkey_restore_input_mode_only_within_time_preference,
-                tenkeyRestoreInputModeTimeoutMinutes =
-                    appPreference.tenkey_restore_input_mode_timeout_minutes_preference,
-                tenkeyLastInputModeSavedAtEpochMillis =
-                    appPreference.tenkey_last_input_mode_saved_at_epoch_millis_preference,
-                sumireRestoreInputModeOnlyWithinTime =
-                    appPreference.sumire_restore_input_mode_only_within_time_preference,
-                sumireRestoreInputModeTimeoutMinutes =
-                    appPreference.sumire_restore_input_mode_timeout_minutes_preference,
-                sumireLastInputModeSavedAtEpochMillis =
-                    appPreference.sumire_last_input_mode_saved_at_epoch_millis_preference,
-                tenkeyLastInputModePreference =
-                    appPreference.tenkey_last_input_mode_preference,
-                tenkeyLastInputModePresentationPreference =
-                    appPreference.tenkey_last_input_mode_presentation_preference,
-                tenkeyLastQwertyNumberReturnTargetPreference =
-                    appPreference.tenkey_last_qwerty_number_return_target_preference,
-                sumireLastInputModePreference =
-                    appPreference.sumire_last_input_mode_preference,
-                sumireLastInputModePresentationPreference =
-                    appPreference.sumire_last_input_mode_presentation_preference,
-                tabletTenkeyQwertySwitchEnglish =
-                    appPreference.tablet_tenkey_qwerty_switch_english_layout,
-                tenkeyJapaneseKeymapGuide =
-                    appPreference.tenkey_keymap_guide_layout ?: false,
-                tenkeyEnglishKeymapGuide = appPreference.tenkey_keymap_guide_english,
-                tenkeyNumberKeymapGuide = appPreference.tenkey_keymap_guide_number,
-                sumireJapaneseKeymapGuide = appPreference.sumire_keymap_guide_japanese,
-                sumireEnglishKeymapGuide = appPreference.sumire_keymap_guide_english,
-                sumireNumberKeymapGuide = appPreference.sumire_keymap_guide_number,
                 customKeymapGuide = appPreference.flick_keymap_guide_layout ?: false,
                 flickGuideTextSizeSp = appPreference.flick_guide_text_size_sp_preference ?: 9,
                 flickGuideMaxCharacters =
@@ -507,11 +363,6 @@ data class ImePreferencesSnapshot(
                 conversionKeySwipePreference =
                     appPreference.conversion_key_swipe_cursor_move_preference,
                 physicalKeyboardInputMode = appPreference.physical_keyboard_input_mode_preference,
-                switchQWERTYPassword = appPreference.switch_qwerty_password ?: false,
-                landscapeForceQwertyPreference =
-                    appPreference.landscape_force_qwerty_preference,
-                landscapeForceQwertyRomajiPreference =
-                    appPreference.landscape_force_qwerty_romaji_preference,
                 shortcutTollbarVisibility =
                     appPreference.shortcut_toolbar_visibility_preference,
                 shortcutToolbarIntegratedInSuggestion =
@@ -527,33 +378,19 @@ data class ImePreferencesSnapshot(
                 clipboardPreviewTapToDelete = appPreference.clipboard_preview_tap_delete_preference,
                 tenkeyHeightPreferenceValue = appPreference.keyboard_height ?: 280,
                 tenkeyWidthPreferenceValue = appPreference.keyboard_width ?: 100,
-                qwertyHeightPreferenceValue = appPreference.qwerty_keyboard_height ?: 280,
-                qwertyWidthPreferenceValue = appPreference.qwerty_keyboard_width ?: 100,
                 candidateViewHeightPreferenceValue = appPreference.candidate_view_height_dp ?: 60,
                 candidateViewHeightEmptyPreferenceValue =
                     appPreference.candidate_view_empty_height_dp ?: 60,
                 tenkeyPositionPreferenceValue = appPreference.keyboard_position ?: true,
                 tenkeyBottomMarginPreferenceValue =
                     appPreference.keyboard_vertical_margin_bottom ?: 0,
-                qwertyPositionPreferenceValue =
-                    appPreference.qwerty_keyboard_position ?: true,
-                qwertyBottomMarginPreferenceValue =
-                    appPreference.qwerty_keyboard_vertical_margin_bottom ?: 0,
                 tenkeyStartMarginPreferenceValue =
                     appPreference.keyboard_margin_start_dp ?: 0,
                 tenkeyEndMarginPreferenceValue = appPreference.keyboard_margin_end_dp ?: 0,
-                qwertyStartMarginPreferenceValue =
-                    appPreference.qwerty_keyboard_margin_start_dp ?: 0,
-                qwertyEndMarginPreferenceValue =
-                    appPreference.qwerty_keyboard_margin_end_dp ?: 0,
                 tenkeyLandscapeStartMarginPreferenceValue =
                     appPreference.keyboard_margin_start_dp_landscape ?: 0,
                 tenkeyLandscapeEndMarginPreferenceValue =
                     appPreference.keyboard_margin_end_dp_landscape ?: 0,
-                qwertyLandscapeStartMarginPreferenceValue =
-                    appPreference.qwerty_keyboard_margin_start_dp_landscape ?: 0,
-                qwertyLandscapeEndMarginPreferenceValue =
-                    appPreference.qwerty_keyboard_margin_end_dp_landscape ?: 0,
                 enableShowLastShownKeyboardInRestart =
                     appPreference.save_last_used_keyboard_enable_preference,
                 lastSavedKeyboardPosition =
@@ -562,10 +399,6 @@ data class ImePreferencesSnapshot(
                     appPreference.keyboard_height_landscape ?: 280,
                 tenkeyWidthLandscapePreferenceValue =
                     appPreference.keyboard_width_landscape ?: 100,
-                qwertyHeightLandscapePreferenceValue =
-                    appPreference.qwerty_keyboard_height_landscape ?: 280,
-                qwertyWidthLandscapePreferenceValue =
-                    appPreference.qwerty_keyboard_width_landscape ?: 100,
                 candidateViewLandscapeHeightPreferenceValue =
                     appPreference.candidate_view_height_dp_landscape ?: 60,
                 candidateViewLandscapeHeightEmptyPreferenceValue =
@@ -574,20 +407,6 @@ data class ImePreferencesSnapshot(
                     appPreference.keyboard_position_landscape ?: true,
                 tenkeyLandscapeBottomMarginPreferenceValue =
                     appPreference.keyboard_vertical_margin_bottom_landscape ?: 0,
-                qwertyLandscapePositionPreferenceValue =
-                    appPreference.qwerty_keyboard_position_landscape ?: true,
-                qwertyLandscapeBottomMarginPreferenceValue =
-                    appPreference.qwerty_keyboard_vertical_margin_bottom_landscape ?: 0,
-                qwertyKeyVerticalMargin = appPreference.qwerty_key_vertical_margin ?: 5.0f,
-                qwertyKeyHorizontalGap = appPreference.qwerty_key_horizontal_gap ?: 2.0f,
-                qwertyKeyIndentLarge = appPreference.qwerty_key_indent_large ?: 23.0f,
-                qwertyKeyIndentSmall = appPreference.qwerty_key_indent_small ?: 9.0f,
-                qwertyKeySideMargin = appPreference.qwerty_key_side_margin ?: 4.0f,
-                qwertyKeyTextSize = appPreference.qwerty_key_text_size ?: 18.0f,
-                qwertySymbolKeymapTextSize =
-                    appPreference.qwerty_symbol_keymap_text_size ?: 9.0f,
-                qwertySpecialKeyTextSize = appPreference.qwerty_special_key_text_size ?: 12.0f,
-                qwertySpecialKeyIconSize = appPreference.qwerty_special_key_icon_size ?: 18.0f,
                 keyboardSkin = appPreference.keyboardSkin,
                 appearance = ImeKeyboardAppearance(
                     keyboardThemeMode = appPreference.theme_mode,
@@ -628,8 +447,6 @@ data class ImePreferencesSnapshot(
                     inputConversionBackgroundColor = appPreference.custom_theme_post_edit_bg_color,
                     inputConversionTextColor = appPreference.custom_theme_post_edit_text_color,
                 ),
-                sumireEnglishQwertyPreference =
-                    appPreference.sumire_english_qwerty_preference,
                 conversionCandidatesRomajiEnablePreference =
                     appPreference.conversion_candidates_romaji_enable_preference,
                 learnFirstCandidateDictionaryPreference =
@@ -648,8 +465,6 @@ data class ImePreferencesSnapshot(
                 hierarchicalFlickModeSwitchAngleMargin =
                     appPreference.hierarchical_flick_mode_switch_angle_margin_preference,
                 customKeyBorderWidth = appPreference.custom_theme_border_width,
-                qwertySwitchNumberKeyWithoutNumberPreference =
-                    appPreference.qwerty_switch_number_key_without_number_preference,
                 customRomajiZenkakuConversionEnablePreference =
                     appPreference.custom_romaji_zenkaku_conversion_enable_preference,
                 omissionSearchOffsetScorePreference =
@@ -658,8 +473,6 @@ data class ImePreferencesSnapshot(
                     appPreference.enable_typo_correction_japanese_flick_keyboard_offset_score_preference,
                 enableTypoCorrectionJapaneseFlickKeyboardPreference =
                     appPreference.enable_typo_correction_japanese_flick_keyboard_preference,
-                enableTypoCorrectionQwertyEnglishKeyboardPreference =
-                    appPreference.enable_typo_correction_qwerty_english_keyboard_preference,
             )
         }
     }

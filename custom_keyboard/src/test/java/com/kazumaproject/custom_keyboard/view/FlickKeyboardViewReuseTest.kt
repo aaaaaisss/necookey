@@ -2,7 +2,6 @@ package com.kazumaproject.custom_keyboard.view
 
 import android.view.ContextThemeWrapper
 import androidx.test.core.app.ApplicationProvider
-import com.kazumaproject.custom_keyboard.data.KeyboardInputMode
 import com.kazumaproject.custom_keyboard.layout.KeyboardDefaultLayouts
 import org.junit.Assert.assertNotSame
 import org.junit.Assert.assertSame
@@ -46,10 +45,5 @@ class FlickKeyboardViewReuseTest {
         )
     }
 
-    private fun createLayout() = KeyboardDefaultLayouts.createFinalLayout(
-        mode = KeyboardInputMode.HIRAGANA,
-        dynamicKeyStates = emptyMap(),
-        inputLayoutType = "toggle",
-        inputStyle = "default",
-    )
+    private fun createLayout() = KeyboardDefaultLayouts.createFlickKanaTemplateLayout(isDefaultKey = true)
 }

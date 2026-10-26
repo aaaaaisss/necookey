@@ -21,32 +21,6 @@ import org.robolectric.annotation.Config
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [35])
 class FlickKeyboardViewCharacterCaseTest {
-    @Test
-    fun qwertyLabels_followCharacterCase_withoutMutatingCanonicalLayout() {
-        val keyboard = createView()
-        val layout = KeyboardDefaultLayouts.createQwertyTemplateLayout()
-        keyboard.setKeyboard(layout)
-
-        assertNotNull(keyboard.findButtonWithText("q"))
-        keyboard.setKeyCharacterCase(KeyCharacterCase.UPPERCASE)
-        assertNotNull(keyboard.findButtonWithText("Q"))
-        assertNull(keyboard.findButtonWithText("q"))
-        assertEquals("q", layout.keys.first { it.keyId == "qwerty_key_q" }.label)
-
-        keyboard.setKeyCharacterCase(KeyCharacterCase.AS_DEFINED)
-        assertNotNull(keyboard.findButtonWithText("q"))
-        assertNull(keyboard.findButtonWithText("Q"))
-    }
-
-    @Test
-    fun characterCaseSetBeforeLayout_isAppliedWhenKeysAreCreated() {
-        val keyboard = createView()
-
-        keyboard.setKeyCharacterCase(KeyCharacterCase.UPPERCASE)
-        keyboard.setKeyboard(KeyboardDefaultLayouts.createQwertyTemplateLayout())
-
-        assertNotNull(keyboard.findButtonWithText("Q"))
-    }
 
     @Test
     fun nonInputShortcutLabel_isNotChanged() {
@@ -103,28 +77,6 @@ class FlickKeyboardViewCharacterCaseTest {
         keyboard.setKeyCharacterCase(KeyCharacterCase.UPPERCASE)
 
         assertNotNull(keyboard.findButtonWithText("A"))
-    }
-
-    @Test
-    fun englishFlickGuideTapLabel_followsCharacterCase() {
-        val keyboard = createView()
-        keyboard.setFlickGuideEnabled(enabled = true, allowMultiCharacterLabels = true)
-        keyboard.setKeyboard(
-            KeyboardDefaultLayouts.createFinalLayout(
-                mode = KeyboardInputMode.ENGLISH,
-                dynamicKeyStates = emptyMap(),
-                inputLayoutType = "flick",
-                inputStyle = "default"
-            )
-        )
-        assertNotNull(keyboard.findButtonWithText("a"))
-
-        keyboard.setKeyCharacterCase(KeyCharacterCase.UPPERCASE)
-        assertNotNull(keyboard.findButtonWithText("A"))
-        assertNull(keyboard.findButtonWithText("a"))
-
-        keyboard.setKeyCharacterCase(KeyCharacterCase.AS_DEFINED)
-        assertNotNull(keyboard.findButtonWithText("a"))
     }
 
     private fun createView(): FlickKeyboardView {

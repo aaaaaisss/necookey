@@ -106,7 +106,7 @@ class KeyboardSizeEditorRegressionTest {
         val originalOrientation = activity.requestedOrientation
         listOf(R.id.keyboardSettingFragment).forEach { destination ->
             val root = openEditor(destination)
-            listOf(R.id.tenkey_tooltip_button, R.id.qwerty_tooltip_button).forEach { pageButton ->
+            listOf(R.id.tenkey_tooltip_button).forEach { pageButton ->
                 root.findViewById<View>(pageButton).performClick()
                 drainNavigation()
                 layoutEditor(root)

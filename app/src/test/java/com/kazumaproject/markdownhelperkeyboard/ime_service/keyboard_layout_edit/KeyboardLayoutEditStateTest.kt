@@ -9,27 +9,19 @@ import org.junit.Test
 class KeyboardLayoutEditStateTest {
 
     @Test
-    fun preferenceSlotSeparatesPortraitLandscapeAndTenkeyQwerty() {
+    fun preferenceSlotSeparatesPortraitAndLandscape() {
         val slots = setOf(
             KeyboardLayoutEditPreferenceSlot(
                 KeyboardLayoutEditOrientation.Portrait,
                 KeyboardLayoutEditTarget.TenKeyFamily,
             ),
             KeyboardLayoutEditPreferenceSlot(
-                KeyboardLayoutEditOrientation.Portrait,
-                KeyboardLayoutEditTarget.QwertyFamily,
-            ),
-            KeyboardLayoutEditPreferenceSlot(
                 KeyboardLayoutEditOrientation.Landscape,
                 KeyboardLayoutEditTarget.TenKeyFamily,
             ),
-            KeyboardLayoutEditPreferenceSlot(
-                KeyboardLayoutEditOrientation.Landscape,
-                KeyboardLayoutEditTarget.QwertyFamily,
-            ),
         )
 
-        assertEquals(4, slots.size)
+        assertEquals(2, slots.size)
     }
 
     @Test

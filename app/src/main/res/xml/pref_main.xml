@@ -268,12 +268,6 @@
                     app:summary="@string/enable_typo_correction_japanese_flick_keyboard_offset_score_preference_summary"
                     app:iconSpaceReserved="false" />
                 <SwitchPreferenceCompat
-                    android:key="enable_typo_correction_qwerty_english_keyboard_preference"
-                    android:title="@string/enable_typo_correction_qwerty_english_keyboard_preference_title"
-                    app:defaultValue="false"
-                    app:summary="@string/enable_typo_correction_qwerty_english_keyboard_preference_summary"
-                    app:iconSpaceReserved="false" />
-                <SwitchPreferenceCompat
                     android:defaultValue="false"
                     android:key="omission_search_preference"
                     android:summaryOff="@string/omission_search_summary_off"

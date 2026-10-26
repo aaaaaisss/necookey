@@ -42,12 +42,16 @@ class FlickKeyboardViewLifecycleTest {
         })
     }.also { host.addView(it) }
 
-    @Test fun all54SumireLayoutsKeepEveryKeysTapAfterHideAndReuse() {
-        for (mode in KeyboardInputMode.entries) {
-            for (method in listOf("toggle", "flick", "switch-mode-effective")) {
-                for (style in listOf("default", "circle", "second-flick", "third-flick", "center-guide-flick", "sumire")) {
-                    val scenario = "$mode/$method/$style"
-                    val layout = KeyboardDefaultLayouts.createFinalLayout(mode, emptyMap(), method, style)
+    private val builtInLayouts = listOf(
+        "kanaTemplate" to KeyboardDefaultLayouts.createFlickKanaTemplateLayout(isDefaultKey = true),
+        "number" to KeyboardDefaultLayouts.createNumberLayout(),
+        "numberTemplate" to KeyboardDefaultLayouts.createNumberTemplateLayout(),
+    )
+
+    @Test fun builtInLayoutsKeepEveryKeysTapAfterHideAndReuse() {
+        run {
+            run {
+                for ((scenario, layout) in builtInLayouts) {
                     install(layout)
                     tapAllKeys()
                     val expected = events.toList()
@@ -84,12 +88,11 @@ class FlickKeyboardViewLifecycleTest {
         }
     }
 
-    @Test fun all54SumireLayoutsKeepEveryKeysLongPressAfterHide() {
-        for (mode in KeyboardInputMode.entries) {
-            for (method in listOf("toggle", "flick", "switch-mode-effective")) {
-                for (style in listOf("default", "circle", "second-flick", "third-flick", "center-guide-flick", "sumire")) {
-                    val scenario = "$mode/$method/$style"
-                    install(KeyboardDefaultLayouts.createFinalLayout(mode, emptyMap(), method, style))
+    @Test fun builtInLayoutsKeepEveryKeysLongPressAfterHide() {
+        run {
+            run {
+                for ((scenario, layout) in builtInLayouts) {
+                    install(layout)
                     holdAllKeys()
                     val expectedActions = events.toList()
                     val expectedHolds = holds.toList()
@@ -148,21 +151,8 @@ class FlickKeyboardViewLifecycleTest {
         }
     }
 
-    @Test fun circularLongPressScopeIsRestoredAfterHideShow() {
-        install(KeyboardDefaultLayouts.createFinalLayout(KeyboardInputMode.HIRAGANA,
-            emptyMap(), "toggle", "sumire"))
-        keyboard.visibility = View.GONE
-        keyboard.visibility = View.VISIBLE
-        val controller = field<List<Any>>(keyboard, "flickControllers").first()
-        val info = field<List<Any>>(keyboard, "keyInfos").first { field<Any?>(it, "controller") === controller }
-        touch(MotionEvent.ACTION_DOWN, field(info, "view"))
-        idle(150)
-        assertTrue(field(controller, "isLongPressModeActive"))
-        touch(MotionEvent.ACTION_UP, field(info, "view"))
-    }
-
-    @Test fun customStickyAndFlickLongPressKeysRecoverAfterHide() {
-        for (type in listOf(KeyType.STICKY_TWO_STEP_FLICK, KeyType.FLICK_LONG_PRESS)) {
+    @Test fun customTwoStepKeysRecoverAfterHide() {
+        for (type in listOf(KeyType.TWO_STEP_FLICK)) {
             val key = KeyData("a", 0, 0, true, action = KeyAction.Text("a"), keyId = "a", keyType = type)
             install(KeyboardLayout(listOf(key), emptyMap(), 1, 1,
                 twoStepFlickKeyMaps = mapOf("a" to mapOf(TfbiFlickDirection.TAP to mapOf(TfbiFlickDirection.TAP to "a")))))

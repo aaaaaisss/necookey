@@ -56,12 +56,10 @@ class FlickKeyboardViewModeKeyTextSizeTest {
     @Test
     fun generatedLayoutsAndPreviewRenderStandardModeIconsAsText() {
         val keyboard = createView()
-        val layouts = listOf(KeyboardDefaultLayouts.defaultLayout()) +
-            listOf("toggle", "flick").flatMap { layoutType ->
-                KeyboardInputMode.entries.map { mode ->
-                    KeyboardDefaultLayouts.createFinalLayout(mode, emptyMap(), layoutType, "default")
-                }
-            }
+        val layouts = listOf(
+            KeyboardDefaultLayouts.createFlickKanaTemplateLayout(isDefaultKey = true),
+            KeyboardDefaultLayouts.createNumberLayout(),
+        )
         layouts.forEach { layout ->
             keyboard.setKeyboard(layout)
             val labels = (0 until keyboard.childCount).mapNotNull {

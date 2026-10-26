@@ -18,7 +18,6 @@ enum class KeyboardSizeOrientation {
 
 enum class KeyboardSizeKeyboardType {
     TenKey,
-    Qwerty,
 }
 
 class KeyboardSizePreferenceAccessor(
@@ -55,16 +54,12 @@ class KeyboardSizePreferenceAccessor(
             KeyboardSizeOrientation.Portrait -> {
                 when (keyboardType) {
                     KeyboardSizeKeyboardType.TenKey -> appPreference.keyboard_position = true
-                    KeyboardSizeKeyboardType.Qwerty -> appPreference.qwerty_keyboard_position = true
                 }
             }
 
             KeyboardSizeOrientation.Landscape -> {
                 when (keyboardType) {
                     KeyboardSizeKeyboardType.TenKey -> appPreference.keyboard_position_landscape = true
-                    KeyboardSizeKeyboardType.Qwerty -> {
-                        appPreference.qwerty_keyboard_position_landscape = true
-                    }
                 }
             }
         }
@@ -79,15 +74,6 @@ class KeyboardSizePreferenceAccessor(
                 marginStartDp = appPreference.keyboard_margin_start_dp ?: DefaultMarginDp,
                 marginEndDp = appPreference.keyboard_margin_end_dp ?: DefaultMarginDp,
             )
-
-            KeyboardSizeKeyboardType.Qwerty -> KeyboardSizeValues(
-                heightDp = appPreference.qwerty_keyboard_height ?: DefaultHeightDp,
-                widthPercent = appPreference.qwerty_keyboard_width ?: DefaultWidthPercent,
-                bottomMarginDp = appPreference.qwerty_keyboard_vertical_margin_bottom
-                    ?: DefaultMarginDp,
-                marginStartDp = appPreference.qwerty_keyboard_margin_start_dp ?: DefaultMarginDp,
-                marginEndDp = appPreference.qwerty_keyboard_margin_end_dp ?: DefaultMarginDp,
-            )
         }
     }
 
@@ -101,18 +87,6 @@ class KeyboardSizePreferenceAccessor(
                 marginStartDp = appPreference.keyboard_margin_start_dp_landscape
                     ?: DefaultMarginDp,
                 marginEndDp = appPreference.keyboard_margin_end_dp_landscape ?: DefaultMarginDp,
-            )
-
-            KeyboardSizeKeyboardType.Qwerty -> KeyboardSizeValues(
-                heightDp = appPreference.qwerty_keyboard_height_landscape ?: DefaultHeightDp,
-                widthPercent = appPreference.qwerty_keyboard_width_landscape
-                    ?: DefaultWidthPercent,
-                bottomMarginDp = appPreference.qwerty_keyboard_vertical_margin_bottom_landscape
-                    ?: DefaultMarginDp,
-                marginStartDp = appPreference.qwerty_keyboard_margin_start_dp_landscape
-                    ?: DefaultMarginDp,
-                marginEndDp = appPreference.qwerty_keyboard_margin_end_dp_landscape
-                    ?: DefaultMarginDp,
             )
         }
     }
@@ -129,14 +103,6 @@ class KeyboardSizePreferenceAccessor(
                 appPreference.keyboard_margin_start_dp = values.marginStartDp
                 appPreference.keyboard_margin_end_dp = values.marginEndDp
             }
-
-            KeyboardSizeKeyboardType.Qwerty -> {
-                appPreference.qwerty_keyboard_height = values.heightDp
-                appPreference.qwerty_keyboard_width = values.widthPercent
-                appPreference.qwerty_keyboard_vertical_margin_bottom = values.bottomMarginDp
-                appPreference.qwerty_keyboard_margin_start_dp = values.marginStartDp
-                appPreference.qwerty_keyboard_margin_end_dp = values.marginEndDp
-            }
         }
     }
 
@@ -151,15 +117,6 @@ class KeyboardSizePreferenceAccessor(
                 appPreference.keyboard_vertical_margin_bottom_landscape = values.bottomMarginDp
                 appPreference.keyboard_margin_start_dp_landscape = values.marginStartDp
                 appPreference.keyboard_margin_end_dp_landscape = values.marginEndDp
-            }
-
-            KeyboardSizeKeyboardType.Qwerty -> {
-                appPreference.qwerty_keyboard_height_landscape = values.heightDp
-                appPreference.qwerty_keyboard_width_landscape = values.widthPercent
-                appPreference.qwerty_keyboard_vertical_margin_bottom_landscape =
-                    values.bottomMarginDp
-                appPreference.qwerty_keyboard_margin_start_dp_landscape = values.marginStartDp
-                appPreference.qwerty_keyboard_margin_end_dp_landscape = values.marginEndDp
             }
         }
     }

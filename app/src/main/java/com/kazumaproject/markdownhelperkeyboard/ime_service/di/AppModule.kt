@@ -88,8 +88,6 @@ import com.kazumaproject.markdownhelperkeyboard.ng_word.database.NgWordDao
 import com.kazumaproject.markdownhelperkeyboard.repository.RomajiMapRepository
 import com.kazumaproject.markdownhelperkeyboard.setting_activity.AppPreference
 import com.kazumaproject.markdownhelperkeyboard.short_cut.database.ShortcutDao
-import com.kazumaproject.markdownhelperkeyboard.sumire_special_key.database.SumireSpecialKeyActionOverrideDao
-import com.kazumaproject.markdownhelperkeyboard.sumire_special_key.database.SumireSpecialKeyPlacementOverrideDao
 import com.kazumaproject.markdownhelperkeyboard.user_dictionary.database.UserWordDao
 import dagger.Module
 import dagger.Provides
@@ -215,18 +213,6 @@ object AppModule {
         db.deleteKeyFlickDeleteTargetDao()
 
 
-
-    @Singleton
-    @Provides
-    fun providesSumireSpecialKeyActionOverrideDao(
-        db: AppDatabase
-    ): SumireSpecialKeyActionOverrideDao = db.sumireSpecialKeyActionOverrideDao()
-
-    @Singleton
-    @Provides
-    fun providesSumireSpecialKeyPlacementOverrideDao(
-        db: AppDatabase
-    ): SumireSpecialKeyPlacementOverrideDao = db.sumireSpecialKeyPlacementOverrideDao()
 
 
     @Singleton

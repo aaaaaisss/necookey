@@ -70,7 +70,6 @@ class MainPreferenceFragment : AsyncPreferenceFragment() {
                 try {
                     val json = withContext(Dispatchers.IO) { readTextFromUri(uri) }
                     AppPreference.importAllFromJson(json, replaceAll = true)
-                    AppPreference.migrateSumirePreferenceIfNeeded()
                     AppPreference.migratePredictionLookaheadPreferenceIfNeeded()
                     toast(getString(R.string.settings_backup_imported))
                     requireActivity().recreate()

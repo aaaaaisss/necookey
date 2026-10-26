@@ -19,8 +19,7 @@ enum class KeyboardLayoutEditSurface {
 }
 
 enum class KeyboardLayoutEditTarget {
-    TenKeyFamily,
-    QwertyFamily;
+    TenKeyFamily;
 
     companion object {
         fun from(mode: TenKeyQWERTYMode): KeyboardLayoutEditTarget {

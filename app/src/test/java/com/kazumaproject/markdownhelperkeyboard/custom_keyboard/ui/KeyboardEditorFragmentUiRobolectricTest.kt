@@ -67,41 +67,6 @@ class KeyboardEditorFragmentUiRobolectricTest {
     }
 
     @Test
-    fun qwertyTemplateUiVisibility_showsFlexibleControlsAndHidesGridControls() {
-        val binding = inflateBinding()
-        val layout = KeyboardDefaultLayouts.createQwertyTemplateLayout()
-
-        applyKeyboardEditorCapabilityVisibility(binding, keyboardEditorCapabilities(layout))
-
-        assertTrue(binding.placementSizeControlsGroup.isVisible)
-        assertTrue(binding.insertDirectionPanel.isVisible)
-        assertFalse(binding.rowControlsGroup.isVisible)
-        assertFalse(binding.columnControlsGroup.isVisible)
-    }
-
-    @Test
-    fun deleteSelectedButtonState_keyAndSpacerSelectionEnableDeletion() {
-        val binding = inflateBinding()
-        val viewModel = viewModel()
-        viewModel.applyTemplate(KeyboardDefaultLayouts.createQwertyTemplateLayout())
-
-        assertFalse(viewModel.onKeyTappedForSelectionOrEdit("qwerty_key_q"))
-        val keyState = viewModel.uiState.value
-        applyKeyboardEditorDeleteSelectionState(binding, keyState, isPlacementMode = false)
-        assertEquals("qwerty_key_q", keyState.selectedItemId)
-        assertTrue(keyState.hasDeletableSelection())
-        assertTrue(binding.buttonDeleteSelectedItem.isEnabled)
-
-        val spacer = keyState.layout.items.filterIsInstance<SpacerItem>().first()
-        viewModel.onSpacerTapped(spacer.id)
-        val spacerState = viewModel.uiState.value
-        applyKeyboardEditorDeleteSelectionState(binding, spacerState, isPlacementMode = false)
-        assertEquals(spacer.id, spacerState.selectedItemId)
-        assertTrue(spacerState.hasDeletableSelection())
-        assertTrue(binding.buttonDeleteSelectedItem.isEnabled)
-    }
-
-    @Test
     fun editorLayout_hasNoUndoDeleteControlThatCanShiftButtons() {
         val binding = inflateBinding()
 

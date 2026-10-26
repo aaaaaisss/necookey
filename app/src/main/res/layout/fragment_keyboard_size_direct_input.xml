@@ -69,15 +69,6 @@
                 android:layout_weight="1"
                 android:checkable="true"
                 android:text="@string/keyboard_size_direct_input_keyboard_type_ten_key" />
-
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/keyboard_type_qwerty_button"
-                style="?attr/materialButtonOutlinedStyle"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:checkable="true"
-                android:text="@string/keyboard_size_direct_input_keyboard_type_qwerty" />
         </com.google.android.material.button.MaterialButtonToggleGroup>
 
         <com.google.android.material.textfield.TextInputLayout

@@ -186,7 +186,6 @@ class KeyboardSizeDirectInputFragment : Fragment() {
 
     private fun selectedKeyboardType(): KeyboardSizeKeyboardType {
         return when (binding.keyboardTypeToggleGroup.checkedButtonId) {
-            binding.keyboardTypeQwertyButton.id -> KeyboardSizeKeyboardType.Qwerty
             else -> KeyboardSizeKeyboardType.TenKey
         }
     }

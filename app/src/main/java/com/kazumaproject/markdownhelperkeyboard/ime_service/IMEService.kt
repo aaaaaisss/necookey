@@ -296,15 +296,7 @@ import com.kazumaproject.markdownhelperkeyboard.repository.UserDictionaryReposit
 import com.kazumaproject.markdownhelperkeyboard.setting_activity.AppPreference
 import com.kazumaproject.markdownhelperkeyboard.setting_activity.ui.keyboard_selection.getKeyboardDisplayName
 import com.kazumaproject.markdownhelperkeyboard.setting_activity.MainActivity
-import com.kazumaproject.markdownhelperkeyboard.setting_activity.circular_slot.CircularSlotActionApplier
 import com.kazumaproject.markdownhelperkeyboard.short_cut.ShortcutType
-import com.kazumaproject.markdownhelperkeyboard.sumire_special_key.SumireSpecialKeyActionDisplayMetadata
-import com.kazumaproject.markdownhelperkeyboard.sumire_special_key.SumireSpecialKeyActionDisplayOverrideApplier
-import com.kazumaproject.markdownhelperkeyboard.sumire_special_key.SumireSpecialKeyActionResolver
-import com.kazumaproject.markdownhelperkeyboard.sumire_special_key.SumireSpecialKeyPlacementOverrideApplier
-import com.kazumaproject.markdownhelperkeyboard.sumire_special_key.SumireSpecialKeyRepository
-import com.kazumaproject.markdownhelperkeyboard.sumire_special_key.database.SumireSpecialKeyActionOverrideEntity
-import com.kazumaproject.markdownhelperkeyboard.sumire_special_key.database.SumireSpecialKeyPlacementOverrideEntity
 import com.kazumaproject.markdownhelperkeyboard.variant.AppVariantConfig
 import com.kazumaproject.symbol_keyboard.CustomSymbolKeyboardView
 import com.kazumaproject.core.domain.extensions.getDakutenFlickLeft
@@ -500,9 +492,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
     @Inject
     lateinit var clipboardUtil: ClipboardUtil
 
-    @Inject
-    lateinit var sumireSpecialKeyRepository: SumireSpecialKeyRepository
-
     private var shortcutAdapter: ShortcutAdapter? = null
 
     private var romajiConverter: RomajiKanaConverter? = null
@@ -537,14 +526,8 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
     private var cachedClipboardPreviewItem: ClipboardItem = ClipboardItem.Empty
     @Volatile
     private var cachedClipboardPreviewSensitive: Boolean = false
-    private var tenkeyQWERTYSwitchNumber: Boolean? = false
     private var tenkeyUseThreeStateKeyboard: Boolean = true
     private var tenkeyNumberSymbolKeyGapDp: Int = 4
-    private var tenkeySwitchNumberToQwertyNumberPreference: Boolean = false
-    private var qwertyNumberOpenedFromTenkeyTwoStateNumberKey: Boolean = false
-    private var tabletTenkeyQwertySwitchEnglish: Boolean = false
-    private var tenkeyKeymapGuideSettings = ModeKeymapGuideSettings()
-    private var sumireKeymapGuideSettings = ModeKeymapGuideSettings()
     private var customKeymapGuidePreference: Boolean = false
     private var flickGuideTextSizeSpPreference: Int? = 9
     private var flickGuideMaxCharactersPreference: Int? = 1
@@ -739,14 +722,8 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         AppPreference.STABILIZE_CANDIDATE_STRIP_HEIGHT_KEY,
         AppPreference.FLICK_SENSITIVITY_KEY,
         AppPreference.TFBI_DIAGONAL_RECOGNITION_MODE_KEY,
-        AppPreference.TENKEY_KEYMAP_GUIDE_JAPANESE_KEY,
-        AppPreference.TENKEY_KEYMAP_GUIDE_ENGLISH_KEY,
-        AppPreference.TENKEY_KEYMAP_GUIDE_NUMBER_KEY,
         AppPreference.TENKEY_USE_THREE_STATE_KEY,
         AppPreference.TENKEY_NUMBER_SYMBOL_KEY_GAP_KEY,
-        AppPreference.SUMIRE_KEYMAP_GUIDE_JAPANESE_KEY,
-        AppPreference.SUMIRE_KEYMAP_GUIDE_ENGLISH_KEY,
-        AppPreference.SUMIRE_KEYMAP_GUIDE_NUMBER_KEY,
         AppPreference.CUSTOM_KEYMAP_GUIDE_KEY,
         AppPreference.CUSTOM_KEYBOARD_INPUT_IN_EMPTY_AREAS_KEY,
         AppPreference.CUSTOM_DIRECT_INPUT_REPLACE_COMPOSING_KEY,
@@ -1086,10 +1063,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
     private var cachedSymbols: List<Symbol>? = null
     private var cachedClickedSymbolHistory: List<ClickedSymbol>? = null
     private var currentClipboardItems: List<ClipboardItem> = emptyList()
-    private var sumireSpecialKeyActionOverrides: List<SumireSpecialKeyActionOverrideEntity> =
-        emptyList()
-    private var sumireSpecialKeyPlacementOverrides: List<SumireSpecialKeyPlacementOverrideEntity> =
-        emptyList()
 
     private var deleteLongPressJob: Job? = null
     private val deleteLongPressConversionGate = DeleteLongPressConversionGate()
@@ -1216,39 +1189,17 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         DeleteLongPressConversionBehavior? = null
     private var deleteLongPressFinalRefreshRequested = false
     private var tenkeyShowIMEButtonPreference: Boolean? = true
-    private var qwertyShowIMEButtonPreference: Boolean? = true
-    private var qwertyShowEmojiButtonPreference: Boolean? = false
     private var defaultEmojiSkinTonePreference: String = EmojiSkinToneSupport.DEFAULT_SKIN_TONE
     private var tenkeySpaceFlickPreference = true
-    private var qwertyRomajiSpaceFlickPreference = false
-    private var qwertyEnglishSpaceFlickPreference = false
-    private var qwertyEnableFlickUpPreference: Boolean? = false
-    private var qwertyEnableFlickDownPreference: Boolean? = false
-    private var qwertyNumberKeyFlickUpChars: Map<String, String> = emptyMap()
-    private var qwertyNumberKeyFlickDownChars: Map<String, String> = emptyMap()
     private var qwertyEnableZenkakuSpacePreference: Boolean? = false
     private var qwertyRomajiHankakuNumberPreference: Boolean? = false
     private var qwertyRomajiHankakuSymbolPreference: Boolean? = false
-    private var qwertyShowPopupWindowPreference: Boolean? = true
-    private var qwertyGlideInputPreference: Boolean = false
-    private var qwertyGlideCommitPreviousCandidateOnNewGlidePreference: Boolean = false
-    private var qwertyGlideInsertSpaceAfterCommittingPreviousCandidatePreference: Boolean = false
-    private var qwertyShowCursorButtonsPreference: Boolean? = false
-    private var qwertyShowNumberButtonsPreference: Boolean? = false
-    private var qwertyShowSwitchRomajiEnglishPreference: Boolean? = false
-    private var qwertyEnglishDirectInputPreference: Boolean = false
-    private var qwertyShowKutoutenButtonsPreference: Boolean? = false
-    private var qwertyShowKeymapSymbolsPreference: Boolean? = false
-    private var qwertyRomajiShiftConversionPreference: Boolean? = false
     private var showCandidateInPasswordPreference: Boolean? = true
     private var mozcUTPersonName: Boolean? = false
     private var mozcUTPlaces: Boolean? = false
     private var mozcUTWiki: Boolean? = false
     private var mozcUTNeologd: Boolean? = false
     private var mozcUTWeb: Boolean? = false
-    private var switchQWERTYPassword: Boolean? = false
-    private var landscapeForceQwertyPreference: Boolean? = false
-    private var landscapeForceQwertyRomajiPreference: Boolean? = false
     private var shortcutTollbarVisibility: Boolean? = false
     private var shortcutToolbarIntegratedInSuggestion: Boolean? = false
     private var shortcutToolbarHeightDp: Int = AppPreference.SHORTCUT_TOOLBAR_HEIGHT_DEFAULT_DP
@@ -1265,62 +1216,28 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
     private var deleteKeyFlickTargetChars: Set<Char> = DEFAULT_DELETE_KEY_FLICK_TARGETS
     private var tenkeyHeightPreferenceValue: Int? = 280
     private var tenkeyWidthPreferenceValue: Int? = 100
-    private var qwertyHeightPreferenceValue: Int? = 280
-    private var qwertyWidthPreferenceValue: Int? = 100
     private var candidateViewHeightPreferenceValue: Int? = 60
     private var candidateViewHeightEmptyPreferenceValue: Int? = 60
     private var tenkeyPositionPreferenceValue: Boolean? = true
     private var tenkeyBottomMarginPreferenceValue: Int? = 0
-    private var qwertyPositionPreferenceValue: Boolean? = true
-    private var qwertyBottomMarginPreferenceValue: Int? = 0
 
     private var tenkeyHeightLandScapePreferenceValue: Int? = 280
     private var tenkeyWidthLandScapePreferenceValue: Int? = 100
-    private var qwertyHeightLandScapePreferenceValue: Int? = 280
-    private var qwertyWidthLandScapePreferenceValue: Int? = 100
     private var candidateViewLandScapeHeightPreferenceValue: Int? = 60
     private var candidateViewLandScapeHeightEmptyPreferenceValue: Int? = 60
     private var tenkeyLandScapePositionPreferenceValue: Boolean? = true
     private var tenkeyLandScapeBottomMarginPreferenceValue: Int? = 0
-    private var qwertyLandScapePositionPreferenceValue: Boolean? = true
-    private var qwertyLandScapeBottomMarginPreferenceValue: Int? = 0
 
     private var tenkeyStartMarginPreferenceValue: Int? = 0
     private var tenkeyEndMarginPreferenceValue: Int? = 0
-    private var qwertyStartMarginPreferenceValue: Int? = 0
-    private var qwertyEndMarginPreferenceValue: Int? = 0
 
     private var tenkeyLandScapeStartMarginPreferenceValue: Int? = 0
     private var tenkeyLandScapeEndMarginPreferenceValue: Int? = 0
-    private var qwertyLandScapeStartMarginPreferenceValue: Int? = 0
-    private var qwertyLandScapeEndMarginPreferenceValue: Int? = 0
 
     private var enableShowLastShownKeyboardInRestart: Boolean? = false
     private var lastSavedKeyboardPosition: Int? = 0
-    private var tenkeyRestoreInputModeOnRestart: Boolean = false
-    private var sumireRestoreInputModeOnRestart: Boolean = false
-    private var tenkeyRestoreInputModeOnlyWithinTime: Boolean = false
-    private var tenkeyRestoreInputModeTimeoutMinutes: Int = 5
-    private var tenkeyLastInputModeSavedAtEpochMillis: Long = 0L
-    private var sumireRestoreInputModeOnlyWithinTime: Boolean = false
-    private var sumireRestoreInputModeTimeoutMinutes: Int = 5
-    private var sumireLastInputModeSavedAtEpochMillis: Long = 0L
-    private var tenkeyLastInputModePreference: String = "japanese"
-    private var tenkeyLastInputModePresentationPreference: String = "native"
-    private var tenkeyLastQwertyNumberReturnTargetPreference: String = "japanese"
-    private var sumireLastInputModePreference: String = "japanese"
-    private var sumireLastInputModePresentationPreference: String = "native"
 
 
-    private var qwertyKeyVerticalMargin: Float? = 5.0f
-    private var qwertyKeyHorizontalGap: Float? = 2.0f
-    private var qwertyKeyIndentLarge: Float? = 23.0f
-    private var qwertyKeyIndentSmall: Float? = 9.0f
-    private var qwertyKeySideMargin: Float? = 4.0f
-    private var qwertyKeyTextSize: Float? = 18.0f
-    private var qwertySymbolKeymapTextSize: Float? = 9.0f
-    private var qwertySpecialKeyTextSize: Float? = 12.0f
-    private var qwertySpecialKeyIconSize: Float? = 18.0f
 
     private var keyboardSkinId = KeyboardSkinId.DEFAULT
     private var keyboardThemeMode: String? = "default"
@@ -1353,14 +1270,10 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
     private var inputConversionTextColor: Int? = Color.WHITE
 
     private var enableTypoCorrectionJapaneseFlickKeyboardPreference: Boolean? = false
-    private var enableTypoCorrectionQwertyEnglishKeyboardPreference: Boolean? = false
 
     @Deprecated(
         message = "Use the new input key type management system instead. This field is kept only for backward compatibility."
     )
-    private var sumireInputKeyType: String? = "flick-default"
-    private var sumireInputKeyLayoutType: String? = "toggle"
-    private var sumireInputStyle: String? = "default"
     private var candidateColumns: String? = "1"
     private var candidateColumnsLandscape: String? = "1"
     private var candidateViewHeight: String? = "2"
@@ -1381,7 +1294,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
     private var customKeyboardSuggestionPreference: Boolean? = true
     private var customDirectInputReplaceComposingPreference = false
 
-    private var sumireEnglishQwertyPreference: Boolean? = false
     private var conversionCandidatesRomajiEnablePreference: Boolean? = false
 
     private var learnFirstCandidateDictionaryPreference: Boolean? = false
@@ -1398,7 +1310,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
 
     private var customKeyBorderWidth: Int? = 1
 
-    private var qwertySwitchNumberKeyWithoutNumberPreference: Boolean? = false
 
 
     private var omissionSearchOffsetScorePreference: Int? = 1900
@@ -1608,7 +1519,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
      * The latter intentionally lives until the current composition boundary, while
      * Caps Lock must survive committing that composition.
      */
-    private var softwareQwertyCapsLockOn = false
     private val isRomajiShiftPressed: Boolean
         get() = hardKeyboardShiftPressd || softwareQwertyShiftPressed
 
@@ -1690,7 +1600,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
     @Volatile
     private var latestCandidateSegmentsByString:
         Map<String, List<CandidateConversionSegment>> = emptyMap()
-    private var previousTenKeyQWERTYMode: TenKeyQWERTYMode? = null
 
     private var currentKeyboardOrder = 0
 
@@ -1796,14 +1705,8 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         val positionIsEnd: Boolean, // true: End, false: Start
         val candidateHeight: Int,
         val candidateEmptyHeight: Int,
-        val qwertyHeightPref: Int,
-        val qwertyWidthPref: Int,
-        val qwertyBottomMargin: Int,
-        val qwertyPositionIsEnd: Boolean,
         val keyboardMarginStart: Int,
         val keyboardMarginEnd: Int,
-        val qwertyMarginStart: Int,
-        val qwertyMarginEnd: Int,
     )
 
 
@@ -1885,7 +1788,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         startKanaKanjiEngineLoad()
 
         observeDeleteKeyFlickTargets()
-        observeSumireSpecialKeyOverrides()
 
         suggestionAdapter = SuggestionAdapter().apply {
             onListUpdated = {
@@ -1993,27 +1895,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
                 deleteKeyFlickTargetChars = targets.mapNotNull { target ->
                     target.symbol.singleOrNull()
                 }.toSet()
-            }
-        }
-    }
-
-    private fun observeSumireSpecialKeyOverrides() {
-        ioScope.launch {
-            combine(
-                sumireSpecialKeyRepository.observeAllPlacementOverrides(),
-                sumireSpecialKeyRepository.observeAllActionOverrides()
-            ) { placementOverrides, actionOverrides ->
-                placementOverrides to actionOverrides
-            }.collect { (placementOverrides, actionOverrides) ->
-                sumireSpecialKeyPlacementOverrides = placementOverrides
-                sumireSpecialKeyActionOverrides = actionOverrides
-                withContext(Dispatchers.Main.immediate) {
-                    if (qwertyMode.value == TenKeyQWERTYMode.Sumire) {
-                        refreshActiveSumireLayoutIfNeeded()
-                    } else {
-                        renderCurrentKeyboardStateOnActiveSurface()
-                    }
-                }
             }
         }
     }
@@ -2255,11 +2136,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
             DeleteLongPressConversionBehavior.fromPreferenceValue(
                 appPreference.delete_long_press_conversion_behavior
             )
-        tenkeyKeymapGuideSettings = ModeKeymapGuideSettings(
-            japanese = appPreference.tenkey_keymap_guide_layout ?: false,
-            english = appPreference.tenkey_keymap_guide_english,
-            number = appPreference.tenkey_keymap_guide_number
-        )
         val latestTenkeyUseThreeStateKeyboard =
             appPreference.tenkey_use_three_state_keyboard_preference
         val latestTenkeyNumberSymbolKeyGapDp =
@@ -2271,11 +2147,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
             tenkeyUseThreeStateKeyboard = latestTenkeyUseThreeStateKeyboard
             tenkeyNumberSymbolKeyGapDp = latestTenkeyNumberSymbolKeyGapDp
         }
-        sumireKeymapGuideSettings = ModeKeymapGuideSettings(
-            japanese = appPreference.sumire_keymap_guide_japanese,
-            english = appPreference.sumire_keymap_guide_english,
-            number = appPreference.sumire_keymap_guide_number
-        )
         customKeymapGuidePreference = appPreference.flick_keymap_guide_layout ?: false
         runtimeGestureSettingsSource.update(
             flickSensitivity = sensitivity,
@@ -2372,86 +2243,26 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
             preferences.tfbiDiagonalRecognitionModePreferenceValue
         )
         longPressTimeoutPreferenceValue = preferences.longPressTimeoutPreferenceValue
-        qwertyShowIMEButtonPreference = preferences.qwertyShowIMEButtonPreference
-        qwertyShowEmojiButtonPreference = preferences.qwertyShowEmojiButtonPreference
         tenkeyShowIMEButtonPreference = preferences.tenkeyShowIMEButtonPreference
-        qwertyShowCursorButtonsPreference = preferences.qwertyShowCursorButtonsPreference
-        qwertyShowNumberButtonsPreference = preferences.qwertyShowNumberButtonsPreference
-        qwertyShowSwitchRomajiEnglishPreference =
-            preferences.qwertyShowSwitchRomajiEnglishPreference
-        qwertyEnglishDirectInputPreference = preferences.qwertyEnglishDirectInputPreference
-        qwertyShowPopupWindowPreference = preferences.qwertyShowPopupWindowPreference
         tenkeySpaceFlickPreference = preferences.tenkeySpaceFlickPreference
-        qwertyRomajiSpaceFlickPreference = preferences.qwertyRomajiSpaceFlickPreference
-        qwertyEnglishSpaceFlickPreference = preferences.qwertyEnglishSpaceFlickPreference
-        qwertyEnableFlickUpPreference = preferences.qwertyEnableFlickUpPreference
-        qwertyEnableFlickDownPreference = preferences.qwertyEnableFlickDownPreference
-        qwertyNumberKeyFlickUpChars = preferences.qwertyNumberKeyFlickUpChars
-        qwertyNumberKeyFlickDownChars = preferences.qwertyNumberKeyFlickDownChars
         qwertyEnableZenkakuSpacePreference = preferences.qwertyEnableZenkakuSpacePreference
         qwertyRomajiHankakuNumberPreference = preferences.qwertyRomajiHankakuNumberPreference
         qwertyRomajiHankakuSymbolPreference = preferences.qwertyRomajiHankakuSymbolPreference
-        qwertyShowKutoutenButtonsPreference = preferences.qwertyShowKutoutenButtonsPreference
         showCandidateInPasswordPreference = preferences.showCandidateInPasswordPreference
-        qwertyShowKeymapSymbolsPreference = preferences.qwertyShowKeymapSymbolsPreference
-        qwertyRomajiShiftConversionPreference = preferences.qwertyRomajiShiftConversionPreference
         isNgWordEnable = preferences.isNgWordEnable
         deleteKeyHighLight = preferences.deleteKeyHighLight
         customKeyboardSuggestionPreference = preferences.customKeyboardSuggestionPreference
         customDirectInputReplaceComposingPreference =
             preferences.customDirectInputReplaceComposingPreference
         userDictionaryPrefixMatchNumber = preferences.userDictionaryPrefixMatchNumber
-        sumireInputKeyType = preferences.sumireInputKeyType
-        sumireInputKeyLayoutType = preferences.sumireInputKeyLayoutType
-        sumireInputStyle = preferences.sumireInputStyle
         candidateColumns = preferences.candidateColumns
         candidateColumnsLandscape = preferences.candidateColumnsLandscape
         candidateTabVisibility = preferences.candidateTabVisibility
         stabilizeCandidateStripHeightPreference = preferences.stabilizeCandidateStripHeightPreference
         symbolKeyboardFirstItem = preferences.symbolKeyboardFirstItem
         defaultEmojiSkinTonePreference = preferences.defaultEmojiSkinTone
-        tenkeyQWERTYSwitchNumber = preferences.tenkeyQWERTYSwitchNumber
         tenkeyUseThreeStateKeyboard = preferences.tenkeyUseThreeStateKeyboard
         tenkeyNumberSymbolKeyGapDp = preferences.tenkeyNumberSymbolKeyGapDp
-        tenkeySwitchNumberToQwertyNumberPreference =
-            preferences.tenkeySwitchNumberToQwertyNumberPreference
-        tenkeyRestoreInputModeOnRestart =
-            preferences.tenkeyRestoreInputModeOnRestart
-        sumireRestoreInputModeOnRestart =
-            preferences.sumireRestoreInputModeOnRestart
-        tenkeyRestoreInputModeOnlyWithinTime =
-            preferences.tenkeyRestoreInputModeOnlyWithinTime
-        tenkeyRestoreInputModeTimeoutMinutes =
-            preferences.tenkeyRestoreInputModeTimeoutMinutes
-        tenkeyLastInputModeSavedAtEpochMillis =
-            preferences.tenkeyLastInputModeSavedAtEpochMillis
-        sumireRestoreInputModeOnlyWithinTime =
-            preferences.sumireRestoreInputModeOnlyWithinTime
-        sumireRestoreInputModeTimeoutMinutes =
-            preferences.sumireRestoreInputModeTimeoutMinutes
-        sumireLastInputModeSavedAtEpochMillis =
-            preferences.sumireLastInputModeSavedAtEpochMillis
-        tenkeyLastInputModePreference =
-            preferences.tenkeyLastInputModePreference
-        tenkeyLastInputModePresentationPreference =
-            preferences.tenkeyLastInputModePresentationPreference
-        tenkeyLastQwertyNumberReturnTargetPreference =
-            preferences.tenkeyLastQwertyNumberReturnTargetPreference
-        sumireLastInputModePreference =
-            preferences.sumireLastInputModePreference
-        sumireLastInputModePresentationPreference =
-            preferences.sumireLastInputModePresentationPreference
-        tabletTenkeyQwertySwitchEnglish = preferences.tabletTenkeyQwertySwitchEnglish
-        tenkeyKeymapGuideSettings = ModeKeymapGuideSettings(
-            japanese = preferences.tenkeyJapaneseKeymapGuide,
-            english = preferences.tenkeyEnglishKeymapGuide,
-            number = preferences.tenkeyNumberKeymapGuide
-        )
-        sumireKeymapGuideSettings = ModeKeymapGuideSettings(
-            japanese = preferences.sumireJapaneseKeymapGuide,
-            english = preferences.sumireEnglishKeymapGuide,
-            number = preferences.sumireNumberKeymapGuide
-        )
         customKeymapGuidePreference = preferences.customKeymapGuide
         flickGuideTextSizeSpPreference = preferences.flickGuideTextSizeSp
         flickGuideMaxCharactersPreference = preferences.flickGuideMaxCharacters
@@ -2463,9 +2274,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         keyboardCornerBottomRight = preferences.keyboardCornerBottomRight
         reconversionEnabledPreference = preferences.reconversionEnabled
         conversionKeySwipePreference = preferences.conversionKeySwipePreference
-        switchQWERTYPassword = preferences.switchQWERTYPassword
-        landscapeForceQwertyPreference = preferences.landscapeForceQwertyPreference
-        landscapeForceQwertyRomajiPreference = preferences.landscapeForceQwertyRomajiPreference
         shortcutTollbarVisibility = preferences.shortcutTollbarVisibility
         shortcutToolbarIntegratedInSuggestion = preferences.shortcutToolbarIntegratedInSuggestion
         shortcutToolbarHeightDp = preferences.shortcutToolbarHeightDp
@@ -2486,27 +2294,17 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         clipboardPreviewTapToDelete = preferences.clipboardPreviewTapToDelete
         tenkeyHeightPreferenceValue = preferences.tenkeyHeightPreferenceValue
         tenkeyWidthPreferenceValue = preferences.tenkeyWidthPreferenceValue
-        qwertyHeightPreferenceValue = preferences.qwertyHeightPreferenceValue
-        qwertyWidthPreferenceValue = preferences.qwertyWidthPreferenceValue
         candidateViewHeightPreferenceValue = preferences.candidateViewHeightPreferenceValue
         candidateViewHeightEmptyPreferenceValue =
             preferences.candidateViewHeightEmptyPreferenceValue
         tenkeyPositionPreferenceValue = preferences.tenkeyPositionPreferenceValue
         tenkeyBottomMarginPreferenceValue = preferences.tenkeyBottomMarginPreferenceValue
-        qwertyPositionPreferenceValue = preferences.qwertyPositionPreferenceValue
-        qwertyBottomMarginPreferenceValue = preferences.qwertyBottomMarginPreferenceValue
         tenkeyStartMarginPreferenceValue = preferences.tenkeyStartMarginPreferenceValue
         tenkeyEndMarginPreferenceValue = preferences.tenkeyEndMarginPreferenceValue
-        qwertyStartMarginPreferenceValue = preferences.qwertyStartMarginPreferenceValue
-        qwertyEndMarginPreferenceValue = preferences.qwertyEndMarginPreferenceValue
         tenkeyLandScapeStartMarginPreferenceValue =
             preferences.tenkeyLandscapeStartMarginPreferenceValue
         tenkeyLandScapeEndMarginPreferenceValue =
             preferences.tenkeyLandscapeEndMarginPreferenceValue
-        qwertyLandScapeStartMarginPreferenceValue =
-            preferences.qwertyLandscapeStartMarginPreferenceValue
-        qwertyLandScapeEndMarginPreferenceValue =
-            preferences.qwertyLandscapeEndMarginPreferenceValue
         enableShowLastShownKeyboardInRestart =
             preferences.enableShowLastShownKeyboardInRestart
         lastSavedKeyboardPosition = preferences.lastSavedKeyboardPosition
@@ -2529,8 +2327,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         currentKeyboardOrder = keyboardSelection.resolvedIndex ?: 0
         tenkeyHeightLandScapePreferenceValue = preferences.tenkeyHeightLandscapePreferenceValue
         tenkeyWidthLandScapePreferenceValue = preferences.tenkeyWidthLandscapePreferenceValue
-        qwertyHeightLandScapePreferenceValue = preferences.qwertyHeightLandscapePreferenceValue
-        qwertyWidthLandScapePreferenceValue = preferences.qwertyWidthLandscapePreferenceValue
         candidateViewLandScapeHeightPreferenceValue =
             preferences.candidateViewLandscapeHeightPreferenceValue
         candidateViewLandScapeHeightEmptyPreferenceValue =
@@ -2539,19 +2335,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
             preferences.tenkeyLandscapePositionPreferenceValue
         tenkeyLandScapeBottomMarginPreferenceValue =
             preferences.tenkeyLandscapeBottomMarginPreferenceValue
-        qwertyLandScapePositionPreferenceValue =
-            preferences.qwertyLandscapePositionPreferenceValue
-        qwertyLandScapeBottomMarginPreferenceValue =
-            preferences.qwertyLandscapeBottomMarginPreferenceValue
-        qwertyKeyVerticalMargin = preferences.qwertyKeyVerticalMargin
-        qwertyKeyHorizontalGap = preferences.qwertyKeyHorizontalGap
-        qwertyKeyIndentLarge = preferences.qwertyKeyIndentLarge
-        qwertyKeyIndentSmall = preferences.qwertyKeyIndentSmall
-        qwertyKeySideMargin = preferences.qwertyKeySideMargin
-        qwertyKeyTextSize = preferences.qwertyKeyTextSize
-        qwertySymbolKeymapTextSize = preferences.qwertySymbolKeymapTextSize
-        qwertySpecialKeyTextSize = preferences.qwertySpecialKeyTextSize
-        qwertySpecialKeyIconSize = preferences.qwertySpecialKeyIconSize
         keyboardThemeMode = preferences.keyboardThemeMode
         customThemeBgColor = preferences.customThemeBgColor
         customThemeKeyColor = preferences.customThemeKeyColor
@@ -2578,7 +2361,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         inputConversionTextColor = preferences.inputConversionTextColor
         inputCompositionAfterBackgroundColor =
             manipulateColor(preferences.inputCompositionBackgroundColor, 1.2f)
-        sumireEnglishQwertyPreference = preferences.sumireEnglishQwertyPreference
         conversionCandidatesRomajiEnablePreference =
             preferences.conversionCandidatesRomajiEnablePreference
         learnFirstCandidateDictionaryPreference =
@@ -2596,15 +2378,11 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         circularFlickDirectionCount = preferences.circularFlickDirectionCount
         hierarchicalFlickModeSwitchAngleMargin = preferences.hierarchicalFlickModeSwitchAngleMargin
         customKeyBorderWidth = preferences.customKeyBorderWidth
-        qwertySwitchNumberKeyWithoutNumberPreference =
-            preferences.qwertySwitchNumberKeyWithoutNumberPreference
         omissionSearchOffsetScorePreference = preferences.omissionSearchOffsetScorePreference
         enableTypoCorrectionJapaneseFlickKeyboardOffsetScorePreference =
             preferences.enableTypoCorrectionJapaneseFlickKeyboardOffsetScorePreference
         enableTypoCorrectionJapaneseFlickKeyboardPreference =
             preferences.enableTypoCorrectionJapaneseFlickKeyboardPreference
-        enableTypoCorrectionQwertyEnglishKeyboardPreference =
-            preferences.enableTypoCorrectionQwertyEnglishKeyboardPreference
         refreshReconversionUi()
     }
 
@@ -2917,27 +2695,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
             !(clipboardPreviewTapToDelete ?: false)
         )
         val isNumberInputType = currentInputType in numberTypes
-        if (!isNumberInputType && qwertyMode.value == TenKeyQWERTYMode.Sumire) {
-            mainLayoutBinding?.let { mainView ->
-                Timber.d("TenKeyQWERTYMode.Sumire: ${currentInputModeForSession} ${switchQWERTYPassword}")
-                when (currentInputModeForSession) {
-                    InputMode.ModeJapanese -> {
-                        customKeyboardMode = KeyboardInputMode.HIRAGANA
-                        updateKeyboardLayout()
-                    }
-
-                    InputMode.ModeEnglish -> {
-                        customKeyboardMode = KeyboardInputMode.ENGLISH
-                        createNewKeyboardLayoutForSumire()
-                    }
-
-                    InputMode.ModeNumber -> {
-                        customKeyboardMode = KeyboardInputMode.SYMBOLS
-                        createNewKeyboardLayoutForSumire()
-                    }
-                }
-            }
-        }
 
         updateClipboardPreview()
 
@@ -3126,27 +2883,11 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         flickSensitivityPreferenceValue = null
         flickThresholdShapePreferenceValue = FlickThresholdShape.Radial
         longPressTimeoutPreferenceValue = null
-        qwertyShowIMEButtonPreference = null
-        qwertyShowEmojiButtonPreference = null
         defaultEmojiSkinTonePreference = EmojiSkinToneSupport.DEFAULT_SKIN_TONE
         tenkeyShowIMEButtonPreference = null
-        qwertyShowCursorButtonsPreference = null
-        qwertyShowNumberButtonsPreference = null
-        qwertyShowSwitchRomajiEnglishPreference = null
-        qwertyEnglishDirectInputPreference = false
-        qwertyGlideInputPreference = false
-        qwertyRomajiShiftConversionPreference = null
-        qwertyShowPopupWindowPreference = null
-        qwertyEnableFlickUpPreference = null
-        qwertyEnableFlickDownPreference = null
-        qwertyNumberKeyFlickUpChars = emptyMap()
-        qwertyNumberKeyFlickDownChars = emptyMap()
         qwertyEnableZenkakuSpacePreference = null
         qwertyRomajiHankakuNumberPreference = null
         qwertyRomajiHankakuSymbolPreference = null
-        switchQWERTYPassword = null
-        landscapeForceQwertyPreference = null
-        landscapeForceQwertyRomajiPreference = null
         shortcutTollbarVisibility = null
         shortcutToolbarIntegratedInSuggestion = null
         shortcutToolbarHeightDp = AppPreference.SHORTCUT_TOOLBAR_HEIGHT_DEFAULT_DP
@@ -3157,54 +2898,31 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         isDeleteLeftFlickPreference = null
         isDeleteUpFlickPreference = null
         isDeleteDownFlickPreference = null
-        qwertyShowKutoutenButtonsPreference = null
-        qwertyShowKeymapSymbolsPreference = null
         showCandidateInPasswordPreference = null
         tenkeyHeightPreferenceValue = null
         tenkeyWidthPreferenceValue = null
-        qwertyHeightPreferenceValue = null
         candidateViewHeightPreferenceValue = null
         candidateViewHeightEmptyPreferenceValue = null
-        qwertyWidthPreferenceValue = null
         tenkeyPositionPreferenceValue = null
         tenkeyBottomMarginPreferenceValue = null
-        qwertyPositionPreferenceValue = null
-        qwertyBottomMarginPreferenceValue = null
 
         tenkeyStartMarginPreferenceValue = null
         tenkeyEndMarginPreferenceValue = null
-        qwertyStartMarginPreferenceValue = null
-        qwertyEndMarginPreferenceValue = null
 
         tenkeyLandScapeStartMarginPreferenceValue = null
         tenkeyLandScapeEndMarginPreferenceValue = null
-        qwertyLandScapeStartMarginPreferenceValue = null
-        qwertyLandScapeEndMarginPreferenceValue = null
 
         enableShowLastShownKeyboardInRestart = null
         lastSavedKeyboardPosition = null
 
         tenkeyHeightLandScapePreferenceValue = null
         tenkeyWidthLandScapePreferenceValue = null
-        qwertyHeightLandScapePreferenceValue = null
         candidateViewLandScapeHeightPreferenceValue = null
         candidateViewLandScapeHeightEmptyPreferenceValue = null
-        qwertyWidthLandScapePreferenceValue = null
         tenkeyLandScapePositionPreferenceValue = null
         tenkeyLandScapeBottomMarginPreferenceValue = null
-        qwertyLandScapePositionPreferenceValue = null
-        qwertyLandScapeBottomMarginPreferenceValue = null
 
 
-        qwertyKeyVerticalMargin = null
-        qwertyKeyHorizontalGap = null
-        qwertyKeyIndentLarge = null
-        qwertyKeyIndentSmall = null
-        qwertyKeySideMargin = null
-        qwertyKeyTextSize = null
-        qwertySymbolKeymapTextSize = null
-        qwertySpecialKeyTextSize = null
-        qwertySpecialKeyIconSize = null
 
         keyboardThemeMode = null
         customThemeBgColor = null
@@ -3225,9 +2943,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         mozcUTWiki = null
         mozcUTNeologd = null
         mozcUTWeb = null
-        sumireInputKeyType = null
-        sumireInputKeyLayoutType = null
-        sumireInputStyle = null
         candidateColumns = null
         candidateColumnsLandscape = null
         candidateViewHeight = null
@@ -3240,31 +2955,12 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         customKeyboardSuggestionPreference = null
         customDirectInputReplaceComposingPreference = false
         customKeymapGuidePreference = false
-        sumireKeymapGuideSettings = ModeKeymapGuideSettings()
         flickGuideTextSizeSpPreference = null
         flickGuideMaxCharactersPreference = null
         symbolKeyboardFirstItem = null
         userDictionaryPrefixMatchNumber = null
-        tenkeyQWERTYSwitchNumber = null
         tenkeyUseThreeStateKeyboard = true
         tenkeyNumberSymbolKeyGapDp = 4
-        tenkeySwitchNumberToQwertyNumberPreference = false
-        tenkeyRestoreInputModeOnRestart = false
-        sumireRestoreInputModeOnRestart = false
-        tenkeyRestoreInputModeOnlyWithinTime = false
-        tenkeyRestoreInputModeTimeoutMinutes = 5
-        tenkeyLastInputModeSavedAtEpochMillis = 0L
-        sumireRestoreInputModeOnlyWithinTime = false
-        sumireRestoreInputModeTimeoutMinutes = 5
-        sumireLastInputModeSavedAtEpochMillis = 0L
-        tenkeyLastInputModePreference = "japanese"
-        tenkeyLastInputModePresentationPreference = "native"
-        tenkeyLastQwertyNumberReturnTargetPreference = "japanese"
-        sumireLastInputModePreference = "japanese"
-        sumireLastInputModePresentationPreference = "native"
-        qwertyNumberOpenedFromTenkeyTwoStateNumberKey = false
-        tabletTenkeyQwertySwitchEnglish = false
-        tenkeyKeymapGuideSettings = ModeKeymapGuideSettings()
         isKeyboardRounded = null
         reconversionEnabledPreference = false
         conversionKeySwipePreference = null
@@ -3289,9 +2985,7 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         inputConversionBackgroundColor = null
         inputConversionTextColor = null
 
-        previousTenKeyQWERTYMode = null
 
-        sumireEnglishQwertyPreference = null
         conversionCandidatesRomajiEnablePreference = null
         learnFirstCandidateDictionaryPreference = null
         learnDictionaryAllowMixedSymbolsNumbersPreference = true
@@ -3301,12 +2995,10 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         learnDictionaryPredictionCandidateLimit = 4
         circularFlickWindowScale = null
         customKeyBorderWidth = null
-        qwertySwitchNumberKeyWithoutNumberPreference = null
         omissionSearchOffsetScorePreference = null
         enableTypoCorrectionJapaneseFlickKeyboardOffsetScorePreference = null
 
         enableTypoCorrectionJapaneseFlickKeyboardPreference = null
-        enableTypoCorrectionQwertyEnglishKeyboardPreference = null
 
         actionInDestroy()
         speechRecognizer?.destroy()
@@ -4172,7 +3864,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         when (mode) {
 
             TenKeyQWERTYMode.Custom,
-            TenKeyQWERTYMode.Sumire,
             TenKeyQWERTYMode.Number -> {
                 surface.customLayout?.isVisible = true
             }
@@ -4241,14 +3932,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         refreshBaselineInputBehaviorForCurrentKeyboard("keyboard state rendered")
     }
 
-    private fun refreshActiveSumireLayoutIfNeeded() {
-        if (qwertyMode.value != TenKeyQWERTYMode.Sumire) return
-        val surface = getActiveKeyboardSurface() ?: return
-        val customLayout = surface.customLayout ?: return
-        setSumireLayoutTo(customLayout)
-        renderDynamicKeysOnActiveSurface()
-    }
-
     private fun defaultInputModeFor(inputType: InputTypeForIME): InputMode {
         return when (inputType) {
             InputTypeForIME.TextEmailAddress,
@@ -4272,51 +3955,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         }
     }
 
-    private fun createSumireKeyboardLayout(): KeyboardLayout {
-        val dynamicStates = mapOf(
-            "enter_key" to currentEnterKeyIndex,
-            "dakuten_toggle_key" to currentDakutenKeyIndex,
-            "katakana_toggle_key" to currentKatakanaKeyIndex,
-            "space_convert_key" to currentSpaceKeyIndex,
-        )
-        val layoutType = sumireInputKeyLayoutType ?: "toggle"
-        return applyCircularSlotActionSettings(
-            KeyboardDefaultLayouts.createFinalLayout(
-                mode = customKeyboardMode,
-                dynamicKeyStates = dynamicStates,
-                inputLayoutType = layoutType,
-                inputStyle = sumireInputStyle ?: "default",
-                deleteKeyFlickSettings = currentDeleteKeyFlickSettings()
-            ),
-            customKeyboardMode
-        ).let { baseLayout ->
-            SumireSpecialKeyActionDisplayOverrideApplier.apply(
-                layout = baseLayout,
-                layoutType = layoutType,
-                inputMode = customKeyboardMode.name,
-                overrides = sumireSpecialKeyActionOverrides,
-                displayMetadata = sumireSpecialKeyActionDisplayMetadata()
-            )
-        }.let { layout ->
-            SumireSpecialKeyPlacementOverrideApplier.apply(
-                layout = layout,
-                layoutType = layoutType,
-                inputMode = customKeyboardMode.name,
-                overrides = sumireSpecialKeyPlacementOverrides
-            )
-        }
-    }
-
-    private fun sumireSpecialKeyActionDisplayMetadata(): List<SumireSpecialKeyActionDisplayMetadata> {
-        return KeyActionMapper.getDisplayActions(this).map {
-            SumireSpecialKeyActionDisplayMetadata(
-                action = it.action,
-                displayName = it.displayName,
-                iconResId = it.iconResId
-            )
-        }
-    }
-
     private fun currentDeleteKeyFlickSettings(): DeleteKeyFlickSettings {
         return DeleteKeyFlickSettings(
             left = isDeleteLeftFlickPreference ?: true,
@@ -4337,7 +3975,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         layout: KeyboardLayout,
         isUserDefinedCustomLayout: Boolean = false
     ) {
-        flickView.clearSumireSpecialKeyActionResolver()
         flickView.setKeyboard(
             applyDeleteKeyFlickPreferences(layout),
             if (isUserDefinedCustomLayout) customKeyboardHitTestMode() else KeyHitTestMode.KEY_BOUNDS
@@ -4361,32 +3998,17 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
 
     private fun applyCurrentFlickGuidePreference(flickView: FlickKeyboardView) {
         val surface = when (qwertyMode.value) {
-            TenKeyQWERTYMode.Sumire -> FlickGuideSurface.Sumire
             TenKeyQWERTYMode.Custom -> FlickGuideSurface.Custom
             else -> FlickGuideSurface.Other
         }
         val config = resolveFlickGuideRuntimeConfig(
             surface = surface,
-            mode = customKeyboardMode,
-            sumireSettings = sumireKeymapGuideSettings,
             customGuideEnabled = customKeymapGuidePreference
         )
         flickView.setFlickGuideEnabled(
             enabled = config.enabled,
             allowMultiCharacterLabels = config.allowMultiCharacterLabels
         )
-    }
-
-    private fun setSumireLayoutTo(flickView: FlickKeyboardView) {
-        val layoutType = sumireInputKeyLayoutType ?: "toggle"
-        flickView.setKeyCharacterCase(KeyCharacterCase.AS_DEFINED)
-        applyCurrentFlickGuidePreference(flickView)
-        flickView.setSumireSpecialKeyActionResolver(
-            resolver = SumireSpecialKeyActionResolver(sumireSpecialKeyActionOverrides)::resolve,
-            layoutType = layoutType,
-            inputMode = customKeyboardMode.name
-        )
-        flickView.setKeyboard(createSumireKeyboardLayout(), KeyHitTestMode.NEAREST_KEY)
     }
 
     private fun setNumberLayoutTo(flickView: FlickKeyboardView) {
@@ -4535,10 +4157,8 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
     private fun refreshDeleteKeyFlickPreferenceLayouts() {
         val customLayout = getActiveKeyboardSurface()?.customLayout ?: return
         when (qwertyMode.value) {
-            TenKeyQWERTYMode.Sumire -> setSumireLayoutTo(customLayout)
             TenKeyQWERTYMode.Custom -> setCurrentCustomLayoutTo(customLayout)
             TenKeyQWERTYMode.Number -> setNumberLayoutTo(customLayout)
-            else -> Unit
         }
     }
 
@@ -5848,7 +5468,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
             when (type) {
 
                 KeyboardType.CUSTOM -> {
-                    Timber.d("updateKeyboardLayout CUSTOM: $isFlickOnlyMode $sumireInputKeyType")
                     if (!selectInitialCustomKeyboardTab()) {
                         fallbackFromCustomKeyboardIfNeeded()
                         return@apply
@@ -5874,36 +5493,12 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         when (qwertyMode.value) {
             TenKeyQWERTYMode.Custom -> {}
 
-            TenKeyQWERTYMode.Sumire -> {
-                Timber.d("updateKeyboardLayout: $isFlickOnlyMode $sumireInputKeyType")
-                renderDynamicKeysOnActiveSurface()
-            }
-
             TenKeyQWERTYMode.Number -> {
 
             }
 
         }
         renderCurrentKeyboardStateOnActiveSurface()
-    }
-
-    private fun InputMode.toSumireKeyboardInputMode(): KeyboardInputMode {
-        return when (this) {
-            InputMode.ModeJapanese -> KeyboardInputMode.HIRAGANA
-            InputMode.ModeEnglish -> KeyboardInputMode.ENGLISH
-            InputMode.ModeNumber -> KeyboardInputMode.SYMBOLS
-        }
-    }
-
-    private fun applyCircularSlotActionSettings(
-        layout: KeyboardLayout,
-        mode: KeyboardInputMode
-    ): KeyboardLayout {
-        return CircularSlotActionApplier.apply(
-            layout = layout,
-            mode = mode,
-            settings = appPreference.getCircularSlotActionSettings()
-        )
     }
 
     private fun createNewKeyboardLayoutForSumire() {
@@ -5925,17 +5520,12 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
                     }
 
                     KeyboardInputMode.ENGLISH -> {
-                        // necookey: the QWERTY keyboard was removed. English mode stays on the
-                        // custom keyboard surface and shows the built-in English layout (rendered
-                        // through the Sumire layout path) until the user switches back.
-                        previousTenKeyQWERTYMode = TenKeyQWERTYMode.Custom
-                        resetCustomToggleState()
-                        _tenKeyQWERTYMode.update { TenKeyQWERTYMode.Sumire }
+                        // necookey: the built-in English layouts were removed. English mode
+                        // keeps the user's custom layout on screen.
                         getActiveKeyboardSurface()?.customLayout?.let { flickView ->
-                            setSumireLayoutTo(flickView)
+                            setCurrentCustomLayoutTo(flickView)
                             flickView.isVisible = true
                         }
-                        renderDynamicKeysOnActiveSurface()
                     }
 
                     KeyboardInputMode.SYMBOLS -> {
@@ -5944,34 +5534,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
                         )
                     }
 
-                }
-            }
-
-            TenKeyQWERTYMode.Sumire -> {
-                if (previousTenKeyQWERTYMode == TenKeyQWERTYMode.Custom &&
-                    customKeyboardMode != KeyboardInputMode.ENGLISH
-                ) {
-                    // Leaving the built-in English layout: return to the user's custom keyboard.
-                    previousTenKeyQWERTYMode = null
-                    _tenKeyQWERTYMode.update { TenKeyQWERTYMode.Custom }
-                    createNewKeyboardLayoutForSumire()
-                    return
-                }
-                when (customKeyboardMode) {
-                    KeyboardInputMode.HIRAGANA -> {
-                        Timber.d("updateKeyboardLayout: $isFlickOnlyMode $sumireInputKeyType")
-                        getActiveKeyboardSurface()?.customLayout?.let(::setSumireLayoutTo)
-                    }
-
-                    KeyboardInputMode.ENGLISH -> {
-                        Timber.d("updateKeyboardLayout: $isFlickOnlyMode $sumireInputKeyType")
-                        getActiveKeyboardSurface()?.customLayout?.let(::setSumireLayoutTo)
-                    }
-
-                    KeyboardInputMode.SYMBOLS -> {
-                        Timber.d("updateKeyboardLayout: $isFlickOnlyMode $sumireInputKeyType")
-                        getActiveKeyboardSurface()?.customLayout?.let(::setSumireLayoutTo)
-                    }
                 }
             }
 
@@ -6277,12 +5839,7 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
     }
 
     private fun updateSumireDakutenKeyForCurrentInput() {
-        val isSumireJapaneseInput =
-            qwertyMode.value == TenKeyQWERTYMode.Sumire &&
-                currentInputModeForSession == InputMode.ModeJapanese
-        val canTransformLastCharacter =
-            inputString.value.lastOrNull()?.getDakutenSmallChar() != null
-        currentDakutenKeyIndex = if (isSumireJapaneseInput && canTransformLastCharacter) 1 else 0
+        currentDakutenKeyIndex = 0
         updateDynamicKeyOnActiveSurface("dakuten_toggle_key", currentDakutenKeyIndex)
     }
 
@@ -7277,12 +6834,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
                                     }
                                 }
                                 consumeCustomKeyboardOneShotShift()
-                            }
-
-                            TenKeyQWERTYMode.Sumire -> {
-                                Timber.d("TenKeyQWERTYMode.Sumire: $text $isFlick")
-                                handleOnKeyForSumire(text, mainView, isFlick)
-                                updateSumireDakutenKeyForCurrentInput()
                             }
 
                             TenKeyQWERTYMode.Number -> {
@@ -9070,12 +8621,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
                         }
                     }
 
-                    TenKeyQWERTYMode.Sumire -> {
-                        suggestionAdapter?.updateState(
-                            TenKeyQWERTYMode.Sumire, emptyList()
-                        )
-                    }
-
                     TenKeyQWERTYMode.Number -> {
                         suggestionAdapter?.updateState(
                             TenKeyQWERTYMode.Number, emptyList()
@@ -9559,14 +9104,8 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
                 positionIsEnd = tenkeyPositionPreferenceValue ?: true,
                 candidateHeight = (candidateViewHeightPreferenceValue ?: 60) + necookeyPredictionRowBudgetDp(),
                 candidateEmptyHeight = candidateViewHeightEmptyPreferenceValue ?: 60,
-                qwertyHeightPref = qwertyHeightPreferenceValue ?: 280,
-                qwertyWidthPref = qwertyWidthPreferenceValue ?: 100,
-                qwertyBottomMargin = qwertyBottomMarginPreferenceValue ?: 0,
-                qwertyPositionIsEnd = qwertyPositionPreferenceValue ?: true,
                 keyboardMarginStart = tenkeyStartMarginPreferenceValue ?: 0,
-                keyboardMarginEnd = tenkeyEndMarginPreferenceValue ?: 0,
-                qwertyMarginStart = qwertyStartMarginPreferenceValue ?: 0,
-                qwertyMarginEnd = qwertyEndMarginPreferenceValue ?: 0
+                keyboardMarginEnd = tenkeyEndMarginPreferenceValue ?: 0
             )
         } else {
             KeyboardSizePreferences(
@@ -9576,14 +9115,8 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
                 positionIsEnd = tenkeyLandScapePositionPreferenceValue ?: true,
                 candidateHeight = (candidateViewLandScapeHeightPreferenceValue ?: 60) + necookeyPredictionRowBudgetDp(),
                 candidateEmptyHeight = candidateViewLandScapeHeightEmptyPreferenceValue ?: 60,
-                qwertyHeightPref = qwertyHeightLandScapePreferenceValue ?: 280,
-                qwertyWidthPref = qwertyWidthLandScapePreferenceValue ?: 100,
-                qwertyBottomMargin = qwertyLandScapeBottomMarginPreferenceValue ?: 0,
-                qwertyPositionIsEnd = qwertyLandScapePositionPreferenceValue ?: true,
                 keyboardMarginStart = tenkeyLandScapeStartMarginPreferenceValue ?: 0,
-                keyboardMarginEnd = tenkeyLandScapeEndMarginPreferenceValue ?: 0,
-                qwertyMarginStart = qwertyLandScapeStartMarginPreferenceValue ?: 0,
-                qwertyMarginEnd = qwertyLandScapeEndMarginPreferenceValue ?: 0
+                keyboardMarginEnd = tenkeyLandScapeEndMarginPreferenceValue ?: 0
             )
         }
     }
@@ -9618,28 +9151,15 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         )
 
         // 2. ピクセル値の計算
-        val heightPx = when {
-            false || false -> {
-                val clampedHeight = if (isPortrait) {
-                    prefs.qwertyHeightPref.coerceIn(100, 420)
-                } else if (isFloating) {
-                    prefs.qwertyHeightPref
-                } else {
-                    prefs.qwertyHeightPref.coerceIn(100, 420)
-                }
-                (clampedHeight * density).toInt()
+        val heightPx = run {
+            val clampedHeight = if (isPortrait) {
+                prefs.heightPref.coerceIn(100, 420)
+            } else if (isFloating) {
+                prefs.heightPref
+            } else {
+                prefs.heightPref.coerceIn(100, 420)
             }
-
-            else -> {
-                val clampedHeight = if (isPortrait) {
-                    prefs.heightPref.coerceIn(100, 420)
-                } else if (isFloating) {
-                    prefs.heightPref
-                } else {
-                    prefs.heightPref.coerceIn(100, 420)
-                }
-                (clampedHeight * density).toInt()
-            }
+            (clampedHeight * density).toInt()
         }
 
         val widthPx = when {
@@ -9647,10 +9167,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
             else -> (screenWidth * (prefs.widthPref / 100f)).toInt()
         }
 
-        val qwertyWidthPx = when {
-            prefs.qwertyWidthPref == 100 -> ViewGroup.LayoutParams.MATCH_PARENT
-            else -> (screenWidth * (prefs.qwertyWidthPref / 100f)).toInt()
-        }
 
         // 3. 最終的な高さ、幅、Gravity、マージンの決定
         val candidatesShown = isCandidateStripActive(
@@ -9981,36 +9497,11 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         } else {
             tenkeyLandScapePositionPreferenceValue ?: true
         }
-        val qwertyHeightPref = if (isPortrait) {
-            qwertyHeightPreferenceValue ?: 280
-        } else {
-            qwertyHeightLandScapePreferenceValue ?: 220
-        }
-        val qwertyWidthPref = if (isPortrait) {
-            qwertyWidthPreferenceValue ?: 100
-        } else {
-            qwertyWidthLandScapePreferenceValue ?: 100
-        }
-        val qwertyPositionPref = if (isPortrait) {
-            qwertyPositionPreferenceValue ?: true
-        } else {
-            qwertyLandScapePositionPreferenceValue ?: true
-        }
-        val qwertyKeyboardMarginBottomPref = if (isPortrait) {
-            qwertyBottomMarginPreferenceValue ?: 0
-        } else {
-            qwertyLandScapeBottomMarginPreferenceValue ?: 0
-        }
 
         val heightPx = when {
             keyboardSymbolViewState.value.isShown -> {
                 val height = if (isPortrait) 320 else 220
                 (height * density).toInt()
-            }
-
-            false || false -> {
-                val clampedHeight = qwertyHeightPref.coerceIn(60, 420)
-                (clampedHeight * density).toInt()
             }
 
             else -> {
@@ -10029,15 +9520,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
             }
         }
 
-        val qwertyWidthPx = when {
-            qwertyWidthPref == 100 -> {
-                ViewGroup.LayoutParams.MATCH_PARENT
-            }
-
-            else -> {
-                (screenWidth * (qwertyWidthPref / 100f)).toInt()
-            }
-        }
 
         val suggestionHeightInDp = if (isPortrait) {
             candidateViewHeightPreferenceValue ?: 60
@@ -10454,7 +9936,7 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         }
 
         return when (qwertyMode.value) {
-            TenKeyQWERTYMode.Sumire, TenKeyQWERTYMode.Custom, TenKeyQWERTYMode.Number -> true
+            TenKeyQWERTYMode.Custom, TenKeyQWERTYMode.Number -> true
         }
     }
 
@@ -12020,22 +11502,7 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
                     positionIsEnd = tenkeyPositionPreferenceValue ?: true,
                 )
 
-            KeyboardLayoutEditOrientation.Portrait to KeyboardLayoutEditTarget.QwertyFamily ->
-                KeyboardLayoutEditValues.Normal(
-                    heightDp = qwertyHeightPreferenceValue
-                        ?: KeyboardLayoutEditConstraints.DefaultHeightDp,
-                    widthPercent = qwertyWidthPreferenceValue
-                        ?: KeyboardLayoutEditConstraints.DefaultWidthPercent,
-                    bottomMarginDp = qwertyBottomMarginPreferenceValue
-                        ?: KeyboardLayoutEditConstraints.DefaultMarginDp,
-                    marginStartDp = qwertyStartMarginPreferenceValue
-                        ?: KeyboardLayoutEditConstraints.DefaultMarginDp,
-                    marginEndDp = qwertyEndMarginPreferenceValue
-                        ?: KeyboardLayoutEditConstraints.DefaultMarginDp,
-                    positionIsEnd = qwertyPositionPreferenceValue ?: true,
-                )
-
-            KeyboardLayoutEditOrientation.Landscape to KeyboardLayoutEditTarget.TenKeyFamily ->
+            else ->
                 KeyboardLayoutEditValues.Normal(
                     heightDp = tenkeyHeightLandScapePreferenceValue
                         ?: KeyboardLayoutEditConstraints.DefaultHeightDp,
@@ -12048,21 +11515,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
                     marginEndDp = tenkeyLandScapeEndMarginPreferenceValue
                         ?: KeyboardLayoutEditConstraints.DefaultMarginDp,
                     positionIsEnd = tenkeyLandScapePositionPreferenceValue ?: true,
-                )
-
-            else ->
-                KeyboardLayoutEditValues.Normal(
-                    heightDp = qwertyHeightLandScapePreferenceValue
-                        ?: KeyboardLayoutEditConstraints.DefaultHeightDp,
-                    widthPercent = qwertyWidthLandScapePreferenceValue
-                        ?: KeyboardLayoutEditConstraints.DefaultWidthPercent,
-                    bottomMarginDp = qwertyLandScapeBottomMarginPreferenceValue
-                        ?: KeyboardLayoutEditConstraints.DefaultMarginDp,
-                    marginStartDp = qwertyLandScapeStartMarginPreferenceValue
-                        ?: KeyboardLayoutEditConstraints.DefaultMarginDp,
-                    marginEndDp = qwertyLandScapeEndMarginPreferenceValue
-                        ?: KeyboardLayoutEditConstraints.DefaultMarginDp,
-                    positionIsEnd = qwertyLandScapePositionPreferenceValue ?: true,
                 )
         }
     }
@@ -12109,31 +11561,13 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
                 tenkeyPositionPreferenceValue = values.positionIsEnd
             }
 
-            KeyboardLayoutEditOrientation.Portrait to KeyboardLayoutEditTarget.QwertyFamily -> {
-                qwertyHeightPreferenceValue = values.heightDp
-                qwertyWidthPreferenceValue = values.widthPercent
-                qwertyBottomMarginPreferenceValue = values.bottomMarginDp
-                qwertyStartMarginPreferenceValue = values.marginStartDp
-                qwertyEndMarginPreferenceValue = values.marginEndDp
-                qwertyPositionPreferenceValue = values.positionIsEnd
-            }
-
-            KeyboardLayoutEditOrientation.Landscape to KeyboardLayoutEditTarget.TenKeyFamily -> {
+            else -> {
                 tenkeyHeightLandScapePreferenceValue = values.heightDp
                 tenkeyWidthLandScapePreferenceValue = values.widthPercent
                 tenkeyLandScapeBottomMarginPreferenceValue = values.bottomMarginDp
                 tenkeyLandScapeStartMarginPreferenceValue = values.marginStartDp
                 tenkeyLandScapeEndMarginPreferenceValue = values.marginEndDp
                 tenkeyLandScapePositionPreferenceValue = values.positionIsEnd
-            }
-
-            else -> {
-                qwertyHeightLandScapePreferenceValue = values.heightDp
-                qwertyWidthLandScapePreferenceValue = values.widthPercent
-                qwertyLandScapeBottomMarginPreferenceValue = values.bottomMarginDp
-                qwertyLandScapeStartMarginPreferenceValue = values.marginStartDp
-                qwertyLandScapeEndMarginPreferenceValue = values.marginEndDp
-                qwertyLandScapePositionPreferenceValue = values.positionIsEnd
             }
         }
     }
@@ -12153,16 +11587,7 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
                 appPreference.keyboard_position = values.positionIsEnd
             }
 
-            KeyboardLayoutEditOrientation.Portrait to KeyboardLayoutEditTarget.QwertyFamily -> {
-                appPreference.qwerty_keyboard_height = values.heightDp
-                appPreference.qwerty_keyboard_width = values.widthPercent
-                appPreference.qwerty_keyboard_vertical_margin_bottom = values.bottomMarginDp
-                appPreference.qwerty_keyboard_margin_start_dp = values.marginStartDp
-                appPreference.qwerty_keyboard_margin_end_dp = values.marginEndDp
-                appPreference.qwerty_keyboard_position = values.positionIsEnd
-            }
-
-            KeyboardLayoutEditOrientation.Landscape to KeyboardLayoutEditTarget.TenKeyFamily -> {
+            else -> {
                 appPreference.keyboard_height_landscape = values.heightDp
                 appPreference.keyboard_width_landscape = values.widthPercent
                 appPreference.keyboard_vertical_margin_bottom_landscape = values.bottomMarginDp
@@ -12170,50 +11595,25 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
                 appPreference.keyboard_margin_end_dp_landscape = values.marginEndDp
                 appPreference.keyboard_position_landscape = values.positionIsEnd
             }
-
-            else -> {
-                appPreference.qwerty_keyboard_height_landscape = values.heightDp
-                appPreference.qwerty_keyboard_width_landscape = values.widthPercent
-                appPreference.qwerty_keyboard_vertical_margin_bottom_landscape =
-                    values.bottomMarginDp
-                appPreference.qwerty_keyboard_margin_start_dp_landscape = values.marginStartDp
-                appPreference.qwerty_keyboard_margin_end_dp_landscape = values.marginEndDp
-                appPreference.qwerty_keyboard_position_landscape = values.positionIsEnd
-            }
         }
     }
 
     private fun reloadKeyboardLayoutEditCachesFromPreferences() {
         tenkeyHeightPreferenceValue = appPreference.keyboard_height
         tenkeyWidthPreferenceValue = appPreference.keyboard_width
-        qwertyHeightPreferenceValue = appPreference.qwerty_keyboard_height
-        qwertyWidthPreferenceValue = appPreference.qwerty_keyboard_width
         tenkeyPositionPreferenceValue = appPreference.keyboard_position
         tenkeyBottomMarginPreferenceValue = appPreference.keyboard_vertical_margin_bottom
-        qwertyPositionPreferenceValue = appPreference.qwerty_keyboard_position
-        qwertyBottomMarginPreferenceValue = appPreference.qwerty_keyboard_vertical_margin_bottom
         tenkeyStartMarginPreferenceValue = appPreference.keyboard_margin_start_dp
         tenkeyEndMarginPreferenceValue = appPreference.keyboard_margin_end_dp
-        qwertyStartMarginPreferenceValue = appPreference.qwerty_keyboard_margin_start_dp
-        qwertyEndMarginPreferenceValue = appPreference.qwerty_keyboard_margin_end_dp
         tenkeyHeightLandScapePreferenceValue = appPreference.keyboard_height_landscape
         tenkeyWidthLandScapePreferenceValue = appPreference.keyboard_width_landscape
-        qwertyHeightLandScapePreferenceValue = appPreference.qwerty_keyboard_height_landscape
-        qwertyWidthLandScapePreferenceValue = appPreference.qwerty_keyboard_width_landscape
         tenkeyLandScapePositionPreferenceValue = appPreference.keyboard_position_landscape
         tenkeyLandScapeBottomMarginPreferenceValue =
             appPreference.keyboard_vertical_margin_bottom_landscape
-        qwertyLandScapePositionPreferenceValue = appPreference.qwerty_keyboard_position_landscape
-        qwertyLandScapeBottomMarginPreferenceValue =
-            appPreference.qwerty_keyboard_vertical_margin_bottom_landscape
         tenkeyLandScapeStartMarginPreferenceValue =
             appPreference.keyboard_margin_start_dp_landscape
         tenkeyLandScapeEndMarginPreferenceValue =
             appPreference.keyboard_margin_end_dp_landscape
-        qwertyLandScapeStartMarginPreferenceValue =
-            appPreference.qwerty_keyboard_margin_start_dp_landscape
-        qwertyLandScapeEndMarginPreferenceValue =
-            appPreference.qwerty_keyboard_margin_end_dp_landscape
     }
 
     private fun resolvedFixedHeightPx(view: View, fallbackDp: Float): Int {
@@ -13746,7 +13146,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         romajiConverter?.clear()
         hardKeyboardShiftPressd = false
         softwareQwertyShiftPressed = false
-        softwareQwertyCapsLockOn = false
         resetSumireKeyboardDakutenMode()
         countToggleKatakana = 0
         currentEnterKeyIndex = 0
@@ -14776,14 +14175,9 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         val ngWords: List<NgWord> =
             if (isNgWordEnable == true) ngWordsList.value else emptyList()
 
-        val enableFlickPref = (enableTypoCorrectionJapaneseFlickKeyboardPreference == true)
-        val enableTypoCorrectionJapaneseFlick =
-            enableFlickPref && qwertyMode.value in setOf(
-                TenKeyQWERTYMode.Sumire,
-            )
-        val enableTypoCorrectionQwertyEnglish =
-            (enableTypoCorrectionQwertyEnglishKeyboardPreference == true) &&
-                    (false || (false && !currentQwertyRomajiModeForSession))
+        // Typo correction only applied to the removed built-in (Sumire / QWERTY) keyboards.
+        val enableTypoCorrectionJapaneseFlick = false
+        val enableTypoCorrectionQwertyEnglish = false
 
         val coreResult = withContext(kanaKanjiConversionDispatcher) {
             queryKanaKanjiCore(
@@ -14894,13 +14288,9 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
             if (isNgWordEnable == true) ngWordsList.value else emptyList()
         }
 
-        val enableFlickPref = (enableTypoCorrectionJapaneseFlickKeyboardPreference == true)
-        val enableTypoCorrectionJapaneseFlick =
-            enableFlickPref && (false || qwertyMode.value == TenKeyQWERTYMode.Sumire)
-
-        val enableTypoCorrectionQwertyEnglish =
-            (enableTypoCorrectionQwertyEnglishKeyboardPreference == true) &&
-                    (false || (false && !currentQwertyRomajiModeForSession))
+        // Typo correction only applied to the removed built-in (Sumire / QWERTY) keyboards.
+        val enableTypoCorrectionJapaneseFlick = false
+        val enableTypoCorrectionQwertyEnglish = false
 
         val coreResultDeferred = async(kanaKanjiConversionDispatcher) {
             measureDebugStage("IMEService.getSuggestionList.kanaKanjiEngine") {
@@ -16349,8 +15739,7 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
     private fun currentFlickPreviewContext(source: FlickPreviewSource): FlickPreviewContext {
         val surfaceEligible = when (source) {
             FlickPreviewSource.TENKEY -> false
-            FlickPreviewSource.SUMIRE -> qwertyMode.value == TenKeyQWERTYMode.Sumire ||
-                    qwertyMode.value == TenKeyQWERTYMode.Number
+            FlickPreviewSource.SUMIRE -> qwertyMode.value == TenKeyQWERTYMode.Number
         }
         return FlickPreviewContext(
             source = source,

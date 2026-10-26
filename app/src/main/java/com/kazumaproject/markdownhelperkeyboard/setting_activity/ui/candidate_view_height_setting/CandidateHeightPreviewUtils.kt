@@ -34,12 +34,6 @@ import com.kazumaproject.markdownhelperkeyboard.ime_service.resolveInitialCustom
 import com.kazumaproject.markdownhelperkeyboard.ime_service.state.KeyboardType
 import com.kazumaproject.markdownhelperkeyboard.repository.KeyboardRepository
 import com.kazumaproject.markdownhelperkeyboard.setting_activity.AppPreference
-import com.kazumaproject.markdownhelperkeyboard.setting_activity.circular_slot.CircularSlotActionApplier
-import com.kazumaproject.markdownhelperkeyboard.sumire_special_key.SumireSpecialKeyActionDisplayMetadata
-import com.kazumaproject.markdownhelperkeyboard.sumire_special_key.SumireSpecialKeyActionDisplayOverrideApplier
-import com.kazumaproject.markdownhelperkeyboard.sumire_special_key.SumireSpecialKeyActionResolver
-import com.kazumaproject.markdownhelperkeyboard.sumire_special_key.SumireSpecialKeyPlacementOverrideApplier
-import com.kazumaproject.markdownhelperkeyboard.sumire_special_key.SumireSpecialKeyRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
@@ -136,7 +130,6 @@ internal fun renderCandidateKeyboardPreview(
     fragment: Fragment,
     appPreference: AppPreference,
     keyboardRepository: KeyboardRepository,
-    sumireSpecialKeyRepository: SumireSpecialKeyRepository,
     views: CandidateKeyboardPreviewViews,
     isLandscape: Boolean,
     onPreviewLayoutChanged: () -> Unit
@@ -167,7 +160,6 @@ internal fun renderCandidateKeyboardPreview(
                 val customLayout = withContext(Dispatchers.IO) {
                     loadPreviewCustomKeyboardLayout(appPreference, keyboardRepository)
                 }
-                views.flick.clearSumireSpecialKeyActionResolver()
                 if (customLayout == null) {
                     // No custom layout stored yet: preview the default layout that the IME inserts.
                     views.flick.setKeyboard(
@@ -280,40 +272,7 @@ private fun previewKeyboardLayoutConfig(
     type: KeyboardType,
     isLandscape: Boolean
 ): PreviewKeyboardLayoutConfig {
-    return if (false) {
-        PreviewKeyboardLayoutConfig(
-            heightDp = if (isLandscape) {
-                appPreference.qwerty_keyboard_height_landscape ?: 220
-            } else {
-                appPreference.qwerty_keyboard_height ?: 220
-            },
-            widthPercent = if (isLandscape) {
-                appPreference.qwerty_keyboard_width_landscape ?: 100
-            } else {
-                appPreference.qwerty_keyboard_width ?: 100
-            },
-            bottomMarginDp = if (isLandscape) {
-                appPreference.qwerty_keyboard_vertical_margin_bottom_landscape ?: 0
-            } else {
-                appPreference.qwerty_keyboard_vertical_margin_bottom ?: 0
-            },
-            positionIsEnd = if (isLandscape) {
-                appPreference.qwerty_keyboard_position_landscape ?: true
-            } else {
-                appPreference.qwerty_keyboard_position ?: true
-            },
-            startMarginDp = if (isLandscape) {
-                appPreference.qwerty_keyboard_margin_start_dp_landscape ?: 0
-            } else {
-                appPreference.qwerty_keyboard_margin_start_dp ?: 0
-            },
-            endMarginDp = if (isLandscape) {
-                appPreference.qwerty_keyboard_margin_end_dp_landscape ?: 0
-            } else {
-                appPreference.qwerty_keyboard_margin_end_dp ?: 0
-            }
-        )
-    } else {
+    return run {
         PreviewKeyboardLayoutConfig(
             heightDp = if (isLandscape) {
                 appPreference.keyboard_height_landscape ?: 220
@@ -534,18 +493,6 @@ private fun syncCustomKeyboardToggleKeyIcons(
             com.kazumaproject.core.R.drawable.caps_lock_outline
         }
     )
-}
-
-private fun sumireSpecialKeyActionDisplayMetadata(
-    context: Context
-): List<SumireSpecialKeyActionDisplayMetadata> {
-    return KeyActionMapper.getDisplayActions(context).map {
-        SumireSpecialKeyActionDisplayMetadata(
-            action = it.action,
-            displayName = it.displayName,
-            iconResId = it.iconResId
-        )
-    }
 }
 
 private fun currentNightMode(context: Context): Int =

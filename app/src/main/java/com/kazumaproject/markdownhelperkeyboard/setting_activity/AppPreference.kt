@@ -22,7 +22,6 @@ import com.kazumaproject.markdownhelperkeyboard.ime_service.state.CandidateTab
 import com.kazumaproject.markdownhelperkeyboard.ime_service.state.KeyboardType
 import com.kazumaproject.markdownhelperkeyboard.setting_activity.backup.PrefBackup
 import com.kazumaproject.markdownhelperkeyboard.setting_activity.backup.PrefEntry
-import com.kazumaproject.markdownhelperkeyboard.setting_activity.circular_slot.CircularSlotActionSetting
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.atomic.AtomicBoolean
 import com.kazumaproject.core.R as CoreR
@@ -62,14 +61,8 @@ object AppPreference {
     const val FLICK_TFBI_POPUP_PRESENTATION_KEY = "flick_tfbi_popup_presentation_preference"
     const val FLICK_TFBI_FLICK_START_POSITION_KEY =
         "flick_tfbi_flick_start_position_preference"
-    const val TENKEY_KEYMAP_GUIDE_JAPANESE_KEY = "tenkey_keymap_guide"
-    const val TENKEY_KEYMAP_GUIDE_ENGLISH_KEY = "tenkey_keymap_guide_english"
-    const val TENKEY_KEYMAP_GUIDE_NUMBER_KEY = "tenkey_keymap_guide_number"
     const val TENKEY_USE_THREE_STATE_KEY = "tenkey_use_three_state_keyboard_preference"
     const val TENKEY_NUMBER_SYMBOL_KEY_GAP_KEY = "tenkey_number_symbol_key_gap_preference"
-    const val SUMIRE_KEYMAP_GUIDE_JAPANESE_KEY = "sumire_keymap_guide_japanese"
-    const val SUMIRE_KEYMAP_GUIDE_ENGLISH_KEY = "sumire_keymap_guide_english"
-    const val SUMIRE_KEYMAP_GUIDE_NUMBER_KEY = "sumire_keymap_guide_number"
     const val STABILIZE_CANDIDATE_STRIP_HEIGHT_KEY = "stabilize_candidate_strip_height_preference"
     const val CUSTOM_DIRECT_INPUT_REPLACE_COMPOSING_KEY =
         "custom_direct_input_replace_composing_preference"
@@ -156,25 +149,14 @@ object AppPreference {
     private val MOZCUT_NEOLOGD = Pair("mozc_ut_neologd_preference", false)
     private val MOZCUT_WEB = Pair("mozc_ut_web_preference", false)
 
-    private val SWITCH_QWERTY_PASSWORD = Pair("switch_qwerty_keyboard_password_preference", false)
 
-    private val TENKEY_SWITCH_QWERTY_PREFERENCE =
-        Pair("tenkey_kana_english_qwerty_preference", false)
 
     private val TENKEY_USE_THREE_STATE_KEYBOARD_PREFERENCE =
         Pair(TENKEY_USE_THREE_STATE_KEY, true)
     private val TENKEY_NUMBER_SYMBOL_KEY_GAP_PREFERENCE =
         Pair(TENKEY_NUMBER_SYMBOL_KEY_GAP_KEY, 4)
 
-    private val TENKEY_SWITCH_NUMBER_TO_QWERTY_NUMBER_PREFERENCE =
-        Pair("tenkey_switch_number_to_qwerty_number_preference", false)
 
-    private val TENKEY_RESTORE_INPUT_MODE_ON_RESTART_PREFERENCE =
-        Pair("tenkey_restore_input_mode_on_restart_preference", false)
-    private val TENKEY_RESTORE_INPUT_MODE_ONLY_WITHIN_TIME_PREFERENCE =
-        Pair("tenkey_restore_input_mode_only_within_time_preference", false)
-    private val TENKEY_RESTORE_INPUT_MODE_TIMEOUT_MINUTES_PREFERENCE =
-        Pair("tenkey_restore_input_mode_timeout_minutes_preference", 5)
     private val TENKEY_LAST_INPUT_MODE_PREFERENCE =
         Pair("tenkey_last_input_mode_preference", "japanese")
     private val TENKEY_LAST_INPUT_MODE_PRESENTATION_PREFERENCE =
@@ -184,26 +166,10 @@ object AppPreference {
     private val TENKEY_LAST_INPUT_MODE_SAVED_AT_EPOCH_MILLIS_PREFERENCE =
         Pair("tenkey_last_input_mode_saved_at_epoch_millis_preference", 0L)
 
-    private val TABLET_TENKEY_SWITCH_QWERTY_PREFERENCE =
-        Pair("tablet_tenkey_kana_english_qwerty_preference", false)
 
-    private val TENKEY_KEYMAP_GUIDE_PREFERENCE =
-        Pair(TENKEY_KEYMAP_GUIDE_JAPANESE_KEY, false)
-    private val TENKEY_KEYMAP_GUIDE_ENGLISH_PREFERENCE =
-        Pair(TENKEY_KEYMAP_GUIDE_ENGLISH_KEY, false)
-    private val TENKEY_KEYMAP_GUIDE_NUMBER_PREFERENCE =
-        Pair(TENKEY_KEYMAP_GUIDE_NUMBER_KEY, false)
 
     private val FLICK_KEYMAP_GUIDE_PREFERENCE =
         Pair(CUSTOM_KEYMAP_GUIDE_KEY, false)
-    private val SUMIRE_KEYMAP_GUIDE_JAPANESE_PREFERENCE =
-        Pair(SUMIRE_KEYMAP_GUIDE_JAPANESE_KEY, false)
-    private val SUMIRE_KEYMAP_GUIDE_ENGLISH_PREFERENCE =
-        Pair(SUMIRE_KEYMAP_GUIDE_ENGLISH_KEY, false)
-    private val SUMIRE_KEYMAP_GUIDE_NUMBER_PREFERENCE =
-        Pair(SUMIRE_KEYMAP_GUIDE_NUMBER_KEY, false)
-    private const val SUMIRE_KEYMAP_GUIDE_MIGRATION_KEY =
-        "sumire_keymap_guide_modes_migrated"
     private val FLICK_GUIDE_TEXT_SIZE_SP_PREFERENCE =
         Pair("flick_guide_text_size_sp_preference", 9)
     private val FLICK_GUIDE_MAX_CHARACTERS_PREFERENCE =
@@ -211,44 +177,19 @@ object AppPreference {
     private val HIERARCHICAL_FLICK_MODE_SWITCH_ANGLE_MARGIN =
         Pair("hierarchical_flick_mode_switch_angle_margin_preference", 20)
 
-    private val QWERTY_SHOW_IME_SWITCH_BUTTON =
-        Pair("qwerty_show_switch_ime_button_preference", true)
 
-    private val QWERTY_SHOW_EMOJI_BUTTON =
-        Pair("qwerty_show_emoji_button_preference", false)
 
-    private val QWERTY_SHOW_CURSOR_BUTTONS = Pair("qwerty_show_cursor_buttons_preference", false)
 
-    private val QWERTY_SHOW_KEYMAP_SYMBOLS =
-        Pair("qwerty_show_keymap_symbols_romaji_preference", false)
 
-    private val QWERTY_SHOW_NUMBER_BUTTONS =
-        Pair("qwerty_show_number_keys_buttons_preference", false)
 
-    private val QWERTY_NUMBER_KEY_FLICK_UP_CHARS =
-        Pair("qwerty_number_key_flick_up_chars", "{}")
 
-    private val QWERTY_NUMBER_KEY_FLICK_DOWN_CHARS =
-        Pair("qwerty_number_key_flick_down_chars", "{}")
 
-    private val QWERTY_SHOW_SWITCH_ROMAJI_ENGLISH =
-        Pair("qwerty_show_switch_romaji_english_preference", true)
 
-    private val QWERTY_ENGLISH_DIRECT_INPUT_PREFERENCE =
-        Pair("qwerty_english_direct_input_preference", false)
 
-    private val QWERTY_GLIDE_INPUT_PREFERENCE =
-        Pair("qwerty_glide_input_preference", false)
 
-    private val QWERTY_GLIDE_COMMIT_PREVIOUS_CANDIDATE_ON_NEW_GLIDE_PREFERENCE =
-        Pair("qwerty_glide_commit_previous_candidate_on_new_glide_preference", false)
 
-    private val QWERTY_GLIDE_INSERT_SPACE_AFTER_COMMITTING_PREVIOUS_CANDIDATE_PREFERENCE =
-        Pair("qwerty_glide_insert_space_after_committing_previous_candidate_preference", false)
 
-    private val QWERTY_ENABLE_FLICK_UP_WINDOW = Pair("qwerty_enable_flick_up_preference", false)
 
-    private val QWERTY_ENABLE_FLICK_DOWN_WINDOW = Pair("qwerty_enable_flick_down_preference", false)
 
     private val QWERTY_ZENKAKU_SPACE_PREFERENCE =
         Pair("qwerty_romaji_zenkaku_space_preference", false)
@@ -259,7 +200,6 @@ object AppPreference {
     private val QWERTY_ROMAJI_HANKAKU_SYMBOL_PREFERENCE =
         Pair("qwerty_romaji_hankaku_symbol_preference", false)
 
-    private val QWERTY_SHOW_POPUP_WINDOW = Pair("qwerty_show_popup_window_preference", true)
 
     private val KEY_POPUP_USE_CUSTOM_COLOR =
         Pair("key_popup_use_custom_color_preference", false)
@@ -272,47 +212,24 @@ object AppPreference {
         Pair("tenkey_popup_size_scale_percent_preference", 100)
     private val TENKEY_POPUP_TEXT_SIZE_SP = Pair("tenkey_popup_text_size_sp_preference", 28.0f)
 
-    private val QWERTY_KEY_PREVIEW_POPUP_SIZE_SCALE_PERCENT =
-        Pair("qwerty_key_preview_popup_size_scale_percent_preference", 100)
-    private val QWERTY_KEY_PREVIEW_POPUP_TEXT_SIZE_SP =
-        Pair("qwerty_key_preview_popup_text_size_sp_preference", 28.0f)
-    private val QWERTY_VARIATION_POPUP_SIZE_SCALE_PERCENT =
-        Pair("qwerty_variation_popup_size_scale_percent_preference", 100)
-    private val QWERTY_VARIATION_POPUP_TEXT_SIZE_SP =
-        Pair("qwerty_variation_popup_text_size_sp_preference", 28.0f)
 
 
     private val CANDIDATE_IN_PASSWORD_COMPOSE = Pair("password_compose_preference", false)
 
     private val TYPE_NULL_INPUT_BEHAVIOR = Pair("type_null_input_behavior_preference", "default")
 
-    private val QWERTY_SHOW_KUTOUTEN_BUTTONS =
-        Pair("qwerty_show_kutouten_buttons_preference", false)
 
     private val KEYBOARD_HEIGHT = Pair("keyboard_height_preference", 220)
     private val KEYBOARD_WIDTH = Pair("keyboard_width_preference", 100)
     private val KEYBOARD_POSITION = Pair("keyboard_position_preference", true)
     private val KEYBOARD_VERTICAL_MARGIN_BOTTOM =
         Pair("keyboard_vertical_margin_bottom_preference", 0)
-    private val QWERTY_KEYBOARD_HEIGHT = Pair("qwerty_keyboard_height_preference", 220)
-    private val QWERTY_KEYBOARD_WIDTH = Pair("qwerty_keyboard_width_preference", 100)
-    private val QWERTY_KEYBOARD_VERTICAL_MARGIN_BOTTOM =
-        Pair("qwerty_keyboard_vertical_margin_bottom_preference", 0)
-    private val QWERTY_KEYBOARD_POSITION = Pair("qwerty_keyboard_position_preference", true)
 
     private val KEYBOARD_HEIGHT_LANDSCAPE = Pair("keyboard_height_landscape_preference", 220)
     private val KEYBOARD_WIDTH_LANDSCAPE = Pair("keyboard_width_landscape_preference", 100)
     private val KEYBOARD_POSITION_LANDSCAPE = Pair("keyboard_position_landscape_preference", true)
     private val KEYBOARD_VERTICAL_MARGIN_BOTTOM_LANDSCAPE =
         Pair("keyboard_vertical_margin_bottom_landscape_preference", 0)
-    private val QWERTY_KEYBOARD_HEIGHT_LANDSCAPE =
-        Pair("qwerty_keyboard_height_landscape_preference", 220)
-    private val QWERTY_KEYBOARD_WIDTH_LANDSCAPE =
-        Pair("qwerty_keyboard_width_landscape_preference", 100)
-    private val QWERTY_KEYBOARD_VERTICAL_MARGIN_BOTTOM_LANDSCAPE =
-        Pair("qwerty_keyboard_vertical_margin_bottom_landscape_preference", 0)
-    private val QWERTY_KEYBOARD_POSITION_LANDSCAPE =
-        Pair("qwerty_keyboard_position_landscape_preference", true)
 
     private val CANDIDATE_VIEW_HEIGHT_DP_LANDSCAPE =
         Pair("candidate_view_height_dp_landscape_preference", 60)
@@ -331,17 +248,6 @@ object AppPreference {
     const val CANDIDATE_YOMI_MODE_RUBY = "ruby"
     const val MIN_LIVE_CONVERSION_CANDIDATE_YOMI_SIZE = 1
     const val MAX_LIVE_CONVERSION_CANDIDATE_YOMI_SIZE = 24
-    private const val OLD_SUMIRE_PREFERENCE_KEY = "sumire_keyboard_input_type_preference"
-    private const val NEW_SUMIRE_STYLE_KEY = "sumire_keyboard_style_preference"
-    private const val NEW_SUMIRE_METHOD_KEY = "sumire_input_method_preference"
-    private val SUMIRE_INPUT_SELECTION_PREFERENCE =
-        Pair("sumire_keyboard_input_type_preference", "toggle-default")
-    private val SUMIRE_RESTORE_INPUT_MODE_ON_RESTART_PREFERENCE =
-        Pair("sumire_restore_input_mode_on_restart_preference", false)
-    private val SUMIRE_RESTORE_INPUT_MODE_ONLY_WITHIN_TIME_PREFERENCE =
-        Pair("sumire_restore_input_mode_only_within_time_preference", false)
-    private val SUMIRE_RESTORE_INPUT_MODE_TIMEOUT_MINUTES_PREFERENCE =
-        Pair("sumire_restore_input_mode_timeout_minutes_preference", 5)
     private val SUMIRE_LAST_INPUT_MODE_PREFERENCE =
         Pair("sumire_last_input_mode_preference", "japanese")
     private val SUMIRE_LAST_INPUT_MODE_PRESENTATION_PREFERENCE =
@@ -454,10 +360,6 @@ object AppPreference {
     )
 
     private val KEY_LETTER_SIZE = Pair("key_letter_size_preference", 0.0f)
-    private val TENKEY_KEY_WIDTH_SCALE_PERCENT =
-        Pair("tenkey_key_width_scale_percent_preference", 100)
-    private val TENKEY_KEY_HEIGHT_SCALE_PERCENT =
-        Pair("tenkey_key_height_scale_percent_preference", 100)
     private val FLICK_KEY_WIDTH_SCALE_PERCENT =
         Pair("flick_key_width_scale_percent_preference", 160)
     private val FLICK_KEY_HEIGHT_SCALE_PERCENT =
@@ -575,8 +477,6 @@ object AppPreference {
 
     private val ROMAJI_MAP_DATA_VERSION = Pair("romaji_map_data_version", 0)
 
-    private val QWERTY_ROMAJI_SHIFT_CONVERSION_PREFERENCE =
-        Pair("qwerty_romaji_shift_conversion_preference", false)
 
     private val TABLET_GOJUON_LAYOUT_PREFERENCE =
         Pair("tablet_use_gojuon_layout_preference", true)
@@ -602,17 +502,6 @@ object AppPreference {
 
 
 
-    private val QWERTY_KEY_VERTICAL_MARGIN = Pair("qwerty_key_vertical_margin_preference", 5.0f)
-    private val QWERTY_KEY_HORIZONTAL_GAP = Pair("qwerty_key_horizontal_gap_preference", 2.0f)
-    private val QWERTY_KEY_INDENT_LARGE = Pair("qwerty_key_indent_large_preference", 23.0f)
-    private val QWERTY_KEY_INDENT_SMALL = Pair("qwerty_key_indent_small_preference", 9.0f)
-    private val QWERTY_KEY_SIDE_MARGIN = Pair("qwerty_key_side_margin_preference", 4.0f)
-    private val QWERTY_KEY_TEXT_SIZE = Pair("qwerty_key_text_size_preference", 18.0f)
-    private val QWERTY_SYMBOL_KEYMAP_TEXT_SIZE =
-        Pair("qwerty_symbol_keymap_text_size_preference", 9.0f)
-    private val QWERTY_SPECIAL_KEY_TEXT_SIZE = Pair("special_key_text_size_preference", 12.0f)
-    private val QWERTY_SPECIAL_KEY_ICON_SIZE =
-        Pair("qwerty_special_key_icon_size_preference", 18.0f)
 
     private val LIQUID_GLASS_ENABLE = Pair("liquid_glass_preference", false)
     private val LIQUID_GLASS_BLUR_RADIUS = Pair("liquid_glass_blur_preference", 220)
@@ -628,7 +517,6 @@ object AppPreference {
         Pair("theme_custom_post_edit_bg_color", "#55FF8800".toColorInt())
     private val CUSTOM_THEME_POST_EDIT_TEXT = Pair("theme_custom_post_edit_text_color", Color.WHITE)
 
-    private val SUMIRE_ENGLISH_QWERTY_PREFERENCE = Pair("sumire_english_qwerty_preference", false)
 
     private val CONVERSION_CANDIDATES_ROMAJI_ENABLE_PREFERENCE =
         Pair("conversion_candidates_romaji_enable_preference", false)
@@ -672,26 +560,15 @@ object AppPreference {
     private val PREF_SLOT_6_START = Pair("circular_flick_slot_6_start", 167.14285f)
     private val PREF_SLOT_6_SWEEP = Pair("circular_flick_slot_6_sweep", 51.42857f)
     private val PREF_CIRCULAR_DIRECTION_COUNT = Pair("circular_flick_direction_count", 4)
-    private val CIRCULAR_SLOT_ACTION_SETTINGS =
-        Pair("circular_slot_action_settings", "[]")
 
-    private val QWERTY_SWITCH_NUMBER_KEY_WITHOUT_NUMBER_PREFERENCE =
-        Pair("qwerty_switch_number_key_without_number_preference", false)
 
     private val KEYBOARD_MARGIN_START_DP = Pair("keyboard_margin_start_dp_preference", 0)
     private val KEYBOARD_MARGIN_END_DP = Pair("keyboard_margin_end_dp_preference", 0)
-    private val QWERTY_KEYBOARD_MARGIN_START_DP =
-        Pair("qwerty_keyboard_margin_start_dp_preference", 0)
-    private val QWERTY_KEYBOARD_MARGIN_END_DP = Pair("qwerty_keyboard_margin_end_dp_preference", 0)
 
     private val KEYBOARD_MARGIN_START_DP_LANDSCAPE =
         Pair("keyboard_margin_start_dp_landscape_preference", 0)
     private val KEYBOARD_MARGIN_END_DP_LANDSCAPE =
         Pair("keyboard_margin_end_dp_landscape_preference", 0)
-    private val QWERTY_KEYBOARD_MARGIN_START_DP_LANDSCAPE =
-        Pair("qwerty_keyboard_margin_start_dp_landscape_preference", 0)
-    private val QWERTY_KEYBOARD_MARGIN_END_DP_LANDSCAPE =
-        Pair("qwerty_keyboard_margin_end_dp_landscape_preference", 0)
 
     /** 同音異義 UI の迷い印の判定にリランカーの文節マージン（SumireLmSpanMargin）を使う（既定オフ、設定画面なし）。 */
     private val SUMIRE_LM_HOMOPHONE_MARGIN_PREFERENCE = Pair("sumire_lm_homophone_margin_preference", false)
@@ -704,8 +581,6 @@ object AppPreference {
     private val TYPO_CORRECTION_JA_FLICK =
         Pair("enable_typo_correction_japanese_flick_keyboard_preference", false)
 
-    private val TYPO_CORRECTION_EN_QWERTY =
-        Pair("enable_typo_correction_qwerty_english_keyboard_preference", false)
 
     private val CUSTOM_ROMAJI_ZENKAKU_CONVERSION_ENABLE_PREFERENCE =
         Pair("custom_romaji_zenkaku_conversion_enable_preference", true)
@@ -761,8 +636,6 @@ object AppPreference {
                 migrateCandidateHeightDefaultsIfNeeded()
                 migratePredictionLookaheadPreferenceIfNeeded()
                 migrateSymbolEmojiCandidatePreferenceIfNeeded()
-                migrateSumireKeymapGuideModesIfNeeded()
-                migrateSumirePreferenceIfNeeded()
                 initialized = true
                 initialization.complete(Unit)
             } catch (failure: Throwable) {
@@ -816,23 +689,6 @@ object AppPreference {
         }
     }
 
-    private fun migrateSumireKeymapGuideModesIfNeeded() {
-        if (preferences.getBoolean(SUMIRE_KEYMAP_GUIDE_MIGRATION_KEY, false)) return
-        val legacyGuideEnabled = preferences.getBoolean(
-            FLICK_KEYMAP_GUIDE_PREFERENCE.first,
-            FLICK_KEYMAP_GUIDE_PREFERENCE.second
-        )
-        preferences.edit {
-            if (!preferences.contains(SUMIRE_KEYMAP_GUIDE_JAPANESE_PREFERENCE.first)) {
-                it.putBoolean(
-                    SUMIRE_KEYMAP_GUIDE_JAPANESE_PREFERENCE.first,
-                    legacyGuideEnabled
-                )
-            }
-            it.putBoolean(SUMIRE_KEYMAP_GUIDE_MIGRATION_KEY, true)
-        }
-    }
-
     private inline fun SharedPreferences.edit(operation: (SharedPreferences.Editor) -> Unit) {
         val editor = edit()
         operation(editor)
@@ -844,28 +700,7 @@ object AppPreference {
         return if (trimmed.length == 2) trimmed else null
     }
 
-    private fun normalizeQwertyNumberKeyFlickChars(map: Map<String, String?>): Map<String, String> {
-        val allowedKeys = setOf("1", "2", "3", "4", "5", "6", "7", "8", "9", "0")
-        return map.mapNotNull { (key, value) ->
-            val normalizedValue = value?.trim().orEmpty()
-            if (key in allowedKeys && normalizedValue.isNotEmpty()) {
-                key to normalizedValue.take(1)
-            } else {
-                null
-            }
-        }.toMap()
-    }
 
-    private fun readQwertyNumberKeyFlickChars(preferenceKey: String): Map<String, String> {
-        val raw = preferences.getString(preferenceKey, "{}") ?: "{}"
-        val parsed = runCatching {
-            gson.fromJson<Map<String, String?>>(
-                raw,
-                object : TypeToken<Map<String, String?>>() {}.type
-            )
-        }.getOrNull()
-        return normalizeQwertyNumberKeyFlickChars(parsed ?: emptyMap())
-    }
 
     private fun readIntPreference(key: String, defaultValue: Int): Int {
         return runCatching {
@@ -970,13 +805,6 @@ object AppPreference {
             it.putBoolean(CLIPBOARD_HISTORY_ENABLE.first, value ?: false)
         }
 
-    var tenkey_qwerty_switch_number_layout: Boolean?
-        get() = preferences.getBoolean(
-            TENKEY_SWITCH_QWERTY_PREFERENCE.first, TENKEY_SWITCH_QWERTY_PREFERENCE.second
-        )
-        set(value) = preferences.edit {
-            it.putBoolean(TENKEY_SWITCH_QWERTY_PREFERENCE.first, value ?: false)
-        }
 
     var tenkey_use_three_state_keyboard_preference: Boolean
         get() = preferences.getBoolean(
@@ -996,41 +824,9 @@ object AppPreference {
             it.putInt(TENKEY_NUMBER_SYMBOL_KEY_GAP_PREFERENCE.first, value.coerceIn(0, 16))
         }
 
-    var tenkey_switch_number_to_qwerty_number_preference: Boolean
-        get() = preferences.getBoolean(
-            TENKEY_SWITCH_NUMBER_TO_QWERTY_NUMBER_PREFERENCE.first,
-            TENKEY_SWITCH_NUMBER_TO_QWERTY_NUMBER_PREFERENCE.second
-        )
-        set(value) = preferences.edit {
-            it.putBoolean(TENKEY_SWITCH_NUMBER_TO_QWERTY_NUMBER_PREFERENCE.first, value)
-        }
 
-    var tenkey_restore_input_mode_on_restart_preference: Boolean
-        get() = preferences.getBoolean(
-            TENKEY_RESTORE_INPUT_MODE_ON_RESTART_PREFERENCE.first,
-            TENKEY_RESTORE_INPUT_MODE_ON_RESTART_PREFERENCE.second
-        )
-        set(value) = preferences.edit {
-            it.putBoolean(TENKEY_RESTORE_INPUT_MODE_ON_RESTART_PREFERENCE.first, value)
-        }
 
-    var tenkey_restore_input_mode_only_within_time_preference: Boolean
-        get() = preferences.getBoolean(
-            TENKEY_RESTORE_INPUT_MODE_ONLY_WITHIN_TIME_PREFERENCE.first,
-            TENKEY_RESTORE_INPUT_MODE_ONLY_WITHIN_TIME_PREFERENCE.second
-        )
-        set(value) = preferences.edit {
-            it.putBoolean(TENKEY_RESTORE_INPUT_MODE_ONLY_WITHIN_TIME_PREFERENCE.first, value)
-        }
 
-    var tenkey_restore_input_mode_timeout_minutes_preference: Int
-        get() = preferences.getInt(
-            TENKEY_RESTORE_INPUT_MODE_TIMEOUT_MINUTES_PREFERENCE.first,
-            TENKEY_RESTORE_INPUT_MODE_TIMEOUT_MINUTES_PREFERENCE.second
-        )
-        set(value) = preferences.edit {
-            it.putInt(TENKEY_RESTORE_INPUT_MODE_TIMEOUT_MINUTES_PREFERENCE.first, value)
-        }
 
     // Publish a complete restart snapshot together, including the timeout timestamp.
     // Keep apply() semantics: readers and listeners see the new state immediately.
@@ -1056,76 +852,13 @@ object AppPreference {
         it.putLong(SUMIRE_LAST_INPUT_MODE_SAVED_AT_EPOCH_MILLIS_PREFERENCE.first, savedAtEpochMillis)
     }
 
-    var tenkey_last_input_mode_preference: String
-        get() = preferences.getString(
-            TENKEY_LAST_INPUT_MODE_PREFERENCE.first,
-            TENKEY_LAST_INPUT_MODE_PREFERENCE.second
-        ) ?: TENKEY_LAST_INPUT_MODE_PREFERENCE.second
-        set(value) = preferences.edit {
-            it.putString(TENKEY_LAST_INPUT_MODE_PREFERENCE.first, value)
-        }
 
-    var tenkey_last_input_mode_presentation_preference: String
-        get() = preferences.getString(
-            TENKEY_LAST_INPUT_MODE_PRESENTATION_PREFERENCE.first,
-            TENKEY_LAST_INPUT_MODE_PRESENTATION_PREFERENCE.second
-        ) ?: TENKEY_LAST_INPUT_MODE_PRESENTATION_PREFERENCE.second
-        set(value) = preferences.edit {
-            it.putString(TENKEY_LAST_INPUT_MODE_PRESENTATION_PREFERENCE.first, value)
-        }
 
-    var tenkey_last_qwerty_number_return_target_preference: String
-        get() = preferences.getString(
-            TENKEY_LAST_QWERTY_NUMBER_RETURN_TARGET_PREFERENCE.first,
-            TENKEY_LAST_QWERTY_NUMBER_RETURN_TARGET_PREFERENCE.second
-        ) ?: TENKEY_LAST_QWERTY_NUMBER_RETURN_TARGET_PREFERENCE.second
-        set(value) = preferences.edit {
-            it.putString(TENKEY_LAST_QWERTY_NUMBER_RETURN_TARGET_PREFERENCE.first, value)
-        }
 
-    var tenkey_last_input_mode_saved_at_epoch_millis_preference: Long
-        get() = preferences.getLong(
-            TENKEY_LAST_INPUT_MODE_SAVED_AT_EPOCH_MILLIS_PREFERENCE.first,
-            TENKEY_LAST_INPUT_MODE_SAVED_AT_EPOCH_MILLIS_PREFERENCE.second
-        )
-        set(value) = preferences.edit {
-            it.putLong(TENKEY_LAST_INPUT_MODE_SAVED_AT_EPOCH_MILLIS_PREFERENCE.first, value)
-        }
 
-    var tablet_tenkey_qwerty_switch_english_layout: Boolean
-        get() = preferences.getBoolean(
-            TABLET_TENKEY_SWITCH_QWERTY_PREFERENCE.first,
-            TABLET_TENKEY_SWITCH_QWERTY_PREFERENCE.second
-        )
-        set(value) = preferences.edit {
-            it.putBoolean(TABLET_TENKEY_SWITCH_QWERTY_PREFERENCE.first, value)
-        }
 
-    var tenkey_keymap_guide_layout: Boolean?
-        get() = preferences.getBoolean(
-            TENKEY_KEYMAP_GUIDE_PREFERENCE.first, TENKEY_KEYMAP_GUIDE_PREFERENCE.second
-        )
-        set(value) = preferences.edit {
-            it.putBoolean(TENKEY_KEYMAP_GUIDE_PREFERENCE.first, value ?: false)
-        }
 
-    var tenkey_keymap_guide_english: Boolean
-        get() = preferences.getBoolean(
-            TENKEY_KEYMAP_GUIDE_ENGLISH_PREFERENCE.first,
-            TENKEY_KEYMAP_GUIDE_ENGLISH_PREFERENCE.second
-        )
-        set(value) = preferences.edit {
-            it.putBoolean(TENKEY_KEYMAP_GUIDE_ENGLISH_PREFERENCE.first, value)
-        }
 
-    var tenkey_keymap_guide_number: Boolean
-        get() = preferences.getBoolean(
-            TENKEY_KEYMAP_GUIDE_NUMBER_PREFERENCE.first,
-            TENKEY_KEYMAP_GUIDE_NUMBER_PREFERENCE.second
-        )
-        set(value) = preferences.edit {
-            it.putBoolean(TENKEY_KEYMAP_GUIDE_NUMBER_PREFERENCE.first, value)
-        }
 
     var flick_keymap_guide_layout: Boolean?
         get() = preferences.getBoolean(
@@ -1135,32 +868,8 @@ object AppPreference {
             it.putBoolean(FLICK_KEYMAP_GUIDE_PREFERENCE.first, value ?: false)
         }
 
-    var sumire_keymap_guide_japanese: Boolean
-        get() = preferences.getBoolean(
-            SUMIRE_KEYMAP_GUIDE_JAPANESE_PREFERENCE.first,
-            SUMIRE_KEYMAP_GUIDE_JAPANESE_PREFERENCE.second
-        )
-        set(value) = preferences.edit {
-            it.putBoolean(SUMIRE_KEYMAP_GUIDE_JAPANESE_PREFERENCE.first, value)
-        }
 
-    var sumire_keymap_guide_english: Boolean
-        get() = preferences.getBoolean(
-            SUMIRE_KEYMAP_GUIDE_ENGLISH_PREFERENCE.first,
-            SUMIRE_KEYMAP_GUIDE_ENGLISH_PREFERENCE.second
-        )
-        set(value) = preferences.edit {
-            it.putBoolean(SUMIRE_KEYMAP_GUIDE_ENGLISH_PREFERENCE.first, value)
-        }
 
-    var sumire_keymap_guide_number: Boolean
-        get() = preferences.getBoolean(
-            SUMIRE_KEYMAP_GUIDE_NUMBER_PREFERENCE.first,
-            SUMIRE_KEYMAP_GUIDE_NUMBER_PREFERENCE.second
-        )
-        set(value) = preferences.edit {
-            it.putBoolean(SUMIRE_KEYMAP_GUIDE_NUMBER_PREFERENCE.first, value)
-        }
 
     var flick_guide_text_size_sp_preference: Int?
         get() = preferences.getInt(
@@ -1186,143 +895,24 @@ object AppPreference {
             )
         }
 
-    var qwerty_show_ime_button: Boolean?
-        get() = preferences.getBoolean(
-            QWERTY_SHOW_IME_SWITCH_BUTTON.first, QWERTY_SHOW_IME_SWITCH_BUTTON.second
-        )
-        set(value) = preferences.edit {
-            it.putBoolean(QWERTY_SHOW_IME_SWITCH_BUTTON.first, value ?: true)
-        }
 
-    var qwerty_show_emoji_button: Boolean?
-        get() = preferences.getBoolean(
-            QWERTY_SHOW_EMOJI_BUTTON.first, QWERTY_SHOW_EMOJI_BUTTON.second
-        )
-        set(value) = preferences.edit {
-            it.putBoolean(QWERTY_SHOW_EMOJI_BUTTON.first, value ?: false)
-        }
 
-    var qwerty_show_cursor_buttons: Boolean?
-        get() = preferences.getBoolean(
-            QWERTY_SHOW_CURSOR_BUTTONS.first, QWERTY_SHOW_CURSOR_BUTTONS.second
-        )
-        set(value) = preferences.edit {
-            it.putBoolean(QWERTY_SHOW_CURSOR_BUTTONS.first, value ?: false)
-        }
 
-    var qwerty_show_keymap_symbols: Boolean?
-        get() = preferences.getBoolean(
-            QWERTY_SHOW_KEYMAP_SYMBOLS.first, QWERTY_SHOW_KEYMAP_SYMBOLS.second
-        )
-        set(value) = preferences.edit {
-            it.putBoolean(QWERTY_SHOW_KEYMAP_SYMBOLS.first, value ?: false)
-        }
 
-    var qwerty_show_number_buttons: Boolean?
-        get() = preferences.getBoolean(
-            QWERTY_SHOW_NUMBER_BUTTONS.first, QWERTY_SHOW_NUMBER_BUTTONS.second
-        )
-        set(value) = preferences.edit {
-            it.putBoolean(QWERTY_SHOW_NUMBER_BUTTONS.first, value ?: false)
-        }
 
-    fun getQwertyNumberKeyFlickUpChars(): Map<String, String> =
-        readQwertyNumberKeyFlickChars(QWERTY_NUMBER_KEY_FLICK_UP_CHARS.first)
 
-    fun saveQwertyNumberKeyFlickUpChars(map: Map<String, String>) = preferences.edit {
-        it.putString(
-            QWERTY_NUMBER_KEY_FLICK_UP_CHARS.first,
-            gson.toJson(normalizeQwertyNumberKeyFlickChars(map))
-        )
-    }
 
-    fun getQwertyNumberKeyFlickDownChars(): Map<String, String> =
-        readQwertyNumberKeyFlickChars(QWERTY_NUMBER_KEY_FLICK_DOWN_CHARS.first)
 
-    fun saveQwertyNumberKeyFlickDownChars(map: Map<String, String>) = preferences.edit {
-        it.putString(
-            QWERTY_NUMBER_KEY_FLICK_DOWN_CHARS.first,
-            gson.toJson(normalizeQwertyNumberKeyFlickChars(map))
-        )
-    }
 
-    var qwerty_show_switch_romaji_english_button: Boolean?
-        get() = preferences.getBoolean(
-            QWERTY_SHOW_SWITCH_ROMAJI_ENGLISH.first, QWERTY_SHOW_SWITCH_ROMAJI_ENGLISH.second
-        )
-        set(value) = preferences.edit {
-            it.putBoolean(QWERTY_SHOW_SWITCH_ROMAJI_ENGLISH.first, value ?: true)
-        }
 
-    var qwerty_english_direct_input_preference: Boolean
-        get() = preferences.getBoolean(
-            QWERTY_ENGLISH_DIRECT_INPUT_PREFERENCE.first,
-            QWERTY_ENGLISH_DIRECT_INPUT_PREFERENCE.second
-        )
-        set(value) = preferences.edit {
-            it.putBoolean(QWERTY_ENGLISH_DIRECT_INPUT_PREFERENCE.first, value)
-        }
 
-    var qwerty_glide_input_preference: Boolean
-        get() = preferences.getBoolean(
-            QWERTY_GLIDE_INPUT_PREFERENCE.first,
-            QWERTY_GLIDE_INPUT_PREFERENCE.second
-        )
-        set(value) = preferences.edit {
-            it.putBoolean(QWERTY_GLIDE_INPUT_PREFERENCE.first, value)
-        }
 
-    var qwerty_glide_commit_previous_candidate_on_new_glide_preference: Boolean
-        get() = preferences.getBoolean(
-            QWERTY_GLIDE_COMMIT_PREVIOUS_CANDIDATE_ON_NEW_GLIDE_PREFERENCE.first,
-            QWERTY_GLIDE_COMMIT_PREVIOUS_CANDIDATE_ON_NEW_GLIDE_PREFERENCE.second
-        )
-        set(value) = preferences.edit {
-            it.putBoolean(
-                QWERTY_GLIDE_COMMIT_PREVIOUS_CANDIDATE_ON_NEW_GLIDE_PREFERENCE.first,
-                value
-            )
-        }
 
-    var qwerty_glide_insert_space_after_committing_previous_candidate_preference: Boolean
-        get() = preferences.getBoolean(
-            QWERTY_GLIDE_INSERT_SPACE_AFTER_COMMITTING_PREVIOUS_CANDIDATE_PREFERENCE.first,
-            QWERTY_GLIDE_INSERT_SPACE_AFTER_COMMITTING_PREVIOUS_CANDIDATE_PREFERENCE.second
-        )
-        set(value) = preferences.edit {
-            it.putBoolean(
-                QWERTY_GLIDE_INSERT_SPACE_AFTER_COMMITTING_PREVIOUS_CANDIDATE_PREFERENCE.first,
-                value
-            )
-        }
 
-    var switch_qwerty_password: Boolean?
-        get() = preferences.getBoolean(
-            SWITCH_QWERTY_PASSWORD.first, SWITCH_QWERTY_PASSWORD.second
-        )
-        set(value) = preferences.edit {
-            it.putBoolean(SWITCH_QWERTY_PASSWORD.first, value ?: false)
-        }
 
-    val landscape_force_qwerty_preference: Boolean get() = false // S3: hardcoded, setting removed
 
-    val landscape_force_qwerty_romaji_preference: Boolean get() = false // S3: hardcoded, setting removed
 
-    var qwerty_enable_flick_up_preference: Boolean?
-        get() = preferences.getBoolean(
-            QWERTY_ENABLE_FLICK_UP_WINDOW.first, QWERTY_ENABLE_FLICK_UP_WINDOW.second
-        )
-        set(value) = preferences.edit {
-            it.putBoolean(QWERTY_ENABLE_FLICK_UP_WINDOW.first, value ?: false)
-        }
 
-    var qwerty_enable_flick_down_preference: Boolean?
-        get() = preferences.getBoolean(
-            QWERTY_ENABLE_FLICK_DOWN_WINDOW.first, QWERTY_ENABLE_FLICK_DOWN_WINDOW.second
-        )
-        set(value) = preferences.edit {
-            it.putBoolean(QWERTY_ENABLE_FLICK_DOWN_WINDOW.first, value ?: false)
-        }
 
     var qwerty_enable_zenkaku_space_preference: Boolean?
         get() = preferences.getBoolean(
@@ -1350,13 +940,6 @@ object AppPreference {
             it.putBoolean(QWERTY_ROMAJI_HANKAKU_SYMBOL_PREFERENCE.first, value ?: false)
         }
 
-    var qwerty_show_popup_window: Boolean?
-        get() = preferences.getBoolean(
-            QWERTY_SHOW_POPUP_WINDOW.first, QWERTY_SHOW_POPUP_WINDOW.second
-        )
-        set(value) = preferences.edit {
-            it.putBoolean(QWERTY_SHOW_POPUP_WINDOW.first, value ?: true)
-        }
 
     var key_popup_use_custom_color: Boolean
         get() = preferences.getBoolean(
@@ -1401,13 +984,6 @@ object AppPreference {
             it.putString(TYPE_NULL_INPUT_BEHAVIOR.first, value ?: TYPE_NULL_INPUT_BEHAVIOR.second)
         }
 
-    var qwerty_show_kutouten_buttons: Boolean?
-        get() = preferences.getBoolean(
-            QWERTY_SHOW_KUTOUTEN_BUTTONS.first, QWERTY_SHOW_KUTOUTEN_BUTTONS.second
-        )
-        set(value) = preferences.edit {
-            it.putBoolean(QWERTY_SHOW_KUTOUTEN_BUTTONS.first, value ?: false)
-        }
 
     /** Only the custom keyboard exists; stored legacy orders (tenkey/QWERTY/...) are ignored. */
     var keyboard_order: List<KeyboardType>
@@ -1773,30 +1349,8 @@ object AppPreference {
             it.putInt(KEYBOARD_WIDTH.first, value ?: 100)
         }
 
-    var qwerty_keyboard_height: Int?
-        get() = preferences.getInt(
-            QWERTY_KEYBOARD_HEIGHT.first, QWERTY_KEYBOARD_HEIGHT.second
-        )
-        set(value) = preferences.edit {
-            it.putInt(QWERTY_KEYBOARD_HEIGHT.first, value ?: 220)
-        }
 
-    var qwerty_keyboard_width: Int?
-        get() = preferences.getInt(
-            QWERTY_KEYBOARD_WIDTH.first, QWERTY_KEYBOARD_WIDTH.second
-        )
-        set(value) = preferences.edit {
-            it.putInt(QWERTY_KEYBOARD_WIDTH.first, value ?: 100)
-        }
 
-    var qwerty_keyboard_vertical_margin_bottom: Int?
-        get() = preferences.getInt(
-            QWERTY_KEYBOARD_VERTICAL_MARGIN_BOTTOM.first,
-            QWERTY_KEYBOARD_VERTICAL_MARGIN_BOTTOM.second
-        )
-        set(value) = preferences.edit {
-            it.putInt(QWERTY_KEYBOARD_VERTICAL_MARGIN_BOTTOM.first, value ?: 0)
-        }
 
     var keyboard_position: Boolean?
         get() = preferences.getBoolean(KEYBOARD_POSITION.first, KEYBOARD_POSITION.second)
@@ -1804,14 +1358,6 @@ object AppPreference {
             it.putBoolean(KEYBOARD_POSITION.first, value ?: true)
         }
 
-    var qwerty_keyboard_position: Boolean?
-        get() = preferences.getBoolean(
-            QWERTY_KEYBOARD_POSITION.first,
-            QWERTY_KEYBOARD_POSITION.second
-        )
-        set(value) = preferences.edit {
-            it.putBoolean(QWERTY_KEYBOARD_POSITION.first, value ?: true)
-        }
 
     var keyboard_vertical_margin_bottom: Int?
         get() = preferences.getInt(
@@ -1854,39 +1400,9 @@ object AppPreference {
             it.putInt(KEYBOARD_VERTICAL_MARGIN_BOTTOM_LANDSCAPE.first, value ?: 0)
         }
 
-    var qwerty_keyboard_height_landscape: Int?
-        get() = preferences.getInt(
-            QWERTY_KEYBOARD_HEIGHT_LANDSCAPE.first, QWERTY_KEYBOARD_HEIGHT_LANDSCAPE.second
-        )
-        set(value) = preferences.edit {
-            it.putInt(QWERTY_KEYBOARD_HEIGHT_LANDSCAPE.first, value ?: 220)
-        }
 
-    var qwerty_keyboard_width_landscape: Int?
-        get() = preferences.getInt(
-            QWERTY_KEYBOARD_WIDTH_LANDSCAPE.first, QWERTY_KEYBOARD_WIDTH_LANDSCAPE.second
-        )
-        set(value) = preferences.edit {
-            it.putInt(QWERTY_KEYBOARD_WIDTH_LANDSCAPE.first, value ?: 100)
-        }
 
-    var qwerty_keyboard_vertical_margin_bottom_landscape: Int?
-        get() = preferences.getInt(
-            QWERTY_KEYBOARD_VERTICAL_MARGIN_BOTTOM_LANDSCAPE.first,
-            QWERTY_KEYBOARD_VERTICAL_MARGIN_BOTTOM_LANDSCAPE.second
-        )
-        set(value) = preferences.edit {
-            it.putInt(QWERTY_KEYBOARD_VERTICAL_MARGIN_BOTTOM_LANDSCAPE.first, value ?: 0)
-        }
 
-    var qwerty_keyboard_position_landscape: Boolean?
-        get() = preferences.getBoolean(
-            QWERTY_KEYBOARD_POSITION_LANDSCAPE.first,
-            QWERTY_KEYBOARD_POSITION_LANDSCAPE.second
-        )
-        set(value) = preferences.edit {
-            it.putBoolean(QWERTY_KEYBOARD_POSITION_LANDSCAPE.first, value ?: true)
-        }
 
     var candidate_view_height_dp_landscape: Int?
         get() = preferences.getInt(
@@ -1935,17 +1451,7 @@ object AppPreference {
             it.putBoolean("tenkey_space_flick_preference", value)
         }
 
-    var qwerty_english_space_flick_preference: Boolean
-        get() = preferences.getBoolean("qwerty_english_space_flick_preference", false)
-        set(value) = preferences.edit {
-            it.putBoolean("qwerty_english_space_flick_preference", value)
-        }
 
-    var qwerty_romaji_space_flick_preference: Boolean
-        get() = preferences.getBoolean("qwerty_romaji_space_flick_preference", false)
-        set(value) = preferences.edit {
-            it.putBoolean("qwerty_romaji_space_flick_preference", value)
-        }
 
     var space_hankaku_preference: Boolean?
         get() = preferences.getBoolean(SPACE_HANKAKU_ENABLE.first, SPACE_HANKAKU_ENABLE.second)
@@ -2044,25 +1550,8 @@ object AppPreference {
         }
     }
 
-    var sumire_input_selection_preference: String?
-        get() = preferences.getString(
-            SUMIRE_INPUT_SELECTION_PREFERENCE.first, SUMIRE_INPUT_SELECTION_PREFERENCE.second
-        )
-        set(value) = preferences.edit {
-            it.putString(SUMIRE_INPUT_SELECTION_PREFERENCE.first, value ?: "toggle-default")
-        }
 
-    var sumire_keyboard_style: String
-        get() = preferences.getString(NEW_SUMIRE_STYLE_KEY, "default") ?: "default"
-        set(value) = preferences.edit {
-            it.putString(NEW_SUMIRE_STYLE_KEY, value)
-        }
 
-    var sumire_input_method: String
-        get() = preferences.getString(NEW_SUMIRE_METHOD_KEY, "toggle") ?: "toggle"
-        set(value) = preferences.edit {
-            it.putString(NEW_SUMIRE_METHOD_KEY, value)
-        }
 
     val is_floating_mode: Boolean? get() = false // S3: hardcoded, setting removed
 
@@ -2622,29 +2111,7 @@ object AppPreference {
             it.putFloat(CANDIDATE_LETTER_SIZE.first, value ?: CANDIDATE_LETTER_SIZE.second)
         }
 
-    var tenkey_key_width_scale_percent: Int?
-        get() = preferences.getInt(
-            TENKEY_KEY_WIDTH_SCALE_PERCENT.first,
-            TENKEY_KEY_WIDTH_SCALE_PERCENT.second
-        )
-        set(value) = preferences.edit {
-            it.putInt(
-                TENKEY_KEY_WIDTH_SCALE_PERCENT.first,
-                value ?: TENKEY_KEY_WIDTH_SCALE_PERCENT.second
-            )
-        }
 
-    var tenkey_key_height_scale_percent: Int?
-        get() = preferences.getInt(
-            TENKEY_KEY_HEIGHT_SCALE_PERCENT.first,
-            TENKEY_KEY_HEIGHT_SCALE_PERCENT.second
-        )
-        set(value) = preferences.edit {
-            it.putInt(
-                TENKEY_KEY_HEIGHT_SCALE_PERCENT.first,
-                value ?: TENKEY_KEY_HEIGHT_SCALE_PERCENT.second
-            )
-        }
 
     var flick_key_width_scale_percent: Int?
         get() = preferences.getInt(
@@ -2727,53 +2194,9 @@ object AppPreference {
             it.putFloat(TENKEY_POPUP_TEXT_SIZE_SP.first, value ?: TENKEY_POPUP_TEXT_SIZE_SP.second)
         }
 
-    var qwerty_key_preview_popup_size_scale_percent: Int?
-        get() = preferences.getInt(
-            QWERTY_KEY_PREVIEW_POPUP_SIZE_SCALE_PERCENT.first,
-            QWERTY_KEY_PREVIEW_POPUP_SIZE_SCALE_PERCENT.second
-        )
-        set(value) = preferences.edit {
-            it.putInt(
-                QWERTY_KEY_PREVIEW_POPUP_SIZE_SCALE_PERCENT.first,
-                value ?: QWERTY_KEY_PREVIEW_POPUP_SIZE_SCALE_PERCENT.second
-            )
-        }
 
-    var qwerty_key_preview_popup_text_size_sp: Float?
-        get() = preferences.getFloat(
-            QWERTY_KEY_PREVIEW_POPUP_TEXT_SIZE_SP.first,
-            QWERTY_KEY_PREVIEW_POPUP_TEXT_SIZE_SP.second
-        )
-        set(value) = preferences.edit {
-            it.putFloat(
-                QWERTY_KEY_PREVIEW_POPUP_TEXT_SIZE_SP.first,
-                value ?: QWERTY_KEY_PREVIEW_POPUP_TEXT_SIZE_SP.second
-            )
-        }
 
-    var qwerty_variation_popup_size_scale_percent: Int?
-        get() = preferences.getInt(
-            QWERTY_VARIATION_POPUP_SIZE_SCALE_PERCENT.first,
-            QWERTY_VARIATION_POPUP_SIZE_SCALE_PERCENT.second
-        )
-        set(value) = preferences.edit {
-            it.putInt(
-                QWERTY_VARIATION_POPUP_SIZE_SCALE_PERCENT.first,
-                value ?: QWERTY_VARIATION_POPUP_SIZE_SCALE_PERCENT.second
-            )
-        }
 
-    var qwerty_variation_popup_text_size_sp: Float?
-        get() = preferences.getFloat(
-            QWERTY_VARIATION_POPUP_TEXT_SIZE_SP.first,
-            QWERTY_VARIATION_POPUP_TEXT_SIZE_SP.second
-        )
-        set(value) = preferences.edit {
-            it.putFloat(
-                QWERTY_VARIATION_POPUP_TEXT_SIZE_SP.first,
-                value ?: QWERTY_VARIATION_POPUP_TEXT_SIZE_SP.second
-            )
-        }
 
     var flick_directional_popup_size_scale_percent: Int?
         get() = preferences.getInt(
@@ -3012,14 +2435,6 @@ object AppPreference {
             it.putInt(ROMAJI_MAP_DATA_VERSION.first, value)
         }
 
-    var qwerty_romaji_shift_conversion_preference: Boolean
-        get() = preferences.getBoolean(
-            QWERTY_ROMAJI_SHIFT_CONVERSION_PREFERENCE.first,
-            QWERTY_ROMAJI_SHIFT_CONVERSION_PREFERENCE.second
-        )
-        set(value) = preferences.edit {
-            it.putBoolean(QWERTY_ROMAJI_SHIFT_CONVERSION_PREFERENCE.first, value)
-        }
 
     var last_pasted_clipboard_text_preference: String
         get() = preferences.getString(
@@ -3060,81 +2475,14 @@ object AppPreference {
 
 
 
-    var qwerty_key_vertical_margin: Float?
-        get() = preferences.getFloat(
-            QWERTY_KEY_VERTICAL_MARGIN.first,
-            QWERTY_KEY_VERTICAL_MARGIN.second
-        )
-        set(value) = preferences.edit {
-            it.putFloat(
-                QWERTY_KEY_VERTICAL_MARGIN.first,
-                value ?: 5.0f
-            )
-        }
 
-    var qwerty_key_horizontal_gap: Float?
-        get() = preferences.getFloat(
-            QWERTY_KEY_HORIZONTAL_GAP.first,
-            QWERTY_KEY_HORIZONTAL_GAP.second
-        )
-        set(value) = preferences.edit {
-            it.putFloat(
-                QWERTY_KEY_HORIZONTAL_GAP.first,
-                value ?: 2.0f
-            )
-        }
 
-    var qwerty_key_indent_large: Float?
-        get() = preferences.getFloat(QWERTY_KEY_INDENT_LARGE.first, QWERTY_KEY_INDENT_LARGE.second)
-        set(value) = preferences.edit { it.putFloat(QWERTY_KEY_INDENT_LARGE.first, value ?: 23.0f) }
 
-    var qwerty_key_indent_small: Float?
-        get() = preferences.getFloat(QWERTY_KEY_INDENT_SMALL.first, QWERTY_KEY_INDENT_SMALL.second)
-        set(value) = preferences.edit { it.putFloat(QWERTY_KEY_INDENT_SMALL.first, value ?: 9.0f) }
 
-    var qwerty_key_side_margin: Float?
-        get() = preferences.getFloat(QWERTY_KEY_SIDE_MARGIN.first, QWERTY_KEY_SIDE_MARGIN.second)
-        set(value) = preferences.edit { it.putFloat(QWERTY_KEY_SIDE_MARGIN.first, value ?: 4.0f) }
 
-    var qwerty_key_text_size: Float?
-        get() = preferences.getFloat(QWERTY_KEY_TEXT_SIZE.first, QWERTY_KEY_TEXT_SIZE.second)
-        set(value) = preferences.edit { it.putFloat(QWERTY_KEY_TEXT_SIZE.first, value ?: 18.0f) }
 
-    var qwerty_symbol_keymap_text_size: Float?
-        get() = preferences.getFloat(
-            QWERTY_SYMBOL_KEYMAP_TEXT_SIZE.first,
-            QWERTY_SYMBOL_KEYMAP_TEXT_SIZE.second
-        ).coerceIn(4.0f, 24.0f)
-        set(value) = preferences.edit {
-            it.putFloat(
-                QWERTY_SYMBOL_KEYMAP_TEXT_SIZE.first,
-                (value ?: QWERTY_SYMBOL_KEYMAP_TEXT_SIZE.second).coerceIn(4.0f, 24.0f)
-            )
-        }
 
-    var qwerty_special_key_text_size: Float?
-        get() = preferences.getFloat(
-            QWERTY_SPECIAL_KEY_TEXT_SIZE.first,
-            QWERTY_SPECIAL_KEY_TEXT_SIZE.second
-        )
-        set(value) = preferences.edit {
-            it.putFloat(
-                QWERTY_SPECIAL_KEY_TEXT_SIZE.first,
-                value ?: 12.0f
-            )
-        }
 
-    var qwerty_special_key_icon_size: Float?
-        get() = preferences.getFloat(
-            QWERTY_SPECIAL_KEY_ICON_SIZE.first,
-            QWERTY_SPECIAL_KEY_ICON_SIZE.second
-        )
-        set(value) = preferences.edit {
-            it.putFloat(
-                QWERTY_SPECIAL_KEY_ICON_SIZE.first,
-                value ?: 24.0f
-            )
-        }
 
     var liquid_glass_preference: Boolean
         get() = preferences.getBoolean(
@@ -3215,68 +2563,12 @@ object AppPreference {
         )
         set(value) = preferences.edit { it.putInt(CUSTOM_THEME_POST_EDIT_TEXT.first, value) }
 
-    var sumire_english_qwerty_preference: Boolean
-        get() = preferences.getBoolean(
-            SUMIRE_ENGLISH_QWERTY_PREFERENCE.first,
-            SUMIRE_ENGLISH_QWERTY_PREFERENCE.second
-        )
-        set(value) = preferences.edit {
-            it.putBoolean(SUMIRE_ENGLISH_QWERTY_PREFERENCE.first, value)
-        }
 
-    var sumire_restore_input_mode_on_restart_preference: Boolean
-        get() = preferences.getBoolean(
-            SUMIRE_RESTORE_INPUT_MODE_ON_RESTART_PREFERENCE.first,
-            SUMIRE_RESTORE_INPUT_MODE_ON_RESTART_PREFERENCE.second
-        )
-        set(value) = preferences.edit {
-            it.putBoolean(SUMIRE_RESTORE_INPUT_MODE_ON_RESTART_PREFERENCE.first, value)
-        }
 
-    var sumire_restore_input_mode_only_within_time_preference: Boolean
-        get() = preferences.getBoolean(
-            SUMIRE_RESTORE_INPUT_MODE_ONLY_WITHIN_TIME_PREFERENCE.first,
-            SUMIRE_RESTORE_INPUT_MODE_ONLY_WITHIN_TIME_PREFERENCE.second
-        )
-        set(value) = preferences.edit {
-            it.putBoolean(SUMIRE_RESTORE_INPUT_MODE_ONLY_WITHIN_TIME_PREFERENCE.first, value)
-        }
 
-    var sumire_restore_input_mode_timeout_minutes_preference: Int
-        get() = preferences.getInt(
-            SUMIRE_RESTORE_INPUT_MODE_TIMEOUT_MINUTES_PREFERENCE.first,
-            SUMIRE_RESTORE_INPUT_MODE_TIMEOUT_MINUTES_PREFERENCE.second
-        )
-        set(value) = preferences.edit {
-            it.putInt(SUMIRE_RESTORE_INPUT_MODE_TIMEOUT_MINUTES_PREFERENCE.first, value)
-        }
 
-    var sumire_last_input_mode_preference: String
-        get() = preferences.getString(
-            SUMIRE_LAST_INPUT_MODE_PREFERENCE.first,
-            SUMIRE_LAST_INPUT_MODE_PREFERENCE.second
-        ) ?: SUMIRE_LAST_INPUT_MODE_PREFERENCE.second
-        set(value) = preferences.edit {
-            it.putString(SUMIRE_LAST_INPUT_MODE_PREFERENCE.first, value)
-        }
 
-    var sumire_last_input_mode_presentation_preference: String
-        get() = preferences.getString(
-            SUMIRE_LAST_INPUT_MODE_PRESENTATION_PREFERENCE.first,
-            SUMIRE_LAST_INPUT_MODE_PRESENTATION_PREFERENCE.second
-        ) ?: SUMIRE_LAST_INPUT_MODE_PRESENTATION_PREFERENCE.second
-        set(value) = preferences.edit {
-            it.putString(SUMIRE_LAST_INPUT_MODE_PRESENTATION_PREFERENCE.first, value)
-        }
 
-    var sumire_last_input_mode_saved_at_epoch_millis_preference: Long
-        get() = preferences.getLong(
-            SUMIRE_LAST_INPUT_MODE_SAVED_AT_EPOCH_MILLIS_PREFERENCE.first,
-            SUMIRE_LAST_INPUT_MODE_SAVED_AT_EPOCH_MILLIS_PREFERENCE.second
-        )
-        set(value) = preferences.edit {
-            it.putLong(SUMIRE_LAST_INPUT_MODE_SAVED_AT_EPOCH_MILLIS_PREFERENCE.first, value)
-        }
 
     var conversion_candidates_romaji_enable_preference: Boolean
         get() = preferences.getBoolean(
@@ -3431,17 +2723,6 @@ object AppPreference {
         get() = preferences.getFloat(PREF_SLOT_6_SWEEP.first, PREF_SLOT_6_SWEEP.second)
         set(value) = preferences.edit { it.putFloat(PREF_SLOT_6_SWEEP.first, value) }
 
-    var qwerty_switch_number_key_without_number_preference: Boolean
-        get() = preferences.getBoolean(
-            QWERTY_SWITCH_NUMBER_KEY_WITHOUT_NUMBER_PREFERENCE.first,
-            QWERTY_SWITCH_NUMBER_KEY_WITHOUT_NUMBER_PREFERENCE.second
-        )
-        set(value) = preferences.edit {
-            it.putBoolean(
-                QWERTY_SWITCH_NUMBER_KEY_WITHOUT_NUMBER_PREFERENCE.first,
-                value
-            )
-        }
 
     var keyboard_margin_start_dp: Int?
         get() = preferences.getInt(KEYBOARD_MARGIN_START_DP.first, KEYBOARD_MARGIN_START_DP.second)
@@ -3451,24 +2732,7 @@ object AppPreference {
         get() = preferences.getInt(KEYBOARD_MARGIN_END_DP.first, KEYBOARD_MARGIN_END_DP.second)
         set(value) = preferences.edit { it.putInt(KEYBOARD_MARGIN_END_DP.first, value ?: 0) }
 
-    var qwerty_keyboard_margin_start_dp: Int?
-        get() = preferences.getInt(
-            QWERTY_KEYBOARD_MARGIN_START_DP.first,
-            QWERTY_KEYBOARD_MARGIN_START_DP.second
-        )
-        set(value) = preferences.edit {
-            it.putInt(
-                QWERTY_KEYBOARD_MARGIN_START_DP.first,
-                value ?: 0
-            )
-        }
 
-    var qwerty_keyboard_margin_end_dp: Int?
-        get() = preferences.getInt(
-            QWERTY_KEYBOARD_MARGIN_END_DP.first,
-            QWERTY_KEYBOARD_MARGIN_END_DP.second
-        )
-        set(value) = preferences.edit { it.putInt(QWERTY_KEYBOARD_MARGIN_END_DP.first, value ?: 0) }
 
     var keyboard_margin_start_dp_landscape: Int?
         get() = preferences.getInt(
@@ -3494,29 +2758,7 @@ object AppPreference {
             )
         }
 
-    var qwerty_keyboard_margin_start_dp_landscape: Int?
-        get() = preferences.getInt(
-            QWERTY_KEYBOARD_MARGIN_START_DP_LANDSCAPE.first,
-            QWERTY_KEYBOARD_MARGIN_START_DP_LANDSCAPE.second
-        )
-        set(value) = preferences.edit {
-            it.putInt(
-                QWERTY_KEYBOARD_MARGIN_START_DP_LANDSCAPE.first,
-                value ?: 0
-            )
-        }
 
-    var qwerty_keyboard_margin_end_dp_landscape: Int?
-        get() = preferences.getInt(
-            QWERTY_KEYBOARD_MARGIN_END_DP_LANDSCAPE.first,
-            QWERTY_KEYBOARD_MARGIN_END_DP_LANDSCAPE.second
-        )
-        set(value) = preferences.edit {
-            it.putInt(
-                QWERTY_KEYBOARD_MARGIN_END_DP_LANDSCAPE.first,
-                value ?: 0
-            )
-        }
 
     var sumire_lm_homophone_margin_preference: Boolean
         get() = preferences.getBoolean(
@@ -3563,14 +2805,6 @@ object AppPreference {
             it.putBoolean(TYPO_CORRECTION_JA_FLICK.first, value)
         }
 
-    var enable_typo_correction_qwerty_english_keyboard_preference: Boolean
-        get() = preferences.getBoolean(
-            TYPO_CORRECTION_EN_QWERTY.first,
-            TYPO_CORRECTION_EN_QWERTY.second
-        )
-        set(value) = preferences.edit {
-            it.putBoolean(TYPO_CORRECTION_EN_QWERTY.first, value)
-        }
 
     var custom_romaji_zenkaku_conversion_enable_preference: Boolean
         get() = CUSTOM_ROMAJI_ZENKAKU_CONVERSION_ENABLE_PREFERENCE.second // 設定UI削除済み: 保存値を無視して既定値に固定
@@ -3693,68 +2927,6 @@ object AppPreference {
         return getCircularFlickSlotRanges()
     }
 
-    fun getCircularSlotActionSettings(): List<CircularSlotActionSetting> {
-        val raw = preferences.getString(
-            CIRCULAR_SLOT_ACTION_SETTINGS.first,
-            CIRCULAR_SLOT_ACTION_SETTINGS.second
-        ) ?: CIRCULAR_SLOT_ACTION_SETTINGS.second
-
-        return runCatching {
-            gson.fromJson<List<CircularSlotActionSetting>>(
-                raw,
-                object : TypeToken<List<CircularSlotActionSetting>>() {}.type
-            )
-        }.getOrNull()
-            ?.filter { it.slot in circularSlotActionEditableSlots }
-            ?: emptyList()
-    }
-
-    fun saveCircularSlotActionSettings(settings: List<CircularSlotActionSetting>) {
-        preferences.edit {
-            it.putString(
-                CIRCULAR_SLOT_ACTION_SETTINGS.first,
-                gson.toJson(settings.filter { setting ->
-                    setting.slot in circularSlotActionEditableSlots &&
-                            setting.keyIdentifier.isNotBlank()
-                })
-            )
-        }
-    }
-
-    fun getCircularSlotActionSetting(
-        mode: KeyboardInputMode,
-        keyIdentifier: String,
-        slot: CircularFlickDirection
-    ): CircularSlotActionSetting? {
-        return getCircularSlotActionSettings().firstOrNull {
-            it.mode == mode && it.keyIdentifier == keyIdentifier && it.slot == slot
-        }
-    }
-
-    fun upsertCircularSlotActionSetting(setting: CircularSlotActionSetting) {
-        if (setting.slot !in circularSlotActionEditableSlots || setting.keyIdentifier.isBlank()) return
-        val nextSettings = getCircularSlotActionSettings()
-            .filterNot {
-                it.mode == setting.mode &&
-                        it.keyIdentifier == setting.keyIdentifier &&
-                        it.slot == setting.slot
-            }
-            .plus(setting)
-        saveCircularSlotActionSettings(nextSettings)
-    }
-
-    fun deleteCircularSlotActionSetting(
-        mode: KeyboardInputMode,
-        keyIdentifier: String,
-        slot: CircularFlickDirection
-    ) {
-        saveCircularSlotActionSettings(
-            getCircularSlotActionSettings().filterNot {
-                it.mode == mode && it.keyIdentifier == keyIdentifier && it.slot == slot
-            }
-        )
-    }
-
     /**
      * SharedPreferences 全体を JSON として書き出す（将来キーが増えても自動対応）
      */
@@ -3816,32 +2988,6 @@ object AppPreference {
                 }
             }
         }
-        migrateSumireKeymapGuideModesIfNeeded()
     }
 
-    fun migrateSumirePreferenceIfNeeded() {
-        // 古いキーが存在する場合のみ移行処理を実行
-        if (preferences.contains(OLD_SUMIRE_PREFERENCE_KEY)) {
-            val oldValue = preferences.getString(OLD_SUMIRE_PREFERENCE_KEY, "toggle-default")
-
-            val (newStyle, newMethod) = when (oldValue) {
-                "toggle-default" -> "default" to "toggle"
-                "flick-default" -> "default" to "flick"
-                "flick-circle" -> "circle" to "toggle"
-                "flick-circle-flick" -> "circle" to "flick"
-                "second-flick" -> "second-flick" to "toggle"
-                "second-flick-flick" -> "second-flick" to "flick"
-                "flick-sumire" -> "sumire" to "flick"
-                else -> "default" to "toggle"
-            }
-
-            preferences.edit {
-                // 新しいキーで値を保存
-                it.putString(NEW_SUMIRE_STYLE_KEY, newStyle)
-                it.putString(NEW_SUMIRE_METHOD_KEY, newMethod)
-                // 移行が完了したので古いキーを削除
-                it.remove(OLD_SUMIRE_PREFERENCE_KEY)
-            }
-        }
-    }
 }

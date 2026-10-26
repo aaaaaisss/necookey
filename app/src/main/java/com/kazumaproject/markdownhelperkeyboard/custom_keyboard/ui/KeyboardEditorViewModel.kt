@@ -118,25 +118,6 @@ class KeyboardEditorViewModel @Inject constructor(
             R.string.template_flick_kana_cursor,
             KeyboardDefaultLayouts.createFlickKanaTemplateLayout(true)
         ),
-        LayoutTemplate(
-            R.string.template_toggle_kana,
-            KeyboardDefaultLayouts.createToggleKanaTemplateLayout()
-        ),
-        LayoutTemplate(
-            R.string.template_flick_english_cursor,
-            KeyboardDefaultLayouts.createFlickEnglishTemplateLayout(
-                isDefaultKey = true,
-                isUpperCase = false
-            )
-        ),
-        LayoutTemplate(
-            R.string.template_qwerty,
-            KeyboardDefaultLayouts.createQwertyTemplateLayout()
-        ),
-        LayoutTemplate(
-            R.string.template_empty_5x4_flexible,
-            KeyboardDefaultLayouts.createEmpty5x4FlexibleTemplateLayout()
-        ),
         LayoutTemplate(R.string.template_number, KeyboardDefaultLayouts.createNumberTemplateLayout())
     )
 
@@ -1541,18 +1522,11 @@ class KeyboardEditorViewModel @Inject constructor(
         val maxBottom = items.maxOfOrNull { item ->
             item.placement.rowUnits + item.placement.rowSpanUnits
         } ?: 1
-        val qwertyTemplate = KeyboardDefaultLayouts.createQwertyTemplateLayout()
-        val isQwertyFamilyLayout = items.any { item ->
-            item.id.startsWith("qwerty_") ||
-                    (item is KeyItem && item.keyData.keyId?.startsWith("qwerty_") == true)
-        }
         val minimumColumnUnits = when {
-            isQwertyFamilyLayout -> qwertyTemplate.columnUnitCount
             isFlexiblePlacementLayout -> columnUnitCount
             else -> 1
         }
         val minimumRowUnits = when {
-            isQwertyFamilyLayout -> qwertyTemplate.rowUnitCount
             isFlexiblePlacementLayout -> rowUnitCount
             else -> 1
         }

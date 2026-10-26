@@ -37,7 +37,6 @@ import com.kazumaproject.markdownhelperkeyboard.ime_service.state.CandidateTab
 import com.kazumaproject.markdownhelperkeyboard.repository.KeyboardRepository
 import com.kazumaproject.markdownhelperkeyboard.setting_activity.AppPreference
 import com.kazumaproject.markdownhelperkeyboard.short_cut.ShortcutType
-import com.kazumaproject.markdownhelperkeyboard.sumire_special_key.SumireSpecialKeyRepository
 import dagger.hilt.android.AndroidEntryPoint
 import timber.log.Timber
 import java.util.Locale
@@ -53,8 +52,6 @@ class CandidateViewHeightSettingFragment : Fragment() {
     @Inject
     lateinit var keyboardRepository: KeyboardRepository
 
-    @Inject
-    lateinit var sumireSpecialKeyRepository: SumireSpecialKeyRepository
 
     private lateinit var suggestionAdapter: SuggestionAdapter2
 
@@ -829,7 +826,6 @@ class CandidateViewHeightSettingFragment : Fragment() {
             fragment = this,
             appPreference = appPreference,
             keyboardRepository = keyboardRepository,
-            sumireSpecialKeyRepository = sumireSpecialKeyRepository,
             views = CandidateKeyboardPreviewViews(
                 container = binding.keyboardPreviewContainer,
                 flick = binding.candidateHeightSettingFlickPreview

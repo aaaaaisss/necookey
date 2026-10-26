@@ -265,7 +265,6 @@
     <string name="keyboard_size_direct_input_orientation_landscape">横画面</string>
     <string name="keyboard_size_direct_input_keyboard_type_title">キーボード種別</string>
     <string name="keyboard_size_direct_input_keyboard_type_ten_key">TenKey系（TenKey・50音・Sumire・カスタム）</string>
-    <string name="keyboard_size_direct_input_keyboard_type_qwerty">QWERTY</string>
     <string name="keyboard_size_direct_input_height_dp">高さ dp</string>
     <string name="keyboard_size_direct_input_width_percent">幅 %</string>
     <string name="keyboard_size_direct_input_bottom_margin_dp">下 margin dp</string>
@@ -332,10 +331,6 @@
     <string name="read_from_template">テンプレートから読み込む</string>
     <string name="show_row_column_delete_buttons">行・列の削除ボタンを表示</string>
     <string name="template_flick_kana_cursor">かな入力 (カーソル)</string>
-    <string name="template_toggle_kana">かな入力（トグル）</string>
-    <string name="template_flick_english_cursor">英語入力 (カーソル)</string>
-    <string name="template_qwerty">QWERTY</string>
-    <string name="template_empty_5x4_flexible">空のフレキシブルレイアウト</string>
     <string name="template_number">数字入力</string>
     <string name="editor_place_half_key">半マスキー</string>
     <string name="editor_place_one_key">1マスキー</string>
@@ -606,8 +601,6 @@
     <string name="typo_correction_title">タイピングミス補正</string>
     <string name="enable_typo_correction_japanese_flick_keyboard_preference_title">フリック（日本語）</string>
     <string name="enable_typo_correction_japanese_flick_keyboard_preference_sumary">フリック入力でミスを検知した場合、補正した変換候補を表示します。</string>
-    <string name="enable_typo_correction_qwerty_english_keyboard_preference_title">QWERTY（英語）</string>
-    <string name="enable_typo_correction_qwerty_english_keyboard_preference_summary">QWERTY入力でミスを検知した場合、補正した候補を表示します。</string>
     <string name="back_up">設定のバックアップ</string>
     <string name="pref_backup_export_title">設定をエクスポート</string>
     <string name="pref_backup_export_summary">現在の設定をバックアップファイルとして保存します</string>
