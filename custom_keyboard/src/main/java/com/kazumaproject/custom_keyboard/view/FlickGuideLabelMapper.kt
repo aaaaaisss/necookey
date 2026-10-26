@@ -1,6 +1,5 @@
 package com.kazumaproject.custom_keyboard.view
 
-import com.kazumaproject.custom_keyboard.data.TfbiFlickNode
 
 internal object FlickGuideLabelMapper {
     private val displayDirections = listOf(
@@ -36,26 +35,6 @@ internal object FlickGuideLabelMapper {
         }
 
         return labelsFromDirections(displayDirections.associateWith { labelFor(it) })
-    }
-
-    fun buildHierarchicalGuideLabels(
-        rootMap: Map<TfbiFlickDirection, TfbiFlickNode>,
-        maxCodePoints: Int
-    ): AutoSizeButton.FlickGuideLabels {
-        return labelsFromDirections(
-            displayDirections.associateWith { direction ->
-                sanitizeGuideText(displayText(rootMap[direction]), maxCodePoints).orEmpty()
-            }
-        )
-    }
-
-    private fun displayText(node: TfbiFlickNode?): String {
-        return when (node) {
-            is TfbiFlickNode.Input -> node.char
-            is TfbiFlickNode.SubMenu -> node.label.orEmpty()
-            is TfbiFlickNode.StatefulKey -> node.label
-            null -> ""
-        }
     }
 
     private fun labelsFromDirections(

@@ -764,8 +764,7 @@ class KeyboardEditorViewModel @Inject constructor(
             circularFlickKeyMaps = circularFlickKeyMaps.filterKeys { it !in removedKeyIds },
             twoStepFlickKeyMaps = twoStepFlickKeyMaps.filterKeys { it !in removedKeyIds },
             longPressFlickKeyMaps = longPressFlickKeyMaps.filterKeys { it !in removedKeyIds },
-            twoStepLongPressKeyMaps = twoStepLongPressKeyMaps.filterKeys { it !in removedKeyIds },
-            hierarchicalFlickMaps = hierarchicalFlickMaps.filterKeys { it !in removedKeyIds }
+            twoStepLongPressKeyMaps = twoStepLongPressKeyMaps.filterKeys { it !in removedKeyIds }
         )
     }
 
@@ -982,7 +981,6 @@ class KeyboardEditorViewModel @Inject constructor(
         twoStepMap: Map<TfbiFlickDirection, Map<TfbiFlickDirection, String>>,
         longPressFlickMap: Map<FlickDirection, String>,
         twoStepLongPressMap: Map<TfbiFlickDirection, Map<TfbiFlickDirection, String>>,
-        circularFlickMaps: List<Map<CircularFlickDirection, FlickAction>> = emptyList(),
         flexibleRowSpanUnits: Int? = null,
         flexibleColumnSpanUnits: Int? = null
     ): Boolean {
@@ -1009,7 +1007,6 @@ class KeyboardEditorViewModel @Inject constructor(
                 twoStepMap = twoStepMap,
                 longPressFlickMap = longPressFlickMap,
                 twoStepLongPressMap = twoStepLongPressMap,
-                circularFlickMaps = circularFlickMaps,
                 finalFlickMaps = finalFlickMaps,
                 finalCircularFlickMaps = finalCircularFlickMaps,
                 finalTwoStepMaps = finalTwoStepMaps,
@@ -1154,7 +1151,6 @@ class KeyboardEditorViewModel @Inject constructor(
         twoStepMap: Map<TfbiFlickDirection, Map<TfbiFlickDirection, String>>,
         longPressFlickMap: Map<FlickDirection, String>,
         twoStepLongPressMap: Map<TfbiFlickDirection, Map<TfbiFlickDirection, String>>,
-        circularFlickMaps: List<Map<CircularFlickDirection, FlickAction>>,
         finalFlickMaps: MutableMap<String, List<Map<FlickDirection, FlickAction>>>,
         finalCircularFlickMaps: MutableMap<String, List<Map<CircularFlickDirection, FlickAction>>>,
         finalTwoStepMaps: MutableMap<String, Map<TfbiFlickDirection, Map<TfbiFlickDirection, String>>>,
@@ -1162,8 +1158,7 @@ class KeyboardEditorViewModel @Inject constructor(
         finalTwoStepLongPressMaps: MutableMap<String, Map<TfbiFlickDirection, Map<TfbiFlickDirection, String>>>
     ) {
         when (newKeyData.keyType) {
-            KeyType.TWO_STEP_FLICK,
-            KeyType.FLICK_LONG_PRESS -> {
+            KeyType.TWO_STEP_FLICK -> {
                 finalFlickMaps.remove(keyId)
                 finalCircularFlickMaps.remove(keyId)
                 finalLongPressFlickMaps.remove(keyId)
@@ -1173,15 +1168,6 @@ class KeyboardEditorViewModel @Inject constructor(
                 } else {
                     finalTwoStepLongPressMaps.remove(keyId)
                 }
-            }
-
-            KeyType.CIRCULAR_FLICK -> {
-                finalFlickMaps.remove(keyId)
-                finalTwoStepMaps.remove(keyId)
-                finalTwoStepLongPressMaps.remove(keyId)
-                finalLongPressFlickMaps.remove(keyId)
-                finalCircularFlickMaps[keyId] =
-                    circularFlickMaps.ifEmpty { listOf(emptyMap()) }
             }
 
             else -> {

@@ -28,48 +28,6 @@ import java.time.Duration
 class RuntimeGestureControllerTest {
 
     @Test
-    fun standardFlickUsesLatestConfigOnNextGestureButNotHalfwayThroughCurrentGesture() {
-        var currentConfig = config(thresholdPx = 100f, timeoutMillis = 300L, revision = 1L)
-        val controller = StandardFlickInputController(
-            context = context(),
-            gestureConfigSource = GestureSessionConfigSource { currentConfig }
-        )
-        val button = Button(context())
-        val committed = mutableListOf<String>()
-        controller.listener = object : StandardFlickInputController.StandardFlickListener {
-            override fun onPress(character: String) = Unit
-            override fun onFlick(character: String) {
-                committed += character
-            }
-        }
-        controller.attach(
-            button,
-            mapOf(
-                FlickDirection.TAP to "tap",
-                FlickDirection.UP_RIGHT_FAR to "right"
-            ),
-            SegmentedBackgroundDrawable(
-                label = "a",
-                baseColor = 0,
-                highlightColor = 0,
-                textColor = 0,
-                cornerRadius = 0f,
-                primaryTextSizePx = 20f,
-                secondaryTextSizePx = 12f
-            )
-        )
-
-        button.dispatch(MotionEvent.ACTION_DOWN, x = 10f, y = 10f, downTime = 1L)
-        currentConfig = config(thresholdPx = 10f, timeoutMillis = 300L, revision = 2L)
-        button.dispatch(MotionEvent.ACTION_UP, x = 60f, y = 10f, downTime = 1L)
-
-        button.dispatch(MotionEvent.ACTION_DOWN, x = 10f, y = 10f, downTime = 10L)
-        button.dispatch(MotionEvent.ACTION_UP, x = 60f, y = 10f, downTime = 10L)
-
-        assertEquals(listOf("tap", "right"), committed)
-    }
-
-    @Test
     fun normalKeyLongPressUsesConfiguredTimeoutAndSnapshotsItAtDown() {
         var currentConfig = config(thresholdPx = 50f, timeoutMillis = 1_000L, revision = 1L)
         val activity = Robolectric.buildActivity(Activity::class.java).setup().get()
@@ -119,56 +77,6 @@ class RuntimeGestureControllerTest {
         assertTrue(events.contains("long"))
         button.dispatch(MotionEvent.ACTION_UP, x = 10f, y = 10f, downTime = 10L)
         assertEquals(listOf("press", "long", "upAfterLong"), events)
-    }
-
-    @Test
-    fun standardFlickUsesConfiguredThresholdShape() {
-        var currentConfig = config(
-            thresholdPx = 100f,
-            timeoutMillis = 300L,
-            revision = 1L,
-            thresholdShape = FlickThresholdShape.Rectangular
-        )
-        val controller = StandardFlickInputController(
-            context = context(),
-            gestureConfigSource = GestureSessionConfigSource { currentConfig }
-        )
-        val button = Button(context())
-        val committed = mutableListOf<String>()
-        controller.listener = object : StandardFlickInputController.StandardFlickListener {
-            override fun onPress(character: String) = Unit
-            override fun onFlick(character: String) {
-                committed += character
-            }
-        }
-        controller.attach(
-            button,
-            mapOf(
-                FlickDirection.TAP to "tap",
-                FlickDirection.DOWN to "down"
-            ),
-            SegmentedBackgroundDrawable(
-                label = "a",
-                baseColor = 0,
-                highlightColor = 0,
-                textColor = 0,
-                cornerRadius = 0f,
-                primaryTextSizePx = 20f,
-                secondaryTextSizePx = 12f
-            )
-        )
-
-        button.dispatch(MotionEvent.ACTION_DOWN, x = 10f, y = 10f, downTime = 1L)
-        button.dispatch(MotionEvent.ACTION_UP, x = 90f, y = 100f, downTime = 1L)
-
-        currentConfig = currentConfig.copy(
-            settingsRevision = 2L,
-            flickThresholdShape = FlickThresholdShape.Radial
-        )
-        button.dispatch(MotionEvent.ACTION_DOWN, x = 10f, y = 10f, downTime = 10L)
-        button.dispatch(MotionEvent.ACTION_UP, x = 90f, y = 100f, downTime = 10L)
-
-        assertEquals(listOf("tap", "down"), committed)
     }
 
     private fun context(): Context {

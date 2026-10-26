@@ -9,6 +9,7 @@ import com.kazumaproject.custom_keyboard.data.CircularFlickDirection
 import com.kazumaproject.custom_keyboard.data.FlickDirection
 import com.kazumaproject.custom_keyboard.data.KeyActionMapper
 import com.kazumaproject.custom_keyboard.data.KeyType
+import com.kazumaproject.custom_keyboard.data.toSupportedKeyType
 import com.kazumaproject.custom_keyboard.data.KeyTextInputBehavior
 import com.kazumaproject.custom_keyboard.data.KeyIconBuiltInDrawable
 import com.kazumaproject.custom_keyboard.data.KeyIconType
@@ -346,7 +347,7 @@ object KeyboardBackupNormalizer {
                 column = keyDto.column ?: 0,
                 rowSpan = keyDto.rowSpan ?: 1,
                 colSpan = keyDto.colSpan ?: 1,
-                keyType = enumValueOrNull<KeyType>(keyDto.keyType) ?: KeyType.NORMAL,
+                keyType = (enumValueOrNull<KeyType>(keyDto.keyType) ?: KeyType.NORMAL).toSupportedKeyType(),
                 isSpecialKey = isSpecialKey,
                 drawableResId = keyDto.drawableResId,
                 iconType = normalizedIconType(

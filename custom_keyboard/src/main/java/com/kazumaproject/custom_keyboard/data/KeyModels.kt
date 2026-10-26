@@ -147,7 +147,7 @@ data class KeyData(
     val isSpecialKey: Boolean = false,
     val isHiLighted: Boolean = false,
     val keyId: String? = null,
-    val keyType: KeyType = if (isFlickable) KeyType.CIRCULAR_FLICK else KeyType.NORMAL,
+    val keyType: KeyType = if (isFlickable) KeyType.PETAL_FLICK else KeyType.NORMAL,
     val specialKeyColorStyle: SpecialKeyColorStyle = SpecialKeyColorStyle.SPECIAL,
     val doubleTapBinding: DoubleTapBinding? = null,
     val textInputBehavior: KeyTextInputBehavior = KeyTextInputBehavior.NORMAL
@@ -589,7 +589,6 @@ data class KeyboardLayout(
     val twoStepFlickKeyMaps: Map<String, Map<TfbiFlickDirection, Map<TfbiFlickDirection, String>>> = emptyMap(),
     val longPressFlickKeyMaps: Map<String, Map<FlickDirection, String>> = emptyMap(),
     val twoStepLongPressKeyMaps: Map<String, Map<TfbiFlickDirection, Map<TfbiFlickDirection, String>>> = emptyMap(),
-    val hierarchicalFlickMaps: Map<String, TfbiFlickNode.StatefulKey> = emptyMap(),
     val items: List<KeyboardLayoutItem> = keys.map { it.toKeyItem() },
     val columnUnitCount: Int = columnCount * 2,
     val rowUnitCount: Int = rowCount * 2,
@@ -599,31 +598,61 @@ data class KeyboardLayout(
 
 /**
  * キーの種類を定義する
+ *
+ * 使えるのは [NORMAL] / [CROSS_FLICK] / [PETAL_FLICK] / [TWO_STEP_FLICK] だけ。
+ * それ以外の値は古い DB 行・バックアップを読み込めるように残しているだけで、
+ * 読み込み時に [toSupportedKeyType] で使える種類へ置き換える。
  */
 enum class KeyType {
     /** 通常のクリック/長押しキー */
     NORMAL,
 
-    /** 円形フリックキー */
+    @Deprecated("Legacy (donut flick). Read as PETAL_FLICK.")
     CIRCULAR_FLICK,
 
     /** 十字フリックキー */
     CROSS_FLICK,
 
+    @Deprecated("Legacy. Read as PETAL_FLICK.")
     STANDARD_FLICK,
 
     PETAL_FLICK,
 
-    /** Sumire guide popup with a cursor that starts at the key center. */
+    @Deprecated("Legacy. Read as PETAL_FLICK.")
     CENTER_GUIDE_FLICK,
 
     TWO_STEP_FLICK,
 
+    @Deprecated("Legacy. Read as TWO_STEP_FLICK.")
     STICKY_TWO_STEP_FLICK,
 
+    @Deprecated("Legacy. Read as NORMAL.")
     HIERARCHICAL_FLICK,
 
+    @Deprecated("Legacy (flick long press). Read as TWO_STEP_FLICK.")
     FLICK_LONG_PRESS
+}
+
+/** The key types the keyboard and editor still support. */
+val SUPPORTED_KEY_TYPES: List<KeyType> = listOf(
+    KeyType.NORMAL,
+    KeyType.CROSS_FLICK,
+    KeyType.PETAL_FLICK,
+    KeyType.TWO_STEP_FLICK,
+)
+
+/** Maps a legacy (removed) key type to the closest supported one. */
+@Suppress("DEPRECATION")
+fun KeyType.toSupportedKeyType(): KeyType = when (this) {
+    KeyType.NORMAL, KeyType.CROSS_FLICK, KeyType.PETAL_FLICK, KeyType.TWO_STEP_FLICK -> this
+    KeyType.CIRCULAR_FLICK,
+    KeyType.STANDARD_FLICK,
+    KeyType.CENTER_GUIDE_FLICK -> KeyType.PETAL_FLICK
+
+    // Flick-long-press keys stored their outputs in the two-step maps.
+    KeyType.FLICK_LONG_PRESS,
+    KeyType.STICKY_TWO_STEP_FLICK -> KeyType.TWO_STEP_FLICK
+    KeyType.HIERARCHICAL_FLICK -> KeyType.NORMAL
 }
 
 enum class ShapeType {

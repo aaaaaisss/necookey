@@ -15,6 +15,7 @@ import com.kazumaproject.custom_keyboard.data.KeyIconType
 import com.kazumaproject.custom_keyboard.data.KeyItem
 import com.kazumaproject.custom_keyboard.data.KeyTextInputBehavior
 import com.kazumaproject.custom_keyboard.data.KeyType
+import com.kazumaproject.custom_keyboard.data.toSupportedKeyType
 import com.kazumaproject.custom_keyboard.data.KeyboardLayout
 import com.kazumaproject.custom_keyboard.data.KeyboardLayoutItem
 import com.kazumaproject.custom_keyboard.data.KeyboardLayoutUsageMode
@@ -932,13 +933,14 @@ class KeyboardRepository @Inject constructor(
                     )
                 )
             }
+            val supportedKeyType = dbKey.keyType.toSupportedKeyType()
             val keyData = if (restoredAction == null) {
                 KeyData(
                     label = dbKey.label,
                     row = dbKey.row,
                     column = dbKey.column,
-                    isFlickable = dbKey.keyType != KeyType.NORMAL,
-                    keyType = dbKey.keyType,
+                    isFlickable = supportedKeyType != KeyType.NORMAL,
+                    keyType = supportedKeyType,
                     rowSpan = dbKey.rowSpan,
                     colSpan = dbKey.colSpan,
                     isSpecialKey = dbKey.isSpecialKey,
@@ -955,8 +957,8 @@ class KeyboardRepository @Inject constructor(
                     label = dbKey.label,
                     row = dbKey.row,
                     column = dbKey.column,
-                    isFlickable = dbKey.keyType != KeyType.NORMAL,
-                    keyType = dbKey.keyType,
+                    isFlickable = supportedKeyType != KeyType.NORMAL,
+                    keyType = supportedKeyType,
                     rowSpan = dbKey.rowSpan,
                     colSpan = dbKey.colSpan,
                     isSpecialKey = dbKey.isSpecialKey,

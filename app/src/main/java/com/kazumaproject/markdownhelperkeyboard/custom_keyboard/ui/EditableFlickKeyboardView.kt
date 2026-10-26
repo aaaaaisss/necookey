@@ -28,13 +28,11 @@ import com.kazumaproject.custom_keyboard.data.GridPlacement
 import com.kazumaproject.custom_keyboard.data.KeyData
 import com.kazumaproject.custom_keyboard.data.KeyIconResolver
 import com.kazumaproject.custom_keyboard.data.KeyItem
-import com.kazumaproject.custom_keyboard.data.KeyType
 import com.kazumaproject.custom_keyboard.data.KeyVisualStyleResolver
 import com.kazumaproject.custom_keyboard.data.KeyboardLayout
 import com.kazumaproject.custom_keyboard.data.KeyboardLayoutItem
 import com.kazumaproject.custom_keyboard.data.SpacerItem
 import com.kazumaproject.custom_keyboard.data.isDeletedKeySlot
-import com.kazumaproject.custom_keyboard.layout.SegmentedBackgroundDrawable
 import com.kazumaproject.custom_keyboard.view.AutoSizeButton
 import com.kazumaproject.markdownhelperkeyboard.R
 import com.kazumaproject.markdownhelperkeyboard.custom_keyboard.ui.placement.canonicalLayoutForEditor
@@ -654,24 +652,6 @@ class EditableFlickKeyboardView @JvmOverloads constructor(
                         ContextCompat.getDrawable(
                             context,
                             defaultKeyBackgroundDrawableRes(keyData, isDarkTheme)
-                        )
-                    }
-
-                    keyData.keyType == KeyType.STANDARD_FLICK -> {
-                        val keyBaseColor =
-                            if (isDarkTheme) context.getColorFromAttr(MaterialR.attr.colorSurfaceContainerHighest) else context.getColorFromAttr(
-                                MaterialR.attr.colorSurface
-                            )
-                        val keyHighlightColor =
-                            context.getColorFromAttr(MaterialR.attr.colorSecondaryContainer)
-                        val keyTextColor = context.getColorFromAttr(MaterialR.attr.colorOnSurface)
-                        setTextColor(Color.TRANSPARENT)
-                        SegmentedBackgroundDrawable(
-                            label = keyData.label,
-                            baseColor = keyBaseColor,
-                            highlightColor = keyHighlightColor,
-                            textColor = keyTextColor,
-                            cornerRadius = 20f
                         )
                     }
 

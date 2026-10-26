@@ -331,14 +331,6 @@ private fun configureFlickKeyboardPreview(
         liquidGlassKeyAlphaEnable = appPreference.liquid_glass_key_alpha,
         borderWidth = appPreference.custom_theme_border_width
     )
-    flickView.setAngleAndRange(
-        appPreference.getCircularFlickRanges(),
-        appPreference.circular_flickWindow_scale
-    )
-    flickView.setCircularFlickOptions(directionCount = appPreference.circularFlickDirectionCount)
-    flickView.setHierarchicalFlickModeSwitchAngleMargin(
-        appPreference.hierarchical_flick_mode_switch_angle_margin_preference.toDouble()
-    )
     flickView.applyKeySizing(
         keyWidthScalePercent = appPreference.flick_key_width_scale_percent ?: 160,
         keyHeightScalePercent = appPreference.flick_key_height_scale_percent ?: 160,

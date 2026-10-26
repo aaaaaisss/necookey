@@ -95,11 +95,6 @@ object AppPreference {
     private val gson = Gson()
     private const val LEGACY_SYMBOL_EMOJI_CANDIDATE_ENABLE_KEY =
         "symbol_emoji_candidate_enable_preference"
-    private val circularSlotActionEditableSlots = setOf(
-        CircularFlickDirection.SLOT_4,
-        CircularFlickDirection.SLOT_5,
-        CircularFlickDirection.SLOT_6
-    )
 
     private val CLIPBOARD_HISTORY_ENABLE = Pair("clipboard_history_preference", false)
     private val FLICK_SENSITIVITY = Pair(FLICK_SENSITIVITY_KEY, 100)
@@ -174,8 +169,6 @@ object AppPreference {
         Pair("flick_guide_text_size_sp_preference", 9)
     private val FLICK_GUIDE_MAX_CHARACTERS_PREFERENCE =
         Pair("flick_guide_max_characters_preference", 1)
-    private val HIERARCHICAL_FLICK_MODE_SWITCH_ANGLE_MARGIN =
-        Pair("hierarchical_flick_mode_switch_angle_margin_preference", 20)
 
 
 
@@ -536,30 +529,13 @@ object AppPreference {
     private val USER_DICTIONARY_PREDICTION_CANDIDATE_LIMIT_PREFERENCE =
         Pair("user_dictionary_prediction_candidate_limit_preference", 4)
 
-    private val PREF_UP_START = Pair("circular_flick_up_start", 225f)
-    private val PREF_UP_SWEEP = Pair("circular_flick_up_sweep", 90f)
 
-    private val PREF_RIGHT_START = Pair("circular_flick_right_start", 315f)
-    private val PREF_RIGHT_SWEEP = Pair("circular_flick_right_sweep", 90f)
 
-    private val PREF_DOWN_START = Pair("circular_flick_down_start", 45f)
-    private val PREF_DOWN_SWEEP = Pair("circular_flick_down_sweep", 90f)
 
-    private val PREF_LEFT_START = Pair("circular_flick_left_start", 135f)
-    private val PREF_LEFT_SWEEP = Pair("circular_flick_left_sweep", 90f)
 
-    private val CIRCULAR_FLICK_WINDOW_SCALE = Pair("circular_flick_window_scale", 1.0f)
 
     private val CUSTOM_THEME_BORDER_WIDTH = Pair("theme_custom_border_width", 1)
 
-    private val PREF_FIVE_DIRECTIONS_ENABLE = Pair("circular_flick_five_directions_enable", false)
-    private val PREF_UP_RIGHT_START = Pair("circular_flick_up_right_start", 90f)
-    private val PREF_UP_RIGHT_SWEEP = Pair("circular_flick_up_right_sweep", 72f)
-    private val PREF_SLOT_5_START = Pair("circular_flick_slot_5_start", 150f)
-    private val PREF_SLOT_5_SWEEP = Pair("circular_flick_slot_5_sweep", 60f)
-    private val PREF_SLOT_6_START = Pair("circular_flick_slot_6_start", 167.14285f)
-    private val PREF_SLOT_6_SWEEP = Pair("circular_flick_slot_6_sweep", 51.42857f)
-    private val PREF_CIRCULAR_DIRECTION_COUNT = Pair("circular_flick_direction_count", 4)
 
 
     private val KEYBOARD_MARGIN_START_DP = Pair("keyboard_margin_start_dp_preference", 0)
@@ -1072,17 +1048,6 @@ object AppPreference {
             it.putString(TFBI_DIAGONAL_RECOGNITION_MODE.first, value.preferenceValue)
         }
 
-    var hierarchical_flick_mode_switch_angle_margin_preference: Int
-        get() = preferences.getInt(
-            HIERARCHICAL_FLICK_MODE_SWITCH_ANGLE_MARGIN.first,
-            HIERARCHICAL_FLICK_MODE_SWITCH_ANGLE_MARGIN.second
-        ).coerceIn(0, 34)
-        set(value) = preferences.edit {
-            it.putInt(
-                HIERARCHICAL_FLICK_MODE_SWITCH_ANGLE_MARGIN.first,
-                value.coerceIn(0, 34)
-            )
-        }
 
     val independent_multi_touch_preference: Boolean get() = false // S3: hardcoded, setting removed
 
@@ -2625,12 +2590,6 @@ object AppPreference {
             )
         }
 
-    var circular_flickWindow_scale: Float
-        get() = preferences.getFloat(
-            CIRCULAR_FLICK_WINDOW_SCALE.first,
-            CIRCULAR_FLICK_WINDOW_SCALE.second
-        )
-        set(value) = preferences.edit { it.putFloat(CIRCULAR_FLICK_WINDOW_SCALE.first, value) }
 
     var custom_theme_border_width: Int
         get() = preferences.getInt(
@@ -2641,87 +2600,20 @@ object AppPreference {
             it.putInt(CUSTOM_THEME_BORDER_WIDTH.first, value)
         }
 
-    var circularFlick5DirectionsEnable: Boolean
-        get() = preferences.getBoolean(
-            PREF_FIVE_DIRECTIONS_ENABLE.first,
-            PREF_FIVE_DIRECTIONS_ENABLE.second
-        )
-        set(value) = preferences.edit { it.putBoolean(PREF_FIVE_DIRECTIONS_ENABLE.first, value) }
 
-    var circularFlickDirectionCount: Int
-        get() {
-            val hasNewPreference = preferences.contains(PREF_CIRCULAR_DIRECTION_COUNT.first)
-            val raw = if (hasNewPreference) {
-                preferences.getInt(
-                    PREF_CIRCULAR_DIRECTION_COUNT.first,
-                    PREF_CIRCULAR_DIRECTION_COUNT.second
-                )
-            } else if (circularFlick5DirectionsEnable) {
-                5
-            } else {
-                PREF_CIRCULAR_DIRECTION_COUNT.second
-            }
-            return raw.coerceIn(4, 7)
-        }
-        set(value) = preferences.edit {
-            it.putInt(PREF_CIRCULAR_DIRECTION_COUNT.first, value.coerceIn(4, 7))
-        }
 
-    var circularFlickUpStart: Float
-        get() = preferences.getFloat(PREF_UP_START.first, PREF_UP_START.second)
-        set(value) = preferences.edit { it.putFloat(PREF_UP_START.first, value) }
 
-    var circularFlickUpSweep: Float
-        get() = preferences.getFloat(PREF_UP_SWEEP.first, PREF_UP_SWEEP.second)
-        set(value) = preferences.edit { it.putFloat(PREF_UP_SWEEP.first, value) }
 
-    var circularFlickRightStart: Float
-        get() = preferences.getFloat(PREF_RIGHT_START.first, PREF_RIGHT_START.second)
-        set(value) = preferences.edit { it.putFloat(PREF_RIGHT_START.first, value) }
 
-    var circularFlickRightSweep: Float
-        get() = preferences.getFloat(PREF_RIGHT_SWEEP.first, PREF_RIGHT_SWEEP.second)
-        set(value) = preferences.edit { it.putFloat(PREF_RIGHT_SWEEP.first, value) }
 
-    var circularFlickDownStart: Float
-        get() = preferences.getFloat(PREF_DOWN_START.first, PREF_DOWN_START.second)
-        set(value) = preferences.edit { it.putFloat(PREF_DOWN_START.first, value) }
 
-    var circularFlickDownSweep: Float
-        get() = preferences.getFloat(PREF_DOWN_SWEEP.first, PREF_DOWN_SWEEP.second)
-        set(value) = preferences.edit { it.putFloat(PREF_DOWN_SWEEP.first, value) }
 
-    var circularFlickLeftStart: Float
-        get() = preferences.getFloat(PREF_LEFT_START.first, PREF_LEFT_START.second)
-        set(value) = preferences.edit { it.putFloat(PREF_LEFT_START.first, value) }
 
-    var circularFlickLeftSweep: Float
-        get() = preferences.getFloat(PREF_LEFT_SWEEP.first, PREF_LEFT_SWEEP.second)
-        set(value) = preferences.edit { it.putFloat(PREF_LEFT_SWEEP.first, value) }
 
-    var circularFlickUpRightStart: Float
-        get() = preferences.getFloat(PREF_UP_RIGHT_START.first, PREF_UP_RIGHT_START.second)
-        set(value) = preferences.edit { it.putFloat(PREF_UP_RIGHT_START.first, value) }
 
-    var circularFlickUpRightSweep: Float
-        get() = preferences.getFloat(PREF_UP_RIGHT_SWEEP.first, PREF_UP_RIGHT_SWEEP.second)
-        set(value) = preferences.edit { it.putFloat(PREF_UP_RIGHT_SWEEP.first, value) }
 
-    var circularFlickSlot5Start: Float
-        get() = preferences.getFloat(PREF_SLOT_5_START.first, PREF_SLOT_5_START.second)
-        set(value) = preferences.edit { it.putFloat(PREF_SLOT_5_START.first, value) }
 
-    var circularFlickSlot5Sweep: Float
-        get() = preferences.getFloat(PREF_SLOT_5_SWEEP.first, PREF_SLOT_5_SWEEP.second)
-        set(value) = preferences.edit { it.putFloat(PREF_SLOT_5_SWEEP.first, value) }
 
-    var circularFlickSlot6Start: Float
-        get() = preferences.getFloat(PREF_SLOT_6_START.first, PREF_SLOT_6_START.second)
-        set(value) = preferences.edit { it.putFloat(PREF_SLOT_6_START.first, value) }
-
-    var circularFlickSlot6Sweep: Float
-        get() = preferences.getFloat(PREF_SLOT_6_SWEEP.first, PREF_SLOT_6_SWEEP.second)
-        set(value) = preferences.edit { it.putFloat(PREF_SLOT_6_SWEEP.first, value) }
 
 
     var keyboard_margin_start_dp: Int?
@@ -2830,102 +2722,9 @@ object AppPreference {
             it.putInt(TYPO_CORRECTION_JA_FLICK_OFFSET_SCORE_PREFERENCE.first, value)
         }
 
-    /**
-     * キーボード側で使用するためのマップ取得メソッド
-     * 戻り値: Map<FlickDirection, Pair<StartAngle, SweepAngle>>
-     */
-    fun getCircularFlickSlotRanges(): Map<CircularFlickDirection, Pair<Float, Float>> {
-        val count = circularFlickDirectionCount
-        val defaults = getDefaultCircularFlickSlotRanges(count)
 
-        val baseMap = mutableMapOf(
-            CircularFlickDirection.SLOT_0 to getCircularFlickRange(
-                CircularFlickDirection.SLOT_0,
-                defaults.getValue(CircularFlickDirection.SLOT_0)
-            ),
-            CircularFlickDirection.SLOT_1 to getCircularFlickRange(
-                CircularFlickDirection.SLOT_1,
-                defaults.getValue(CircularFlickDirection.SLOT_1)
-            ),
-            CircularFlickDirection.SLOT_2 to getCircularFlickRange(
-                CircularFlickDirection.SLOT_2,
-                defaults.getValue(CircularFlickDirection.SLOT_2)
-            ),
-            CircularFlickDirection.SLOT_3 to getCircularFlickRange(
-                CircularFlickDirection.SLOT_3,
-                defaults.getValue(CircularFlickDirection.SLOT_3)
-            )
-        )
 
-        if (count >= 5) {
-            baseMap[CircularFlickDirection.SLOT_4] = getCircularFlickRange(
-                CircularFlickDirection.SLOT_4,
-                defaults.getValue(CircularFlickDirection.SLOT_4)
-            )
-        }
 
-        if (count >= 6) {
-            baseMap[CircularFlickDirection.SLOT_5] = getCircularFlickRange(
-                CircularFlickDirection.SLOT_5,
-                defaults.getValue(CircularFlickDirection.SLOT_5)
-            )
-        }
-
-        if (count >= 7) {
-            baseMap[CircularFlickDirection.SLOT_6] = getCircularFlickRange(
-                CircularFlickDirection.SLOT_6,
-                defaults.getValue(CircularFlickDirection.SLOT_6)
-            )
-        }
-
-        return baseMap
-    }
-
-    private fun getDefaultCircularFlickSlotRanges(
-        count: Int
-    ): Map<CircularFlickDirection, Pair<Float, Float>> {
-        return when (count.coerceIn(4, 7)) {
-            4 -> mapOf(
-                CircularFlickDirection.SLOT_0 to (225f to 90f),
-                CircularFlickDirection.SLOT_1 to (315f to 90f),
-                CircularFlickDirection.SLOT_2 to (45f to 90f),
-                CircularFlickDirection.SLOT_3 to (135f to 90f)
-            )
-
-            5 -> mapOf(
-                CircularFlickDirection.SLOT_0 to (234f to 72f),
-                CircularFlickDirection.SLOT_1 to (306f to 72f),
-                CircularFlickDirection.SLOT_2 to (18f to 72f),
-                CircularFlickDirection.SLOT_3 to (90f to 72f),
-                CircularFlickDirection.SLOT_4 to (162f to 72f)
-            )
-
-            else -> buildEvenCircularRanges(count)
-        }
-    }
-
-    private fun getCircularFlickRange(
-        direction: CircularFlickDirection,
-        defaultRange: Pair<Float, Float>
-    ): Pair<Float, Float> {
-        val (startPreference, sweepPreference) = when (direction) {
-            CircularFlickDirection.SLOT_0 -> PREF_UP_START to PREF_UP_SWEEP
-            CircularFlickDirection.SLOT_1 -> PREF_RIGHT_START to PREF_RIGHT_SWEEP
-            CircularFlickDirection.SLOT_2 -> PREF_DOWN_START to PREF_DOWN_SWEEP
-            CircularFlickDirection.SLOT_3 -> PREF_LEFT_START to PREF_LEFT_SWEEP
-            CircularFlickDirection.SLOT_4 -> PREF_UP_RIGHT_START to PREF_UP_RIGHT_SWEEP
-            CircularFlickDirection.SLOT_5 -> PREF_SLOT_5_START to PREF_SLOT_5_SWEEP
-            CircularFlickDirection.SLOT_6 -> PREF_SLOT_6_START to PREF_SLOT_6_SWEEP
-            CircularFlickDirection.TAP -> return defaultRange
-        }
-
-        return preferences.getFloat(startPreference.first, defaultRange.first) to
-                preferences.getFloat(sweepPreference.first, defaultRange.second)
-    }
-
-    fun getCircularFlickRanges(): Map<CircularFlickDirection, Pair<Float, Float>> {
-        return getCircularFlickSlotRanges()
-    }
 
     /**
      * SharedPreferences 全体を JSON として書き出す（将来キーが増えても自動対応）

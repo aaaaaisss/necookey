@@ -143,9 +143,6 @@ data class ImePreferencesSnapshot(
     val learnPredictionPreference: Int,
     val userDictionaryPredictionCandidateLimit: Int,
     val learnDictionaryPredictionCandidateLimit: Int,
-    val circularFlickWindowScale: Float,
-    val circularFlickDirectionCount: Int,
-    val hierarchicalFlickModeSwitchAngleMargin: Int,
     val customKeyBorderWidth: Int,
     val customRomajiZenkakuConversionEnablePreference: Boolean,
     val omissionSearchOffsetScorePreference: Int,
@@ -460,10 +457,6 @@ data class ImePreferencesSnapshot(
                     appPreference.user_dictionary_prediction_candidate_limit_preference,
                 learnDictionaryPredictionCandidateLimit =
                     appPreference.learn_dictionary_prediction_candidate_limit_preference,
-                circularFlickWindowScale = appPreference.circular_flickWindow_scale,
-                circularFlickDirectionCount = appPreference.circularFlickDirectionCount,
-                hierarchicalFlickModeSwitchAngleMargin =
-                    appPreference.hierarchical_flick_mode_switch_angle_margin_preference,
                 customKeyBorderWidth = appPreference.custom_theme_border_width,
                 customRomajiZenkakuConversionEnablePreference =
                     appPreference.custom_romaji_zenkaku_conversion_enable_preference,

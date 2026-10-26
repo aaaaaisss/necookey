@@ -1304,9 +1304,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
     private var learnDictionaryPredictionCandidateLimit: Int = 4
     private val conversionLearningSession = ConversionLearningSession()
     private var learningPausedForSession: Boolean = false
-    private var circularFlickWindowScale: Float? = 1.0f
-    private var circularFlickDirectionCount: Int? = 4
-    private var hierarchicalFlickModeSwitchAngleMargin: Int? = 20
 
     private var customKeyBorderWidth: Int? = 1
 
@@ -2374,9 +2371,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
             preferences.userDictionaryPredictionCandidateLimit.coerceIn(1, 8)
         learnDictionaryPredictionCandidateLimit =
             preferences.learnDictionaryPredictionCandidateLimit.coerceIn(1, 8)
-        circularFlickWindowScale = preferences.circularFlickWindowScale
-        circularFlickDirectionCount = preferences.circularFlickDirectionCount
-        hierarchicalFlickModeSwitchAngleMargin = preferences.hierarchicalFlickModeSwitchAngleMargin
         customKeyBorderWidth = preferences.customKeyBorderWidth
         omissionSearchOffsetScorePreference = preferences.omissionSearchOffsetScorePreference
         enableTypoCorrectionJapaneseFlickKeyboardOffsetScorePreference =
@@ -2993,7 +2987,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         learnPredictionPreference = null
         userDictionaryPredictionCandidateLimit = 4
         learnDictionaryPredictionCandidateLimit = 4
-        circularFlickWindowScale = null
         customKeyBorderWidth = null
         omissionSearchOffsetScorePreference = null
         enableTypoCorrectionJapaneseFlickKeyboardOffsetScorePreference = null
@@ -5980,19 +5973,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
             customBorderColor = customKeyBorderEnableColor ?: Color.BLACK,
             liquidGlassKeyAlphaEnable = liquidGlassKeyBlurRadiousPreference ?: 255,
             borderWidth = customKeyBorderWidth ?: 1
-        )
-
-        flickView.setAngleAndRange(
-            appPreference.getCircularFlickRanges(),
-            circularFlickWindowScale ?: 1.0f
-        )
-        flickView.setCircularFlickOptions(
-            directionCount = circularFlickDirectionCount
-                ?: appPreference.circularFlickDirectionCount
-        )
-        flickView.setHierarchicalFlickModeSwitchAngleMargin(
-            (hierarchicalFlickModeSwitchAngleMargin
-                ?: appPreference.hierarchical_flick_mode_switch_angle_margin_preference).toDouble()
         )
 
         flickView.applyKeySizing(
