@@ -150,6 +150,7 @@ internal object TestEngineFactory {
 
     fun create(
         connectionMatrix: ConnectionMatrix.CostTable = ConnectionMatrix.fromShortArray(readConnectionIds()),
+        findPath: FindPath = FindPath(),
     ): KanaKanjiEngine {
         val englishEngine = mock<EnglishEngine>()
         whenever(englishEngine.getCandidates(any(), any())).thenReturn(emptyList<Candidate>())
@@ -182,7 +183,7 @@ internal object TestEngineFactory {
         return KanaKanjiEngine().also {
             it.buildEngine(
                 graphBuilder = GraphBuilder(),
-                findPath = FindPath(),
+                findPath = findPath,
                 connectionMatrix = connectionMatrix,
                 systemTangoTrie = system.tangoTrie,
                 systemYomiTrie = system.yomiTrie,
@@ -232,6 +233,31 @@ internal object TestEngineFactory {
                 mozcDictionaryActive = true,
             )
         }
+    }
+
+    /**
+     * 実機と同じく、常時有効の任意辞書（人名・Wiki）をエンジンのラティス用フィールドに入れる（評価ハーネス用）。
+     * 実機は DictionaryOverrideStore.ALWAYS_ENABLED_OPTIONAL_DICTIONARIES（READING_CORRECTION/PERSON_NAME/PLACES/WIKI）を
+     * initializeOptionalDictionaryStateFromCurrentSources で読み、GraphBuilder は非 null の人名・Wiki 辞書から常にノードを足す。
+     * （地名は候補リスト側だけで mozcUTPlaces 既定オフのため不要。）
+     */
+    fun attachAlwaysOnOptionalDictionaries(engine: KanaKanjiEngine, person: Boolean = true, wiki: Boolean = true) {
+        fun set(prefix: String, d: TripleData) {
+            val values = mapOf(
+                "${prefix}TangoTrie" to d.tangoTrie,
+                "${prefix}YomiTrie" to d.yomiTrie,
+                "${prefix}TokenArray" to d.tokenArray,
+                "${prefix}SuccinctBitVectorLBSYomi" to d.succinctBitVectorLBSYomi,
+                "${prefix}SuccinctBitVectorIsLeaf" to d.succinctBitVectorIsLeafYomi,
+                "${prefix}SuccinctBitVectorTokenArray" to d.succinctBitVectorTokenArray,
+                "${prefix}SuccinctBitVectorLBSTango" to d.succinctBitVectorTangoLBS,
+            )
+            for ((name, v) in values) {
+                KanaKanjiEngine::class.java.getDeclaredField(name).also { it.isAccessible = true }.set(engine, v)
+            }
+        }
+        if (person) set("person", loadTriple("person_name/tango_person_names.dat", "person_name/yomi_person_names.dat", "person_name/token_person_names.dat"))
+        if (wiki) set("wiki", loadTriple("wiki/tango_wiki.dat.zip", "wiki/yomi_wiki.dat.zip", "wiki/token_wiki.dat.zip"))
     }
 
     private fun loadTriple(
