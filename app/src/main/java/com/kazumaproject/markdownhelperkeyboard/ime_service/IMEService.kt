@@ -182,7 +182,6 @@ import com.kazumaproject.markdownhelperkeyboard.clipboard_history.database.Clipb
 import com.kazumaproject.markdownhelperkeyboard.clipboard_history.database.ItemType
 import com.kazumaproject.markdownhelperkeyboard.converter.candidate.BunsetsuCandidateResult
 import com.kazumaproject.markdownhelperkeyboard.converter.candidatebar.ZenzaiConstraint
-import com.kazumaproject.markdownhelperkeyboard.converter.candidatebar.ZenzaiScheduler
 import com.kazumaproject.markdownhelperkeyboard.converter.candidatebar.ZenzaiGate
 import com.kazumaproject.markdownhelperkeyboard.converter.candidatebar.SumireLmGate
 import com.kazumaproject.markdownhelperkeyboard.converter.sumirelm.SumireLmReranker
@@ -203,11 +202,6 @@ import com.kazumaproject.markdownhelperkeyboard.converter.candidate.Candidate
 import com.kazumaproject.markdownhelperkeyboard.converter.candidate.CandidateConversionSegment
 import com.kazumaproject.markdownhelperkeyboard.converter.candidate.ExactInputCandidatePromotionPolicy
 import com.kazumaproject.markdownhelperkeyboard.converter.candidate.QWERTY_GLIDE_CANDIDATE_TYPE
-import com.kazumaproject.markdownhelperkeyboard.converter.candidate.ZenzCandidate
-import com.kazumaproject.markdownhelperkeyboard.ime_service.zenz.ZenzConfidence
-import com.kazumaproject.markdownhelperkeyboard.ime_service.zenz.ZenzConfidenceDiagnostics
-import com.kazumaproject.markdownhelperkeyboard.ime_service.zenz.ZenzDiagnosticsStore
-import com.kazumaproject.markdownhelperkeyboard.ime_service.zenz.ZenzSkipReason
 import com.kazumaproject.markdownhelperkeyboard.converter.candidate.buildRomajiCandidates
 import com.kazumaproject.markdownhelperkeyboard.converter.engine.EnglishEngine
 import com.kazumaproject.markdownhelperkeyboard.converter.engine.KanaKanjiEngine
@@ -1381,14 +1375,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
     private var kanaKanjiConversionSession: KanaKanjiConversionSession? = null
     @Volatile
     private var lastKanaKanjiQueryRequest: KanaKanjiQueryRequest? = null
-    /** Zenzai: 直前の入力・左文脈と、そのとき得た FIX 制約（読みが伸びる間は引き継ぐ）。 */
-    @Volatile
-    private var zenzaiCarry: ZenzaiConstraint? = null
-    /** (文脈, 読み, ドラフト) -> zenz の判定。同じドラフトを二度推論しない。 */
-    private val zenzaiVerdictCache = object : LinkedHashMap<String, String>(32, 0.75f, true) {
-        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, String>?): Boolean =
-            size > 64
-    }
     private val candidateRequestTracker = CandidateRequestTracker()
     private val editorMutationRevision = EditorMutationRevision()
     private var symbolKeyboardFirstItem: SymbolMode? = SymbolMode.EMOJI
@@ -1544,15 +1530,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         const val CANDIDATE_TYPE_NEXT_WORD: Byte = 53
         /** 文脈絵文字の事前スコア（モデルごとに一度だけ計算）の保存先。 */
 
-        /**
-         * 手が止まった後、FIX で直した結果を zenz が PASS するまで続けて判定する。これは安全上限
-         * （最初の 1 回と合わせて最大 9 回）。同じ判定・変化なし・制約経路なし・ドラフトの繰り返しでも止まる。
-         */
-        private const val ZENZAI_PAUSE_RECHECK_MAX = 8
-
-        /** zenz の文脈長。左文脈 40 字 + 読み 32 字 + 候補で十分収まる。 */
-        private const val ZENZ_N_CTX = 256
-        private const val ZENZ_ENGINE_ZENZ = "zenz"
         private const val ZENZ_ENGINE_SUMIRE_LM = "sumire_lm"
         /** SUMIRE-LM の表（tools/sumire_lm/export_od.py の出力）を置くディレクトリ名（外部ファイル領域 / 内部 / アセット）。 */
         private const val SUMIRE_LM_TABLE_DIR = "sumire_lm"
@@ -1560,8 +1537,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         private const val SUMIRE_LM_RETRY_MS = 30_000L
         /** 案2 ラティス辺コスト表（LatticeLmCost、SLC2）のアセット。ビルド時に lm-data から取得（無ければ従来どおり）。 */
         private const val LATTICE_LM_ASSET = "lattice_lm/lc_np1m.slc"
-        private const val DEFAULT_MODEL_ASSET_NAME = "jinen-v2-small-Q5_K_M.gguf"
-        private const val LEGACY_ZENZ_MODEL_ASSET_NAME = "ggml-model-Q5_K_M.gguf"
         private const val NEXT_WORD_CANDIDATE_LIMIT = 6
         private const val LONG_DELAY_TIME = 64L
         private const val DEFAULT_DELAY_MS = 1000L
@@ -1672,12 +1647,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
     private val necookeyCandidateBarConfig = NecookeyCandidateBarConfig.DEFAULT
     private var necookeyZenzJob: Job? = null
 
-    /** Zenzai をいつ始めるか（打鍵リズムに合わせて、手が止まったら）。 */
-    private val zenzaiScheduler = ZenzaiScheduler()
-
-    /** 長く打ち続けたときに待たずに始めた推論。読みが伸びるだけなら中断しない（直しを次へ引き継ぐ）。 */
-    private var necookeyZenzForcedJob: Job? = null
-    private var necookeyZenzForcedInput: String? = null
     /** Zenzai cache key of [necookeyZenzJob]; a repeat request for the same key keeps the running job. */
     private var necookeyZenzJobKey: String? = null
     private var necookeyZenzJobInput: String? = null
@@ -9238,8 +9207,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
 
         launch {
             inputString.collect { string ->
-                // 確定・全消去・モード切替で読みが空になったら Zenzai の引き継ぎ制約も捨てる。
-                if (string.isEmpty()) zenzaiCarry = null
                 try {
                     measureDebugStage("IMEService.input.immediate") {
                         processInputString(string, mainView)
@@ -9390,68 +9357,15 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         val unverifiedFix: Boolean = false,
     )
 
-    /** 直近の Zenzai の判定（信頼度の診断用。確定したときに当たり外れと一緒に記録する）。 */
-    private data class ZenzaiStepRecord(
-        val input: String,
-        val draft: String,
-        val top: String,
-        val kind: ZenzConfidenceDiagnostics.Kind,
-        val confidence: ZenzConfidence,
-        val sumireGap: Int?,
-    )
-
-    @Volatile private var lastZenzaiStepRecord: ZenzaiStepRecord? = null
-
     /**
      * Sumire の 1 位と 2 位（読み全体を覆う別表記のシステム辞書経路の最小コスト）の差。ZENZ-GATE と診断に使う。
      */
     private fun sumireCostGap(insertString: String, candidates: List<Candidate>, top: Candidate): Int? =
         ZenzaiGate.pathCostGap(insertString, candidates, top)
 
-    /** 確定した表記と直前の Zenzai の判定を照らして、信頼度の診断に残す（文字列は残さない）。 */
-    private fun recordZenzaiConfidenceOutcome(reading: String, committed: String) {
-        val record = lastZenzaiStepRecord ?: return
-        lastZenzaiStepRecord = null
-        if (record.input != reading) return
-        val result = when (record.kind) {
-            ZenzConfidenceDiagnostics.Kind.PASS ->
-                if (committed == record.draft) ZenzConfidenceDiagnostics.Result.KEPT
-                else ZenzConfidenceDiagnostics.Result.OTHER
-            else -> when (committed) {
-                record.top -> ZenzConfidenceDiagnostics.Result.KEPT
-                record.draft -> ZenzConfidenceDiagnostics.Result.REJECTED
-                else -> ZenzConfidenceDiagnostics.Result.OTHER
-            }
-        }
-        Timber.d(
-            "zenzai confidence outcome: kind=%s result=%s %s sumireGap=%s",
-            record.kind, result, record.confidence.describe(), record.sumireGap,
-        )
-        val sample = ZenzConfidenceDiagnostics.Sample(record.kind, result, record.confidence, record.sumireGap)
-        ioScope.launch {
-            try {
-                ZenzConfidenceDiagnostics.record(applicationContext, sample)
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Exception) {
-                Timber.w(e, "zenz confidence diagnostics failed")
-            }
-        }
-    }
-
-    /**
-     * 変換エンジンが jinen-v2（内蔵モデルの自由生成）か。zenz を選んでもモデルを読み込んでいなければ
-     * 内蔵モデルは jinen なので jinen として扱う（zenz のプロンプトを jinen に渡さない）。
-     */
-    /** jinen（内蔵 jinen-v2 の自由生成）は削除済み。 */
-    private fun isJinenEngine(): Boolean = false
-
     /** 変換エンジンが Sumire + SUMIRE-LM リランカー（迷った読みだけ zenz）か。 */
     private fun isSumireLmEngine(): Boolean =
         AppPreference.zenz_engine_preference == ZENZ_ENGINE_SUMIRE_LM
-
-    /** zenz 用のプロンプト（評価）を渡せるモデル（読み込んだ zenz）があるか。内蔵モデルは jinen なので対象外。 */
-    private fun isZenzPromptModelLoaded(): Boolean = false
 
     @Volatile private var latticeLmLoadStarted = false
 
@@ -9540,9 +9454,8 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
     }
 
     /**
-     * 変換エンジン sumire_lm の 1 ステップ（[SumireLmGate]）。リランカーで 1 位を決め、マージンが小さいとき・
-     * 前回の FIX 制約を引き継いでいるときだけ zenz（[runZenzaiStep] の評価ループ）にその 1 位をドラフトとして渡す。
-     * 表が無ければ Sumire の順のまま（zenz の判定は従来の ZENZ-GATE）、zenz を読み込んでいなければリランカーだけ。
+     * 変換エンジン sumire_lm の 1 ステップ（[SumireLmGate]）。リランカーで 1 位を決める。
+     * 表が無ければ Sumire の順のまま。zenz は削除済みなので、迷っても追加の判定はしない。
      */
     private suspend fun runSumireLmStep(
         insertString: String,
@@ -9599,30 +9512,11 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
             }
         }
         sumireLmLastTop = topKey to top
-        val carried = zenzaiCarry?.carriedFor(insertString, context.leftContext) != null
-        val askZenz = isZenzPromptModelLoaded() && (
-            recheck || carried || when {
-                margin != null -> SumireLmGate.needsZenz(margin, appPreference.sumire_lm_zenz_margin_preference)
-                reranker == null -> ZenzaiGate.shouldEvaluate(insertString.length, context.leftContext.length, sumireGap)
-                else -> false
-            }
-            )
         Timber.d(
-            "sumire-lm: input=[%s] sumire=[%s] rerank=[%s] margin=%s zenz=%s",
-            insertString, sumireTop.string, top.string, margin, askZenz,
+            "sumire-lm: input=[%s] sumire=[%s] rerank=[%s] margin=%s",
+            insertString, sumireTop.string, top.string, margin,
         )
-        val rerankOutcome = ZenzaiOutcome(top = top, changed = top.string != sumireTop.string, inferred = false)
-        if (!askZenz) {
-            zenzaiCarry = null
-            return rerankOutcome
-        }
-        if (top.string != sumireTop.string) onProvisional(top)
-        // ZENZ-GATE（Sumire の経路コスト差）はここでは使わない（判定済み）: 差なし = 必ず評価。
-        val zenz = runZenzaiStep(
-            insertString, top, context, sumireGap = null, sumireCandidates = sumireCandidates,
-            onProvisional = onProvisional, viaSumireLm = true,
-        ) ?: return rerankOutcome
-        return zenz.copy(changed = zenz.top.string != sumireTop.string)
+        return ZenzaiOutcome(top = top, changed = top.string != sumireTop.string, inferred = false)
     }
 
     /** zenz を回す対象か（唯一の設定は zenz の ON/OFF）。 */
@@ -9639,59 +9533,9 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         listOf(context.leftContext, context.rightContext, input, draft)
             .joinToString("\u0001") { "${it.length}:$it" }
 
-    /**
-     * Zenzai 方式（1 キー入力につき zenz 推論は最大 1 回）。
-     * 1. ドラフト = sumire の最良経路。前回の FIX 制約が今回の読みにも使える（読みが伸びただけ）なら
-     *    その制約付きで sumire が再探索したものをドラフトにする（推論なし）。
-     * 2. ドラフトを zenz が 1 回評価（同じ文脈・読み・ドラフトは判定キャッシュで推論を省略）。
-     * 3. FIX:prefix なら sumire が prefix 制約付きで再探索した結果を採用し、制約を次の入力へ引き継ぐ。
-     * 古い推論は呼び出し元ジョブのキャンセルで中断される（最新入力優先）。
-     */
-    private suspend fun runZenzaiStep(
-        insertString: String,
-        sumireTop: Candidate,
-        context: ZenzContext,
-        sumireGap: Int?,
-        sumireCandidates: List<Candidate> = emptyList(),
-        onProvisional: suspend (Candidate) -> Unit,
-        viaSumireLm: Boolean = false,
-    ): ZenzaiOutcome? {
-        // necookey: zenz/jinen は削除済み。SUMIRE-LM の「迷ったら zenz」も評価しない（リランカーの結果を使う）。
-        if (viaSumireLm) return null
-        return runSumireLmStep(insertString, sumireTop, context, sumireGap, sumireCandidates, onProvisional)
-    }
-
-    /**
-     * [candidate] のうちユーザー辞書の登録語そのもの（読み範囲と出力が一致）の文節。学習語は守らない。
-     * 経路の分かれ目が分からないユーザー辞書候補（文節情報なし）は全体を守るため null。
-     */
-    private suspend fun zenzaiProtectedSegments(
-        request: KanaKanjiQueryRequest,
-        input: String,
-        candidate: Candidate,
-        segments: List<CandidateConversionSegment>,
-    ): List<CandidateConversionSegment>? {
-        val fromUserData = ZenzaiConstraint.isProtectedCandidateType(candidate.type)
-        if (segments.isEmpty()) return if (fromUserData) null else emptyList()
-        return withContext(Dispatchers.IO) {
-            segments.filter { segment ->
-                if (segment.inputStart < 0 || segment.inputEnd > input.length) return@filter false
-                val reading = input.substring(segment.inputStart, segment.inputEnd)
-                isUserDictionaryEnable == true &&
-                    request.userDictionaryRepository.exactMatchesForConversion(reading)
-                        .any { it.word == segment.output }
-            }
-        }
-    }
-
     /** ユーザー辞書の候補: 読みが入力と完全一致する語を先に、その中はスコア（小さいほど強い）順。 */
     private fun userDictionaryExactFirst(input: String): Comparator<Candidate> =
         compareBy<Candidate>({ it.length.toInt() != input.length }, { it.score })
-
-    private fun recordZenzaiDiagnostics(outcome: ZenzaiOutcome?) {
-        if (outcome == null || !outcome.inferred) return
-        ZenzDiagnosticsStore.recordEvaluation(applicationContext, 1, if (outcome.changed) 1 else 0)
-    }
 
     private fun promoteZenzaiCandidate(candidates: List<Candidate>, top: Candidate?): List<Candidate> {
         if (top == null) return candidates
@@ -9718,23 +9562,12 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         val sumireTop = baseCandidates.firstOrNull {
             it.length.toInt() == insertString.length
         } ?: return
-        zenzaiScheduler.onInput(insertString, SystemClock.uptimeMillis())
         val sumireGap = sumireCostGap(insertString, baseCandidates, sumireTop)
-        val jinen = isJinenEngine()
         zenzRerankJob = scope.launch {
             // 待たずに始める（次の打鍵でキャンセル）。
             if (requestToken != zenzRerankRequestToken ||
                 !shouldApplyCandidateResult(insertString, candidateToken)
             ) return@launch
-            // jinen は入力が止まってから文全体を生成する（次の打鍵でこのジョブごとキャンセル）。
-            // TODO(jinen): 打鍵中の投機的デコード（読み ~7 文字から）。
-            if (jinen) {
-                delay(zenzaiScheduler.startDelayMs())
-                if (requestToken != zenzRerankRequestToken ||
-                    !shouldApplyCandidateResult(insertString, candidateToken)
-                ) return@launch
-            }
-            zenzaiScheduler.onInferenceStarted()
             suspend fun show(top: Candidate) {
                 if (requestToken != zenzRerankRequestToken ||
                     !shouldApplyCandidateResult(insertString, candidateToken)
@@ -9759,74 +9592,15 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
                 }
             }
             val outcome = try {
-                runZenzaiStep(insertString, sumireTop, context, sumireGap, baseCandidates, ::show)
-            } catch (e: kotlinx.coroutines.TimeoutCancellationException) {
-                // withTimeout's exception is a CancellationException; it must not be swallowed silently.
-                Timber.e(e, "zenzai (list) timed out")
-                ZenzDiagnosticsStore.recordSkip(applicationContext, ZenzSkipReason.TIMEOUT)
-                null
+                runSumireLmStep(insertString, sumireTop, context, sumireGap, baseCandidates, ::show)
             } catch (e: CancellationException) {
-                ZenzDiagnosticsStore.recordSkip(applicationContext, ZenzSkipReason.CANCELLED)
                 throw e
             } catch (e: Exception) {
-                Timber.e(e, "zenzai (list) failed")
-                ZenzDiagnosticsStore.recordFailure(applicationContext)
-                if (
-                    e is android.os.RemoteException
-                ) {
-                    ZenzDiagnosticsStore.recordSkip(applicationContext, ZenzSkipReason.BINDER_ERROR)
-                }
+                Timber.e(e, "sumire-lm rerank (list) failed")
                 null
             } ?: return@launch
-            recordZenzaiDiagnostics(outcome)
             show(outcome.top)
-            // 手が止まった後なので、FIX で直した結果を zenz が満足する（PASS など）まで続けて判定する。打鍵で即キャンセル。
-            var last = outcome
-            var rounds = 0
-            // 同じドラフトに戻ったら（振動）止める。
-            val seenDrafts = hashSetOf(outcome.top.string)
-            while (last.unverifiedFix && rounds < ZENZAI_PAUSE_RECHECK_MAX) {
-                if (requestToken != zenzRerankRequestToken) return@launch
-                rounds++
-                val next = try {
-                    runZenzaiStep(insertString, sumireTop, context, sumireGap, onProvisional = ::show)
-                } catch (e: CancellationException) {
-                    throw e
-                } catch (e: Exception) {
-                    Timber.w(e, "zenzai (list) recheck failed")
-                    null
-                } ?: return@launch
-                recordZenzaiDiagnostics(next)
-                if (!(next.top.zenzAdjusted || next.top.zenzChecked || !last.top.zenzAdjusted)) return@launch
-                show(next.top)
-                last = next
-                if (!seenDrafts.add(next.top.string)) return@launch
-            }
         }
-    }
-
-    private fun commonPrefixLength(a: String, b: String): Int {
-        val n = minOf(a.length, b.length)
-        var i = 0
-        while (i < n && a[i] == b[i]) i++
-        return i
-    }
-
-    private fun String.duplicateCharCount(): Int {
-        val counts = this.groupingBy { it }.eachCount()
-        return counts.values.sumOf { (it - 1).coerceAtLeast(0) } // 2回目以降の総数
-    }
-
-    private fun ZenzCandidate.rank(prefix: String): Int {
-        val prefixScore = commonPrefixLength(this.string, prefix) * 10
-        val kanjiScore = this.string.kanjiCount() * 3
-
-        // ★ここを強めに：重複が多い候補は大きく減点
-        val duplicatePenalty = this.string.duplicateCharCount() * 50
-
-        val typeBonus = if (this.type == (40).toByte()) 2 else 0
-
-        return prefixScore + kanjiScore + typeBonus - duplicatePenalty
     }
 
     private fun getKeyboardSizePreferences(): KeyboardSizePreferences {
@@ -13886,10 +13660,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
             learnFirstCandidate = learnFirstCandidateDictionaryPreference == true,
         )
         val committedText = fragments.joinToString(separator = "") { it.output }
-        recordZenzaiConfidenceOutcome(
-            reading = fragments.joinToString(separator = "") { it.reading },
-            committed = committedText,
-        )
         val revert = if (committedText.isNotEmpty() && isLearningWriteEnabled()) {
             LearningRevert(committedText, lastLearnedBunsetsuOutput)
         } else {
@@ -14755,7 +14525,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         val cached = cacheKey?.let { key ->
             synchronized(necookeyZenzOverrideCache) { necookeyZenzOverrideCache[key] }
         }
-        cached?.let { (_, carry) -> zenzaiCarry = carry }
         val cachedOverride = cached?.first
 
         if (!shouldApplyCandidateResult(insertString, token)) return
@@ -14771,23 +14540,10 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         )
         publishNecookeyTwoRowBar(insertString, bar, token, applyLiveConversion = true)
 
-        zenzaiScheduler.onInput(insertString, SystemClock.uptimeMillis())
-        // Keep a running inference for exactly this context/reading/draft; anything else is superseded.
+        // Keep a running rerank for exactly this context/reading/draft; anything else is superseded.
         val keepRunning = cacheKey != null && necookeyZenzJobKey == cacheKey && necookeyZenzJob?.isActive == true
-        // 待たずに始めた推論は、読みが伸びただけなら最後まで走らせる（その直しを次の推論が引き継ぐ）。
-        val forcedJob = necookeyZenzForcedJob?.takeIf { it.isActive }
-        val forcedInput = necookeyZenzForcedInput
-        val forcedContinues = forcedJob != null && forcedInput != null &&
-            context != null && insertString.startsWith(forcedInput)
-        if (forcedJob != null && !forcedContinues) {
-            forcedJob.cancel()
-        }
-        if (!forcedContinues) {
-            necookeyZenzForcedJob = null
-            necookeyZenzForcedInput = null
-        }
         if (!keepRunning) {
-            if (!(forcedContinues && necookeyZenzJob === forcedJob)) necookeyZenzJob?.cancel()
+            necookeyZenzJob?.cancel()
             necookeyZenzJob = null
             necookeyZenzJobKey = null
         }
@@ -14804,7 +14560,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
                 conversion = conversion,
                 predictions = barPredictions,
                 token = token,
-                awaitBefore = if (forcedContinues) forcedJob else null,
             )
         }
     }
@@ -14818,31 +14573,13 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         conversion: List<Candidate>,
         predictions: List<Candidate>,
         token: CandidateRequestToken,
-        awaitBefore: Job? = null,
     ) {
         val sumireGap = sumireCostGap(insertString, conversion, sumireTop)
-        val jinen = isJinenEngine()
         necookeyZenzJob = scope.launch {
             var shown: Candidate? = null
             fun stillCurrent(): Boolean =
                 necookeyZenzJobKey == cacheKey && shouldApplyCandidateResult(insertString)
-            // 待たずに始める。短い読みは次の打鍵でキャンセル（推論が軽い）。
-            // 長い読みは裏の推論が終わり次第、最新の読みで始める（途中経過は出さず、打鍵で中断しない）。
-            awaitBefore?.join()
-            // jinen は打鍵中の裏推論をしない。入力が止まってから文全体を生成する（次の打鍵でキャンセル）。
-            // TODO(jinen): 打鍵中の投機的デコード（読み ~7 文字から）。
-            val background = !jinen && zenzaiScheduler.runsInBackground(insertString)
-            if (jinen) {
-                if (!stillCurrent()) return@launch
-                delay(zenzaiScheduler.startDelayMs())
-            }
             if (!stillCurrent()) return@launch
-            zenzaiScheduler.onInferenceStarted()
-            val self = coroutineContext[Job]
-            if (background) {
-                necookeyZenzForcedJob = self
-                necookeyZenzForcedInput = insertString
-            }
             suspend fun show(top: Candidate) {
                 if (!stillCurrent()) return
                 if (!shouldUseNecookeyTwoRowBar()) return
@@ -14872,74 +14609,23 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
                 }
             }
             val outcome = try {
-                if (background) {
-                    runZenzaiStep(insertString, sumireTop, context, sumireGap, conversion, onProvisional = { })
-                } else {
-                    runZenzaiStep(insertString, sumireTop, context, sumireGap, conversion, ::show)
-                }
-            } catch (e: kotlinx.coroutines.TimeoutCancellationException) {
-                // withTimeout's exception is a CancellationException; it must not be swallowed silently.
-                Timber.e(e, "zenzai (two-row) timed out")
-                ZenzDiagnosticsStore.recordSkip(applicationContext, ZenzSkipReason.TIMEOUT)
-                null
+                runSumireLmStep(insertString, sumireTop, context, sumireGap, conversion, ::show)
             } catch (e: CancellationException) {
-                ZenzDiagnosticsStore.recordSkip(applicationContext, ZenzSkipReason.CANCELLED)
                 throw e
             } catch (e: Exception) {
-                Timber.e(e, "zenzai (two-row) failed")
-                ZenzDiagnosticsStore.recordFailure(applicationContext)
-                if (
-                    e is android.os.RemoteException
-                ) {
-                    ZenzDiagnosticsStore.recordSkip(applicationContext, ZenzSkipReason.BINDER_ERROR)
-                }
+                Timber.e(e, "sumire-lm rerank (two-row) failed")
                 null
             } ?: return@launch
-            recordZenzaiDiagnostics(outcome)
             if (!stillCurrent()) return@launch
-            if (background) {
-                // 裏の推論の間に打鍵がなかった（＝手が止まっている）。待たずにすぐ表示して仕上げる。
-                // 仕上げ中の打鍵ではキャンセルされるよう、中断しない推論の印を外す。
-                if (necookeyZenzForcedJob === self) {
-                    necookeyZenzForcedJob = null
-                    necookeyZenzForcedInput = null
-                }
-            }
             shown = null // a same-reading refresh may have repainted the bar since the provisional
             fun remember(result: ZenzaiOutcome) {
                 synchronized(necookeyZenzOverrideCache) {
                     necookeyZenzOverrideCache[cacheKey] =
-                        (result.top.takeIf { result.changed || it.zenzChecked || it.zenzAdjusted }) to zenzaiCarry
+                        (result.top.takeIf { result.changed || it.zenzChecked || it.zenzAdjusted }) to null
                 }
             }
             remember(outcome)
             show(outcome.top)
-            // 手が止まった後なので、直した結果を同じ読みで zenz が満足するまで続けて判定する。打鍵で即キャンセル。
-            var last: ZenzaiOutcome = outcome
-            var rounds = 0
-            // 同じドラフトに戻ったら（振動）止める。
-            val seenDrafts = hashSetOf(outcome.top.string)
-            while (last.unverifiedFix && rounds < ZENZAI_PAUSE_RECHECK_MAX) {
-                if (!stillCurrent()) return@launch
-                rounds++
-                val next = try {
-                    runZenzaiStep(insertString, sumireTop, context, sumireGap, onProvisional = ::show)
-                } catch (e: CancellationException) {
-                    throw e
-                } catch (e: Exception) {
-                    Timber.w(e, "zenzai idle recheck failed")
-                    null
-                } ?: return@launch
-                recordZenzaiDiagnostics(next)
-                if (!stillCurrent()) return@launch
-                // 追加判定で読みが同じまま候補が戻る（制約が捨てられた）ときは直前の結果を残す。
-                val result = if (next.top.zenzAdjusted || next.top.zenzChecked || !last.top.zenzAdjusted) next else last.copy(unverifiedFix = false)
-                remember(result)
-                shown = null
-                show(result.top)
-                last = result
-                if (!seenDrafts.add(result.top.string)) return@launch
-            }
         }
     }
 
@@ -17313,72 +16999,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         finishComposingText()
         setComposingText("", 0)
         _inputString.update { "" }
-    }
-
-    private fun resolveZenzModelPath(customUri: String): String? {
-        // 内蔵モデルは jinen-v2-small（zenz/build.gradle の zenzModelAssetName と一致させる）。
-        val defaultAssetFileName = DEFAULT_MODEL_ASSET_NAME
-        val defaultDestFile = File(filesDir, defaultAssetFileName)
-        // 以前の内蔵 zenz モデルのコピーは使わないので消す（容量）。
-        File(filesDir, LEGACY_ZENZ_MODEL_ASSET_NAME).takeIf { it.exists() }?.delete()
-
-        fun ensureDefaultModelCopied(): File {
-            if (!defaultDestFile.exists()) {
-                // Copy to a temp file and rename, so an interrupted copy never leaves a truncated model.
-                val temporary = File(filesDir, "$defaultAssetFileName.tmp")
-                assets.open(defaultAssetFileName).use { input ->
-                    FileOutputStream(temporary).use { output ->
-                        input.copyTo(output)
-                    }
-                }
-                if (!temporary.renameTo(defaultDestFile)) {
-                    temporary.delete()
-                    error("Could not install the default Zenz model.")
-                }
-            }
-            return defaultDestFile
-        }
-
-        fun copyUriToInternalFile(uriString: String): File {
-            val uri = uriString.toUri()
-            val dest = File(filesDir, "zenz_custom_model.gguf")
-            val temporary = File(filesDir, "zenz_custom_model.gguf.tmp")
-
-            contentResolver.openInputStream(uri).use { input ->
-                requireNotNull(input) { "openInputStream returned null for uri=$uri" }
-                FileOutputStream(temporary).use { output ->
-                    input.copyTo(output)
-                }
-            }
-            if (dest.exists() && !dest.delete()) {
-                temporary.delete()
-                error("Could not replace the existing custom Zenz model.")
-            }
-            if (!temporary.renameTo(dest)) {
-                temporary.delete()
-                error("Could not install the custom Zenz model.")
-            }
-            return dest
-        }
-
-        if (customUri.isNotBlank()) {
-            try {
-                val customFile = copyUriToInternalFile(customUri)
-                Timber.d("Zenz custom model prepared: %s", customFile.absolutePath)
-                return customFile.absolutePath
-            } catch (e: Exception) {
-                Timber.e(e, "Failed to prepare custom Zenz model. Falling back to default.")
-            }
-        }
-
-        return try {
-            val defaultFile = ensureDefaultModelCopied()
-            Timber.d("Zenz default model prepared: %s", defaultFile.absolutePath)
-            defaultFile.absolutePath
-        } catch (e: Exception) {
-            Timber.e(e, "Failed to prepare the default Zenz model.")
-            null
-        }
     }
 
     override val lifecycle: Lifecycle

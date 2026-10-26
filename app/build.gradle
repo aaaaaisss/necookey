@@ -139,7 +139,7 @@ android {
         jvmTarget = '17'
     }
     buildFeatures {
-        aidl true
+        aidl false
         buildConfig true
         viewBinding true
     }
