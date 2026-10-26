@@ -11,8 +11,6 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
-    env:
-      ZENZ_MODEL_CACHE_DIR: ${{ github.workspace }}/.zenz-model-cache
 
     steps:
       - name: Checkout code
@@ -42,11 +40,6 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-gradle-
 
-      - name: Cache Zenz model
-        uses: actions/cache@v4
-        with:
-          path: .zenz-model-cache
-          key: ${{ runner.os }}-zenz-model-v3-jinen-3461d0573ab447985badde3174165b967d06076c-Q5_K_M-jinen-v2-small-Q5_K_M.gguf
 
       - name: Decode JKS from Base64
         run: |

@@ -36,9 +36,6 @@ jobs:
     name: Pixel 6 Pro API 35
     runs-on: ubuntu-latest
     timeout-minutes: 120
-    env:
-      ZENZ_MODEL_CACHE_DIR: ${{ github.workspace }}/.zenz-model-cache
-      ZENZ_DEBUG_NATIVE_ABIS: x86_64
 
     steps:
       - name: Checkout code
@@ -69,11 +66,6 @@ jobs:
             ${{ runner.os }}-fast-input-gradle-
             ${{ runner.os }}-gradle-
 
-      - name: Cache Zenz model
-        uses: actions/cache@v5
-        with:
-          path: .zenz-model-cache
-          key: ${{ runner.os }}-zenz-model-v3-jinen-3461d0573ab447985badde3174165b967d06076c-Q5_K_M-jinen-v2-small-Q5_K_M.gguf
 
       - name: Enable KVM
         run: |
