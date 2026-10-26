@@ -1,0 +1,8 @@
+# necookey project history (moved out of project skill 2026-10-24)
+
+- 2026-10-12: collaborator made JINEN default (c4fdf75); ZENZ-GATE margin>=1448 (0873646). Zenzai loop work 51dc931..2830bcc only with engine=zenz; progress doc entries owed.
+- SUMIRE-LM (branch sumire-lm; handoff tools/sumire_lm/HANDOFF.md; data /workspace/work/sumire_lm): discriminative rerank of Sumire top-50, non-lexical linear. Full ~.511 held JWTD / .760 AJIMEE. Count-cut pruning: 20MB .41, 10MB .39, 5MB .36. 4bit values+12bit fp+char5gram free. ~0.7ms median. Bunsetsu diag: boundary errors need candidate generation; split-fixed reconversion no gain (flag off).
+- 2026-10-13: lattice bigram LM (LatticeLmCost, tables on orphan branch lm-data, sha256-pinned) default on; merged dbec2cd/66c912f. boundary-colloq 48640e9 (ColloquialKanaNodes). homophone-ctx 46be869: co-occurrence +4pt over Sumire, +1 over reranker -> dropped. rerank-v2 37ee707 +0.7pt only -> not adopted. Daily held lenient: Sumire+lattice .880, full reranker .936. Leader task-adapted pruning failed (30MB .385 vs count-cut 20MB .410). inline-ui prototype branch 063c0a6 on hold.
+- 2026-10-14: 3-layer plan; kana-dialect step1 399f349 default on; KanaSpanNodes aa5610e and NK_KANJIRUN f0b6a9d worse -> off. Two tracks (stable / challenge). Leader challenge plan: N-best oracle -> auto-labeled data -> lattice discriminative retrain / tiny scorer / Mozc compare -> transducer only if oracle low. Ideas A (low margin -> kana + chip), C left context, F instability signal, G patchwork guard. Paused until Nov.
+- 2026-10-23: direction change to no-AI; ideas in IDEAS_challenge.md.
+- abea5a6 (homophone-ui/main): engine default "Sumire (no AI)" = Sumire+lattice+reranker; chips use SumireLmMarginSource.
