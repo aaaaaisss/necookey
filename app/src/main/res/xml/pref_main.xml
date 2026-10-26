@@ -90,12 +90,6 @@
                     android:summaryOn="@string/henkan_delete_key_action_summary_on"
                     android:title="@string/henkan_delete_key_action_title"
                     app:iconSpaceReserved="false" />
-                <SwitchPreferenceCompat
-                    android:defaultValue="true"
-                    android:key="custom_direct_mode_space_hankaku_preference"
-                    android:summary="@string/custom_direct_mode_space_hankaku_summary"
-                    android:title="@string/custom_direct_mode_space_hankaku_title"
-                    app:iconSpaceReserved="false" />
                 <Preference
                     android:key="cursor_move_after_commit_target_pairs_preference"
                     android:summary="@string/cursor_move_target_pairs_summary"

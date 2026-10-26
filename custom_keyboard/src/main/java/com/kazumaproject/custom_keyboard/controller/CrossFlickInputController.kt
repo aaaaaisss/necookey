@@ -114,7 +114,6 @@ class CrossFlickInputController(
 
     private var flickActionMap: Map<FlickDirection, FlickAction> = emptyMap()
     private var textMap: Map<FlickDirection, String> = emptyMap()
-    private var longPressTextMap: Map<FlickDirection, String> = emptyMap()
 
     private val actionPopupViews = mutableMapOf<FlickDirection, CrossFlickPopupView>()
 
@@ -203,22 +202,18 @@ class CrossFlickInputController(
         inputMode = InputMode.ACTION
         flickActionMap = map.mapValues { (_, action) -> action.withDisplayMetadata() }
         textMap = emptyMap()
-        longPressTextMap = emptyMap()
         invalidateDirectionalPopupCache()
         view.setOnTouchListener { v, event -> handleTouchEvent(v, event) }
     }
 
     // TEXT モードでビューにアタッチする。PETAL_FLICK キー（文字入力キー）向け。
-    // longPressMap を省略するとグリッドポップアップには通常 map の文字がそのまま表示される
     @SuppressLint("ClickableViewAccessibility")
     fun attachText(
         view: View,
-        map: Map<FlickDirection, String>,
-        longPressMap: Map<FlickDirection, String> = emptyMap()
+        map: Map<FlickDirection, String>
     ) {
         inputMode = InputMode.TEXT
         textMap = map
-        longPressTextMap = longPressMap
         flickActionMap = emptyMap()
         invalidateDirectionalPopupCache()
         view.setOnTouchListener { v, event -> handleTouchEvent(v, event) }
@@ -290,7 +285,7 @@ class CrossFlickInputController(
                     }
                     if (inputMode == InputMode.TEXT) {
                         listener?.onTextSelectionChanged(
-                            resolveText(currentDirection, preferLongPress = isLongPressMode),
+                            resolveText(currentDirection),
                             currentDirection != FlickDirection.TAP
                         )
                     }
@@ -337,7 +332,7 @@ class CrossFlickInputController(
                     highlightGrid(currentDirection)
                 }
                 listener?.onTextSelectionChanged(
-                    resolveText(currentDirection, preferLongPress = true),
+                    resolveText(currentDirection),
                     currentDirection != FlickDirection.TAP
                 )
             }
@@ -354,7 +349,7 @@ class CrossFlickInputController(
             }
 
             InputMode.TEXT -> {
-                val text = resolveText(FlickDirection.TAP, preferLongPress = false)
+                val text = resolveText(FlickDirection.TAP)
                 if (!text.isNullOrEmpty()) {
                     listener?.onPress(KeyAction.Text(text), FlickDirection.TAP)
                 }
@@ -376,7 +371,7 @@ class CrossFlickInputController(
 
             InputMode.TEXT -> {
                 val isFlick = currentDirection != FlickDirection.TAP
-                val output = resolveText(currentDirection, preferLongPress = isLongPressMode)
+                val output = resolveText(currentDirection)
                 if (!output.isNullOrEmpty()) {
                     listener?.onFlick(
                         KeyAction.Text(output),
@@ -478,19 +473,9 @@ class CrossFlickInputController(
         return null
     }
 
-    // FlickDirection に対応する出力テキストを解決する。preferLongPress=true のとき longPressTextMap を優先する。
-    private fun resolveText(
-        direction: FlickDirection,
-        preferLongPress: Boolean
-    ): String? {
-        if (preferLongPress) {
-            val longPress = resolveTextFromMap(direction, longPressTextMap)
-            if (!longPress.isNullOrEmpty()) {
-                return longPress
-            }
-        }
-        return resolveTextFromMap(direction, textMap)
-    }
+    // FlickDirection に対応する出力テキストを解決する。
+    private fun resolveText(direction: FlickDirection): String? =
+        resolveTextFromMap(direction, textMap)
 
     // 指定した Map から FlickDirection に対応する文字列を候補順に検索して返す。
     private fun resolveTextFromMap(
@@ -630,7 +615,7 @@ class CrossFlickInputController(
         )
 
         directions.forEach { direction ->
-            val text = resolveText(direction, preferLongPress = false)
+            val text = resolveText(direction)
             if (text.isNullOrEmpty()) return@forEach
 
             val popupView = DirectionalKeyPopupView(context).apply {
@@ -744,7 +729,7 @@ class CrossFlickInputController(
         gridPopupView.highlightDirection(direction)
     }
 
-    // グリッドポップアップに渡す表示文字マップを生成する。各方向で longPressTextMap を優先し、なければ textMap を使う。
+    // グリッドポップアップに渡す表示文字マップを生成する。
     private fun getLongPressDisplayMap(): Map<FlickDirection, String> {
         val directions = listOf(
             FlickDirection.TAP,
@@ -754,7 +739,7 @@ class CrossFlickInputController(
             FlickDirection.UP_RIGHT_FAR
         )
         return directions.mapNotNull { dir ->
-            val text = resolveText(dir, preferLongPress = true)
+            val text = resolveText(dir)
             if (!text.isNullOrEmpty()) dir to text else null
         }.toMap()
     }

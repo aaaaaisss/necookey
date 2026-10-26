@@ -3,22 +3,13 @@ package com.kazumaproject.markdownhelperkeyboard.ime_service
 import com.kazumaproject.custom_keyboard.data.KeyAction
 import com.kazumaproject.custom_keyboard.view.FlickKeyboardView
 
-/** Updates the custom keyboard's shift / direct-input / romaji toggle key icons. */
+/** Updates the custom keyboard's shift / romaji toggle key icons. */
 internal fun renderCustomKeyboardToggles(
     flickView: FlickKeyboardView,
     shift: CustomKeyboardShiftState,
-    direct: Boolean,
     romaji: Boolean,
 ) {
     flickView.setKeyCharacterCase(shift.keyCharacterCase)
-    flickView.updateKeyIconByAction(
-        KeyAction.SwitchDirectMode,
-        if (direct) {
-            com.kazumaproject.core.R.drawable.language_japanese_kana_right_24px
-        } else {
-            com.kazumaproject.core.R.drawable.language_japanese_kana_left_24px
-        }
-    )
     flickView.updateKeyIconByAction(
         KeyAction.SwitchRomajiEnglish,
         if (romaji) {

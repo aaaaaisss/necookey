@@ -130,11 +130,6 @@ class KeyboardEditorFragment : Fragment(R.layout.fragment_keyboard_editor),
                 viewModel.updateIsRomaji(isChecked)
             }
         }
-        binding.switchDirectMode.setOnCheckedChangeListener { _, isChecked ->
-            if (isChecked != viewModel.uiState.value.isDirectMode) {
-                viewModel.updateIsDirectMode(isChecked)
-            }
-        }
         binding.switchUsageModeNumber.setOnCheckedChangeListener { _, isChecked ->
             val usageMode = if (isChecked) {
                 KeyboardLayoutUsageMode.Number
@@ -319,9 +314,6 @@ class KeyboardEditorFragment : Fragment(R.layout.fragment_keyboard_editor),
         }
         if (binding.switchRomaji.isChecked != state.isRomaji) {
             binding.switchRomaji.isChecked = state.isRomaji
-        }
-        if (binding.switchDirectMode.isChecked != state.isDirectMode) {
-            binding.switchDirectMode.isChecked = state.isDirectMode
         }
         val isNumberUsageMode = state.layout.usageMode == KeyboardLayoutUsageMode.Number
         if (binding.switchUsageModeNumber.isChecked != isNumberUsageMode) {

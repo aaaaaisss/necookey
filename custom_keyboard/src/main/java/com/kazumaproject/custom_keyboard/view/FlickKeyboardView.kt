@@ -71,11 +71,9 @@ import com.kazumaproject.custom_keyboard.layout.SegmentedBackgroundDrawable
 import com.kazumaproject.custom_keyboard.data.toSupportedKeyType
 import com.kazumaproject.custom_keyboard.data.KeyData
 import com.kazumaproject.custom_keyboard.data.KeyItem
-import com.kazumaproject.custom_keyboard.data.KeyTextInputBehavior
 import com.kazumaproject.custom_keyboard.data.KeyType
 import com.kazumaproject.custom_keyboard.data.KeyVisualStyleResolver
 import com.kazumaproject.custom_keyboard.data.KeyboardLayout
-import com.kazumaproject.custom_keyboard.data.PETAL_TOGGLE_DIRECTIONS
 import com.kazumaproject.custom_keyboard.data.SpacerItem
 import com.kazumaproject.custom_keyboard.data.effectiveDoubleTapBinding
 import com.kazumaproject.custom_keyboard.data.toCircularFlickKeyMaps
@@ -119,9 +117,6 @@ class FlickKeyboardView @JvmOverloads constructor(
         fun onFlickActionLongPress(action: KeyAction)
         fun onFlickActionUpAfterLongPress(action: KeyAction, isFlick: Boolean)
         fun onLongPressActionCanceled(action: KeyAction) {}
-        fun onToggleText(keyIdentity: String, values: List<String>) {
-            values.firstOrNull()?.let { onAction(KeyAction.Text(it), false) }
-        }
     }
 
     private companion object {
@@ -1660,15 +1655,12 @@ class FlickKeyboardView @JvmOverloads constructor(
                         }
 
                         val stringMap = extractInputMap(flickActionMap)
-                        val longPressStringMap = layout.longPressFlickKeyMaps[keyData.keyId]
-                            ?: layout.longPressFlickKeyMaps[keyData.label]
-                            ?: emptyMap()
 
                         if (keyView is AutoSizeButton) {
                             applyGuideLabels(keyView, keyData, stringMap)
                         }
 
-                        attachText(keyView, stringMap, longPressStringMap)
+                        attachText(keyView, stringMap)
                     }
 
                     crossFlickControllers.add(controller)
@@ -1859,29 +1851,6 @@ class FlickKeyboardView @JvmOverloads constructor(
         isLongPress: Boolean = false,
     ) {
         val dispatch = dispatch@{
-            val toggleValues = if (
-                !isFlick &&
-                !isLongPress &&
-                keyData.keyType == KeyType.PETAL_FLICK &&
-                keyData.textInputBehavior == KeyTextInputBehavior.TOGGLE
-            ) {
-                val actionMap = currentLayout?.let { layout ->
-                    keyData.keyId?.let { layout.flickKeyMaps[it] }?.firstOrNull()
-                        ?: layout.flickKeyMaps[keyData.label]?.firstOrNull()
-                }.orEmpty()
-                PETAL_TOGGLE_DIRECTIONS.mapNotNull { direction ->
-                    (actionMap[direction] as? FlickAction.Input)?.char?.takeIf(String::isNotEmpty)
-                }
-            } else {
-                emptyList()
-            }
-            if (toggleValues.isNotEmpty()) {
-                listener?.onToggleText(
-                    keyData.keyId ?: "legacy:${keyData.row}:${keyData.column}",
-                    toggleValues
-                )
-                return@dispatch
-            }
             if (isFlick) {
                 dispatchNonTapActionWithoutPreviewCancel(action, isFlick = true)
             } else {

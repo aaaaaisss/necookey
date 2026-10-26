@@ -64,8 +64,6 @@ object AppPreference {
     const val TENKEY_USE_THREE_STATE_KEY = "tenkey_use_three_state_keyboard_preference"
     const val TENKEY_NUMBER_SYMBOL_KEY_GAP_KEY = "tenkey_number_symbol_key_gap_preference"
     const val STABILIZE_CANDIDATE_STRIP_HEIGHT_KEY = "stabilize_candidate_strip_height_preference"
-    const val CUSTOM_DIRECT_INPUT_REPLACE_COMPOSING_KEY =
-        "custom_direct_input_replace_composing_preference"
     const val CUSTOM_KEYMAP_GUIDE_KEY = "flick_keymap_guide"
     const val CUSTOM_KEYBOARD_INPUT_IN_EMPTY_AREAS_KEY =
         "custom_keyboard_input_in_empty_areas_preference"
@@ -232,8 +230,6 @@ object AppPreference {
     private val OMISSION_SEARCH = Pair("omission_search_preference", false)
     private val UNDO_ENABLE = Pair("undo_enable_preference", false)
     private val SPACE_HANKAKU_ENABLE = Pair("space_key_preference", false)
-    private val CUSTOM_DIRECT_MODE_SPACE_HANKAKU_ENABLE =
-        Pair("custom_direct_mode_space_hankaku_preference", true)
     const val CANDIDATE_YOMI_MODE_WHOLE = "whole"
     const val DEFAULT_LIVE_CONVERSION_CANDIDATE_YOMI_SIZE = 14
     const val PRESERVE_DICTIONARY_WORD_WHITESPACE_KEY =
@@ -255,8 +251,6 @@ object AppPreference {
         Pair("last_used_custom_keyboard_stable_id", "")
     private val REMEMBER_CUSTOM_KEYBOARD_INPUT_MODE_PREFERENCE =
         Pair("remember_custom_keyboard_input_mode_preference", false)
-    private const val CUSTOM_KEYBOARD_LAST_DIRECT_MODE_PREFIX =
-        "custom_keyboard_last_direct_mode_"
     private const val CUSTOM_KEYBOARD_LAST_ROMAJI_MODE_PREFIX =
         "custom_keyboard_last_romaji_mode_"
 
@@ -1424,18 +1418,6 @@ object AppPreference {
             it.putBoolean(SPACE_HANKAKU_ENABLE.first, value ?: false)
         }
 
-    var custom_direct_mode_space_hankaku_preference: Boolean?
-        get() = preferences.getBoolean(
-            CUSTOM_DIRECT_MODE_SPACE_HANKAKU_ENABLE.first,
-            CUSTOM_DIRECT_MODE_SPACE_HANKAKU_ENABLE.second
-        )
-        set(value) = preferences.edit {
-            it.putBoolean(
-                CUSTOM_DIRECT_MODE_SPACE_HANKAKU_ENABLE.first,
-                value ?: CUSTOM_DIRECT_MODE_SPACE_HANKAKU_ENABLE.second
-            )
-        }
-
     val live_conversion_preference: Boolean? get() = false // S3: hardcoded, setting removed
 
     val live_conversion_start_length_preference: Int? get() = 1 // S3: hardcoded, setting removed
@@ -1453,12 +1435,6 @@ object AppPreference {
         }
 
     val custom_keyboard_suggestion_preference: Boolean? get() = false // 候補欄のキーボード一覧表示は廃止
-
-    var custom_direct_input_replace_composing_preference: Boolean
-        get() = preferences.getBoolean(CUSTOM_DIRECT_INPUT_REPLACE_COMPOSING_KEY, false)
-        set(value) = preferences.edit {
-            it.putBoolean(CUSTOM_DIRECT_INPUT_REPLACE_COMPOSING_KEY, value)
-        }
 
     var custom_keyboard_input_in_empty_areas_preference: Boolean
         get() = preferences.getBoolean(
@@ -1488,19 +1464,6 @@ object AppPreference {
         set(value) = preferences.edit {
             it.putString(LAST_USED_CUSTOM_KEYBOARD_STABLE_ID.first, value.orEmpty())
         }
-
-    fun saveCustomKeyboardLastDirectMode(key: String, value: Boolean) = preferences.edit {
-        it.putBoolean("$CUSTOM_KEYBOARD_LAST_DIRECT_MODE_PREFIX$key", value)
-    }
-
-    fun getCustomKeyboardLastDirectMode(key: String): Boolean? {
-        val preferenceKey = "$CUSTOM_KEYBOARD_LAST_DIRECT_MODE_PREFIX$key"
-        return if (preferences.contains(preferenceKey)) {
-            preferences.getBoolean(preferenceKey, false)
-        } else {
-            null
-        }
-    }
 
     fun saveCustomKeyboardLastRomajiMode(key: String, value: Boolean) = preferences.edit {
         it.putBoolean("$CUSTOM_KEYBOARD_LAST_ROMAJI_MODE_PREFIX$key", value)

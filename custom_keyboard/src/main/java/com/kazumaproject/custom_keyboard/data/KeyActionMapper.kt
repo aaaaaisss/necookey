@@ -133,11 +133,6 @@ object KeyActionMapper {
                 com.kazumaproject.core.R.drawable.caps_lock
             ),
             DisplayAction(
-                KeyAction.SwitchDirectMode,
-                context.getString(R.string.action_switch_direct_mode_key),
-                com.kazumaproject.core.R.drawable.language_japanese_kana_left_24px
-            ),
-            DisplayAction(
                 KeyAction.SwitchRomajiEnglish,
                 context.getString(R.string.action_switch_romaji_english),
                 com.kazumaproject.core.R.drawable.language_japanese_kana_24px

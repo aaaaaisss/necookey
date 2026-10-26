@@ -39,18 +39,6 @@ internal object RuntimeInputBehaviorPolicy {
         }
     }
 
-    fun resolveBaseline(
-        qwertyMode: TenKeyQWERTYMode,
-        isCustomLayoutDirectMode: Boolean,
-        resolvedInputBehavior: ResolvedInputBehavior,
-    ): ResolvedInputBehavior {
-        return if (qwertyMode == TenKeyQWERTYMode.Custom && isCustomLayoutDirectMode) {
-            ResolvedInputBehavior.DIRECT_COMMIT
-        } else {
-            resolvedInputBehavior
-        }
-    }
-
     fun effective(
         baseline: ResolvedInputBehavior,
         shortcutOverride: ResolvedInputBehavior?,

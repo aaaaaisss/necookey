@@ -61,7 +61,6 @@ data class ImePreferencesSnapshot(
     val showDictionaryCandidateLabels: Boolean,
     val suppressHentaiganaCandidates: Boolean,
     val hankakuPreference: Boolean,
-    val customDirectModeSpaceHankakuPreference: Boolean,
     val isLiveConversionEnable: Boolean,
     val liveConversionStartLength: Int,
     val showLiveConversionCandidateYomi: Boolean,
@@ -84,7 +83,6 @@ data class ImePreferencesSnapshot(
     val isNgWordEnable: Boolean,
     val deleteKeyHighLight: Boolean,
     val customKeyboardSuggestionPreference: Boolean,
-    val customDirectInputReplaceComposingPreference: Boolean,
     val userDictionaryPrefixMatchNumber: Int,
     val candidateColumns: String,
     val candidateColumnsLandscape: String,
@@ -257,8 +255,6 @@ data class ImePreferencesSnapshot(
                 suppressHentaiganaCandidates =
                     appPreference.suppress_hentaigana_candidates_preference,
                 hankakuPreference = appPreference.space_hankaku_preference ?: false,
-                customDirectModeSpaceHankakuPreference =
-                    appPreference.custom_direct_mode_space_hankaku_preference ?: true,
                 isLiveConversionEnable = appPreference.live_conversion_preference ?: false,
                 liveConversionStartLength =
                     appPreference.live_conversion_start_length_preference ?: 1,
@@ -326,8 +322,6 @@ data class ImePreferencesSnapshot(
                 showCandidateInPasswordPreference = appPreference.show_candidates_password ?: true,
                 isNgWordEnable = appPreference.ng_word_preference ?: true,
                 deleteKeyHighLight = appPreference.delete_key_high_light_preference ?: true,
-                customDirectInputReplaceComposingPreference =
-                    appPreference.custom_direct_input_replace_composing_preference,
                 customKeyboardSuggestionPreference =
                     appPreference.custom_keyboard_suggestion_preference ?: true,
                 userDictionaryPrefixMatchNumber =

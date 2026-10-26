@@ -10,7 +10,6 @@ import com.kazumaproject.custom_keyboard.data.FlickDirection
 import com.kazumaproject.custom_keyboard.data.KeyActionMapper
 import com.kazumaproject.custom_keyboard.data.KeyType
 import com.kazumaproject.custom_keyboard.data.toSupportedKeyType
-import com.kazumaproject.custom_keyboard.data.KeyTextInputBehavior
 import com.kazumaproject.custom_keyboard.data.KeyIconBuiltInDrawable
 import com.kazumaproject.custom_keyboard.data.KeyIconType
 import com.kazumaproject.custom_keyboard.data.KeyboardLayoutUsageMode
@@ -373,9 +372,8 @@ object KeyboardBackupNormalizer {
                     .dbValue,
                 doubleTapAction = normalizedDoubleTapAction,
                 doubleTapPolicy = normalizedDoubleTapPolicy,
-                textInputBehavior = KeyTextInputBehavior
-                    .fromDbValue(keyDto.textInputBehavior)
-                    .dbValue
+                // トグル入力は廃止。古いバックアップの TOGGLE も通常入力として取り込む。
+                textInputBehavior = "NORMAL"
             )
 
             ImportableKeyWithFlicks(

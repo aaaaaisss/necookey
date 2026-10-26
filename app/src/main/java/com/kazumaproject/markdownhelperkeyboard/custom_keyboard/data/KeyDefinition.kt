@@ -5,7 +5,6 @@ import androidx.room.ForeignKey
 import androidx.room.Index
 import androidx.room.PrimaryKey
 import com.kazumaproject.custom_keyboard.data.KeyType
-import com.kazumaproject.custom_keyboard.data.KeyTextInputBehavior
 import com.kazumaproject.custom_keyboard.data.SpecialKeyColorStyle
 
 /**
@@ -45,5 +44,5 @@ data class KeyDefinition(
     val specialKeyColorStyle: String = SpecialKeyColorStyle.SPECIAL.dbValue,
     val doubleTapAction: String? = null,
     val doubleTapPolicy: String? = null,
-    val textInputBehavior: String = KeyTextInputBehavior.NORMAL.dbValue
+    val textInputBehavior: String = "NORMAL"
 )

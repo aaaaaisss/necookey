@@ -13,7 +13,6 @@ import com.kazumaproject.custom_keyboard.data.KeyIconRef
 import com.kazumaproject.custom_keyboard.data.KeyIconResolver
 import com.kazumaproject.custom_keyboard.data.KeyIconType
 import com.kazumaproject.custom_keyboard.data.KeyItem
-import com.kazumaproject.custom_keyboard.data.KeyTextInputBehavior
 import com.kazumaproject.custom_keyboard.data.KeyType
 import com.kazumaproject.custom_keyboard.data.toSupportedKeyType
 import com.kazumaproject.custom_keyboard.data.KeyboardLayout
@@ -949,8 +948,7 @@ class KeyboardRepository @Inject constructor(
                     keyId = dbKey.keyIdentifier,
                     action = null,
                     specialKeyColorStyle = specialKeyColorStyle,
-                    doubleTapBinding = doubleTapBinding,
-                    textInputBehavior = KeyTextInputBehavior.fromDbValue(dbKey.textInputBehavior)
+                    doubleTapBinding = doubleTapBinding
                 )
             } else {
                 KeyData(
@@ -967,8 +965,7 @@ class KeyboardRepository @Inject constructor(
                     keyId = dbKey.keyIdentifier,
                     action = restoredAction,
                     specialKeyColorStyle = specialKeyColorStyle,
-                    doubleTapBinding = doubleTapBinding,
-                    textInputBehavior = KeyTextInputBehavior.fromDbValue(dbKey.textInputBehavior)
+                    doubleTapBinding = doubleTapBinding
                 )
             }
             val placement = GridPlacement(
@@ -1242,8 +1239,7 @@ class KeyboardRepository @Inject constructor(
                     doubleTapAction = KeyActionMapper.fromKeyAction(
                         doubleTapBinding?.action
                     ),
-                    doubleTapPolicy = doubleTapBinding?.policy?.serializedName,
-                    textInputBehavior = keyData.textInputBehavior.dbValue
+                    doubleTapPolicy = doubleTapBinding?.policy?.serializedName
                 )
             )
 

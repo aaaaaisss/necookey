@@ -979,7 +979,6 @@ class KeyboardEditorViewModel @Inject constructor(
         newKeyData: KeyData,
         flickMap: Map<FlickDirection, FlickAction>,
         twoStepMap: Map<TfbiFlickDirection, Map<TfbiFlickDirection, String>>,
-        longPressFlickMap: Map<FlickDirection, String>,
         twoStepLongPressMap: Map<TfbiFlickDirection, Map<TfbiFlickDirection, String>>,
         flexibleRowSpanUnits: Int? = null,
         flexibleColumnSpanUnits: Int? = null
@@ -1005,7 +1004,6 @@ class KeyboardEditorViewModel @Inject constructor(
                 newKeyData = newKeyData,
                 flickMap = flickMap,
                 twoStepMap = twoStepMap,
-                longPressFlickMap = longPressFlickMap,
                 twoStepLongPressMap = twoStepLongPressMap,
                 finalFlickMaps = finalFlickMaps,
                 finalCircularFlickMaps = finalCircularFlickMaps,
@@ -1149,7 +1147,6 @@ class KeyboardEditorViewModel @Inject constructor(
         newKeyData: KeyData,
         flickMap: Map<FlickDirection, FlickAction>,
         twoStepMap: Map<TfbiFlickDirection, Map<TfbiFlickDirection, String>>,
-        longPressFlickMap: Map<FlickDirection, String>,
         twoStepLongPressMap: Map<TfbiFlickDirection, Map<TfbiFlickDirection, String>>,
         finalFlickMaps: MutableMap<String, List<Map<FlickDirection, FlickAction>>>,
         finalCircularFlickMaps: MutableMap<String, List<Map<CircularFlickDirection, FlickAction>>>,
@@ -1175,11 +1172,8 @@ class KeyboardEditorViewModel @Inject constructor(
                 finalTwoStepLongPressMaps.remove(keyId)
                 finalCircularFlickMaps.remove(keyId)
                 finalFlickMaps[keyId] = listOf(flickMap)
-                if (longPressFlickMap.isNotEmpty()) {
-                    finalLongPressFlickMaps[keyId] = longPressFlickMap
-                } else {
-                    finalLongPressFlickMaps.remove(keyId)
-                }
+                // ペタルの長押し出力は廃止。保存時に古い長押しマップを掃除する。
+                finalLongPressFlickMaps.remove(keyId)
             }
         }
     }
@@ -1532,10 +1526,6 @@ class KeyboardEditorViewModel @Inject constructor(
 
     fun updateIsRomaji(isRomaji: Boolean) {
         _uiState.update { it.copy(isRomaji = isRomaji) }
-    }
-
-    fun updateIsDirectMode(isDirectMode: Boolean) {
-        _uiState.update { it.copy(isDirectMode = isDirectMode) }
     }
 
     fun setCurrentLayoutUsageMode(layoutId: Long?, usageMode: KeyboardLayoutUsageMode) {

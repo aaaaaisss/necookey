@@ -14,34 +14,8 @@ class SpaceKeyResolverTest {
 
 
     @Test
-    fun directModeUsesHalfWidthSpaceWhenPreferenceIsEnabled() {
-        val space = resolveEmptySpaceForCurrentMode(
-            isCustomLayoutDirectMode = true,
-            customDirectModeSpaceHankakuPreference = true,
-            isFlick = false,
-            currentInputMode = InputMode.ModeJapanese
-        )
-
-        assertEquals(" ", space)
-    }
-
-    @Test
-    fun directModeUsesFullWidthSpaceWhenPreferenceIsDisabled() {
-        val space = resolveEmptySpaceForCurrentMode(
-            isCustomLayoutDirectMode = true,
-            customDirectModeSpaceHankakuPreference = false,
-            isFlick = true,
-            currentInputMode = InputMode.ModeEnglish
-        )
-
-        assertEquals("　", space)
-    }
-
-    @Test
     fun nonDirectJapaneseFlickKeepsHalfWidthSpace() {
         val space = resolveEmptySpaceForCurrentMode(
-            isCustomLayoutDirectMode = false,
-            customDirectModeSpaceHankakuPreference = false,
             isFlick = true,
             currentInputMode = InputMode.ModeJapanese
         )
@@ -52,8 +26,6 @@ class SpaceKeyResolverTest {
     @Test
     fun nonDirectJapaneseTapKeepsFullWidthSpace() {
         val space = resolveEmptySpaceForCurrentMode(
-            isCustomLayoutDirectMode = false,
-            customDirectModeSpaceHankakuPreference = true,
             isFlick = false,
             currentInputMode = InputMode.ModeJapanese
         )
@@ -65,8 +37,6 @@ class SpaceKeyResolverTest {
     fun nonDirectEnglishAndNumberKeepHalfWidthSpace() {
         listOf(InputMode.ModeEnglish, InputMode.ModeNumber).forEach { inputMode ->
             val space = resolveEmptySpaceForCurrentMode(
-                isCustomLayoutDirectMode = false,
-                customDirectModeSpaceHankakuPreference = false,
                 isFlick = false,
                 currentInputMode = inputMode
             )

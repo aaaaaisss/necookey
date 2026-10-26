@@ -411,12 +411,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
     )
 
 
-    private data class CustomToggleEditorSelection(
-        val connection: InputConnection,
-        val selectionStart: Int,
-        val selectionEnd: Int,
-    )
-
     private data class ConversionContext(
         val leftContext: String,
     )
@@ -726,7 +720,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         AppPreference.TENKEY_NUMBER_SYMBOL_KEY_GAP_KEY,
         AppPreference.CUSTOM_KEYMAP_GUIDE_KEY,
         AppPreference.CUSTOM_KEYBOARD_INPUT_IN_EMPTY_AREAS_KEY,
-        AppPreference.CUSTOM_DIRECT_INPUT_REPLACE_COMPOSING_KEY,
         AppPreference.FLICK_TFBI_POPUP_PRESENTATION_KEY,
         AppPreference.FLICK_TFBI_FLICK_START_POSITION_KEY,
     )
@@ -1172,7 +1165,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
     private var isUserDictionaryEnable: Boolean? = false
     private var suppressHentaiganaCandidates: Boolean = false
     private var hankakuPreference: Boolean? = false
-    private var customDirectModeSpaceHankakuPreference: Boolean = true
     private var isLiveConversionEnable: Boolean? = false
     private var liveConversionStartLength: Int = 1
     private var showLiveConversionCandidateYomi: Boolean = false
@@ -1292,7 +1284,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
     private var isNgWordEnable: Boolean? = false
     private var deleteKeyHighLight: Boolean? = true
     private var customKeyboardSuggestionPreference: Boolean? = true
-    private var customDirectInputReplaceComposingPreference = false
 
     private var conversionCandidatesRomajiEnablePreference: Boolean? = false
 
@@ -1962,7 +1953,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         // next extracted-text read establish it instead of reusing a stale range.
         forwardDeleteCoordinator.reset(editor?.selectionStart ?: -1, editor?.selectionEnd ?: -1)
         resetEditorSelectionSnapshot()
-        resetCustomToggleState()
         currentInputType = getCurrentInputTypeForIME2(currentInputEditorInfo)
         suppressSuggestions = showCandidateInPasswordPreference == true && currentInputType.isPassword()
         if (targetChanged) {
@@ -2018,7 +2008,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
     override fun onStartInput(attribute: EditorInfo?, restarting: Boolean) {
         dismissKeyboardSelectionPopups()
         super.onStartInput(attribute, restarting)
-        resetCustomToggleState()
         forwardDeleteCoordinator.reset(attribute?.initialSelStart ?: -1, attribute?.initialSelEnd ?: -1)
         resetEditorSelectionSnapshot()
         flickPreviewEditorSessionId += 1L
@@ -2108,8 +2097,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
             mainLayoutBinding?.let { updateKeyboardLayout(it) }
         }
 
-        customDirectInputReplaceComposingPreference =
-            appPreference.custom_direct_input_replace_composing_preference
 
 
 
@@ -2218,8 +2205,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         }
         suppressHentaiganaCandidates = preferences.suppressHentaiganaCandidates
         hankakuPreference = preferences.hankakuPreference
-        customDirectModeSpaceHankakuPreference =
-            preferences.customDirectModeSpaceHankakuPreference
         isLiveConversionEnable = preferences.isLiveConversionEnable
         liveConversionStartLength = preferences.liveConversionStartLength.coerceIn(1, 10)
         showLiveConversionCandidateYomi = preferences.showLiveConversionCandidateYomi
@@ -2249,8 +2234,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         isNgWordEnable = preferences.isNgWordEnable
         deleteKeyHighLight = preferences.deleteKeyHighLight
         customKeyboardSuggestionPreference = preferences.customKeyboardSuggestionPreference
-        customDirectInputReplaceComposingPreference =
-            preferences.customDirectInputReplaceComposingPreference
         userDictionaryPrefixMatchNumber = preferences.userDictionaryPrefixMatchNumber
         candidateColumns = preferences.candidateColumns
         candidateColumnsLandscape = preferences.candidateColumnsLandscape
@@ -2762,7 +2745,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         modeSwitchAwaitingCursorPosition = false
         dismissJob?.cancel()
         forwardDeleteCoordinator.cancel()
-        resetCustomToggleState()
         super.onFinishInput()
     }
 
@@ -2772,7 +2754,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         dismissJob?.cancel()
         imeSwitchPopupWindow?.dismiss()
         forwardDeleteCoordinator.cancel()
-        resetCustomToggleState()
         flickInputPreviewCoordinator.cancel(restore = false)
         candidateRequestTracker.invalidate()
         candidateRefreshCoordinator.invalidate()
@@ -2868,7 +2849,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         isUserDictionaryEnable = null
         suppressHentaiganaCandidates = false
         hankakuPreference = null
-        customDirectModeSpaceHankakuPreference = true
         isLiveConversionEnable = null
         nBest = null
         conversionBeamWidth = 20
@@ -2947,7 +2927,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         isNgWordEnable = null
         deleteKeyHighLight = null
         customKeyboardSuggestionPreference = null
-        customDirectInputReplaceComposingPreference = false
         customKeymapGuidePreference = false
         flickGuideTextSizeSpPreference = null
         flickGuideMaxCharactersPreference = null
@@ -3674,7 +3653,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         }
         forwardDeleteCoordinator.onSelectionChanged(newSelStart, newSelEnd)
         observeSelectionForLearningRevert(newSelStart, newSelEnd)
-        invalidateCustomToggleStateForSelection(newSelStart, newSelEnd)
         // Skip if composing text is active
         if (candidatesStart != -1 || candidatesEnd != -1) {
             return
@@ -3977,10 +3955,9 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
     private fun syncCustomKeyboardTogglePresentation(
         flickView: FlickKeyboardView,
         shift: CustomKeyboardShiftState = customKeyboardShiftState,
-        direct: Boolean = isCustomLayoutDirectMode,
         romaji: Boolean = isCustomLayoutRomajiMode,
     ) {
-        renderCustomKeyboardToggles(flickView, shift, direct, romaji)
+        renderCustomKeyboardToggles(flickView, shift, romaji)
     }
 
     private fun syncCustomKeyboardTogglePresentationOnAvailableSurfaces() {
@@ -4100,11 +4077,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
                 stableId = expectedStableId,
                 defaultValue = finalLayout.isRomaji
             )
-            isCustomLayoutDirectMode = resolveInitialCustomKeyboardDirectMode(
-                layoutId = id,
-                stableId = expectedStableId,
-                defaultValue = finalLayout.isDirectMode
-            )
             customKeyboardShiftState = CustomKeyboardShiftState.OFF
             withContext(Dispatchers.Main) {
                 if (!isCurrentCustomKeyboardSelection(layoutId = id, stableId = expectedStableId)) {
@@ -4135,7 +4107,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
     }
 
     private fun setCustomLayoutOnAvailableSurfaces(layout: KeyboardLayout) {
-        resetCustomToggleState()
         getNormalKeyboardSurface()
             ?.customLayout
             ?.let { flickView ->
@@ -5454,7 +5425,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
     }
 
     private fun showResolvedKeyboard(type: KeyboardType) {
-        if (qwertyMode.value == TenKeyQWERTYMode.Custom) resetCustomToggleState()
         hideAllKeyboards()
         Timber.d("showKeyboard called: resolved=$type")
         mainLayoutBinding?.apply {
@@ -5560,11 +5530,7 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
     }
 
     private var isCustomLayoutRomajiMode = false
-    private var isCustomLayoutDirectMode = false
     private var customKeyboardShiftState = CustomKeyboardShiftState.OFF
-    private val customToggleInputState = CustomToggleInputState()
-    private var customToggleFinalizeJob: Job? = null
-    private var customToggleWasDirect: Boolean = false
     private val isCustomLayoutShiftPressed: Boolean
         get() = customKeyboardShiftState == CustomKeyboardShiftState.ONE_SHOT
     private val isCustomLayoutCapLock: Boolean
@@ -5572,18 +5538,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
 
     private fun customKeyboardInputModePersistenceKey(layoutId: Long, stableId: String): String {
         return stableId.takeIf { it.isNotBlank() } ?: layoutId.toString()
-    }
-
-    private fun resolveInitialCustomKeyboardDirectMode(
-        layoutId: Long,
-        stableId: String,
-        defaultValue: Boolean
-    ): Boolean {
-        if (appPreference.remember_custom_keyboard_input_mode_preference != true) {
-            return defaultValue
-        }
-        val key = customKeyboardInputModePersistenceKey(layoutId, stableId)
-        return appPreference.getCustomKeyboardLastDirectMode(key) ?: defaultValue
     }
 
     private fun resolveInitialCustomKeyboardRomajiMode(
@@ -5610,7 +5564,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
             layoutId = layout.layoutId,
             stableId = layout.stableId
         )
-        appPreference.saveCustomKeyboardLastDirectMode(key, isCustomLayoutDirectMode)
         appPreference.saveCustomKeyboardLastRomajiMode(key, isCustomLayoutRomajiMode)
     }
 
@@ -5706,11 +5659,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
                 layoutId = id,
                 stableId = expectedStableId,
                 defaultValue = finalLayout.isRomaji
-            )
-            isCustomLayoutDirectMode = resolveInitialCustomKeyboardDirectMode(
-                layoutId = id,
-                stableId = expectedStableId,
-                defaultValue = finalLayout.isDirectMode
             )
             customKeyboardShiftState = CustomKeyboardShiftState.OFF
             withContext(Dispatchers.Main) {
@@ -6006,7 +5954,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
 
             override fun onActionLongPress(action: KeyAction) {
                 if (isKeyboardLayoutEditModeActive()) return
-                finishCustomToggleForAction()
                 if (action != KeyAction.DoNothing) {
                     clearDeleteBufferWithView()
                 }
@@ -6292,7 +6239,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
 
             override fun onFlickActionLongPress(action: KeyAction) {
                 if (isKeyboardLayoutEditModeActive()) return
-                finishCustomToggleForAction()
                 Timber.d("onFlickActionLongPress: $action")
                 when (action) {
                     KeyAction.DoNothing -> Unit
@@ -6658,21 +6604,7 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
                         }
                     }
 
-                    KeyAction.SwitchDirectMode -> {
-                        isCustomLayoutDirectMode = !isCustomLayoutDirectMode
-                        persistCurrentCustomKeyboardInputModeIfEnabled()
-                        shortcutInputBehaviorOverride = null
-                        baselineInputBehavior = resolveBaselineInputBehavior()
-                        applyEffectiveInputBehavior("custom direct mode key")
-
-                        Handler(mainLooper).post {
-                            getActiveKeyboardSurface()?.customLayout?.updateKeyIconByAction(
-                                KeyAction.SwitchDirectMode,
-                                if (isCustomLayoutDirectMode) com.kazumaproject.core.R.drawable.language_japanese_kana_right_24px
-                                else com.kazumaproject.core.R.drawable.language_japanese_kana_left_24px
-                            )
-                        }
-                    }
+                    KeyAction.SwitchDirectMode -> {}
 
                     KeyAction.SwitchRomajiEnglish -> {
                         isCustomLayoutRomajiMode = !isCustomLayoutRomajiMode
@@ -6705,27 +6637,8 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
                 }
             }
 
-            override fun onToggleText(keyIdentity: String, values: List<String>) {
-                if (isKeyboardLayoutEditModeActive()) return
-                clearDeleteBufferWithView()
-                val isDirect = isCustomToggleDirectInput()
-                if (customToggleWasDirect != isDirect) {
-                    resetCustomToggleState()
-                }
-                val canonicalValues = values.filter { it.length == 1 }
-                val outputValues = canonicalValues.map(::applyCustomLayoutShiftAndCapLock)
-                handleCustomToggleText(
-                    keyIdentity = keyIdentity,
-                    values = canonicalValues,
-                    outputValues = outputValues,
-                    mainView = mainView
-                )
-                consumeCustomKeyboardOneShotShift()
-            }
-
             override fun onAction(action: KeyAction, isFlick: Boolean) {
                 if (isKeyboardLayoutEditModeActive()) return
-                finishCustomToggleForAction()
 
                 Timber.d("onAction: $action $isFlick")
                 if (!shouldPreserveDeleteHistoryForAction(action)) {
@@ -6741,13 +6654,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
                                 if (text.isEmpty()) return
                                 val shiftedText = applyCustomLayoutShiftAndCapLock(text)
                                 if (dispatchDirectTextIfNeeded(shiftedText)) {
-                                    consumeCustomKeyboardOneShotShift()
-                                    return
-                                }
-                                if (isCustomLayoutDirectMode) {
-                                    finishComposingText()
-                                    setComposingText("", 0)
-                                    commitText(shiftedText, 1)
                                     consumeCustomKeyboardOneShotShift()
                                     return
                                 }
@@ -7058,21 +6964,7 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
                         handleCustomKeyboardShiftTap()
                     }
 
-                    KeyAction.SwitchDirectMode -> {
-                        isCustomLayoutDirectMode = !isCustomLayoutDirectMode
-                        persistCurrentCustomKeyboardInputModeIfEnabled()
-                        shortcutInputBehaviorOverride = null
-                        baselineInputBehavior = resolveBaselineInputBehavior()
-                        applyEffectiveInputBehavior("custom direct mode key")
-
-                        Handler(mainLooper).post {
-                            getActiveKeyboardSurface()?.customLayout?.updateKeyIconByAction(
-                                KeyAction.SwitchDirectMode,
-                                if (isCustomLayoutDirectMode) com.kazumaproject.core.R.drawable.language_japanese_kana_right_24px
-                                else com.kazumaproject.core.R.drawable.language_japanese_kana_left_24px
-                            )
-                        }
-                    }
+                    KeyAction.SwitchDirectMode -> {}
 
                     KeyAction.CapLockKey -> {
                         handleCustomKeyboardCapsLockTap()
@@ -7212,265 +7104,8 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         return customKeyboardShiftState.transformAsciiLetters(text)
     }
 
-    private fun isCustomToggleDirectInput(): Boolean {
-        return currentInputBehavior != ResolvedInputBehavior.COMPOSING_TEXT ||
-            isCustomLayoutDirectMode
-    }
-
-    private fun resetCustomToggleState() {
-        customToggleFinalizeJob?.cancel()
-        customToggleFinalizeJob = null
-        customToggleInputState.reset()
-        customToggleWasDirect = false
-        customToggleExpectedEditorSelection = null
-    }
-
-    private var customToggleExpectedEditorSelection: CustomToggleEditorSelection? = null
-    private var customToggleEditInProgress = false
-
-    private fun finishCustomToggleForAction() {
-        val shouldUpdateColor = qwertyMode.value == TenKeyQWERTYMode.Custom &&
-            customToggleRemainingMillis() > 0 && !isCustomToggleDirectInput() &&
-            inputString.value.isNotEmpty() && !isHenkan.get()
-        resetCustomToggleState()
-        if (shouldUpdateColor) applyRawComposingFallback(inputString.value)
-    }
-
-    private fun customToggleRemainingMillis(): Long =
-        customToggleInputState.remainingMillis(SystemClock.elapsedRealtime())
-
     private fun renderCustomKeyboardComposingText(string: String) {
-        if (customToggleRemainingMillis() > 0 && !isCustomToggleDirectInput()) {
-            setComposingTextPreEdit(
-                inputString = string,
-                spannableString = createSpannableWithTail(string),
-                backgroundColor = if (customComposingTextPreference == true) {
-                    inputCompositionBackgroundColor
-                        ?: getColor(com.kazumaproject.core.R.color.char_in_edit_color)
-                } else {
-                    getColor(com.kazumaproject.core.R.color.char_in_edit_color)
-                },
-                textColor = if (customComposingTextPreference == true) inputCompositionTextColor else null,
-            )
-        } else {
-            applyRawComposingFallback(string)
-        }
-    }
-
-    private fun scheduleCustomToggleFinalize() {
-        customToggleFinalizeJob?.cancel()
-        customToggleFinalizeJob = null
-        if (qwertyMode.value != TenKeyQWERTYMode.Custom || currentInputConnection == null) return
-        val remaining = customToggleRemainingMillis()
-        if (remaining <= 0 || isCustomToggleDirectInput()) return
-        val string = inputString.value
-        if (string.isEmpty()) return
-        // Render here as well: cycling equal output values does not emit a StateFlow update.
-        renderCustomKeyboardComposingText(string)
-        val revision = editorMutationRevision.current()
-        customToggleFinalizeJob = scope.launch {
-            delay(customToggleRemainingMillis())
-            if (qwertyMode.value != TenKeyQWERTYMode.Custom ||
-                inputString.value != string || !editorMutationRevision.isCurrent(revision) ||
-                isCustomToggleDirectInput() || isHenkan.get()
-            ) return@launch
-            applyRawComposingFallback(string)
-        }
-    }
-
-    private fun captureCustomToggleEditorSelection(
-        connection: InputConnection
-    ): CustomToggleEditorSelection? {
-        val extracted = runCatching {
-            connection.getExtractedText(ExtractedTextRequest(), 0)
-        }.getOrNull() ?: return null
-        if (
-            extracted.text == null ||
-            extracted.startOffset < 0 ||
-            extracted.selectionStart < 0 ||
-            extracted.selectionEnd < 0
-        ) {
-            return null
-        }
-        return CustomToggleEditorSelection(
-            connection = connection,
-            selectionStart = extracted.startOffset + extracted.selectionStart,
-            selectionEnd = extracted.startOffset + extracted.selectionEnd,
-        )
-    }
-
-    private fun invalidateCustomToggleStateForSelection(
-        newSelStart: Int,
-        newSelEnd: Int,
-    ) {
-        if (customToggleEditInProgress) return
-        val expected = customToggleExpectedEditorSelection ?: return
-        if (newSelStart < 0 || newSelEnd < 0) return
-        if (
-            currentInputConnection !== expected.connection ||
-            newSelStart != expected.selectionStart ||
-            newSelEnd != expected.selectionEnd
-        ) {
-            resetCustomToggleState()
-        }
-    }
-
-    private fun replaceCustomToggleDirectText(
-        previous: String,
-        next: String,
-    ): Boolean {
-        val connection = currentInputConnection ?: return false
-        val expected = customToggleExpectedEditorSelection ?: return false
-        if (expected.connection !== connection) return false
-
-        val selection = captureCustomToggleEditorSelection(connection) ?: return false
-        if (
-            selection.selectionStart != expected.selectionStart ||
-            selection.selectionEnd != expected.selectionEnd
-        ) {
-            return false
-        }
-
-        val textBeforeCursor = runCatching {
-            connection.getTextBeforeCursor(previous.length, 0)?.toString()
-        }.getOrNull() ?: return false
-        if (textBeforeCursor != previous) return false
-
-        var batchStarted = false
-        var committed = false
-        customToggleEditInProgress = true
-        try {
-            batchStarted = runCatching { connection.beginBatchEdit() }.getOrDefault(false)
-            if (batchStarted) {
-                val deleted = runCatching {
-                    connection.deleteSurroundingText(previous.length, 0)
-                }.getOrDefault(false)
-                committed = deleted && runCatching {
-                    connection.commitText(next, 1)
-                }.getOrDefault(false)
-            }
-        } finally {
-            if (batchStarted) {
-                runCatching { connection.endBatchEdit() }
-            }
-            customToggleEditInProgress = false
-        }
-
-        if (!committed) return false
-        // Both values are one UTF-16 code unit, so replacing the preceding value leaves the
-        // collapsed cursor at the same absolute position. Keep the validated position even if
-        // the editor does not expose a second extracted-text snapshot after the batch edit.
-        customToggleExpectedEditorSelection = expected
-        return true
-    }
-
-    private fun customToggleAppendWasCommitted(
-        before: CustomToggleEditorSelection,
-        after: CustomToggleEditorSelection,
-        text: String,
-    ): Boolean {
-        if (before.connection !== after.connection) return false
-        if (before.selectionStart != before.selectionEnd) return false
-        val expectedCursor = before.selectionStart + text.length
-        if (after.selectionStart != expectedCursor || after.selectionEnd != expectedCursor) {
-            return false
-        }
-        val textBeforeCursor = runCatching {
-            after.connection.getTextBeforeCursor(text.length, 0)?.toString()
-        }.getOrNull()
-        return textBeforeCursor == text
-    }
-
-    private fun handleCustomToggleText(
-        keyIdentity: String,
-        values: List<String>,
-        outputValues: List<String>,
-        mainView: MainLayoutBinding
-    ) {
-        if (values.size != outputValues.size) {
-            resetCustomToggleState()
-            return
-        }
-        val validPairs = values.zip(outputValues)
-            .filter { (value, output) -> value.length == 1 && output.length == 1 }
-        if (validPairs.isEmpty()) {
-            resetCustomToggleState()
-            return
-        }
-        val canonicalValues = validPairs.map { it.first }
-        val emittedValues = validPairs.map { it.second }
-        when (
-            val mutation = customToggleInputState.next(
-                keyIdentity = keyIdentity,
-                values = canonicalValues,
-                outputValues = emittedValues,
-                nowMillis = SystemClock.elapsedRealtime(),
-                timeoutMillis = delayTime?.toLong() ?: DEFAULT_DELAY_MS,
-            )
-        ) {
-            null -> return
-            is CustomToggleInputState.Mutation.Append -> {
-                val isDirect = isCustomToggleDirectInput()
-                val before = if (isDirect) {
-                    currentInputConnection?.let(::captureCustomToggleEditorSelection)
-                } else {
-                    null
-                }
-                customToggleEditInProgress = true
-                try {
-                    // A new toggle sequence must append, bypassing the legacy kana tap cycle.
-                    handleCustomKeyboardText(mutation.text, mainView, isFlick = true)
-                } finally {
-                    customToggleEditInProgress = false
-                }
-                if (isDirect) {
-                    val after = currentInputConnection?.let(::captureCustomToggleEditorSelection)
-                    if (
-                        before == null ||
-                        after == null ||
-                        !customToggleAppendWasCommitted(before, after, mutation.text)
-                    ) {
-                        resetCustomToggleState()
-                        return
-                    }
-                    customToggleWasDirect = true
-                    customToggleExpectedEditorSelection = after
-                } else {
-                    customToggleWasDirect = false
-                    customToggleExpectedEditorSelection = null
-                }
-            }
-            is CustomToggleInputState.Mutation.Replace -> {
-                val previous = mutation.previous
-                val next = mutation.next
-                if (customToggleWasDirect) {
-                    if (!replaceCustomToggleDirectText(previous, next)) {
-                        resetCustomToggleState()
-                        handleCustomToggleText(
-                            keyIdentity = keyIdentity,
-                            values = canonicalValues,
-                            outputValues = emittedValues,
-                            mainView = mainView,
-                        )
-                        return
-                    }
-                } else {
-                    val current = inputString.value
-                    if (!current.endsWith(previous)) {
-                        resetCustomToggleState()
-                        handleCustomToggleText(
-                            keyIdentity = keyIdentity,
-                            values = canonicalValues,
-                            outputValues = emittedValues,
-                            mainView = mainView,
-                        )
-                        return
-                    }
-                    _inputString.update { current.dropLast(previous.length) + next }
-                }
-            }
-        }
-        scheduleCustomToggleFinalize()
+        applyRawComposingFallback(string)
     }
 
     private fun handleCustomKeyboardText(
@@ -7479,15 +7114,8 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         isFlick: Boolean
     ) {
         if (dispatchDirectTextIfNeeded(text)) return
-        if (isCustomLayoutDirectMode) {
-            finishComposingText()
-            setComposingText("", 0)
-            commitText(text, 1)
-            return
-        }
         if (applyPendingFlickTextMutation(text, isFlick)) return
         if (text.length == 1) {
-            // Only onToggleText cycles custom keys; ordinary taps always append.
             handleFlick(text.first(), inputString.value, StringBuilder(), mainView)
         } else {
             _inputString.update { it + text }
@@ -9892,7 +9520,7 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
 
     private fun liveConversionApplyDelayMillis(): Long {
         if (qwertyMode.value == TenKeyQWERTYMode.Custom) {
-            return customToggleRemainingMillis()
+            return 0L
         }
         val originalDelay = delayTime?.toLong() ?: DEFAULT_DELAY_MS
 
@@ -9921,16 +9549,7 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
     }
 
     private suspend fun delayBeforeApplyingLiveConversion() {
-        if (qwertyMode.value == TenKeyQWERTYMode.Custom) {
-            // Equal toggle outputs do not restart the candidate request. Recheck the deadline
-            // after waking so another tap cannot leave that request using an older timeout.
-            while (qwertyMode.value == TenKeyQWERTYMode.Custom) {
-                val remaining = customToggleRemainingMillis()
-                if (remaining <= 0L) break
-                delay(remaining)
-            }
-            return
-        }
+        if (qwertyMode.value == TenKeyQWERTYMode.Custom) return
         val applyDelay = liveConversionApplyDelayMillis()
         measureDebugStage("IMEService.liveConversionApplyDelay") {
             if (applyDelay > 0L) {
@@ -9942,8 +9561,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
     private fun applyFirstSuggestion(
         candidate: Candidate
     ) {
-        // Once a candidate owns the composing display, an old toggle timer must not restore kana.
-        if (qwertyMode.value == TenKeyQWERTYMode.Custom) resetCustomToggleState()
         beginBatchEdit()
         val commitString = getCandidateCommitString(candidate)
         lastCandidate = commitString
@@ -10734,11 +10351,7 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
     }
 
     private fun resolveBaselineInputBehavior(): ResolvedInputBehavior {
-        return RuntimeInputBehaviorPolicy.resolveBaseline(
-            qwertyMode = qwertyMode.value,
-            isCustomLayoutDirectMode = isCustomLayoutDirectMode,
-            resolvedInputBehavior = inputBehaviorResolver.resolve(currentInputType),
-        )
+        return inputBehaviorResolver.resolve(currentInputType)
     }
 
     private fun applyEffectiveInputBehavior(reason: String) {
@@ -10762,9 +10375,7 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
                 current = currentInputBehavior,
                 startingNewInput = reason == "start input",
                 canToggleSafely = canToggleRuntimeInputBehaviorSafely(),
-                replaceComposingOnNextInput = customDirectInputReplaceComposingPreference &&
-                        _tenKeyQWERTYMode.value == TenKeyQWERTYMode.Custom &&
-                        isCustomLayoutDirectMode,
+                replaceComposingOnNextInput = false,
             )
         ) {
             DirectCommitTransition.NONE -> Unit
@@ -13374,7 +12985,7 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         val spanFlag = Spannable.SPAN_EXCLUSIVE_EXCLUSIVE or Spannable.SPAN_COMPOSING
         // フリック専用入力にはトグル待機がないため、最初から編集後の背景を使う。
         val useAfterEditColor = if (qwertyMode.value == TenKeyQWERTYMode.Custom) {
-            customToggleRemainingMillis() == 0L
+            true
         } else {
             isFlickOnlyMode == true
         }
@@ -14811,8 +14422,7 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         EditorEnterPolicy.usesEditorActionForDefaultTypeNull(
             inputType = currentInputEditorInfo?.inputType,
             setting = TypeNullInputBehaviorSetting.fromPreferenceValue(appPreference.type_null_input_behavior_preference),
-            hasExplicitDirectOverride = shortcutInputBehaviorOverride != null ||
-                (qwertyMode.value == TenKeyQWERTYMode.Custom && isCustomLayoutDirectMode),
+            hasExplicitDirectOverride = shortcutInputBehaviorOverride != null,
         )
 
     private fun editorEnterAction(): EditorEnterAction =
@@ -16157,8 +15767,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         currentInputMode: InputMode
     ): String {
         return resolveEmptySpaceForCurrentMode(
-            isCustomLayoutDirectMode = isCustomLayoutDirectMode,
-            customDirectModeSpaceHankakuPreference = customDirectModeSpaceHankakuPreference,
             isFlick = isFlick,
             currentInputMode = currentInputMode
         )
@@ -16357,14 +15965,7 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
 
     override fun setComposingText(p0: CharSequence?, p1: Int): Boolean {
         val connection = currentInputConnection ?: return false
-        val applied = composingTextArbiter.setCanonical(p0, p1)
-        if (applied && qwertyMode.value == TenKeyQWERTYMode.Custom &&
-            !isCustomToggleDirectInput() && customToggleRemainingMillis() > 0
-        ) {
-            customToggleExpectedEditorSelection =
-                captureCustomToggleEditorSelection(connection)
-        }
-        return applied
+        return composingTextArbiter.setCanonical(p0, p1)
     }
 
     override fun setComposingRegion(p0: Int, p1: Int): Boolean {
@@ -16374,7 +15975,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
     }
 
     override fun finishComposingText(): Boolean {
-        if (!customToggleEditInProgress) resetCustomToggleState()
         val connection = currentInputConnection ?: return false
         flickInputPreviewCoordinator.cancel(restore = true)
         val finished = composingTextArbiter.finishCanonical()
@@ -16382,7 +15982,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
     }
 
     override fun commitText(p0: CharSequence?, p1: Int): Boolean {
-        if (!customToggleEditInProgress) resetCustomToggleState()
         val connection = currentInputConnection ?: return false
         flickInputPreviewCoordinator.cancel(restore = true)
         val committed = connection.commitText(p0, p1)

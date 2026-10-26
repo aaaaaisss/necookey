@@ -4,7 +4,6 @@ import com.google.gson.JsonParser
 import com.google.gson.annotations.SerializedName
 import com.kazumaproject.custom_keyboard.data.FlickDirection
 import com.kazumaproject.custom_keyboard.data.KeyType
-import com.kazumaproject.custom_keyboard.data.KeyTextInputBehavior
 import com.kazumaproject.custom_keyboard.data.KeyboardLayoutUsageMode
 import com.kazumaproject.markdownhelperkeyboard.custom_keyboard.data.CustomKeyboardLayout
 import com.kazumaproject.markdownhelperkeyboard.custom_keyboard.data.FlickMapping
@@ -263,14 +262,15 @@ class KeyboardLayoutJsonImporterTest {
     }
 
     @Test
-    fun parse_versionedToggleBehavior_restoresToggle() {
+    fun parse_versionedToggleBehavior_isImportedAsNormal() {
         val json = versionedBackupWithLayoutName("\"name\": \"Toggle\"")
             .replace("\"action\": null", "\"action\": null, \"textInputBehavior\": \"TOGGLE\"")
 
         val imported = parseSuccessLayouts(json).single()
 
+        // トグル入力は廃止されたため、古い TOGGLE も NORMAL として取り込む。
         assertEquals(
-            KeyTextInputBehavior.TOGGLE.dbValue,
+            "NORMAL",
             imported.keysWithFlicks.single().key.textInputBehavior
         )
     }
@@ -282,7 +282,7 @@ class KeyboardLayoutJsonImporterTest {
         ).single()
 
         assertEquals(
-            KeyTextInputBehavior.NORMAL.dbValue,
+            "NORMAL",
             imported.keysWithFlicks.single().key.textInputBehavior
         )
     }

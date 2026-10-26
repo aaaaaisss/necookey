@@ -174,7 +174,6 @@ internal fun renderCandidateKeyboardPreview(
                 views.flick.setKeyboard(finalLayout)
                 syncCustomKeyboardToggleKeyIcons(
                     flickView = views.flick,
-                    isDirectMode = customLayout.isDirectMode,
                     isRomaji = customLayout.isRomaji,
                     isShiftPressed = false,
                     isCapLock = false
@@ -201,8 +200,7 @@ private data class PreviewKeyboardLayoutConfig(
 
 private data class PreviewCustomKeyboardLayout(
     val layout: KeyboardLayout,
-    val isRomaji: Boolean,
-    val isDirectMode: Boolean
+    val isRomaji: Boolean
 )
 
 private fun applyCandidateKeyboardPreviewLayout(
@@ -417,11 +415,6 @@ private suspend fun loadPreviewCustomKeyboardLayout(
             appPreference.getCustomKeyboardLastRomajiMode(persistenceKey) ?: convertedLayout.isRomaji
         } else {
             convertedLayout.isRomaji
-        },
-        isDirectMode = if (appPreference.remember_custom_keyboard_input_mode_preference == true) {
-            appPreference.getCustomKeyboardLastDirectMode(persistenceKey) ?: convertedLayout.isDirectMode
-        } else {
-            convertedLayout.isDirectMode
         }
     )
 }
@@ -448,19 +441,10 @@ private fun currentDeleteKeyFlickSettings(
 
 private fun syncCustomKeyboardToggleKeyIcons(
     flickView: FlickKeyboardView,
-    isDirectMode: Boolean,
     isRomaji: Boolean,
     isShiftPressed: Boolean,
     isCapLock: Boolean
 ) {
-    flickView.updateKeyIconByAction(
-        KeyAction.SwitchDirectMode,
-        if (isDirectMode) {
-            com.kazumaproject.core.R.drawable.language_japanese_kana_right_24px
-        } else {
-            com.kazumaproject.core.R.drawable.language_japanese_kana_left_24px
-        }
-    )
     flickView.updateKeyIconByAction(
         KeyAction.SwitchRomajiEnglish,
         if (isRomaji) {

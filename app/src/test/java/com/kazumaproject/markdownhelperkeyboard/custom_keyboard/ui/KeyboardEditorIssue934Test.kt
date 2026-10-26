@@ -121,9 +121,6 @@ class KeyboardEditorIssue934Test {
         assertTrue(viewModel.hasUnsavedChanges())
         viewModel.updateIsRomaji(false)
         assertFalse(viewModel.hasUnsavedChanges())
-
-        viewModel.updateIsDirectMode(true)
-        assertTrue(viewModel.hasUnsavedChanges())
     }
 
     @Test

@@ -19,11 +19,7 @@ class RuntimeInputBehaviorPolicyTest {
 
             assertEquals(
                 ResolvedInputBehavior.DIRECT_COMMIT,
-                RuntimeInputBehaviorPolicy.resolveBaseline(
-                    qwertyMode = TenKeyQWERTYMode.Custom,
-                    isCustomLayoutDirectMode = false,
-                    resolvedInputBehavior = resolved,
-                )
+                resolved
             )
         }
     }
@@ -36,11 +32,7 @@ class RuntimeInputBehaviorPolicyTest {
 
         assertEquals(
             ResolvedInputBehavior.COMPOSING_TEXT,
-            RuntimeInputBehaviorPolicy.resolveBaseline(
-                qwertyMode = TenKeyQWERTYMode.Custom,
-                isCustomLayoutDirectMode = false,
-                resolvedInputBehavior = resolved,
-            )
+            resolved
         )
     }
 
@@ -52,23 +44,7 @@ class RuntimeInputBehaviorPolicyTest {
 
         assertEquals(
             ResolvedInputBehavior.COMPOSING_TEXT,
-            RuntimeInputBehaviorPolicy.resolveBaseline(
-                qwertyMode = TenKeyQWERTYMode.Custom,
-                isCustomLayoutDirectMode = false,
-                resolvedInputBehavior = resolved,
-            )
-        )
-    }
-
-    @Test
-    fun customKeyboardDirectModeOverridesBaselineToDirectCommit() {
-        assertEquals(
-            ResolvedInputBehavior.DIRECT_COMMIT,
-            RuntimeInputBehaviorPolicy.resolveBaseline(
-                qwertyMode = TenKeyQWERTYMode.Custom,
-                isCustomLayoutDirectMode = true,
-                resolvedInputBehavior = ResolvedInputBehavior.COMPOSING_TEXT,
-            )
+            resolved
         )
     }
 
