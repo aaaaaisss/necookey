@@ -1777,6 +1777,20 @@ class FindPath(
         val splitPatterns = mutableListOf<List<Int>>()
         val splitPatternByCandidateString = linkedMapOf<String, List<Int>>()
         val foundStrings = HashSet<String>()
+        // ツギハギ抑制（TsugihagiKanaRepair、既定オフ）: 最初に見つかった経路（1 位）の語の並び
+        var kanaRepairBestString: String? = null
+        var kanaRepairBestPath: List<Node>? = null
+        fun withKanaRepair(ranked: List<Candidate>): List<Candidate> {
+            if (kanaRepairBestPath == null) return ranked
+            val out = TsugihagiKanaRepair.apply(ranked, kanaRepairBestString, kanaRepairBestPath, candidateSegmentCollector)
+            if (out !== ranked) {
+                val top = ranked[0].string
+                splitPatternByCandidateString[top]?.let { pattern ->
+                    for (c in out) if (c.string !in splitPatternByCandidateString) splitPatternByCandidateString[c.string] = pattern
+                }
+            }
+            return out
+        }
         val ngramRuleScorer = ngramRuleScorerProvider()
         val systemNgramDictionary = systemNgramDictionaryProvider()
         val systemNgramMatchedCandidates = SmallSystemNgramMatchSet()
@@ -1846,6 +1860,10 @@ class FindPath(
                 )
 
                 if (foundStrings.add(stringFromNode)) {
+                    if (resultFinal.isEmpty() && TsugihagiKanaRepair.position > 0) {
+                        kanaRepairBestString = stringFromNode
+                        kanaRepairBestPath = getNodesFromPath(element)
+                    }
                     candidateSegmentCollector?.set(
                         stringFromNode,
                         getConversionSegmentsFromPath(element),
@@ -1903,7 +1921,7 @@ class FindPath(
                         )
                         recordBackwardSearchDuration()
                         return BunsetsuCandidateResult(
-                            candidates = ranked,
+                            candidates = withKanaRepair(ranked),
                             splitPatterns = preservedSplitPatterns,
                             splitPatternByCandidateString = splitPatternByCandidateString,
                             systemNgramMatchedCandidates = systemNgramMatchedCandidates,
@@ -1916,7 +1934,7 @@ class FindPath(
                     val ranked = rankSystemNgramCandidates(resultFinal, systemNgramMatchedCandidates, n)
                     recordBackwardSearchDuration()
                     return BunsetsuCandidateResult(
-                        candidates = ranked,
+                        candidates = withKanaRepair(ranked),
                         splitPatterns = splitPatterns,
                         splitPatternByCandidateString = splitPatternByCandidateString,
                         systemNgramMatchedCandidates = systemNgramMatchedCandidates,
@@ -1984,7 +2002,7 @@ class FindPath(
         val ranked = rankSystemNgramCandidates(resultFinal, systemNgramMatchedCandidates, n)
         recordBackwardSearchDuration()
         return BunsetsuCandidateResult(
-            candidates = ranked,
+            candidates = withKanaRepair(ranked),
             splitPatterns = splitPatterns,
             splitPatternByCandidateString = splitPatternByCandidateString,
             systemNgramMatchedCandidates = systemNgramMatchedCandidates,
@@ -2572,6 +2590,18 @@ class FindPath(
             if (node.tango != "BOS" && node.tango != "EOS") {
                 result.add(node.tango)
             }
+            current = current.next
+        }
+        return result
+    }
+
+    /** 経路の語（BOS/EOS を除く、先頭から）。 */
+    private fun getNodesFromPath(path: PathQueueElement): List<Node> {
+        val result = ArrayList<Node>()
+        var current: PathQueueElement? = path
+        while (current != null) {
+            val node = current.node
+            if (node.tango != "BOS" && node.tango != "EOS") result.add(node)
             current = current.next
         }
         return result
