@@ -46,10 +46,34 @@ import java.util.concurrent.TimeoutException
  * NK_NGRAM=0 でシステム n-gram を外す（比較用）。NK_DUMP_SHARD=i/n。1 呼び出し 30 秒で打ち切り。
  */
 class SumireNbestDumpTest {
+    /**
+     * NK_CONFIGS="名前:キー=値,キー=値;名前2:..." なら設定ごとに 1 回ずつダンプする（出力は NK_DUMP_OUT.名前）。1 回の JVM で複数設定を比べる評価用。
+     * キー: dinf（方言活用語尾ノード 0/1）dcost（語尾コスト）kdia（方言かな語 0/1）kpen（そのペナルティ）ha（は-merge ペナルティ）
+     * hat（は-merge を時の名詞の後だけ 0/1）err（辞書表記の誤り修正 0/1）。
+     */
     @Test
     fun dump() {
+        val configs = System.getenv("NK_CONFIGS")?.takeIf { it.isNotBlank() }
+        if (configs == null) {
+            dumpOne(System.getenv("NK_DUMP_OUT"))
+            return
+        }
+        val base = System.getenv("NK_DUMP_OUT")
+        assumeTrue(!base.isNullOrBlank())
+        for (cfg in configs.split(';').filter { it.isNotBlank() }) {
+            val name = cfg.substringBefore(':')
+            ConversionKnobs.reset()
+            cfg.substringAfter(':', "").split(',').filter { '=' in it }.forEach { kv ->
+                ConversionKnobs.set(kv.substringBefore('='), kv.substringAfter('='))
+            }
+            println("config $name: ${ConversionKnobs.describe()}")
+            dumpOne("$base.$name")
+        }
+        ConversionKnobs.reset()
+    }
+
+    private fun dumpOne(outPath: String?) {
         val inPath = System.getenv("NK_DUMP_IN")
-        val outPath = System.getenv("NK_DUMP_OUT")
         assumeTrue(!inPath.isNullOrBlank() && !outPath.isNullOrBlank())
         val (si, sn) = (System.getenv("NK_DUMP_SHARD") ?: "0/1").split('/').map { it.toInt() }
         val ngramOn = System.getenv("NK_NGRAM") != "0"
