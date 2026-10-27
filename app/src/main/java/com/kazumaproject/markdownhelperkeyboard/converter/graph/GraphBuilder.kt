@@ -901,9 +901,11 @@ class GraphBuilder {
                         val tango = when (tokenNodeId) {
                             -2 -> yomiStr
                             -1 -> yomiStr.hiraToKata()
-                            else -> tangoTrie.getLetter(
-                                tokenNodeId,
-                                succinctBitVector = succinctBitVectorTangoLBS
+                            else -> SystemDictionaryErrata.fix(
+                                tangoTrie.getLetter(
+                                    tokenNodeId,
+                                    succinctBitVector = succinctBitVectorTangoLBS
+                                )
                             )
                         }
                         val leftId = tokenArray.leftIds[posTableIndex.toInt()]

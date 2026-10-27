@@ -24,8 +24,9 @@ import com.kazumaproject.markdownhelperkeyboard.converter.candidate.CANDIDATE_TY
 import com.kazumaproject.markdownhelperkeyboard.converter.candidate.Candidate
 import com.kazumaproject.markdownhelperkeyboard.converter.candidate.CandidateConversionSegment
 import com.kazumaproject.markdownhelperkeyboard.converter.graph.GraphBuilder
-import com.kazumaproject.graph.Node
 import com.kazumaproject.markdownhelperkeyboard.converter.graph.GraphNodeDedupMode
+import com.kazumaproject.markdownhelperkeyboard.converter.graph.SystemDictionaryErrata
+import com.kazumaproject.graph.Node
 import com.kazumaproject.markdownhelperkeyboard.converter.mozc.MozcBoundaryMode
 import com.kazumaproject.markdownhelperkeyboard.converter.mozc.MozcNodeAttributeTable
 import com.kazumaproject.markdownhelperkeyboard.converter.mozc.MozcSegmenter
@@ -1496,8 +1497,8 @@ class KanaKanjiEngine {
                     string = when (it.nodeId) {
                         -2 -> yomi
                         -1 -> yomi.hiraToKata()
-                        else -> systemTangoTrie.getLetter(
-                            it.nodeId, systemSuccinctBitVectorTangoLBS
+                        else -> SystemDictionaryErrata.fix(
+                            systemTangoTrie.getLetter(it.nodeId, systemSuccinctBitVectorTangoLBS)
                         )
                     },
                     type = if (yomi.length == input.length) 2 else 5,
@@ -1984,8 +1985,8 @@ class KanaKanjiEngine {
                     string = when (it.nodeId) {
                         -2 -> yomi
                         -1 -> yomi.hiraToKata()
-                        else -> systemTangoTrie.getLetter(
-                            it.nodeId, systemSuccinctBitVectorTangoLBS
+                        else -> SystemDictionaryErrata.fix(
+                            systemTangoTrie.getLetter(it.nodeId, systemSuccinctBitVectorTangoLBS)
                         )
                     },
                     type = if (yomi.length == input.length) 2 else 5,
@@ -2493,8 +2494,8 @@ class KanaKanjiEngine {
                     string = when (it.nodeId) {
                         -2 -> yomi
                         -1 -> yomi.hiraToKata()
-                        else -> systemTangoTrie.getLetter(
-                            it.nodeId, systemSuccinctBitVectorTangoLBS
+                        else -> SystemDictionaryErrata.fix(
+                            systemTangoTrie.getLetter(it.nodeId, systemSuccinctBitVectorTangoLBS)
                         )
                     },
                     type = if (yomi.length == input.length) 2 else 5,
@@ -2969,8 +2970,8 @@ class KanaKanjiEngine {
                     string = when (it.nodeId) {
                         -2 -> yomi
                         -1 -> yomi.hiraToKata()
-                        else -> systemTangoTrie.getLetter(
-                            it.nodeId, systemSuccinctBitVectorTangoLBS
+                        else -> SystemDictionaryErrata.fix(
+                            systemTangoTrie.getLetter(it.nodeId, systemSuccinctBitVectorTangoLBS)
                         )
                     },
                     type = if (yomi.length == input.length) 2 else 5,
@@ -3423,8 +3424,8 @@ class KanaKanjiEngine {
                     string = when (it.nodeId) {
                         -2 -> yomi
                         -1 -> yomi.hiraToKata()
-                        else -> systemTangoTrie.getLetter(
-                            it.nodeId, systemSuccinctBitVectorTangoLBS
+                        else -> SystemDictionaryErrata.fix(
+                            systemTangoTrie.getLetter(it.nodeId, systemSuccinctBitVectorTangoLBS)
                         )
                     },
                     type = if (yomi.length == input.length) 2 else 5,
@@ -3899,8 +3900,8 @@ class KanaKanjiEngine {
                     string = when (it.nodeId) {
                         -2 -> yomi
                         -1 -> yomi.hiraToKata()
-                        else -> systemTangoTrie.getLetter(
-                            it.nodeId, systemSuccinctBitVectorTangoLBS
+                        else -> SystemDictionaryErrata.fix(
+                            systemTangoTrie.getLetter(it.nodeId, systemSuccinctBitVectorTangoLBS)
                         )
                     },
                     type = if (yomi.length == input.length) 2 else 5,
