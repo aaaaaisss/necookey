@@ -64,8 +64,43 @@ internal object PosPairPenalty {
         return 0
     }
 
+    /**
+     * は-merge 対策（駅前|は|混んでる → 駅前|運んでる、既定 [HA_MERGE_PENALTY]、0 で無効）。名詞の直後の、読みが「は」で始まり
+     * 表記が漢字で始まる動詞（自立）に足す。名詞の直後の「は」は係助詞のことが多いが、語幹に吸われると 運ん・履い・吐い のように
+     * 別の動詞になって直しにくい。助詞抜き（荷物運んでる）も同じ並びなので値は控えめ。[haMergeTimeOnly] なら名詞,副詞可能（昨日・今日）の直後だけ。
+     */
+    const val HA_MERGE_PENALTY = 0
+
+    @Volatile
+    @JvmStatic
+    var haMergePenalty: Int = HA_MERGE_PENALTY
+
+    @Volatile
+    @JvmStatic
+    var haMergeTimeOnly: Boolean = false
+
+    private const val VERB_JIRITSU_FIRST = 577
+    private const val VERB_JIRITSU_LAST = 856
+    private const val NOUN_FIRST = 1841
+    private const val NOUN_LAST = 2195
+    private const val NOUN_ADVERBIAL_FIRST = 1909 // 名詞,副詞可能
+    private const val NOUN_ADVERBIAL_LAST = 1918
+
+    fun haMergeCost(prev: Node, node: Node): Int {
+        val p = haMergePenalty
+        if (p == 0) return 0
+        val y = node.yomiUsed
+        if (y.length < 2 || y[0] != 'は') return 0
+        val t = node.tango
+        if (t.isEmpty() || t[0] < '\u4E00' || t[0] > '\u9FFF' || t[0] == '入') return 0 // 入る は hairuCost の担当
+        if (node.l.toInt() !in VERB_JIRITSU_FIRST..VERB_JIRITSU_LAST) return 0
+        val r = prev.r.toInt()
+        val ok = if (haMergeTimeOnly) r in NOUN_ADVERBIAL_FIRST..NOUN_ADVERBIAL_LAST else r in NOUN_FIRST..NOUN_LAST
+        return if (ok) p else 0
+    }
+
     fun cost(prev: Node, node: Node): Int {
-        var penalty = hairuCost(prev, node)
+        var penalty = hairuCost(prev, node) + haMergeCost(prev, node)
         if (isOneKanaNumeral(node) && !isNumberContext(prev)) penalty += ONE_KANA_NUMERAL_PENALTY
         if (node.l.toInt() in SURU_FIRST..SURU_LAST && VERB_RENYOU_IDS.binarySearch(prev.r.toInt()) >= 0) {
             penalty += RENYOU_SURU_PENALTY
