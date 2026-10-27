@@ -18,6 +18,9 @@ enum class CandidateSource {
 object MozcNodeAttributes {
     const val NONE = 0
     const val STARTS_WITH_PARTICLE = 1
+
+    /** 方言の活用語尾を動詞語幹に付けた合成ノード（DialectInflectionNodes）。ラティス LM は語幹の表記で引く。 */
+    const val DIALECT_INFLECTION = 1 shl 8
 }
 
 data class Node(

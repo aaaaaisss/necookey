@@ -1,7 +1,9 @@
 package com.kazumaproject.markdownhelperkeyboard.converter.path_algorithm
 
+import com.kazumaproject.graph.MozcNodeAttributes
 import com.kazumaproject.graph.MozcNodeType
 import com.kazumaproject.graph.Node
+import com.kazumaproject.markdownhelperkeyboard.converter.graph.DialectInflectionNodes
 import java.io.DataInputStream
 import java.io.InputStream
 
@@ -30,8 +32,12 @@ object LatticeLmCost {
         val t = table ?: return 0
         if (node.mozcNodeType == MozcNodeType.EOS || node.tango == "EOS") return 0
         val bos = prev.mozcNodeType == MozcNodeType.BOS || prev.tango == "BOS"
-        return t.correction(if (bos) null else prev.tango, node.tango)
+        return t.correction(if (bos) null else lmWord(prev), lmWord(node))
     }
+
+    /** 方言の活用語尾の合成ノード（言えんかった・撮っとる）は語幹（言え・撮っ）で引く（合成語は表に無く、文脈が効かなくなるため）。 */
+    private fun lmWord(node: Node): String =
+        if ((node.mozcAttributes and MozcNodeAttributes.DIALECT_INFLECTION) != 0) DialectInflectionNodes.lmStem(node.tango) else node.tango
 
     @JvmStatic
     fun wordHash(s: String): Int {

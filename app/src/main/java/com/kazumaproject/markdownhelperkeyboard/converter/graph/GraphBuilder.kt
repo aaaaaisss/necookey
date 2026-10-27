@@ -602,6 +602,9 @@ class GraphBuilder {
         )
         val learnedCostNow = System.currentTimeMillis()
         val dialectActive = KanaDialectNodes.mayApply(str)
+        // 方言の活用語尾が始まる位置（語幹はその手前の辞書の動詞活用形、DialectInflectionNodes.kt）
+        val dialectSuffixStarts = if (DialectInflectionNodes.mayApply(str)) DialectInflectionNodes.suffixStarts(str) else IntArray(0)
+        val dialectSuffixCost = DialectInflectionNodes.suffixCost
         for (i in str.indices) {
             currentCoroutineContext().ensureActive()
             var subStrCache: String? = null
@@ -942,6 +945,45 @@ class GraphBuilder {
                         Node(l = id, r = id, score = cost, f = cost, g = cost, tango = tango, yomiUsed = yomiStr, len = yomiStr.length.toShort(), sPos = i),
                         graphNodeDedupMode, graphNodeTrace, str, "NUMBER",
                     )
+                }
+            }
+
+            // 3.05 方言の活用語尾を動詞語幹に付けた 1 ノード（DialectInflectionNodes.kt）。語幹 = str[i, e) の辞書の動詞活用形。
+            // 差分入力で語幹が再利用範囲にあっても、語尾の終わりが新しい範囲なら作る（共通接頭辞検索の結果には頼らない）。
+            for (e in dialectSuffixStarts) {
+                if (e <= i) continue
+                if (e - i > DialectInflectionNodes.MAX_STEM_LEN) break
+                val stemYomi = str.substring(i, e)
+                val idx = yomiTrie.getNodeIndex(stemYomi, succinctBitVectorLBSYomi)
+                if (idx <= 0) continue
+                val termId = yomiTrie.getTermId(idx, succinctBitVectorIsLeafYomi)
+                if (termId < 0) continue
+                tokenArray.forEachDictionaryByYomiTermId(termId, succinctBitVectorTokenArray) { posTableIndex, wordCost, tokenNodeId ->
+                    val leftId = tokenArray.leftIds[posTableIndex.toInt()]
+                    val stemClass = DialectInflectionNodes.stemClass(leftId)
+                    if (stemClass != 0) {
+                        val stemTango = when (tokenNodeId) {
+                            -2 -> stemYomi
+                            -1 -> stemYomi.hiraToKata()
+                            else -> tangoTrie.getLetter(tokenNodeId, succinctBitVector = succinctBitVectorTangoLBS)
+                        }
+                        val stemCost = wordCost.toInt() + VerbInflectionCost.delta(leftId, stemYomi, stemTango)
+                        for (sfx in DialectInflectionNodes.suffixesAt(str, e, stemClass)) {
+                            val sfxEnd = e + sfx.reading.length
+                            if (sfxEnd <= reusablePrefixLength) continue
+                            val yomi = stemYomi + sfx.reading
+                            val c = stemCost + dialectSuffixCost
+                            addOrUpdateNode(
+                                graph, sfxEnd,
+                                Node(
+                                    l = leftId, r = sfx.r, score = c, f = c, g = c, tango = stemTango + sfx.reading,
+                                    yomiUsed = yomi, len = yomi.length.toShort(), sPos = i,
+                                    mozcAttributes = mozcAttributesFor(leftId) or MozcNodeAttributes.DIALECT_INFLECTION,
+                                ),
+                                graphNodeDedupMode, graphNodeTrace, str, "DIALECT_INFLECTION",
+                            )
+                        }
+                    }
                 }
             }
 
