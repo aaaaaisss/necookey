@@ -46,8 +46,8 @@ interface LearnDao {
     /**
      * Predictive Search: Finds entries where the 'input' column starts with a given prefix.
      * This is useful for autocompleting user input.
-     * Lower scores are preferred by the conversion engine, so the most likely candidates are
-     * selected before applying the limit.
+     * Recently used entries are read first; the caller ranks a larger pool with
+     * [LearningScorePolicy.rankForPrediction].
      *
      * @param prefix The prefix string to search for.
      * @param limit The maximum number of results to return.
@@ -59,8 +59,8 @@ interface LearnDao {
         WHERE input >= :prefix AND input < :prefixUpperBound
           AND LENGTH(input) <= :maxReadingLength
         ORDER BY CASE WHEN input = :prefix THEN 0 ELSE 1 END,
-                 score ASC,
                  lastUsedAt DESC,
+                 score ASC,
                  LENGTH(input) ASC,
                  id DESC
         LIMIT :limit
@@ -120,10 +120,11 @@ interface LearnDao {
                         ),
                         leftId = incoming.leftId ?: existing.leftId,
                         rightId = incoming.rightId ?: existing.rightId,
-                        usageCount = (
-                            existing.usageCount.toLong() +
-                                incoming.usageCount.coerceAtLeast(1).toLong()
-                            ).coerceAtMost(Int.MAX_VALUE.toLong()).toInt(),
+                        usageCount = LearningScorePolicy.reinforcedCount(
+                            existingCount = existing.usageCount,
+                            existingLastUsedAt = existing.lastUsedAt,
+                            now = incoming.lastUsedAt,
+                        ),
                         lastUsedAt = maxOf(existing.lastUsedAt, incoming.lastUsedAt),
                         isPhrase = existing.isPhrase || incoming.isPhrase,
                     )
@@ -145,14 +146,59 @@ interface LearnDao {
         return previous
     }
 
-    /** [upsertLearningEntriesReturningPrevious] の前の状態に戻す（新しく入った行は消す）。 */
+    /**
+     * 既にある行だけを「使った」ことにする（学習対象にならない先頭候補の確定でも忘れないように）。
+     * 書く前の行を返す（無い読み・表記は何もしない）。
+     */
+    @Transaction
+    suspend fun touchExistingReturningPrevious(
+        keys: List<Pair<String, String>>,
+        timestamp: Long,
+    ): List<Pair<LearnEntity, LearnEntity?>> = keys.distinct().mapNotNull { (input, output) ->
+        val existing = findByInputAndOutput(input, output) ?: return@mapNotNull null
+        updateLearnedData(
+            existing.copy(
+                usageCount = LearningScorePolicy.reinforcedCount(existing.usageCount, existing.lastUsedAt, timestamp),
+                lastUsedAt = maxOf(existing.lastUsedAt, timestamp),
+            )
+        )
+        existing to existing
+    }
+
+    /**
+     * 上位に出したのに使われなかった語を弱める（[LearningScorePolicy.ignored]、下限未満は削除）。
+     * 書く前の行を返す。
+     */
+    @Transaction
+    suspend fun applyIgnoredReturningPrevious(
+        keys: List<Pair<String, String>>,
+        factor: Double,
+        now: Long,
+    ): List<Pair<LearnEntity, LearnEntity?>> = keys.distinct().mapNotNull { (input, output) ->
+        val existing = findByInputAndOutput(input, output) ?: return@mapNotNull null
+        val next = LearningScorePolicy.ignored(existing.usageCount, existing.lastUsedAt, now, factor)
+        if (next == null) {
+            deleteByInputAndOutput(input, output)
+        } else {
+            updateLearnedData(existing.copy(usageCount = next.first, lastUsedAt = next.second))
+        }
+        existing to existing
+    }
+
+    /** 忘れた行（時間つきで [cutoff] より前に使われたもの）を消す。lastUsedAt が 0 の行は残す。 */
+    @Query("DELETE FROM learn_table WHERE lastUsedAt > 0 AND lastUsedAt < :cutoff")
+    suspend fun deleteExpired(cutoff: Long): Int
+
+    /** 書く前の状態に戻す（新しく入った行は消す、消した行は入れ直す）。リストの順に戻す。 */
     @Transaction
     suspend fun revertLearningEntries(previous: List<Pair<LearnEntity, LearnEntity?>>) {
         previous.forEach { (incoming, before) ->
             if (before == null) {
                 deleteByInputAndOutput(incoming.input, incoming.out)
-            } else {
+            } else if (findByInputAndOutput(before.input, before.out) != null) {
                 updateLearnedData(before)
+            } else {
+                insert(before)
             }
         }
     }

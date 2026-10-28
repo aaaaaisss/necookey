@@ -654,14 +654,14 @@ class GraphBuilder {
             if (learnedWords.isNotEmpty()) foundInAnyDictionary = true
             learnedWords.forEach { learnedWord ->
                 val endIndex = i + learnedWord.input.length
-                // 上限つき・古さで弱まる単語コスト（読み出し時に計算）。
+                // 学習直後は強く、半減期で弱まる単語コスト（読み出し時に計算、LearningScorePolicy）。
                 val learnedCost = LearningScorePolicy.conversionCost(
                     storedScore = learnedWord.score,
                     usageCount = learnedWord.usageCount,
                     lastUsedAt = learnedWord.lastUsedAt,
                     readingLength = learnedWord.input.length,
                     now = learnedCostNow,
-                )
+                ) ?: return@forEach // 忘れた語（強さが下限未満）はグラフに入れない
                 val node = Node(
                     l = learnedWord.leftId ?: 1851.toShort(),
                     r = learnedWord.rightId ?: 1851.toShort(),

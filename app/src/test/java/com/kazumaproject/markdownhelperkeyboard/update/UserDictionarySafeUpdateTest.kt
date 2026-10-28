@@ -175,6 +175,12 @@ private class FakeLearnDao(
         .sortedBy { it.score }
         .take(limit)
 
+    override suspend fun deleteExpired(cutoff: Long): Int {
+        val before = entries.size
+        entries.removeAll { it.lastUsedAt in 1 until cutoff }
+        return before - entries.size
+    }
+
     override suspend fun deleteByInputAndOutput(input: String, output: String): Int {
         val before = entries.size
         entries.removeAll { it.input == input && it.out == output }

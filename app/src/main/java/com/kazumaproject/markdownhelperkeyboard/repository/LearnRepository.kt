@@ -5,11 +5,13 @@ import com.kazumaproject.markdownhelperkeyboard.converter.engine.PredictionConfi
 import com.kazumaproject.markdownhelperkeyboard.learning.LearningEligibilityPolicy
 import com.kazumaproject.markdownhelperkeyboard.learning.database.LearnDao
 import com.kazumaproject.markdownhelperkeyboard.learning.database.LearnEntity
+import com.kazumaproject.markdownhelperkeyboard.learning.database.LearningScorePolicy
 import com.kazumaproject.markdownhelperkeyboard.learning.model.LearnResult
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import java.util.concurrent.atomic.AtomicInteger
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -100,6 +102,38 @@ class LearnRepository @Inject constructor(
         return previous
     }
 
+    /** 確定した語で既に学習済みのものを「使った」ことにする（書く前の行を返す）。 */
+    suspend fun touchExistingReturningPrevious(
+        keys: List<Pair<String, String>>,
+        timestamp: Long,
+    ): List<Pair<LearnEntity, LearnEntity?>> {
+        if (keys.isEmpty()) return emptyList()
+        val previous = learnDao.touchExistingReturningPrevious(keys, timestamp)
+        if (previous.isNotEmpty()) invalidateConversionSnapshot()
+        return previous
+    }
+
+    /** 上位に出したのに使われなかった学習語を弱める／消す（書く前の行を返す）。 */
+    suspend fun applyIgnoredReturningPrevious(
+        keys: List<Pair<String, String>>,
+        factor: Double,
+        now: Long,
+    ): List<Pair<LearnEntity, LearnEntity?>> {
+        if (keys.isEmpty()) return emptyList()
+        val previous = learnDao.applyIgnoredReturningPrevious(keys, factor, now)
+        if (previous.isNotEmpty()) invalidateConversionSnapshot()
+        return previous
+    }
+
+    /** 忘れた行をたまに消す（書き込み [PRUNE_EVERY] 回に 1 回）。 */
+    suspend fun pruneExpiredOccasionally(now: Long) {
+        if (writesSincePrune.incrementAndGet() < PRUNE_EVERY) return
+        writesSincePrune.set(0)
+        if (learnDao.deleteExpired(LearningScorePolicy.expiryCutoff(now)) > 0) invalidateConversionSnapshot()
+    }
+
+    private val writesSincePrune = AtomicInteger(PRUNE_EVERY)
+
     /** 確定直後の後退: その確定で書いた学習を書く前に戻す。 */
     suspend fun revertLearnedData(previous: List<Pair<LearnEntity, LearnEntity?>>) {
         if (previous.isEmpty()) return
@@ -118,14 +152,16 @@ class LearnRepository @Inject constructor(
         prefix: String,
         limit: Int,
         maxReadingLength: Int = PredictionConfig.MAX_PREDICTION_INPUT_LENGTH,
+        now: Long = System.currentTimeMillis(),
     ): List<LearnEntity> {
-        if (maxReadingLength <= 0) return emptyList()
-        return learnDao.predictiveSearchByInput(
+        if (maxReadingLength <= 0 || limit <= 0) return emptyList()
+        val pool = learnDao.predictiveSearchByInput(
             prefix = prefix,
             prefixUpperBound = prefix.upperBound(),
-            limit = limit,
+            limit = limit * PREDICTION_POOL_FACTOR,
             maxReadingLength = maxReadingLength,
         ).filter { it.input.length <= maxReadingLength }
+        return LearningScorePolicy.rankForPrediction(pool, prefix, now, limit)
     }
 
     /**
@@ -242,6 +278,11 @@ class LearnRepository @Inject constructor(
 }
 
 private fun String.upperBound(): String = this + '\uFFFF'
+
+private const val PRUNE_EVERY = 50
+
+/** 予測の並べ替えのために多めに読む倍率。 */
+private const val PREDICTION_POOL_FACTOR = 4
 
 enum class LearnUpdateResult {
     Updated,
