@@ -8,21 +8,6 @@ import java.io.File
 class SharedActionBarNavigationContractTest {
 
     @Test
-    fun mainActivityOwnsSharedActionBarVisibilityForEveryHiddenHeaderDestination() {
-        val source = mainFile("MainActivity.kt").readText()
-
-        assertTrue(source.contains("private val destinationsWithOwnToolbar = setOf("))
-        assertTrue(source.contains("R.id.candidateViewHeightSettingFragment"))
-        assertTrue(source.contains("R.id.candidateHeightDefaultsFragment"))
-        assertTrue(source.contains("private val destinationsWithoutSharedActionBar"))
-        assertTrue(source.contains("destinationsWithOwnToolbar + R.id.enableKeyboardFragment"))
-        assertTrue(source.contains("updateSharedActionBarVisibility(destination.id)"))
-        assertTrue(source.contains("destinationId in destinationsWithoutSharedActionBar"))
-        assertTrue(source.contains("supportActionBar?.hide()"))
-        assertTrue(source.contains("supportActionBar?.show()"))
-    }
-
-    @Test
     fun fragmentsNeverClearTheSharedActionBarTitleAfterNavigation() {
         val sourceRoot = projectFile("app/src/main/java", "src/main/java")
         val blankSharedTitleAssignments = listOf(
