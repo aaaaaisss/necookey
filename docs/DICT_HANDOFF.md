@@ -77,3 +77,11 @@ SumireNbestDumpTest の `err` キーをまとめて削除する。
 - 県庁ガード NG：けんちょうにいった → 1 位 堅調に行った（正解 3 位、ガードは top5 で許容中）。同音異義。
 - 境界 b001（ここではきものを… → では着物）・b014（きのうはいたくつがない → 機能は痛く注がない、正解 8 位）。
 - 同音異義 16 件はリランカー待ち（表は APK 非同梱・ローカルにも無い）。
+
+## 本家スミレ辞書との比較（2026-10-28 確認）
+
+- 本家：KazumaProject/JapaneseKeyboard（dev 58b6bd9b, 2026-10-27）。辞書の生成元は KazumaProject/kotlin-kana-kanji-converter（手修正は `src/main/kotlin/Constants.kt`）。
+- necookey の `dictionary-src/system` は本家 c306c054（2026-09-17）と同一。connectionId・pos_table・id.def・ngram も本家最新と同一。
+- 本家最新 system 辞書との差分は追加 4 語のみ（えーあい/AI、したせん/下線、ひとくふう/一工夫、ふたくふう/二工夫）、削除 0。おこっ/怒っ の欠落・煽 の おこ 読みは本家でも未修正（怒る は Constants.kt で基本形だけ手追加されているのが原因）。
+- 比較方法：`NK_DICT_SRC=<本家の system ディレクトリ> NK_DICT_DUMP=... ./gradlew ... --tests '*SystemDictionaryDumpTest*'` で両方ダンプして sort/comm。
+- 本家の大きな変更は 143 カテゴリの「分類辞書」（categories/、約 14MB、既定 OFF、wiki/neologd/人名/地名を再分類）、standalone unigram（system_ngram_standalone_unigram.dat＋FindPath 変更）、LOUDSWithTermId の境界ループ修正（9162aadc）。necookey は旧形式の wiki/places/person_name を使っており、分類辞書の取り込みはローダー・設定 UI の移植が必要で APK も増える。

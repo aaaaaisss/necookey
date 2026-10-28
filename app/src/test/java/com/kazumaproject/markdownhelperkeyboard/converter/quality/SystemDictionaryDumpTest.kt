@@ -23,7 +23,7 @@ class SystemDictionaryDumpTest {
         val out = System.getenv("NK_DICT_DUMP")
         assumeTrue(!out.isNullOrBlank())
         val app = listOf(File("."), File("app")).first { File(it, "dictionary-src/system/token.dat.zip").isFile }
-        val src = File(app, "dictionary-src/system")
+        val src = System.getenv("NK_DICT_SRC")?.let { File(it) } ?: File(app, "dictionary-src/system")
         val tango = read(File(src, "tango.dat.zip")) { LOUDS().readExternalNotCompress(it) }
         val yomi = read(File(src, "yomi.dat.zip")) { LOUDSWithTermId().readExternalNotCompress(it) }
         val token = read(File(src, "token.dat.zip")) { input -> TokenArray().also { it.readExternal(input) } }
