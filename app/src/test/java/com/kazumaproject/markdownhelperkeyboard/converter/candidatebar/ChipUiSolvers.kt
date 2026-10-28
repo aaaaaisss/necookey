@@ -55,8 +55,10 @@ internal fun firstWrong(outputs: List<String>, gold: String): Pair<Int, Int> {
     return outputs.size to pos
 }
 
-/** 新 UI（文節チップ）。 */
-/** [useFullAlternatives] = 予測行の読み全体の別候補を 1 手で選べるとみなす。 */
+/**
+ * 新 UI（文節チップ）。操作と手数: 予測行の読み全体の別候補 1（最初だけ、[useFullAlternatives]）、チップのタップ 1、
+ * 候補選択 1、切る = 長押し＋文字の間タップで 2、くっつける（チップ間タップ）1、チップ端の左右フリック 1。
+ */
 class NewUiSolver(
     private val model: ChipBarModel,
     private val maxMoves: Int = 6,
@@ -77,13 +79,6 @@ class NewUiSolver(
             }
             val (f, pos) = firstWrong(s.chips.map { it.output }, gold)
             if (f >= s.chips.size) return@uniformCost out
-            if (s.selected == -1) {
-                val last = f == s.chips.lastIndex
-                (model.lowerRow(s) as? LowerRow.Predictions)?.chipPicks?.forEach { p ->
-                    if (p.chipIndex != f || !gold.startsWith(p.text, pos) || (last && pos + p.text.length != gold.length)) return@forEach
-                    model.pickChipPick(s, p)?.let { out += Triple(it, 1, "予測行のチップ候補「${p.text}」") }
-                }
-            }
             if (s.selected != f) out += Triple(model.tap(s, f), 1, "タップ#$f「${s.chips[f].output}」")
             else {
                 val row = model.lowerRow(s) as LowerRow.ChipCandidates
@@ -92,14 +87,19 @@ class NewUiSolver(
                     if (c == s.chips[f].output || !gold.startsWith(c, pos) || (last && pos + c.length != gold.length)) continue
                     model.pickCandidate(s, c)?.let { out += Triple(it, 1, "候補「$c」") }
                 }
-                for (alt in row.splitAlternatives) {
-                    model.pickSplitAlternative(s, alt)?.let { out += Triple(it, 1, "区切り候補「${alt.label}」") }
-                }
             }
             for (i in listOf(f - 1, f)) {
                 if (i < 0) continue
                 model.flickRight(s, i)?.let { out += Triple(it, 1, "右フリック#$i") }
                 model.flickLeft(s, i)?.let { out += Triple(it, 1, "左フリック#$i") }
+                model.join(s, i)?.let { out += Triple(it, 1, "くっつける#$i+${i + 1}") }
+                model.longPress(s, i)?.let { ex ->
+                    for (p in model.cutPositions(ex)) {
+                        val c = s.chips[i]
+                        val label = "切る#$i「${reading.substring(c.start, p)}|${reading.substring(p, c.end)}」"
+                        model.cutAt(ex, p)?.let { out += Triple(it, 2, label) }
+                    }
+                }
             }
             out
         }
