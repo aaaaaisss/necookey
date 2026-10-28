@@ -31,3 +31,9 @@ NGワード、キーボード自作・編集（メイン利用）、記号キー
 - AIコード（zenz/jinen/llama.cpp）は改変しない方針だった→今は slim で削除済み。
 - `pkill -f gradle` は禁止（自分のシェルが死ぬ）。KSP が古い生成物を復元したら app/build/kspCaches と generated/ksp を消して --no-build-cache。
 - ローカルビルドは重い。APK は CI（necookey-debug-apk.yml、main/slim 等への push で起動）を使う。
+
+## prep-cleanup（2026-10-28、conv-dialect 1f22e7b から。ローカルのみ）
+- 検証は `tools/verify.sh`（コンパイル 4 種＋全 JVM テストを gradle 1 回。`VERIFY_EVAL=1` で 179/reg/dia 評価も、基準値と比べて PASS/FAIL）。
+- aarch64 サンドボックスでは Robolectric ネイティブランタイム非対応のテストを除外（`tools/robolectric_aarch64_excludes.txt`、ルート build.gradle。x86_64/CI は従来どおり全件）。
+- 変換エンジン: 文節分離なしの旧経路（getCandidatesOriginal / getCandidates / getCandidatesWithoutPrediction、アプリは常に bunsetsuSeparation=true）と未使用関数を削除、特殊候補（日付・数字）を engine/SpecialInputCandidates.kt・NumberCandidates.kt に分離。
+- リランカー差し替え口: `CandidateReranker` / `CandidateRerankers`（docs/RERANKER_HOOKUP.md）。

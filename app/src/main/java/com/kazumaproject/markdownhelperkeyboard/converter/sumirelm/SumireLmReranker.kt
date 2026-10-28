@@ -37,7 +37,7 @@ class SumireLmReranker private constructor(
     private val mu: DoubleArray,
     private val sd: DoubleArray,
     private val wv: DoubleArray,
-) {
+) : CandidateReranker {
     /** 候補 1 つ。[tokens] は Sumire の語分割（conversionSegments の出力）。空なら文字列を語彙で分割する。 */
     class Input(
         val surface: String,
@@ -62,7 +62,7 @@ class SumireLmReranker private constructor(
      * 各候補のスコア（大きいほど良い）。[context] は左文脈（生の文字列）。候補は Sumire の順（rank 0 が先頭）で渡す。
      * 文頭扱いは学習時と同じく左文脈が 20 字未満のとき。
      */
-    fun score(context: String, cands: List<Input>): DoubleArray {
+    override fun score(context: String, cands: List<Input>): DoubleArray {
         if (cands.isEmpty()) return DoubleArray(0)
         val bos = context.length < 20
         val nctx = nfkc(context)

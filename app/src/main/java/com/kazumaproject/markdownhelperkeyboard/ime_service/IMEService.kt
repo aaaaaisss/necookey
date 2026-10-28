@@ -182,7 +182,8 @@ import com.kazumaproject.markdownhelperkeyboard.clipboard_history.database.Clipb
 import com.kazumaproject.markdownhelperkeyboard.clipboard_history.database.ItemType
 import com.kazumaproject.markdownhelperkeyboard.converter.candidate.BunsetsuCandidateResult
 import com.kazumaproject.markdownhelperkeyboard.converter.candidatebar.SumireLmGate
-import com.kazumaproject.markdownhelperkeyboard.converter.sumirelm.SumireLmReranker
+import com.kazumaproject.markdownhelperkeyboard.converter.sumirelm.CandidateReranker
+import com.kazumaproject.markdownhelperkeyboard.converter.sumirelm.CandidateRerankers
 import com.kazumaproject.markdownhelperkeyboard.converter.candidatebar.BunsetsuAnalysis
 import com.kazumaproject.markdownhelperkeyboard.converter.candidatebar.BunsetsuAnalyzer
 import com.kazumaproject.markdownhelperkeyboard.converter.candidatebar.BunsetsuRangeEditor
@@ -8500,7 +8501,7 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
     }
 
     private val sumireLmLoadMutex = Mutex()
-    @Volatile private var sumireLmReranker: SumireLmReranker? = null
+    @Volatile private var sumireLmReranker: CandidateReranker? = null
     @Volatile private var sumireLmLastMissAt: Long = Long.MIN_VALUE
     /** 直前のリランカー 1 位（入力が止まった後の追加判定で、ドラフトの基準に使う）: 文脈・読み → 候補。 */
     @Volatile private var sumireLmLastTop: Pair<String, Candidate>? = null
@@ -8510,7 +8511,7 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
      * /sdcard/Android/data/<package>/files/sumire_lm/）→ 内部 files/sumire_lm/ → アセット sumire_lm/（あれば内部へコピー）。
      * 無ければ null（リランカーなし）、[SUMIRE_LM_RETRY_MS] 後にまた探す。
      */
-    private suspend fun sumireLmRerankerOrNull(): SumireLmReranker? {
+    private suspend fun sumireLmRerankerOrNull(): CandidateReranker? {
         sumireLmReranker?.let { return it }
         val now = SystemClock.uptimeMillis()
         if (sumireLmLastMissAt != Long.MIN_VALUE && now - sumireLmLastMissAt < SUMIRE_LM_RETRY_MS) return null
@@ -8523,7 +8524,7 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
                 )
                 dirs.firstNotNullOfOrNull { dir ->
                     if (dir == dirs.last()) copySumireLmAssetsIfNeeded(dir)
-                    SumireLmReranker.load(dir)
+                    CandidateRerankers.load(dir)
                 }
             }
             if (loaded == null) sumireLmLastMissAt = SystemClock.uptimeMillis()
@@ -8538,7 +8539,7 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         try {
             if (File(dir, "meta.tsv").isFile) return
             val names = assets.list(SUMIRE_LM_TABLE_DIR)?.toList().orEmpty()
-            if (SumireLmReranker.REQUIRED_FILES.any { it !in names }) return
+            if (!CandidateRerankers.isCompleteTable(names)) return
             val temporary = File(filesDir, "$SUMIRE_LM_TABLE_DIR.tmp")
             temporary.deleteRecursively()
             temporary.mkdirs()

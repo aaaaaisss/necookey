@@ -12,7 +12,7 @@ import com.kazumaproject.markdownhelperkeyboard.converter.ngram.EmptySystemNgram
 import com.kazumaproject.markdownhelperkeyboard.converter.ngram.SystemNgramDictionary
 import com.kazumaproject.markdownhelperkeyboard.converter.path_algorithm.FindPath
 import com.kazumaproject.markdownhelperkeyboard.converter.path_algorithm.LatticeLmCost
-import com.kazumaproject.markdownhelperkeyboard.converter.sumirelm.SumireLmReranker
+import com.kazumaproject.markdownhelperkeyboard.converter.sumirelm.CandidateRerankers
 import kotlinx.coroutines.runBlocking
 import org.junit.Assume.assumeTrue
 import org.junit.Test
@@ -42,7 +42,7 @@ import java.util.concurrent.TimeoutException
  *  NK_DUMP_OUT           実機上段と同じ設定の候補（n=8、昇格後、読み全体の候補だけ）
  *  NK_DUMP_OUT.pool      リランカープール（n=50）
  *  NK_DUMP_OUT.legacy    旧ハーネス相当（n-gram なし、getCandidatesWithBunsetsuSeparation n=50、表は同じ）。NK_LEGACY=0 で省略
- *  NK_DUMP_OUT.rerank    NK_RERANK_DIR に SumireLmReranker の表（meta.tsv ほか）があればプールの並べ替え結果（列 9 = スコア）
+ *  NK_DUMP_OUT.rerank    NK_RERANK_DIR に CandidateRerankers が読める表（SUMIRE-LM なら meta.tsv ほか）があればプールの並べ替え結果（列 9 = スコア）
  * NK_NGRAM=0 でシステム n-gram を外す（比較用）。NK_DUMP_SHARD=i/n。1 呼び出し 30 秒で打ち切り。
  */
 class SumireNbestDumpTest {
@@ -102,7 +102,7 @@ class SumireNbestDumpTest {
                 .also { println("lattice cost table: ${it.wordCount} words, ${it.pairCount} pairs") }
         }
         LatticeLmCost.table = lcTable
-        val reranker = System.getenv("NK_RERANK_DIR")?.takeIf { it.isNotBlank() }?.let { SumireLmReranker.load(File(it)) }
+        val reranker = System.getenv("NK_RERANK_DIR")?.takeIf { it.isNotBlank() }?.let { CandidateRerankers.load(File(it)) }
         println("reranker: ${if (reranker != null) "loaded" else "none"}")
         val deviceN = DeviceConfigConversion.DEVICE_N
 
