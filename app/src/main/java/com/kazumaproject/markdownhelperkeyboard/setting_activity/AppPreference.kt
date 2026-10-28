@@ -515,9 +515,9 @@ object AppPreference {
         Pair("learn_dictionary_allow_mixed_symbols_numbers_preference", true)
 
     private val ENABLE_PREDICTION_SEARCH_LEARN_DICTIONARY_PREFERENCE =
-        Pair("enable_prediction_search_learn_dictionary_preference", false)
+        Pair("enable_prediction_search_learn_dictionary_preference", true)
 
-    private val LEARN_PREDICTION_PREFERENCE = Pair("learn_prediction_preference", 4)
+    private val LEARN_PREDICTION_PREFERENCE = Pair("learn_prediction_preference", 2)
     private val LEARN_PREDICTION_CANDIDATE_LIMIT_PREFERENCE =
         Pair("learn_dictionary_prediction_candidate_limit_preference", 4)
     private val USER_DICTIONARY_PREDICTION_CANDIDATE_LIMIT_PREFERENCE =

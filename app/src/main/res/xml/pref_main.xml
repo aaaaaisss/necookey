@@ -373,11 +373,11 @@
                     android:dependency="learn_dictionary_preference"
                     android:key="enable_prediction_search_learn_dictionary_preference"
                     android:title="@string/enable_prediction_search_learn_dictionary_preference_titile"
-                    app:defaultValue="false"
+                    app:defaultValue="true"
                     app:summary="@string/enable_prediction_search_learn_dictionary_preference_summary"
                     app:iconSpaceReserved="false" />
                 <SeekBarPreference
-                    android:defaultValue="4"
+                    android:defaultValue="2"
                     android:dependency="enable_prediction_search_learn_dictionary_preference"
                     android:key="learn_prediction_preference"
                     android:max="8"
