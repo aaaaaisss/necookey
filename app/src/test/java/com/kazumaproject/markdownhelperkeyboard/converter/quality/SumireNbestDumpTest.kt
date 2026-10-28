@@ -53,6 +53,17 @@ class SumireNbestDumpTest {
      */
     @Test
     fun dump() {
+        // NK_DUMP_SETS="名前=入力tsv;名前2=..." と NK_DUMP_DIR なら入力ごとに DIR/名前/cands.tsv へ（tools/verify.sh 用。1 回の JVM で 179/reg/dia）
+        val sets = System.getenv("NK_DUMP_SETS")?.takeIf { it.isNotBlank() }
+        if (sets != null) {
+            val dir = System.getenv("NK_DUMP_DIR")
+            assumeTrue(!dir.isNullOrBlank())
+            for (s in sets.split(';').filter { '=' in it }) {
+                val out = File(dir, s.substringBefore('=')).apply { mkdirs() }
+                dumpOne(File(out, "cands.tsv").path, s.substringAfter('='))
+            }
+            return
+        }
         val configs = System.getenv("NK_CONFIGS")?.takeIf { it.isNotBlank() }
         if (configs == null) {
             dumpOne(System.getenv("NK_DUMP_OUT"))
@@ -72,8 +83,7 @@ class SumireNbestDumpTest {
         ConversionKnobs.reset()
     }
 
-    private fun dumpOne(outPath: String?) {
-        val inPath = System.getenv("NK_DUMP_IN")
+    private fun dumpOne(outPath: String?, inPath: String? = System.getenv("NK_DUMP_IN")) {
         assumeTrue(!inPath.isNullOrBlank() && !outPath.isNullOrBlank())
         val (si, sn) = (System.getenv("NK_DUMP_SHARD") ?: "0/1").split('/').map { it.toInt() }
         val ngramOn = System.getenv("NK_NGRAM") != "0"

@@ -13,3 +13,19 @@ plugins {
 //        exclude group: "junit", module: "junit"
 //    }
 //}
+
+// Linux aarch64（ローカルのサンドボックス）だけの JVM テスト設定。x86_64 / mac / CI には影響しない。
+// Robolectric のネイティブランタイムと Conscrypt の JNI が aarch64 非対応のため、該当テストを除外し Conscrypt を切る。
+// 一覧と理由: tools/robolectric_aarch64_excludes.txt
+if (System.getProperty("os.name") == "Linux" && System.getProperty("os.arch") == "aarch64") {
+    def aarch64Excludes = file("tools/robolectric_aarch64_excludes.txt").readLines()
+        .collect { it.trim() }.findAll { it && !it.startsWith("#") }
+    subprojects { p ->
+        tasks.withType(Test).configureEach {
+            systemProperty "robolectric.conscryptMode", "OFF"
+            aarch64Excludes.findAll { it.startsWith(p.name + ":") }.each {
+                filter.excludeTestsMatching("*." + it.substring(p.name.length() + 1))
+            }
+        }
+    }
+}
