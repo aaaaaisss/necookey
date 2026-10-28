@@ -9,3 +9,7 @@
 ## ev3.py（2026-10-27）
 `python3 ev3.py <dump...>` で exact/lenient/致命/ツギハギ/oracle@2,3 と直った/壊れた文を出す。
 `reg.tsv`（回帰リスト 109 文）・`dia.tsv`（方言追加 20 文）も同形式。複数設定は SumireNbestDumpTest の `NK_CONFIGS` で 1 回のビルドで出せる。定義は RESULTS.md。
+
+## 文節チップ UI の手数評価（2026-10-28）
+`ChipUiEvalTest`（NK_CHIP_OUT / NK_CHIP_SETS）→ `python3 chip_eval.py OUT 179=in.tsv reg=reg.tsv dia=dia.tsv long=long.tsv --classified classified.tsv --list`。
+long.tsv = 179 文を 2 文ずつつないだ長文 89。結果と方法は CHIP_UI_EVAL.md、文ごとの手数は chip_eval/*.tsv。
