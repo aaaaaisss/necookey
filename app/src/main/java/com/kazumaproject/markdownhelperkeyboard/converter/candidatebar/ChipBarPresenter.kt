@@ -134,14 +134,26 @@ object ChipBarPresenter {
     /** ユーザーがチップに触ったか（選択・展開・編集）。触った後は入力欄をチップの表記で上書きし、ライブ変換で戻さない。 */
     fun isTouched(state: ChipBarState): Boolean = state.selected >= 0 || state.expanded >= 0 || isEdited(state)
 
-    /** 確定時の文節ごとの学習（チップ = 文節）。 */
+    /**
+     * 確定時の文節ごとの学習（チップ = 文節）。境界操作・候補選択で変えたチップと、読み全体の別候補から来て
+     * 1 位経路の同じ範囲の表記と違うチップを明示選択にする。
+     */
     fun learningFragments(state: ChipBarState): List<ChipLearningFragment> = state.chips.map { chip ->
         ChipLearningFragment(
             reading = state.reading.substring(chip.start, chip.end),
             output = chip.output,
             explicit = chip.origin == Chip.Origin.PICKED || chip.origin == Chip.Origin.RESIZED ||
-                state.whole.primary?.output != state.text,
+                primaryOutput(state, chip.start, chip.end) != chip.output,
         )
+    }
+
+    /** 1 位経路で読みの範囲 [start, end) を覆う語の表記（語の境界と合わなければ null）。 */
+    private fun primaryOutput(state: ChipBarState, start: Int, end: Int): String? {
+        val words = state.whole.primary?.words ?: return null
+        val inside = words.filter { it.start >= start && it.end <= end }
+        if (inside.isEmpty() || inside.first().start != start || inside.last().end != end) return null
+        if (inside.zipWithNext().any { (a, b) -> a.end != b.start }) return null
+        return inside.joinToString("") { it.output }
     }
 
     /**

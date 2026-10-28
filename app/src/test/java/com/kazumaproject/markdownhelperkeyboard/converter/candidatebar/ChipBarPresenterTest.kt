@@ -131,7 +131,8 @@ class ChipBarPresenterTest {
         assertEquals(listOf(false, true), ChipBarPresenter.learningFragments(picked).map { it.explicit })
         val full = m.pickFullAlternative(s, "で履物")!!
         assertEquals(
-            listOf(ChipLearningFragment("で", "で", true), ChipLearningFragment("はきもの", "履物", true)),
+            // で は 1 位経路の同じ範囲と同じ表記なので明示選択にしない
+            listOf(ChipLearningFragment("で", "で", false), ChipLearningFragment("はきもの", "履物", true)),
             ChipBarPresenter.learningFragments(full),
         )
     }
