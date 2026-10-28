@@ -276,7 +276,9 @@ import com.kazumaproject.markdownhelperkeyboard.ime_service.romaji_kana.RomajiKa
 import com.kazumaproject.markdownhelperkeyboard.ime_service.state.CandidateTab
 import com.kazumaproject.markdownhelperkeyboard.ime_service.state.InputTypeForIME
 import com.kazumaproject.markdownhelperkeyboard.ime_service.state.KeyboardType
+import com.kazumaproject.markdownhelperkeyboard.learning.LearningFeedbackPlan
 import com.kazumaproject.markdownhelperkeyboard.learning.database.LearnEntity
+import com.kazumaproject.markdownhelperkeyboard.learning.database.LearningScorePolicy
 import com.kazumaproject.markdownhelperkeyboard.learning.nextword.NextWordEntity
 import com.kazumaproject.markdownhelperkeyboard.learning.nextword.NextWordPolicy
 import com.kazumaproject.markdownhelperkeyboard.learning.nextword.NextWordRepository
@@ -1291,7 +1293,7 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
     private var learnFirstCandidateDictionaryPreference: Boolean? = false
     private var learnDictionaryAllowMixedSymbolsNumbersPreference: Boolean = true
     private var enablePredictionSearchLearnDictionaryPreference: Boolean? = false
-    private var learnPredictionPreference: Int? = 4
+    private var learnPredictionPreference: Int? = 2
     private var userDictionaryPredictionCandidateLimit: Int = 4
     private var learnDictionaryPredictionCandidateLimit: Int = 4
     private val conversionLearningSession = ConversionLearningSession()
@@ -1431,6 +1433,9 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         /** 案2 ラティス辺コスト表（LatticeLmCost、SLC2）のアセット。ビルド時に lm-data から取得（無ければ従来どおり）。 */
         private const val LATTICE_LM_ASSET = "lattice_lm/lc_np1m.slc"
         private const val NEXT_WORD_CANDIDATE_LIMIT = 6
+
+        /** 予測の上から何個を「上位に出した」とみなすか（使われなければ弱める）。 */
+        private const val LEARNING_FEEDBACK_PREDICTION_SLOTS = 2
         private const val LONG_DELAY_TIME = 64L
         private const val DEFAULT_DELAY_MS = 1000L
         private const val DEFAULT_LIVE_CONVERSION_APPLY_DELAY_MS = 120L
@@ -1542,6 +1547,26 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
     private var necookeyLeftContextInput: String = ""
     /** Left context of the conversion the current learning session started with. */
     private var learningSessionLeftContext: String? = null
+
+    /**
+     * 候補欄に出した上位（変換の先頭・予測の上位 [LEARNING_FEEDBACK_PREDICTION_SLOTS] 個）と、そのうち後続語が支えた表記。
+     * 確定で別の候補が選ばれたら、上位に出した学習語・後続語を弱める（docs/LEARNING.md）。
+     */
+    private class ShownForLearningFeedback(
+        val input: String,
+        val primary: String?,
+        val topPredictions: List<Candidate>,
+        val nextWords: Map<String, NextWordEntity>,
+    )
+
+    /** 今の読みに出している上位（[publishNecookeyTwoRowBar] で更新）。 */
+    private var necookeyShownForFeedback: ShownForLearningFeedback? = null
+
+    /** 今の予測に混ぜた後続語（表記 → 後続語）。[setCandidatesNecookeyTwoRow] で更新。 */
+    private var necookeyShownNextWords: Map<String, NextWordEntity> = emptyMap()
+
+    /** 学習セッション開始時（最初の確定時）に出ていた上位。 */
+    private var learningSessionShown: ShownForLearningFeedback? = null
     /** Output of the last bunsetsu learned; the context of the next commit's first bunsetsu. */
     private var lastLearnedBunsetsuOutput: String? = null
 
@@ -12588,39 +12613,71 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         learningSessionLeftContext = necookeyLeftContext.takeIf {
             necookeyLeftContextInput.isNotEmpty() && originalReading.startsWith(necookeyLeftContextInput)
         }
+        learningSessionShown = necookeyShownForFeedback?.takeIf { it.input == originalReading }
     }
 
     private fun persistCompletedLearningSession() {
         val fragments = conversionLearningSession.recordedFragments()
         val sessionLeftContext = learningSessionLeftContext
         learningSessionLeftContext = null
+        val shown = learningSessionShown
+        learningSessionShown = null
         val entries = conversionLearningSession.finish(
             learnFirstCandidate = learnFirstCandidateDictionaryPreference == true,
         )
         val committedText = fragments.joinToString(separator = "") { it.output }
+        val committedReading = fragments.joinToString(separator = "") { it.reading }
         val revert = if (committedText.isNotEmpty() && isLearningWriteEnabled()) {
             LearningRevert(committedText, lastLearnedBunsetsuOutput)
         } else {
             null
         }
         setPendingLearningRevert(revert)
-        persistNextWords(sessionLeftContext, fragments, revert)
-        if (entries.isEmpty()) return
+        val feedback = shown?.takeIf { it.input == committedReading && committedText.isNotEmpty() }
+            ?.let { LearningFeedbackPlan.of(it.primary, it.topPredictions, it.nextWords, committedText) }
+        persistNextWords(sessionLeftContext, fragments, revert, feedback?.ignoredNextWords.orEmpty())
+        if (revert == null || fragments.isEmpty()) return
+        // 先頭候補の確定は学習対象にならないこともあるので、既に学習済みの語は「使った」ことにして忘れないようにする。
+        val used = (fragments.map { it.reading to it.output } + (committedReading to committedText))
+            .filter { it.first.isNotEmpty() && it.second.isNotEmpty() }
+            .distinct()
+        val ignoredPrimary = feedback?.ignoredPrimary?.let { committedReading to it }
+        val ignoredLearnedPredictions = feedback?.ignoredLearnedPredictions.orEmpty()
         val allowMixedSymbolsAndNumbers = learnDictionaryAllowMixedSymbolsNumbersPreference
         val job = ioScope.launch {
             try {
-                val previous = learnRepository.upsertLearnedDataBatchReturningPrevious(
-                    learnDataList = entries,
-                    allowJapaneseWithSymbolsAndNumbers = allowMixedSymbolsAndNumbers,
+                val now = System.currentTimeMillis()
+                val learned = if (entries.isEmpty()) emptyList() else {
+                    learnRepository.upsertLearnedDataBatchReturningPrevious(
+                        learnDataList = entries,
+                        allowJapaneseWithSymbolsAndNumbers = allowMixedSymbolsAndNumbers,
+                    )
+                }
+                val written = entries.mapTo(HashSet()) { it.input to it.out }
+                val touched = learnRepository.touchExistingReturningPrevious(
+                    keys = used.filterNot { it in written },
+                    timestamp = now,
                 )
-                revert?.learned = previous
+                val weakenedPrimary = learnRepository.applyIgnoredReturningPrevious(
+                    keys = listOfNotNull(ignoredPrimary),
+                    factor = LearningScorePolicy.IGNORED_FACTOR_CONVERSION,
+                    now = now,
+                )
+                val weakenedPredictions = learnRepository.applyIgnoredReturningPrevious(
+                    keys = ignoredLearnedPredictions,
+                    factor = LearningScorePolicy.IGNORED_FACTOR_PREDICTION,
+                    now = now,
+                )
+                // 取り消しは書いた順の逆に戻す。
+                revert.learned = weakenedPredictions + weakenedPrimary + touched + learned
+                learnRepository.pruneExpiredOccasionally(now)
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
                 Timber.e(e, "Saving conversion learning session failed")
             }
         }
-        revert?.jobs?.add(job)
+        revert.jobs.add(job)
     }
 
     private fun setPendingLearningRevert(revert: LearningRevert?) {
@@ -12672,6 +12729,7 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         leftContext: String?,
         fragments: List<LearningFragment>,
         revert: LearningRevert? = null,
+        ignored: List<NextWordEntity> = emptyList(),
     ) {
         val previous = lastLearnedBunsetsuOutput
         lastLearnedBunsetsuOutput = fragments.lastOrNull()?.output
@@ -12682,11 +12740,12 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
             bunsetsu = fragments.map { it.reading to it.output },
             timestamp = System.currentTimeMillis(),
         )
-        if (pairs.isEmpty()) return
+        if (pairs.isEmpty() && ignored.isEmpty()) return
         val job = ioScope.launch {
             try {
-                val previous = nextWordRepository.record(pairs)
-                revert?.nextWords = previous
+                val recorded = nextWordRepository.record(pairs)
+                val weakened = nextWordRepository.applyIgnored(ignored, System.currentTimeMillis())
+                revert?.nextWords = weakened + recorded
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
@@ -13397,6 +13456,8 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         necookeyRerankJob = null
         necookeyRerankJobKey = null
         necookeyRerankJobInput = null
+        necookeyShownForFeedback = null
+        necookeyShownNextWords = emptyMap()
         if (necookeyPredictionRowInput.isNotEmpty() || necookeyPredictionRowCandidates.isNotEmpty()) {
             necookeyPredictionRowInput = ""
             necookeyPredictionRowCandidates = emptyList()
@@ -13450,7 +13511,7 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         }
         necookeyLeftContext = leftContext
         necookeyLeftContextInput = insertString
-        val nextWordCandidates = lookupNextWordCandidates(leftContext, insertString)
+        val nextWords = lookupNextWords(leftContext, insertString)
         if (!shouldApplyCandidateResult(insertString, token)) return
 
         val sumireTop = baseAnalysis?.primary
@@ -13465,7 +13526,16 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         val cachedOverride = cached?.override
 
         if (!shouldApplyCandidateResult(insertString, token)) return
-        val barPredictions = nextWordCandidates + predictions
+        // 後続語は先頭に積まず、予測の並べ替えに「左文脈で前に使った」加点として混ぜる。
+        val merged = NextWordPolicy.mergeIntoPredictions(
+            predictions = predictions,
+            textOf = { it.string },
+            nextWords = nextWords,
+            toCandidate = ::nextWordCandidate,
+            now = System.currentTimeMillis(),
+        )
+        necookeyShownNextWords = merged.backedBy
+        val barPredictions = merged.candidates
         val bar = TwoRowCandidateBarPlanner.plan(
             input = insertString,
             conversionCandidates = conversion,
@@ -13565,24 +13635,24 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         }
     }
 
+    private fun nextWordCandidate(entry: NextWordEntity): Candidate = Candidate(
+        string = entry.output,
+        type = CANDIDATE_TYPE_NEXT_WORD,
+        length = entry.reading.length.toUByte(),
+        score = 0,
+        yomi = entry.reading,
+    )
+
     /** Learned following words for [leftContext] whose reading starts with the current input. */
-    private suspend fun lookupNextWordCandidates(
+    private suspend fun lookupNextWords(
         leftContext: String,
         insertString: String,
-    ): List<Candidate> {
+    ): List<NextWordEntity> {
         if (isLearnDictionaryMode != true || leftContext.isBlank()) return emptyList()
         if (insertString.length > NextWordPolicy.MAX_READING_LENGTH) return emptyList()
         return try {
             withContext(Dispatchers.IO) {
                 nextWordRepository.lookup(leftContext, insertString, NEXT_WORD_CANDIDATE_LIMIT)
-            }.map { entry ->
-                Candidate(
-                    string = entry.output,
-                    type = CANDIDATE_TYPE_NEXT_WORD,
-                    length = entry.reading.length.toUByte(),
-                    score = 0,
-                    yomi = entry.reading,
-                )
             }
         } catch (e: CancellationException) {
             throw e
@@ -13621,6 +13691,12 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
             necookeyPredictionRowInput = insertString
             necookeyTopRowInput = insertString
             necookeyPredictionRowCandidates = bar.predictions
+            necookeyShownForFeedback = ShownForLearningFeedback(
+                input = insertString,
+                primary = bar.primary?.string,
+                topPredictions = bar.predictions.take(LEARNING_FEEDBACK_PREDICTION_SLOTS),
+                nextWords = necookeyShownNextWords,
+            )
             bar.primary?.let { adoptRerankBunsetsuPath(insertString, it) }
         }
         if (!suppressSuggestions) {
@@ -13746,7 +13822,7 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
                 suggestionLearnRepository != null
             ) {
                 withContext(Dispatchers.IO) {
-                    val prefixMatchNumber = (learnPredictionPreference ?: 4) - 1
+                    val prefixMatchNumber = (learnPredictionPreference ?: 2) - 1
                     if (insertString.length <= prefixMatchNumber) return@withContext emptyList<Candidate>()
                     suggestionLearnRepository.predictiveSearchByInput(
                         prefix = insertString, limit = learnDictionaryPredictionCandidateLimit
@@ -13758,7 +13834,7 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
                             score = it.score,
                             yomi = it.input,
                         )
-                    }.sortedBy { it.score }
+                    }
                 }
             } else {
                 emptyList()
@@ -13853,7 +13929,7 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
                 suggestionLearnRepository != null
             ) {
                 measureDebugStage("IMEService.getSuggestionList.learnDictionary") {
-                    val prefixMatchNumber = (learnPredictionPreference ?: 4) - 1
+                    val prefixMatchNumber = (learnPredictionPreference ?: 2) - 1
                     if (insertString.length <= prefixMatchNumber) {
                         emptyList()
                     } else {
@@ -13868,7 +13944,7 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
                                 score = it.score,
                                 yomi = it.input,
                             )
-                        }.sortedBy { it.score }
+                        }
                     }
                 }
             } else {
@@ -14003,7 +14079,7 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
                 suggestionLearnRepository != null
             ) {
                 withContext(Dispatchers.IO) {
-                    val prefixMatchNumber = (learnPredictionPreference ?: 4) - 1
+                    val prefixMatchNumber = (learnPredictionPreference ?: 2) - 1
                     if (insertString.length <= prefixMatchNumber) return@withContext emptyList<Candidate>()
                     suggestionLearnRepository.predictiveSearchByInput(
                         prefix = insertString, limit = learnDictionaryPredictionCandidateLimit
@@ -14015,7 +14091,7 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
                             score = it.score,
                             yomi = it.input,
                         )
-                    }.sortedBy { it.score }
+                    }
                 }
             } else {
                 emptyList()
