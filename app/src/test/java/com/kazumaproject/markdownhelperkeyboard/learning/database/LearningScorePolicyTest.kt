@@ -40,9 +40,18 @@ class LearningScorePolicyTest {
     fun repeatedUseLastsLongerButIsCapped() {
         // 4 回使った語は 2 半減期たっても最強のまま。
         assertEquals(cost(1, now), cost(4, now - 2 * halfLife))
-        // 回数は書くたびに減衰後 + 1、上限あり。
+        // 回数は書くたびに減衰後 + 1 の切り上げ、上限あり。
         assertEquals(2, LearningScorePolicy.reinforcedCount(1, now, now))
         assertEquals(2, LearningScorePolicy.reinforcedCount(2, now - 2 * halfLife, now)) // 0.5 + 1 → 2
+        // 7 日おきに使う語でも 1 に戻らない（round だと 0.2 + 1 → 1 に戻っていた。ceil では 2 に積み上がって保たれる）。
+        assertEquals(2, LearningScorePolicy.reinforcedCount(1, now - 7 * day, now))
+        var count = 1
+        repeat(4) { count = LearningScorePolicy.reinforcedCount(count, now - 7 * day, now) }
+        assertEquals(2, count)
+        // 1 日おきなら回数は増え続ける（1→2→3→4→5）。
+        count = 1
+        repeat(4) { count = LearningScorePolicy.reinforcedCount(count, now - day, now) }
+        assertEquals(5, count)
         assertEquals(LearningScorePolicy.MAX_COUNT, LearningScorePolicy.reinforcedCount(100, now, now))
         // 上限まで使った語でも expiryCutoff より前なら消えている。
         val cutoff = LearningScorePolicy.expiryCutoff(now)

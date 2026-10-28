@@ -1,5 +1,6 @@
 package com.kazumaproject.markdownhelperkeyboard.learning.database
 
+import kotlin.math.ceil
 import kotlin.math.ln
 import kotlin.math.pow
 import kotlin.math.roundToInt
@@ -9,7 +10,7 @@ import kotlin.math.roundToInt
  *
  * 「極端に覚えて極端に忘れる」:
  * - 確定した語は 1 回で強い単語コスト（[boostCost]）になり、変換でも予測でも上位に出る。
- * - 強さ = 回数 × 0.5^(経過日数 / [HALF_LIFE_DAYS])。回数は書くたびに減衰させてから +1（上限 [MAX_COUNT]）。
+ * - 強さ = 回数 × 0.5^(経過日数 / [HALF_LIFE_DAYS])。回数は書くたびに減衰させてから +1 を切り上げ（上限 [MAX_COUNT]）。
  * - 強さが [EXPIRE_STRENGTH] 未満は消えたものとして扱う（変換・予測に出さず、[expiryCutoff] より古い行は消す）。
  * - 上位に出したのに別の候補が確定されたら強さを [IGNORED_FACTOR_CONVERSION] / [IGNORED_FACTOR_PREDICTION] 倍にする
  *   （[ignored]。lastUsedAt を過去へずらして表す。DB の列は増やさない）。
@@ -103,14 +104,18 @@ object LearningScorePolicy {
         return boostCost(readingLength) + (FORGET_RANGE * (1.0 - minOf(1.0, s))).roundToInt()
     }
 
-    /** もう一度使われたときの回数: 今の強さ（減衰後）+ 1、1..[MAX_COUNT]。 */
+    /**
+     * もう一度使われたときの回数: ceil(今の強さ（減衰後）+ 1)、1..[MAX_COUNT]。
+     * 切り上げなので、半減期以上あいて使う語でも使うたびに回数が積み上がる（round だと減衰後 0.5 未満で毎回 1 に戻り、
+     * 週 1 回しか打たない語は何度直しても強くならなかった）。
+     */
     fun reinforcedCount(existingCount: Int, existingLastUsedAt: Long, now: Long): Int {
         val decayed = if (isTimed(existingLastUsedAt)) {
             strength(existingCount, existingLastUsedAt, now)
         } else {
             existingCount.coerceAtLeast(1).toDouble()
         }
-        return (decayed + 1.0).roundToInt().coerceIn(1, MAX_COUNT)
+        return ceil(decayed + 1.0).toInt().coerceIn(1, MAX_COUNT)
     }
 
     /**
