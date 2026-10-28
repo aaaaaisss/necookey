@@ -67,7 +67,7 @@ class ChipUiEvalTest {
         }
 
         val tsv = File(dir, "chip_eval.tsv").bufferedWriter()
-        tsv.write("id\treading\tgold\ttop1\tnew\tnew_adv\tcur\tnew_plan\tcur_plan\tchips\tcalls\tnew_nofull\tcur_nofull\tnew_nofull_plan\tcur_nofull_plan\n")
+        tsv.write("id\treading\tgold\ttop1\tnew\tnew_adv\tcur\tnew_plan\tcur_plan\tchips\tcalls\tnew_nofull\tcur_nofull\tnew_nofull_plan\tcur_nofull_plan\tnew_cut0\tnew_nofull_cut0\tnew_cut1\tnew_nofull_cut1\n")
         val dev = File(dir, "cands.tsv").bufferedWriter()
         val devPool = File(dir, "cands.tsv.pool").bufferedWriter()
         fun dump(w: java.io.BufferedWriter, id: String, conv: ChipConversion, limitN: Int) {
@@ -97,6 +97,10 @@ class ChipUiEvalTest {
             val curR = best { g -> CurrentUiSolver(memo).solve(reading, g) }
             val newNf = best { g -> NewUiSolver(model, useFullAlternatives = false).solve(reading, g) }
             val curNf = best { g -> CurrentUiSolver(memo, useFullAlternatives = false).solve(reading, g) }
+            // 実験: 切るの手数（なし / 1 手）を変えたとき（EXP_OVERNIGHT.md）
+            val cutVariants = listOf(0, 1).flatMap { cc ->
+                listOf(true, false).map { full -> best { g -> NewUiSolver(model, useFullAlternatives = full, cutCost = cc).solve(reading, g) }.moves ?: -1 }
+            }
             val chips = model.initial(reading).chips.joinToString("|") { it.output }
             tsv.write(
                 listOf(
@@ -104,7 +108,7 @@ class ChipUiEvalTest {
                     newR.moves ?: -1, advR.moves ?: -1, curR.moves ?: -1,
                     newR.plan.joinToString(" > "), curR.plan.joinToString(" > "), chips, memo.calls,
                     newNf.moves ?: -1, curNf.moves ?: -1, newNf.plan.joinToString(" > "), curNf.plan.joinToString(" > "),
-                ).joinToString("\t"),
+                ).plus(cutVariants).joinToString("\t"),
             )
             tsv.newLine()
             n++

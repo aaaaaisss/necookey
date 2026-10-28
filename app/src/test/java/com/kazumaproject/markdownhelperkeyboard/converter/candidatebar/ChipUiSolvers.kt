@@ -63,6 +63,8 @@ class NewUiSolver(
     private val model: ChipBarModel,
     private val maxMoves: Int = 6,
     private val useFullAlternatives: Boolean = true,
+    /** 切る（長押し＋文字間タップ）の手数。0 なら切る操作なし（実験用）。 */
+    private val cutCost: Int = 2,
 ) {
     fun solve(reading: String, gold: String): SolveResult {
         val start = model.initial(reading)
@@ -93,11 +95,11 @@ class NewUiSolver(
                 model.flickRight(s, i)?.let { out += Triple(it, 1, "右フリック#$i") }
                 model.flickLeft(s, i)?.let { out += Triple(it, 1, "左フリック#$i") }
                 model.join(s, i)?.let { out += Triple(it, 1, "くっつける#$i+${i + 1}") }
-                model.longPress(s, i)?.let { ex ->
+                if (cutCost > 0) model.longPress(s, i)?.let { ex ->
                     for (p in model.cutPositions(ex)) {
                         val c = s.chips[i]
                         val label = "切る#$i「${reading.substring(c.start, p)}|${reading.substring(p, c.end)}」"
-                        model.cutAt(ex, p)?.let { out += Triple(it, 2, label) }
+                        model.cutAt(ex, p)?.let { out += Triple(it, cutCost, label) }
                     }
                 }
             }

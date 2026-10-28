@@ -47,11 +47,12 @@ internal class DeviceConfigConversion(
         reading: String,
         n: Int = DEVICE_N,
         segs: MutableMap<String, List<CandidateConversionSegment>>? = null,
+        learn: com.kazumaproject.markdownhelperkeyboard.repository.LearnRepository? = null,
     ): BunsetsuCandidateResult = engine.getCandidatesWithoutPredictionWithBunsetsu(
         input = reading, n = n,
         mozcUtPersonName = false, mozcUTPlaces = false, mozcUTWiki = false,
         mozcUTNeologd = false, mozcUTWeb = false,
-        userDictionaryRepository = userDict, learnRepository = null,
+        userDictionaryRepository = userDict, learnRepository = learn,
         typoCorrectionOffsetScore = 3000, omissionSearchOffsetScore = 1900,
         beamWidth = 20,
         incrementalSessionState = null,
