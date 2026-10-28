@@ -482,6 +482,8 @@ object AppPreference {
     // necookey
     private val NECOOKEY_TWO_ROW_CANDIDATE_BAR_PREFERENCE =
         Pair("necookey_two_row_candidate_bar_preference", true)
+    private val NECOOKEY_CHIP_CANDIDATE_BAR_PREFERENCE =
+        Pair("necookey_chip_candidate_bar_preference", true)
     private val NECOOKEY_ZENZ_BUNSETSU_GATE_PREFERENCE =
         Pair("necookey_zenz_bunsetsu_gate_preference", true)
 
@@ -2380,6 +2382,16 @@ object AppPreference {
         )
         set(value) = preferences.edit {
             it.putBoolean(TENKEY_SHOW_IME_SWITCH_BUTTON.first, value)
+        }
+
+    /** 2段候補バーの上段を文節チップにする（既定オン。オフで従来の2段表示）。 */
+    var necookey_chip_candidate_bar_preference: Boolean
+        get() = preferences.getBoolean(
+            NECOOKEY_CHIP_CANDIDATE_BAR_PREFERENCE.first,
+            NECOOKEY_CHIP_CANDIDATE_BAR_PREFERENCE.second
+        )
+        set(value) = preferences.edit {
+            it.putBoolean(NECOOKEY_CHIP_CANDIDATE_BAR_PREFERENCE.first, value)
         }
 
     var necookey_two_row_candidate_bar_preference: Boolean

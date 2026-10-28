@@ -148,6 +148,13 @@
                 app:defaultValue="true"
                 app:summary="@string/necookey_two_row_candidate_bar_summary"
                 app:iconSpaceReserved="false" />
+            <SwitchPreferenceCompat
+                android:dependency="necookey_two_row_candidate_bar_preference"
+                android:key="necookey_chip_candidate_bar_preference"
+                android:title="@string/necookey_chip_candidate_bar_title"
+                app:defaultValue="true"
+                app:summary="@string/necookey_chip_candidate_bar_summary"
+                app:iconSpaceReserved="false" />
             <ListPreference
                 android:defaultValue="1"
                 android:dialogTitle="@string/preference_dialog_title_num_columns_conversion"

@@ -736,6 +736,8 @@
     <string name="necookey_candidate_bar_category_title">necookey（2段候補バー）</string>
     <string name="necookey_two_row_candidate_bar_title">2段の候補バー</string>
     <string name="necookey_two_row_candidate_bar_summary">上段に変換結果と最初の文節の別候補、下段に予測候補を表示します（通常のソフトウェアキーボードのみ）。</string>
+    <string name="necookey_chip_candidate_bar_title">文節チップ方式</string>
+    <string name="necookey_chip_candidate_bar_summary">2段の候補バーの上段を文節チップにします。チップをタップでその文節の候補、長押しで文字の間を切る、チップの間をタップでくっつける、左右フリックで1字ずらす。オフで従来の2段表示。</string>
     <string name="necookey_zenz_bunsetsu_gate_title">リランカーで変換を補正（SUMIRE-LM）</string>
     <string name="necookey_zenz_bunsetsu_gate_summary">辞書の候補を端末内の軽量モデル（SUMIRE-LM）で並べ替えて、第一候補を選び直します。2段候補バーが必要です。</string>
     <string name="cursor_move_target_pairs_not_set">未設定</string>

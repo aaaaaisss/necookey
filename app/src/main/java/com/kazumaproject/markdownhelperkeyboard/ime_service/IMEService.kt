@@ -78,6 +78,7 @@ import androidx.appcompat.view.ContextThemeWrapper
 import androidx.constraintlayout.widget.ConstraintLayout
 import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
+import androidx.core.graphics.ColorUtils
 import androidx.core.graphics.toColorInt
 import androidx.core.net.toUri
 import androidx.core.view.ViewCompat
@@ -187,6 +188,18 @@ import com.kazumaproject.markdownhelperkeyboard.converter.sumirelm.CandidateRera
 import com.kazumaproject.markdownhelperkeyboard.converter.candidatebar.BunsetsuAnalysis
 import com.kazumaproject.markdownhelperkeyboard.converter.candidatebar.BunsetsuAnalyzer
 import com.kazumaproject.markdownhelperkeyboard.converter.candidatebar.BunsetsuRangeEditor
+import com.kazumaproject.markdownhelperkeyboard.converter.candidatebar.CANDIDATE_TYPE_CHIP_CANDIDATE
+import com.kazumaproject.markdownhelperkeyboard.converter.candidatebar.CANDIDATE_TYPE_CHIP_FULL_ALTERNATIVE
+import com.kazumaproject.markdownhelperkeyboard.converter.candidatebar.ChipBarModel
+import com.kazumaproject.markdownhelperkeyboard.converter.candidatebar.ChipBarPresenter
+import com.kazumaproject.markdownhelperkeyboard.converter.candidatebar.ChipBarState
+import com.kazumaproject.markdownhelperkeyboard.converter.candidatebar.ChipContext
+import com.kazumaproject.markdownhelperkeyboard.converter.candidatebar.ChipConverter
+import com.kazumaproject.markdownhelperkeyboard.converter.candidatebar.ChipConversion
+import com.kazumaproject.markdownhelperkeyboard.converter.candidatebar.LowerRow
+import com.kazumaproject.markdownhelperkeyboard.converter.candidatebar.MemoChipConverter
+import com.kazumaproject.markdownhelperkeyboard.converter.candidatebar.SeededChipConverter
+import com.kazumaproject.markdownhelperkeyboard.ime_service.candidatebar.ChipStripView
 import com.kazumaproject.markdownhelperkeyboard.converter.candidatebar.NecookeyCandidateBarConfig
 import com.kazumaproject.markdownhelperkeyboard.converter.candidatebar.TwoRowCandidateBar
 import com.kazumaproject.markdownhelperkeyboard.converter.candidatebar.TwoRowCandidateBarPlanner
@@ -343,6 +356,7 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
@@ -1442,6 +1456,10 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         private const val PAGE_SIZE: Int = 5
         /** Height of necookey's bottom (prediction) candidate row. */
         private const val NECOOKEY_PREDICTION_ROW_HEIGHT_DP = 44
+        /** チップの再変換でエンジンに頼む候補数（リランカーの並べ替え元にもなる）。 */
+        private const val CHIP_RECONVERT_N_BEST = 20
+        /** チップ確定の学習で使う候補スコア（文節セッションの既定と同じ）。 */
+        private const val CHIP_LEARNING_CANDIDATE_SCORE = 3000
         private val DEFAULT_DELETE_KEY_FLICK_TARGETS =
             DeleteKeyFlickDeleteTargetRepository.DEFAULT_TARGET_SYMBOLS.toSet()
         private val ALWAYS_DELETE_KEY_FLICK_BOUNDARIES = setOf(' ', '　', '\n')
@@ -1601,6 +1619,30 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
     /** Input the bottom row currently belongs to; the row hides itself for any other input. */
     private var necookeyPredictionRowInput: String = ""
     private var necookeyPredictionRowCandidates: List<Candidate> = emptyList()
+
+    // ---- 文節チップ候補欄（docs/CHIP_BAR.md「組み込み」）。2段候補バーの上段をチップ列に替える。 ----
+    /** 今の読みのチップ状態（Main で読み書き）。読みが変わったら作り直す。 */
+    @Volatile
+    private var chipBarState: ChipBarState? = null
+    private var chipBarModel: ChipBarModel? = null
+    /** 下段の予測（2段バーの予測と同じもの）。チップ非選択のとき下段に出す。 */
+    private var chipBarPredictions: List<Candidate> = emptyList()
+    private var chipBarLowerRow: LowerRow? = null
+    /** 候補欄の更新で取った変換（チップの元）。[setCandidatesNecookeyTwoRow] で更新。 */
+    private class ChipBarSource(
+        val input: String,
+        val conversion: List<Candidate>,
+        val segmentsByString: Map<String, List<CandidateConversionSegment>>,
+        val splitPatternByCandidateString: Map<String, List<Int>>,
+        val editorLeftContext: String,
+    )
+    @Volatile
+    private var chipBarSource: ChipBarSource? = null
+    /** 再変換のときリランカーに渡す入力欄の左文脈（チップ左側の表記はこの後ろに足す）。 */
+    @Volatile
+    private var chipBarEditorLeftContext: String = ""
+    private val chipBarOpMutex = Mutex()
+    private var chipStripDecorated = false
     /** (文脈, 読み, sumire 最良) -> リランカーの結果（変更なしは override = null）。 */
     private data class RerankCacheEntry(val override: Candidate?)
     private val necookeyRerankOverrideCache =
@@ -10679,6 +10721,7 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
             adapter.setOnItemClickListener { candidate, position ->
                 val insertString = inputString.value
                 if (insertString.isEmpty()) return@setOnItemClickListener
+                if (handleChipBarLowerRowClick(candidate)) return@setOnItemClickListener
                 setCandidateClick(
                     candidate = candidate,
                     insertString = insertString,
@@ -10689,7 +10732,9 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
             }
             adapter.setOnItemLongClickListener { candidate, position ->
                 val insertString = inputString.value
-                if (insertString.isEmpty() || isNecookeyActionCandidate(candidate)) {
+                if (insertString.isEmpty() || isNecookeyActionCandidate(candidate) ||
+                    ChipBarPresenter.isChipCandidate(candidate)
+                ) {
                     return@setOnItemLongClickListener
                 }
                 if (shouldShowCandidateLongPressActions(candidate)) {
@@ -13458,6 +13503,7 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         necookeyRerankJobInput = null
         necookeyShownForFeedback = null
         necookeyShownNextWords = emptyMap()
+        runOnMainThread { clearChipBarState() }
         if (necookeyPredictionRowInput.isNotEmpty() || necookeyPredictionRowCandidates.isNotEmpty()) {
             necookeyPredictionRowInput = ""
             necookeyPredictionRowCandidates = emptyList()
@@ -13511,6 +13557,13 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         }
         necookeyLeftContext = leftContext
         necookeyLeftContextInput = insertString
+        chipBarSource = ChipBarSource(
+            input = insertString,
+            conversion = conversion,
+            segmentsByString = core?.candidateSegmentsByString.orEmpty(),
+            splitPatternByCandidateString = core?.bunsetsuResult?.splitPatternByCandidateString.orEmpty(),
+            editorLeftContext = context?.leftContext ?: leftContext,
+        )
         val nextWords = lookupNextWords(leftContext, insertString)
         if (!shouldApplyCandidateResult(insertString, token)) return
 
@@ -13606,7 +13659,7 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
                 publishNecookeyTwoRowBar(insertString, bar, necookeyRerankLatestToken ?: token, applyLiveConversion = false)
                 if (
                     shouldStartLiveConversion(insertString) && !hasConvertedKatakana &&
-                    inputString.value == insertString
+                    inputString.value == insertString && !isChipBarTouched(insertString)
                 ) {
                     val primary = bar.primary
                     if (primary != null && getCandidateCommitString(primary) != lastCandidate) {
@@ -13690,7 +13743,12 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
             if (!shouldApplyCandidateResult(insertString, token)) return@withContext
             necookeyPredictionRowInput = insertString
             necookeyTopRowInput = insertString
-            necookeyPredictionRowCandidates = bar.predictions
+            necookeyPredictionRowCandidates = if (isChipBarMode()) {
+                updateChipBarForPublish(insertString, bar)
+            } else {
+                clearChipBarState()
+                bar.predictions
+            }
             necookeyShownForFeedback = ShownForLearningFeedback(
                 input = insertString,
                 primary = bar.primary?.string,
@@ -13707,9 +13765,12 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
                 token = token,
             )
         }
-        if (applyLiveConversion && shouldStartLiveConversion(insertString) && !hasConvertedKatakana) {
+        if (applyLiveConversion && shouldStartLiveConversion(insertString) && !hasConvertedKatakana &&
+            !isChipBarTouched(insertString)
+        ) {
             delayBeforeApplyingLiveConversion()
             if (!shouldApplyCandidateResult(insertString, token)) return
+            if (isChipBarTouched(insertString)) return
             applyFirstSuggestionOnMainIfCurrent(
                 insertString = insertString,
                 candidate = bar.primary,
@@ -13726,6 +13787,7 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
             necookeyPredictionRowInput.isNotEmpty() &&
             necookeyPredictionRowInput == inputString.value &&
             shouldUseNecookeyTwoRowBar()
+        syncNecookeyChipStrip(binding, show)
         if (!show) {
             if (row.visibility != View.GONE) row.visibility = View.GONE
             if (adapter.suggestions.isNotEmpty()) adapter.suggestions = emptyList()
@@ -13739,6 +13801,7 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         }
         val colors = resolveCandidatePanelColors()
         adapter.setCandidateTextColor(colors.text)
+        syncChipPredictionRowStyle(row, adapter, colors)
         val heightPx = applicationContext.dpToPx(NECOOKEY_PREDICTION_ROW_HEIGHT_DP)
         row.layoutParams?.let { params ->
             if (params.height != heightPx) {
@@ -13751,6 +13814,319 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
             row.scrollToPosition(0)
         }
         if (row.visibility != View.VISIBLE) row.visibility = View.VISIBLE
+    }
+
+    // ------------------------------------------------------------------------------------------
+    // necookey 文節チップ候補欄（docs/CHIP_BAR.md「組み込み」）
+    //
+    // 2段候補バーの流れ（予測・変換・リランカー）はそのまま使い、上段の表示だけを [ChipStripView] に替える
+    // （既存の候補 RecyclerView の上に重ね、下は透明にして隠す）。下段は予測、チップ選択中はそのチップの候補。
+    // チップに触った後は入力欄を [ChipBarModel.composing] で上書きし（選択チップに色）、確定キーで
+    // [ChipBarModel.commit] を学習付きで確定する。触っていなければ従来どおり（ライブ変換・確定）。
+    // ------------------------------------------------------------------------------------------
+
+    private fun isChipBarMode(): Boolean =
+        shouldUseNecookeyTwoRowBar() && appPreference.necookey_chip_candidate_bar_preference
+
+    /** チップに触った後か（触った後はライブ変換・リランカーの結果で入力欄を上書きしない）。 */
+    private fun isChipBarTouched(insertString: String): Boolean {
+        val state = chipBarState ?: return false
+        return state.reading == insertString && ChipBarPresenter.isTouched(state)
+    }
+
+    private fun clearChipBarState() {
+        chipBarState = null
+        chipBarModel = null
+        chipBarLowerRow = null
+        chipBarPredictions = emptyList()
+    }
+
+    /**
+     * Main. 2段バーの公開に合わせてチップ状態を作る（同じ読みで触った後なら保つ。触っていなければリランカーの
+     * 差し替えも含めて上段の 1 位から作り直す）。下段に出す候補を返す。
+     */
+    private fun updateChipBarForPublish(insertString: String, bar: TwoRowCandidateBar): List<Candidate> {
+        chipBarPredictions = bar.predictions
+        val current = chipBarState
+        val keep = current != null && chipBarModel != null && current.reading == insertString &&
+            ChipBarPresenter.isTouched(current)
+        if (!keep) {
+            val source = chipBarSource?.takeIf { it.input == insertString }
+            val whole = ChipBarPresenter.wholeConversion(
+                reading = insertString,
+                primary = bar.primary,
+                conversion = source?.conversion ?: bar.topRow,
+                segmentsByString = source?.segmentsByString.orEmpty(),
+                splitPatternByCandidateString = source?.splitPatternByCandidateString.orEmpty(),
+            )
+            chipBarEditorLeftContext = source?.editorLeftContext.orEmpty()
+            val engine = ChipConverter { reading, context -> chipEngineConvert(reading, context) }
+            val model = ChipBarModel(MemoChipConverter(SeededChipConverter(whole, engine)))
+            val state = model.initial(insertString)
+            chipBarModel = model
+            chipBarState = state
+            chipBarLowerRow = model.lowerRow(state)
+        }
+        val state = chipBarState ?: return bar.predictions
+        val row = chipBarLowerRow ?: return bar.predictions
+        return ChipBarPresenter.lowerRow(state, row, bar.predictions)
+    }
+
+    /**
+     * チップの範囲の再変換（裏のスレッドで呼ばれる。待つ）。実エンジンの文節分離変換（表示用の逐次状態は使わない）に、
+     * リランカーがあれば左文脈（入力欄の左＋左側チップの表記）で 1 位を差し替える。
+     */
+    private fun chipEngineConvert(reading: String, context: ChipContext): ChipConversion {
+        val session = kanaKanjiConversionSession ?: return ChipConversion.unconverted(reading)
+        val request = lastKanaKanjiQueryRequest?.copy(input = reading)
+            ?: return ChipConversion.unconverted(reading)
+        return try {
+            runBlocking {
+                val pool = session.queryRerankPool(request, CHIP_RECONVERT_N_BEST)
+                var candidates = ExactInputCandidatePromotionPolicy.promote(
+                    input = reading,
+                    candidates = pool.candidates,
+                )
+                val reranker = if (necookeyRerankEnabled()) sumireLmReranker else null
+                if (reranker != null && reading.length >= 2 && reading.isAllHiraganaWithSymbols() &&
+                    currentInputType !in passwordTypes
+                ) {
+                    val left = (chipBarEditorLeftContext + context.leftText)
+                        .takeLast(necookeyCandidateBarConfig.maxLeftContextChars)
+                    SumireLmGate.rerank(
+                        reranker = reranker,
+                        input = reading,
+                        leftContext = left,
+                        candidates = candidates,
+                        segmentsOf = { c ->
+                            c.conversionSegments.ifEmpty { pool.candidateSegmentsByString[c.string].orEmpty() }
+                        },
+                    )?.let { candidates = promoteRerankedCandidate(candidates, it.top) }
+                }
+                ChipConversion.fromEngine(
+                    reading = reading,
+                    candidates = candidates,
+                    segmentsByString = pool.candidateSegmentsByString,
+                    splitPatternByCandidateString = pool.bunsetsuResult?.splitPatternByCandidateString.orEmpty(),
+                    primarySplits = pool.bunsetsuResult?.primarySplitPositions.orEmpty(),
+                )
+            }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            Timber.w(e, "chip reconversion failed: %s", reading)
+            ChipConversion.unconverted(reading)
+        }
+    }
+
+    private val chipStripListener = object : ChipStripView.Listener {
+        override fun onChipTap(index: Int) = runChipBarOp { m, s -> m.tap(s, index) }
+        override fun onChipLongPress(index: Int) = runChipBarOp { m, s -> m.longPress(s, index) }
+        override fun onJoin(index: Int) = runChipBarOp { m, s -> m.join(s, index) }
+        override fun onCut(gapIndex: Int) = runChipBarOp { m, s ->
+            ChipBarPresenter.cutOffset(s, gapIndex)?.let { m.cutAt(s, it) }
+        }
+        override fun onFlick(index: Int, toRight: Boolean) = runChipBarOp { m, s ->
+            if (toRight) m.flickRight(s, index) else m.flickLeft(s, index)
+        }
+    }
+
+    /** チップ操作を 1 つずつ（再変換は裏で）。終わったときに読みかチップ状態が変わっていたら捨てる。 */
+    private fun runChipBarOp(op: (ChipBarModel, ChipBarState) -> ChipBarState?) {
+        val input = inputString.value
+        if (input.isEmpty()) return
+        scope.launch {
+            chipBarOpMutex.withLock {
+                val model = chipBarModel ?: return@withLock
+                val state = chipBarState?.takeIf { it.reading == input && inputString.value == input }
+                    ?: return@withLock
+                val result = withContext(Dispatchers.Default) {
+                    try {
+                        val next = op(model, state) ?: return@withContext null
+                        next to model.lowerRow(next)
+                    } catch (e: CancellationException) {
+                        throw e
+                    } catch (e: Exception) {
+                        Timber.w(e, "chip bar operation failed")
+                        null
+                    }
+                } ?: return@withLock
+                if (chipBarState !== state || chipBarModel !== model || inputString.value != input) return@withLock
+                applyChipBarState(input, result.first, result.second)
+            }
+        }
+    }
+
+    /** Main. */
+    private fun applyChipBarState(input: String, state: ChipBarState, row: LowerRow) {
+        chipBarState = state
+        chipBarLowerRow = row
+        necookeyPredictionRowInput = input
+        necookeyPredictionRowCandidates = ChipBarPresenter.lowerRow(state, row, chipBarPredictions)
+        applyChipComposingText(state)
+        syncNecookeyPredictionRow(candidatesShown = true)
+    }
+
+    /** 下段のチップ候補・全体候補のタップ（確定しない）。それ以外は false（通常の候補として確定）。 */
+    private fun handleChipBarLowerRowClick(candidate: Candidate): Boolean {
+        when (candidate.type) {
+            CANDIDATE_TYPE_CHIP_CANDIDATE -> runChipBarOp { m, s -> m.pickCandidate(s, candidate.string) }
+            CANDIDATE_TYPE_CHIP_FULL_ALTERNATIVE -> runChipBarOp { m, s -> m.pickFullAlternative(s, candidate.string) }
+            else -> return false
+        }
+        return true
+    }
+
+    /** 入力欄の composing をチップの表記にする（チップごとに下線、選択チップは変換中の色、ほかは変換後の色）。 */
+    private fun applyChipComposingText(state: ChipBarState) {
+        val model = chipBarModel ?: return
+        val view = model.composing(state)
+        val text = view.text
+        if (text.isEmpty() || stringInTail.get().isNotEmpty()) return
+        val spanFlag = Spannable.SPAN_EXCLUSIVE_EXCLUSIVE or Spannable.SPAN_COMPOSING
+        val custom = customComposingTextPreference == true
+        val baseColor = if (custom) {
+            inputCompositionAfterBackgroundColor ?: getColor(com.kazumaproject.core.R.color.blue)
+        } else {
+            getColor(com.kazumaproject.core.R.color.blue)
+        }
+        val selectedColor = if (custom) {
+            inputConversionBackgroundColor ?: getColor(com.kazumaproject.core.R.color.orange)
+        } else {
+            getColor(com.kazumaproject.core.R.color.orange)
+        }
+        val spannable = SpannableString(text).apply {
+            val selStart = if (view.hasSelection) view.selectedStart.coerceIn(0, text.length) else text.length
+            val selEnd = if (view.hasSelection) view.selectedEnd.coerceIn(selStart, text.length) else text.length
+            if (selStart > 0) setSpan(BackgroundColorSpan(baseColor), 0, selStart, spanFlag)
+            if (selEnd > selStart) {
+                setSpan(BackgroundColorSpan(selectedColor), selStart, selEnd, spanFlag)
+                if (custom) inputConversionTextColor?.let { setSpan(ForegroundColorSpan(it), selStart, selEnd, spanFlag) }
+            }
+            if (selEnd < text.length) setSpan(BackgroundColorSpan(baseColor), selEnd, text.length, spanFlag)
+            if (custom) inputCompositionTextColor?.let { color ->
+                if (selStart > 0) setSpan(ForegroundColorSpan(color), 0, selStart, spanFlag)
+                if (selEnd < text.length) setSpan(ForegroundColorSpan(color), selEnd, text.length, spanFlag)
+            }
+            var start = 0
+            for (chip in state.chips) {
+                val end = (start + chip.output.length).coerceAtMost(text.length)
+                if (end > start) setSpan(UnderlineSpan(), start, end, spanFlag)
+                start = end
+            }
+        }
+        beginBatchEdit()
+        try {
+            lastCandidate = text
+            setComposingText(spannable, 1)
+        } finally {
+            endBatchEdit()
+        }
+    }
+
+    /**
+     * 確定キー: チップに触った後なら [ChipBarModel.commit] を確定し、チップ = 文節として学習する
+     * （変えたチップは明示選択。負のフィードバック・後続語・確定直後の後退での取り消しは通常の確定と同じ経路）。
+     * 触っていなければ false（従来の確定）。
+     */
+    private fun commitChipBarIfTouched(insertString: String): Boolean {
+        val state = chipBarState ?: return false
+        val model = chipBarModel ?: return false
+        if (!isChipBarMode() || state.reading != insertString || !ChipBarPresenter.isTouched(state)) return false
+        val text = model.commit(state)
+        if (text.isEmpty()) return false
+        recordChipBarLearning(state)
+        if (stringInTail.get().isEmpty()) {
+            rememberCommittedTextForReconversion(reading = insertString, committedText = text)
+        }
+        _inputString.update { "" }
+        beginBatchEdit()
+        try {
+            commitText(text, 1)
+        } finally {
+            endBatchEdit()
+        }
+        clearChipBarState()
+        clearSuggestionStateAfterCommit()
+        resetFlagsEnterKeyNotHenkan()
+        return true
+    }
+
+    private fun recordChipBarLearning(state: ChipBarState) {
+        if (currentInputModeForSession != InputMode.ModeJapanese || !isLearningWriteEnabled()) {
+            conversionLearningSession.cancel()
+            return
+        }
+        captureLearningSessionLeftContext(state.reading)
+        conversionLearningSession.beginIfNeeded(state.reading)
+        ChipBarPresenter.learningFragments(state).forEach { fragment ->
+            conversionLearningSession.record(
+                LearningFragment(
+                    reading = fragment.reading,
+                    output = fragment.output,
+                    candidateScore = CHIP_LEARNING_CANDIDATE_SCORE,
+                    candidateIndex = if (fragment.explicit) 1 else 0,
+                    explicitlySelected = fragment.explicit,
+                )
+            )
+        }
+        persistCompletedLearningSession()
+    }
+
+    /** Main. 上段のチップ列（候補 RecyclerView の上に重ねる。出している間は下の候補を透明にする）。 */
+    private fun syncNecookeyChipStrip(binding: MainLayoutBinding, rowShown: Boolean) {
+        val strip = binding.necookeyChipStrip
+        val state = chipBarState
+        val show = rowShown && isChipBarMode() && state != null && state.reading == inputString.value
+        if (!show) {
+            if (strip.visibility != View.GONE) strip.visibility = View.GONE
+            if (binding.suggestionRecyclerView.alpha != 1f) binding.suggestionRecyclerView.alpha = 1f
+            return
+        }
+        if (strip.listener == null) strip.listener = chipStripListener
+        val colors = resolveCandidatePanelColors()
+        strip.setColors(Color.TRANSPARENT, colors.candidate, colors.text, colors.selection, colors.selectionText)
+        strip.setData(ChipBarPresenter.strip(state))
+        if (binding.suggestionRecyclerView.alpha != 0f) binding.suggestionRecyclerView.alpha = 0f
+        if (strip.visibility != View.VISIBLE) strip.visibility = View.VISIBLE
+    }
+
+    private val chipRowItemSpacing = object : RecyclerView.ItemDecoration() {
+        override fun getItemOffsets(
+            outRect: android.graphics.Rect,
+            view: View,
+            parent: RecyclerView,
+            state: RecyclerView.State,
+        ) {
+            val px = applicationContext.dpToPx(3)
+            outRect.left = px
+            outRect.right = px
+        }
+    }
+
+    /** チップ方式の下段はピル形（候補の背景を丸く塗り、区切り線を消して少し離す）。従来の2段表示では元に戻す。 */
+    private fun syncChipPredictionRowStyle(
+        row: RecyclerView,
+        adapter: SuggestionAdapter,
+        colors: com.kazumaproject.markdownhelperkeyboard.ime_service.composing_guide.CandidatePanelColors,
+    ) {
+        if (isChipBarMode()) {
+            val fill = colors.candidate.takeIf { Color.alpha(it) >= 16 }
+                ?: ColorUtils.setAlphaComponent(colors.text, 0x22)
+            adapter.setCandidateItemColors(fill, colors.pressed, 18f)
+            adapter.setCandidateDividerColor(Color.TRANSPARENT)
+            if (!chipStripDecorated) {
+                row.addItemDecoration(chipRowItemSpacing)
+                chipStripDecorated = true
+            }
+        } else {
+            adapter.setCandidateItemColors(null, null)
+            adapter.setCandidateDividerColor(null)
+            if (chipStripDecorated) {
+                row.removeItemDecoration(chipRowItemSpacing)
+                chipStripDecorated = false
+            }
+        }
     }
 
     private suspend fun setCandidatesEnglishKana(
@@ -14799,6 +15175,10 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         if (!fromPhysicalKeyboard) flushCustomScreenComposition()
         if (dispatchDirectEnterIfNeeded()) return
         if (commitBunsetsuConversionSession(explicitlySelected = true)) {
+            return
+        }
+        if (commitChipBarIfTouched(insertString)) {
+            setCursorLeftAfterCommitPair(insertString)
             return
         }
         when (val inputMode = currentInputModeForSession) {
