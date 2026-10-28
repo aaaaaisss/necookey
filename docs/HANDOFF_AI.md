@@ -37,3 +37,4 @@ NGワード、キーボード自作・編集（メイン利用）、記号キー
 - aarch64 サンドボックスでは Robolectric ネイティブランタイム非対応のテストを除外（`tools/robolectric_aarch64_excludes.txt`、ルート build.gradle。x86_64/CI は従来どおり全件）。
 - 変換エンジン: 文節分離なしの旧経路（getCandidatesOriginal / getCandidates / getCandidatesWithoutPrediction、アプリは常に bunsetsuSeparation=true）と未使用関数を削除、特殊候補（日付・数字）を engine/SpecialInputCandidates.kt・NumberCandidates.kt に分離。
 - リランカー差し替え口: `CandidateReranker` / `CandidateRerankers`（docs/RERANKER_HOOKUP.md）。
+- 学習・後続語を「極端に覚えて極端に忘れる」方式に作り直し（docs/LEARNING.md）。半減期 3 日、1 回で先頭、上位に出して使われなければ即弱める、後続語は予測の並べ替えに統合。
