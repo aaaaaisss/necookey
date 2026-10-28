@@ -77,6 +77,13 @@ class NewUiSolver(
             }
             val (f, pos) = firstWrong(s.chips.map { it.output }, gold)
             if (f >= s.chips.size) return@uniformCost out
+            if (s.selected == -1) {
+                val last = f == s.chips.lastIndex
+                (model.lowerRow(s) as? LowerRow.Predictions)?.chipPicks?.forEach { p ->
+                    if (p.chipIndex != f || !gold.startsWith(p.text, pos) || (last && pos + p.text.length != gold.length)) return@forEach
+                    model.pickChipPick(s, p)?.let { out += Triple(it, 1, "予測行のチップ候補「${p.text}」") }
+                }
+            }
             if (s.selected != f) out += Triple(model.tap(s, f), 1, "タップ#$f「${s.chips[f].output}」")
             else {
                 val row = model.lowerRow(s) as LowerRow.ChipCandidates

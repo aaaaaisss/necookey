@@ -19,7 +19,12 @@ data class ChipPath(
     val output: String,
     val words: List<ChipWord>,
     val bunsetsuSplits: List<Int>,
-)
+) {
+    /** 読み全体を 1 語で覆い、漢字を含まない（ひらがな・カタカナ・半角カナ・英数など文字種変換）経路。 */
+    fun isWholeScriptConversion(readingLength: Int): Boolean =
+        words.size == 1 && words[0].start == 0 && words[0].end == readingLength &&
+            output.none { Character.UnicodeScript.of(it.code) == Character.UnicodeScript.HAN || it == '々' }
+}
 
 /**
  * ある読みの変換結果。[paths] はエンジン順（[0] が 1 位）。[partials] は読みの先頭だけを覆う候補
@@ -31,6 +36,9 @@ data class ChipConversion(
     val partials: List<ChipWord> = emptyList(),
 ) {
     val primary: ChipPath? get() = paths.firstOrNull()
+
+    /** 区切り・揺れの判定に使う経路（文全体を 1 語にした文字種変換を除く）。 */
+    val segmentedPaths: List<ChipPath> get() = paths.filterNot { it.isWholeScriptConversion(reading.length) }
 
     companion object {
         fun unconverted(reading: String) = ChipConversion(
@@ -71,16 +79,28 @@ data class ChipConversion(
     }
 }
 
-fun interface ChipConverter {
-    fun convert(reading: String): ChipConversion
+/** 再変換の左文脈（そのチップより左のチップの表記と読み）。 */
+data class ChipContext(val leftText: String = "", val leftReading: String = "") {
+    companion object {
+        val EMPTY = ChipContext()
+    }
 }
 
-/** 同じ読みを何度も変換しないための薄いキャッシュ（評価・UI 共通）。 */
+fun interface ChipConverter {
+    /** [context] = 左文脈。実機では左文脈付き変換（無視してもよい）。 */
+    fun convert(reading: String, context: ChipContext): ChipConversion
+
+    fun convert(reading: String): ChipConversion = convert(reading, ChipContext.EMPTY)
+}
+
+/** 同じ読み（と文脈）を何度も変換しないための薄いキャッシュ（評価・UI 共通）。 */
 class MemoChipConverter(private val base: ChipConverter) : ChipConverter {
-    private val cache = HashMap<String, ChipConversion>()
+    private val cache = HashMap<Pair<String, ChipContext>, ChipConversion>()
     val calls: Int get() = cache.size
-    override fun convert(reading: String): ChipConversion =
-        cache.getOrPut(reading) { if (reading.isEmpty()) ChipConversion(reading, emptyList()) else base.convert(reading) }
+    override fun convert(reading: String, context: ChipContext): ChipConversion =
+        cache.getOrPut(reading to context) {
+            if (reading.isEmpty()) ChipConversion(reading, emptyList()) else base.convert(reading, context)
+        }
 }
 
 /** 上段の 1 チップ。オフセットは入力全体の読みの位置。 */
@@ -95,9 +115,18 @@ data class SplitAlternative(val firstChip: Int, val lastChip: Int, val pieces: L
     val label: String get() = pieces.joinToString("|") { it.output }
 }
 
+/** 予測行に混ぜる「いちばん怪しいチップ」の候補。選ぶとそのチップだけ置き換わる。 */
+data class ChipPick(val chipIndex: Int, val text: String)
+
 sealed interface LowerRow {
-    /** 普段の下段（予測）。モデルは予測を持たない。読み全体の別候補だけ渡す。 */
-    data class Predictions(val fullAlternatives: List<String>) : LowerRow
+    /**
+     * 普段の下段（予測）。モデルは予測を持たない。読み全体の別候補と、怪しいチップの候補
+     * [chipPicks]（UI は予測行の先頭付近に並べる）だけ渡す。
+     */
+    data class Predictions(
+        val fullAlternatives: List<String>,
+        val chipPicks: List<ChipPick> = emptyList(),
+    ) : LowerRow
 
     data class ChipCandidates(
         val chipIndex: Int,
@@ -119,6 +148,10 @@ data class ChipBarConfig(
     val maxSplitAlternatives: Int = 5,
     /** 区切り候補が置き換えるチップ数の上限。 */
     val maxSplitSpanChips: Int = 3,
+    /** 予測行に混ぜる怪しいチップの候補数（0 = 混ぜない）。 */
+    val maxChipPicks: Int = 3,
+    /** N-best の区切りでチップを割るとき、割った片の読みの最小長（では → で|は のような割り方を避ける）。 */
+    val minSplitPiece: Int = 2,
     /** 候補を選んだら次のチップへ選択を進める（既定は仕様どおり、選んだチップのまま）。 */
     val advanceAfterPick: Boolean = false,
 ) {
@@ -134,6 +167,8 @@ data class ChipBarState(
     val selected: Int,
     /** 入力全体の変換（区切り候補と予測行の別候補の元）。 */
     val whole: ChipConversion,
+    /** フリックで消えたチップ（範囲 → チップ）。区切りを戻したとき元の表記に戻す用。 */
+    val remembered: Map<Pair<Int, Int>, Chip> = emptyMap(),
 ) {
     val text: String get() = chips.joinToString("") { it.output }
     val boundaries: List<Int> get() = listOf(0) + chips.map { it.end }
@@ -156,17 +191,14 @@ class ChipBarModel(
         val wordStarts = path.words.mapTo(HashSet()) { it.start }
         val cuts = path.bunsetsuSplits.filter { it in 1 until reading.length && it in wordStarts }
         val bounds = listOf(0) + cuts + reading.length
-        val rivals = whole.paths.drop(1).take(2)
+        val rivals = rivals(whole, path)
         val out = ArrayList<Chip>()
         for ((s, e) in bounds.zipWithNext()) {
             val words = path.words.filter { it.start >= s && it.end <= e }
             val output = words.joinToString("") { it.output }
-            val fragile = lowConfidence && rivals.any { r ->
-                val o = BunsetsuAnalyzer.outputForRange(r.words.toSegments(), s, e)
-                o == null && r.output != path.output
-            }
+            val fragile = lowConfidence && rivals.any { r -> BunsetsuAnalyzer.outputForRange(r.words.toSegments(), s, e) == null }
             if (e - s > config.maxChipReading || fragile) {
-                val groups = contentGroups(words)
+                val groups = rivalGroups(words, rivals, s, e).takeIf { it.size > 1 } ?: contentGroups(words)
                 if (groups.size > 1) {
                     groups.forEach { g -> out += Chip(g.first().start, g.last().end, g.joinToString("") { it.output }, Chip.Origin.WORD_SPLIT) }
                     continue
@@ -177,16 +209,67 @@ class ChipBarModel(
         return out
     }
 
+    /** 2・3 位の経路（文字種変換と [path] と同じ出力を除く）。 */
+    private fun rivals(whole: ChipConversion, path: ChipPath): List<ChipPath> =
+        whole.paths.drop(1).filter { it.output != path.output && !it.isWholeScriptConversion(whole.reading.length) }.take(2)
+
+    /**
+     * N-best の 2・3 位経路の文節区切り（splitPattern 由来の bunsetsuSplits）で [s, e) の語を割る。
+     * 1 位の語頭に当たる区切りだけ使い、片が [ChipBarConfig.minSplitPiece] より短くなる割り方はしない。
+     */
+    private fun rivalGroups(words: List<ChipWord>, rivals: List<ChipPath>, s: Int, e: Int): List<List<ChipWord>> {
+        if (words.isEmpty()) return emptyList()
+        val starts = words.mapTo(HashSet()) { it.start }
+        val cuts = rivals.flatMap { it.bunsetsuSplits }.filter { it in (s + 1) until e && it in starts }.distinct().sorted()
+        if (cuts.isEmpty()) return emptyList()
+        val bounds = listOf(s) + cuts + e
+        if (bounds.zipWithNext().any { (a, b) -> b - a < config.minSplitPiece }) return emptyList()
+        return bounds.zipWithNext().map { (a, b) -> words.filter { it.start >= a && it.end <= b } }
+    }
+
+    /**
+     * いちばん怪しいチップ（2・3 位経路で区切りが揺れる > 表記が揺れる > 割ったり伸縮したりした低信頼）と
+     * その候補（2・3 位経路のその範囲の表記 → そのチップ単独の変換）。候補が無いチップは飛ばす。
+     */
+    internal fun chipPicks(state: ChipBarState): List<ChipPick> {
+        if (config.maxChipPicks <= 0 || state.chips.size < 2) return emptyList()
+        val primary = state.whole.primary ?: return emptyList()
+        val rivals = rivals(state.whole, primary)
+        val scored = state.chips.mapIndexed { i, chip ->
+            val outs = rivals.map { r -> BunsetsuAnalyzer.outputForRange(r.words.toSegments(), chip.start, chip.end) }
+            var score = outs.count { it == null } * 3 + outs.count { it != null && it != chip.output } * 2
+            if (chip.origin == Chip.Origin.WORD_SPLIT || chip.origin == Chip.Origin.RESIZED) score += 1
+            Triple(i, score, outs.filterNotNull())
+        }.filter { it.second > 0 }.sortedWith(compareByDescending<Triple<Int, Int, List<String>>> { it.second }.thenBy { it.first })
+        for ((i, _, rivalOutputs) in scored) {
+            val chip = state.chips[i]
+            val r = state.reading.substring(chip.start, chip.end)
+            val own = converter.convert(r, leftContext(state.reading, state.chips, i)).paths.map { it.output }
+            val picks = (rivalOutputs + own).distinct().filter { it != chip.output && it.isNotEmpty() }.take(config.maxChipPicks)
+            if (picks.isNotEmpty()) return picks.map { ChipPick(i, it) }
+        }
+        return emptyList()
+    }
+
+    /** 予測行の怪しいチップ候補を選ぶ（そのチップだけ置き換え、選択はしない）。 */
+    fun pickChipPick(state: ChipBarState, pick: ChipPick): ChipBarState? {
+        if (pick.chipIndex !in state.chips.indices || pick.text.isEmpty()) return null
+        val chips = state.chips.toMutableList()
+        chips[pick.chipIndex] = chips[pick.chipIndex].copy(output = pick.text, origin = Chip.Origin.PICKED)
+        return state.copy(chips = chips, selected = -1)
+    }
+
     fun lowerRow(state: ChipBarState): LowerRow {
         val i = state.selected
         if (i !in state.chips.indices) {
             return LowerRow.Predictions(
                 state.whole.paths.drop(1).map { it.output }.filter { it != state.text }.distinct().take(config.maxFullAlternatives),
+                chipPicks(state),
             )
         }
         val chip = state.chips[i]
         val chipReading = state.reading.substring(chip.start, chip.end)
-        val conv = converter.convert(chipReading)
+        val conv = converter.convert(chipReading, leftContext(state.reading, state.chips, i))
         val candidates = (listOf(chip.output) + conv.paths.map { it.output }).distinct().take(config.maxCandidates + 1)
         val kana = listOf(chipReading, toKatakana(chipReading)).distinct().filter { it !in candidates }
         return LowerRow.ChipCandidates(i, candidates, kana, splitAlternatives(state, i))
@@ -196,7 +279,7 @@ class ChipBarModel(
     internal fun splitAlternatives(state: ChipBarState, index: Int): List<SplitAlternative> {
         val chips = state.chips
         val out = LinkedHashMap<String, SplitAlternative>()
-        for (path in state.whole.paths) {
+        for (path in state.whole.segmentedPaths) {
             val starts = path.words.mapTo(HashSet()) { it.start }
             val ends = path.words.mapTo(HashSet()) { it.end }
             var a = index
@@ -260,18 +343,36 @@ class ChipBarModel(
         val chip = chips[index]
         val next = chips.getOrNull(index + 1)
         val nextEnd = next?.end ?: state.reading.length
-        chips[index] = reconverted(state.reading, chip.start, newEnd)
+        val memo = state.remembered + listOfNotNull(chip, next).map { (it.start to it.end) to it }
+        chips[index] = reconverted(state, memo, chips, index, chip.start, newEnd)
         when {
-            next == null -> chips += reconverted(state.reading, newEnd, nextEnd)
+            next == null -> chips += reconverted(state, memo, chips, index + 1, newEnd, nextEnd)
             newEnd >= nextEnd -> chips.removeAt(index + 1)
-            else -> chips[index + 1] = reconverted(state.reading, newEnd, nextEnd)
+            else -> chips[index + 1] = reconverted(state, memo, chips, index + 1, newEnd, nextEnd)
         }
-        return state.copy(chips = chips, selected = index)
+        return state.copy(chips = chips, selected = index, remembered = memo)
     }
 
-    private fun reconverted(reading: String, start: Int, end: Int): Chip {
-        val r = reading.substring(start, end)
-        return Chip(start, end, converter.convert(r).primary?.output ?: r, Chip.Origin.RESIZED)
+    /** 範囲 [start, end) のチップ。前に同じ範囲のチップがあればその表記に戻し、無ければ左文脈付きで再変換。 */
+    private fun reconverted(
+        state: ChipBarState,
+        memo: Map<Pair<Int, Int>, Chip>,
+        chips: List<Chip>,
+        index: Int,
+        start: Int,
+        end: Int,
+    ): Chip {
+        memo[start to end]?.let { return it }
+        val r = state.reading.substring(start, end)
+        val ctx = leftContext(state.reading, chips, index)
+        return Chip(start, end, converter.convert(r, ctx).primary?.output ?: r, Chip.Origin.RESIZED)
+    }
+
+    /** チップ [index] より左のチップの表記と読み。 */
+    private fun leftContext(reading: String, chips: List<Chip>, index: Int): ChipContext {
+        val left = chips.take(index.coerceIn(0, chips.size))
+        if (left.isEmpty()) return ChipContext.EMPTY
+        return ChipContext(left.joinToString("") { it.output }, reading.substring(0, left.last().end))
     }
 
     /** 選択チップの表記を [text]（漢字候補・かな）にする。 */

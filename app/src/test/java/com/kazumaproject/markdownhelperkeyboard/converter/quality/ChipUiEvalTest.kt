@@ -84,7 +84,7 @@ class ChipUiEvalTest {
             if (c.size < 5 || c[3].isEmpty() || c[0] == "id") return@forEachIndexed
             val (id, reading) = c[0] to c[3]
             val golds = c[4].split('|').filter { it.isNotEmpty() }
-            val memo = MemoChipConverter { r -> engineConvert(r, DeviceConfigConversion.DEVICE_N).first }
+            val memo = MemoChipConverter { r, _ -> engineConvert(r, DeviceConfigConversion.DEVICE_N).first }
             val whole = memo.convert(reading)
             dump(dev, id, whole, DeviceConfigConversion.DEVICE_N)
             dump(devPool, id, engineConvert(reading, SumireLmGate.POOL_SIZE).first, SumireLmGate.POOL_SIZE)

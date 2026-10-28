@@ -20,8 +20,10 @@ class ChipBarTest {
     private class Table(vararg entries: Pair<String, List<ChipPath>>) : ChipConverter {
         val map = entries.toMap()
         val calls = ArrayList<String>()
-        override fun convert(reading: String): ChipConversion {
+        val contexts = ArrayList<Pair<String, ChipContext>>()
+        override fun convert(reading: String, context: ChipContext): ChipConversion {
             calls += reading
+            contexts += reading to context
             return map[reading]?.let { ChipConversion(reading, it) } ?: ChipConversion.unconverted(reading)
         }
     }
@@ -48,7 +50,61 @@ class ChipBarTest {
         assertEquals(listOf("では", "着物"), s.chips.map { it.output })
         assertEquals(listOf(0, 2, 5), s.boundaries)
         assertEquals(-1, s.selected)
-        assertEquals(LowerRow.Predictions(listOf("で履物")), m.lowerRow(s))
+        // では は候補が無いので、次に怪しい 着物 の候補が予測行に混ざる
+        assertEquals(LowerRow.Predictions(listOf("で履物"), listOf(ChipPick(1, "きもの"))), m.lowerRow(s))
+    }
+
+    @Test
+    fun suspiciousChipCandidatesInPredictionRowReplaceOnlyThatChip() {
+        val m = ChipBarModel(table)
+        val s = m.initial("ではきもの")
+        val pick = (m.lowerRow(s) as LowerRow.Predictions).chipPicks.first()
+        val t = m.pickChipPick(s, pick)!!
+        assertEquals(listOf("では", "きもの"), t.chips.map { it.output })
+        assertEquals(listOf(0, 2, 5), t.boundaries)
+        assertEquals(-1, t.selected)
+        assertTrue(ChipBarModel(table, ChipBarConfig(maxChipPicks = 0)).lowerRow(s).let { (it as LowerRow.Predictions).chipPicks.isEmpty() })
+    }
+
+    @Test
+    fun flickReconvertsWithLeftContextAndRestoresOriginalOutput() {
+        val t = Table(*table.map.toList().toTypedArray())
+        val m = ChipBarModel(t)
+        val picked = m.pickCandidate(m.tap(m.initial("ではきもの"), 1), "きもの")!!
+        t.contexts.clear()
+        val s = m.flickLeft(picked, 0)!!
+        assertEquals(listOf("で", "履物"), s.chips.map { it.output })
+        assertTrue("はきもの" to ChipContext("で", "で") in t.contexts)
+        // 区切りを戻すと再変換せず元の表記（選んだ「きもの」）に戻る
+        val back = m.flickRight(s, 0)!!
+        assertEquals(listOf("では", "きもの"), back.chips.map { it.output })
+    }
+
+    @Test
+    fun fragileOrLongChipIsSplitAtNBestBoundaryFirst() {
+        val r = "ねおちしてもうた"
+        val t = Table(
+            r to listOf(
+                path(r, "ねおち|し|て|も|うた", "値落ち|し|て|も|歌"),
+                path(r, "ねおち|してもうた", "寝落ち|してもうた", listOf(3)),
+            ),
+        )
+        // 2 位の区切り（3）を優先（従来の自立語の頭なら 値落ちしても|歌）
+        assertEquals(listOf("値落ち", "しても歌"), ChipBarModel(t).initial(r).chips.map { it.output })
+    }
+
+    @Test
+    fun splitAlternativesSkipWholeScriptConversion() {
+        val t = Table(
+            "ではきもの" to listOf(
+                path("ではきもの", "で|は|きもの", "で|は|着物", listOf(2)),
+                path("ではきもの", "ではきもの", "ﾃﾞﾊｷﾓﾉ"),
+                path("ではきもの", "で|はきもの", "で|履物", listOf(1)),
+            ),
+        )
+        val m = ChipBarModel(t)
+        val s = m.tap(m.initial("ではきもの"), 0)
+        assertEquals(listOf("で|履物"), (m.lowerRow(s) as LowerRow.ChipCandidates).splitAlternatives.map { it.label })
     }
 
     @Test
@@ -140,8 +196,8 @@ class ChipBarTest {
         assertEquals(0, NewUiSolver(m).solve("ではきもの", "では着物").moves)
         // 左フリック 1 回で で|履物
         assertEquals(1, NewUiSolver(m).solve("ではきもの", "で履物").moves)
-        // では|きもの: タップ + かな候補
-        assertEquals(2, NewUiSolver(m).solve("ではきもの", "ではきもの").moves)
+        // では|きもの: 予測行の怪しいチップ候補 1 手
+        assertEquals(1, NewUiSolver(m).solve("ではきもの", "ではきもの").moves)
         assertNull(NewUiSolver(m).solve("ではきもの", "出歯着物").moves)
 
         assertEquals(1, CurrentUiSolver(table).solve("ではきもの", "で履物").moves) // 全体の 2 位

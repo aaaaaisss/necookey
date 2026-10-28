@@ -21,7 +21,8 @@ UI なしのモデルだけ（`converter/candidatebar/ChipBar.kt`）。View・IM
 - `ChipBarState`（読み、チップ列、選択、読み全体の変換）は不変。`ChipBarModel` の
   `initial / lowerRow / tap / flickLeft / flickRight / pickCandidate / pickSplitAlternative / pickFullAlternative / commit`
   が新しい状態を返す（変化なしは null）。
-- フリックの再変換は隣接 2 チップだけ、文脈なしの単独変換（現行の文節伸縮と同じ扱い）。
+- フリックの再変換は隣接 2 チップだけ。`ChipConverter.convert(reading, ChipContext)` に左文脈（左側チップの表記＋読み）を渡す。
+  フリックで消えたチップは `ChipBarState.remembered`（範囲→チップ）に残し、区切りを戻したら再変換せず元の表記に戻す。
 - `ChipBarConfig.advanceAfterPick`: 候補を選んだら次のチップへ選択を進める（既定オフ = 仕様どおり）。
 
 ## 評価
@@ -35,3 +36,13 @@ UI なしのモデルだけ（`converter/candidatebar/ChipBar.kt`）。View・IM
 - 揺れチップの割り方を N-best の境界の和集合にする（自立語の頭だけだと `変える仕事` のような塊が出る）。
 - 区切り候補から、読み全体を 1 語で覆う文字種変換（半角カナなど）の経路を外す。
 - フリック後の単独再変換は文脈なしなので、左右の確定済みチップを文脈に渡すか、全体経路の該当部分を優先する。
+
+## 改修（2026-10-28、評価の指摘への対応）
+- 予測行: チップ未選択時、いちばん怪しいチップ（2・3 位経路で区切りが揺れる 3 点/表記が揺れる 2 点/割った・伸縮した 1 点、
+  同点は左）の候補を最大 3 個 `Predictions.chipPicks` で返す（UI は予測行の先頭付近）。候補 = 2・3 位のその範囲の表記 →
+  チップ単独変換。候補が無いチップは飛ばす。`pickChipPick` でそのチップだけ置換（選択はしない）。
+- 長い/揺れるチップの分割: 2・3 位経路の文節区切り（splitPatternByCandidateString 由来、1 位の語頭に当たるもの）を優先。
+  片の読みが `minSplitPiece`（2）未満になる割り方はしない（`では`→`で|は` を避ける）。無ければ従来の自立語の頭。
+- 文全体を 1 語にした漢字なしの経路（半角カナ・カタカナ等の文字種変換）は、区切り候補・揺れ判定・分割・怪しさ判定から外す
+  （予測行の読み全体の別候補には残す）。
+- 評価（ChipUiEvalTest）は未再実行。`NewUiSolver` は予測行のチップ候補を 1 手として数えるよう更新済み。
