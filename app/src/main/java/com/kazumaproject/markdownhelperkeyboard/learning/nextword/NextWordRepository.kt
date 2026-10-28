@@ -17,9 +17,16 @@ class NextWordRepository @Inject constructor(
         val previous = dao.upsertAllReturningPrevious(entries)
         if (recordsSincePrune.incrementAndGet() >= PRUNE_EVERY) {
             recordsSincePrune.set(0)
+            dao.deleteExpired(NextWordPolicy.expiryCutoff(System.currentTimeMillis()))
             if (dao.count() > NextWordPolicy.MAX_ENTRIES) dao.pruneOldest(NextWordPolicy.MAX_ENTRIES)
         }
         return previous
+    }
+
+    /** 予測の上位に出したのに使われなかった後続語を弱める／消す。書く前の行を返す（[revert] に渡せる）。 */
+    suspend fun applyIgnored(entries: List<NextWordEntity>, now: Long): List<Pair<NextWordEntity, NextWordEntity?>> {
+        if (entries.isEmpty()) return emptyList()
+        return dao.applyIgnoredReturningPrevious(entries, now)
     }
 
     /** 確定直後の後退: その確定で書いた後続語を書く前に戻す。 */
@@ -37,7 +44,7 @@ class NextWordRepository @Inject constructor(
         val contexts = NextWordPolicy.lookupContexts(leftContext)
         if (contexts.isEmpty() || limit <= 0) return emptyList()
         if (readingPrefix.length > NextWordPolicy.MAX_READING_LENGTH) return emptyList()
-        // 文脈ごとに回数・新しさの順で多めに取り、回数（減衰つき）＋文脈の長さで並べ替える。
+        // 文脈ごとに回数・新しさの順で多めに取り、回数（減衰つき）＋文脈の長さで並べ替える（消えた語は除く）。
         val pool = contexts.flatMap { context ->
             dao.findByContext(
                 context = context,
