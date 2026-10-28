@@ -1771,7 +1771,7 @@ class FindPath(
         val splitPatterns = mutableListOf<List<Int>>()
         val splitPatternByCandidateString = linkedMapOf<String, List<Int>>()
         val foundStrings = HashSet<String>()
-        // ツギハギ抑制（TsugihagiKanaRepair、既定オフ）: 最初に見つかった経路（1 位）の語の並び
+        // ツギハギ抑制（TsugihagiKanaRepair、既定は修復候補を 1 位）: 最初に見つかった経路（1 位）の語の並び
         var kanaRepairBestString: String? = null
         var kanaRepairBestPath: List<Node>? = null
         fun withKanaRepair(ranked: List<Candidate>): List<Candidate> {

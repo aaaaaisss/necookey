@@ -13,15 +13,32 @@ import org.junit.Test
 class TsugihagiKanaRepairTest {
     @Before
     fun setUp() {
+        // 片の判定の単体テストは旧既定（語コスト 4000・読み 3 字）の閾値で書いてある。既定値そのものは defaults で見る。
         TsugihagiKanaRepair.position = 2
-        TsugihagiKanaRepair.minWordCost = TsugihagiKanaRepair.DEFAULT_MIN_WORD_COST
-        TsugihagiKanaRepair.maxPieceYomi = TsugihagiKanaRepair.DEFAULT_MAX_PIECE_YOMI
+        TsugihagiKanaRepair.minWordCost = 4000
+        TsugihagiKanaRepair.maxPieceYomi = 3
         TsugihagiKanaRepair.minRun = 2
     }
 
     @After
     fun tearDown() {
         TsugihagiKanaRepair.position = TsugihagiKanaRepair.DEFAULT_POSITION
+        TsugihagiKanaRepair.minWordCost = TsugihagiKanaRepair.DEFAULT_MIN_WORD_COST
+        TsugihagiKanaRepair.maxPieceYomi = TsugihagiKanaRepair.DEFAULT_MAX_PIECE_YOMI
+        TsugihagiKanaRepair.minRun = 2
+    }
+
+    @Test
+    fun defaults() {
+        // 2026-10-29 本採用: 修復候補を 1 位・語コスト 3000 以上・読み 4 字以下。
+        assertEquals(1, TsugihagiKanaRepair.DEFAULT_POSITION)
+        assertEquals(3000, TsugihagiKanaRepair.DEFAULT_MIN_WORD_COST)
+        assertEquals(4, TsugihagiKanaRepair.DEFAULT_MAX_PIECE_YOMI)
+        // 新しい閾値では 4 字の トマチン も片になり、地位|トマチン|祭 がかなに戻る。
+        TsugihagiKanaRepair.minWordCost = TsugihagiKanaRepair.DEFAULT_MIN_WORD_COST
+        TsugihagiKanaRepair.maxPieceYomi = TsugihagiKanaRepair.DEFAULT_MAX_PIECE_YOMI
+        val (s, _) = TsugihagiKanaRepair.repair(listOf(n("地位", "ちい", 4586), n("トマチン", "とまちん", 8013), n("祭", "さい", 4500)))!!
+        assertEquals("ちいとまちんさい", s)
     }
 
     private fun n(tango: String, yomi: String, cost: Int, id: Short = 1851) =

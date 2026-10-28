@@ -8,7 +8,10 @@ import com.kazumaproject.markdownhelperkeyboard.converter.candidate.CandidateCon
 /**
  * ツギハギ抑制（かな修復候補）: 1 位の経路に「短くて低頻度の漢字・カタカナ語」が 2 つ以上続く区間（地位|トマチン|祭、胃炎|買っ、
  * 痛く|注が）があれば、その区間だけ読みのひらがなに戻した候補を [position] 位に入れる（1 = 1 位に、2 = 2 位に、0 = 無効）。
- * 区切りを誤った漢字片より、区間がかなのままの候補のほうが直しやすい（漢字片は文節ごと選び直しになる）。既定 2 位（1 位は変えない）。
+ * 区切りを誤った漢字片より、区間がかなのままの候補のほうが直しやすい（漢字片は文節ごと選び直しになる）。
+ * 既定は 1 位・語コスト 3000 以上・読み 4 字以下（2026-10-29、exp-overnight の実験 3。179 lenient 158→160・致命 4→3、
+ * 新規 206 文 lenient 144→152、lenient 壊れ 0。exact では 明日→あした のような漢字→かなが出るが、目標「日常で困らない変換」では
+ * 劣化扱いしない）。以前は 2 位・4000・3 字（1 位は変えない）。
  *
  * 片（piece）の条件: 読み [maxPieceYomi] 字以下・語コスト（辞書コスト、Node.score）[minWordCost] 以上・表記に漢字かカタカナを含む・
  * 名詞,数（2043..2055）でない・ユーザー/学習辞書の語でない。
@@ -16,9 +19,9 @@ import com.kazumaproject.markdownhelperkeyboard.converter.candidate.CandidateCon
  * 文には効かなかった。ここでは経路探索は変えず、1 位の区間をかなに戻す候補を足すだけにする（正解の漢字が辞書に無くても直る）。
  */
 internal object TsugihagiKanaRepair {
-    const val DEFAULT_POSITION = 2
-    const val DEFAULT_MIN_WORD_COST = 4000
-    const val DEFAULT_MAX_PIECE_YOMI = 3
+    const val DEFAULT_POSITION = 1
+    const val DEFAULT_MIN_WORD_COST = 3000
+    const val DEFAULT_MAX_PIECE_YOMI = 4
 
     @Volatile
     @JvmStatic
