@@ -4,7 +4,7 @@ import com.kazumaproject.graph.Node
 
 /**
  * 連接コストだけでは抑えきれない品詞の並びへの追加コスト（前ノード＋現ノードで決まる）。
- * FindPath の全探索（前向き DP・後ろ向き A*・文節）と Zenzai の制約付き探索で同じ値を足す。
+ * FindPath の全探索（前向き DP・後ろ向き A*・文節）で同じ値を足す。
  * ID は app/src/main/assets/id.def（Mozc）に対応。
  */
 internal object PosPairPenalty {

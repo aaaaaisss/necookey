@@ -1534,12 +1534,6 @@ class FindPath(
         }
     }
 
-    private fun candidateSourcesFromPath(path: PathQueueElement): Sequence<CandidateSource> =
-        generateSequence(path) { it.next }
-            .map { it.node }
-            .filter { it.tango != "BOS" && it.tango != "EOS" }
-            .map { it.candidateSource }
-
     private fun CandidateSource.toMask(): Int = when (this) {
         CandidateSource.LEARNED_DICTIONARY -> 1
         CandidateSource.USER_DICTIONARY -> 2
@@ -2204,35 +2198,6 @@ class FindPath(
                 )
             }
         }
-    }
-
-    private fun getPathFromNode(node: Node): List<String> {
-        var tempNode = node
-        val result = mutableListOf<String>()
-
-        while (tempNode.tango != "EOS") {
-            tempNode.next?.let {
-                if (it.tango != "EOS") {
-                    result.add(it.tango)
-                }
-                tempNode = it
-            } ?: break
-        }
-
-        return result
-    }
-
-    private fun getStringFromPath(path: PathQueueElement): String {
-        val result = StringBuilder()
-        var current: PathQueueElement? = path
-        while (current != null) {
-            val node = current.node
-            if (node.tango != "BOS" && node.tango != "EOS") {
-                result.append(node.tango)
-            }
-            current = current.next
-        }
-        return result.toString()
     }
 
     private fun rankSystemNgramCandidates(

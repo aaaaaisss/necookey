@@ -4,7 +4,7 @@ import com.kazumaproject.markdownhelperkeyboard.converter.candidate.Candidate
 
 /** What the two rows of the candidate bar show. */
 data class TwoRowCandidateBar(
-    /** Leftmost slot of the top row: Sumire's conversion (possibly zenz-corrected). */
+    /** Leftmost slot of the top row: Sumire's conversion (possibly replaced by the reranker top). */
     val primary: Candidate?,
     /** Rest of the top row: alternatives for the first bunsetsu, in Sumire order. */
     val firstBunsetsuAlternatives: List<Candidate>,
@@ -27,7 +27,7 @@ object TwoRowCandidateBarPlanner {
      * @param input the current reading.
      * @param conversionCandidates Sumire's merged conversion-mode list (no prediction), in order.
      * @param analysis bunsetsu analysis of the engine primary, or null when unavailable.
-     * @param primaryOverride the zenz-corrected primary, when one is available for this input.
+     * @param primaryOverride the reranker-chosen primary, when one is available for this input.
      * @param predictionCandidates Sumire's merged prediction-mode list, in order.
      * @param isActionCandidate candidates that are not text (macros, selection actions) are
      *   never deduplicated away and never treated as bunsetsu alternatives.

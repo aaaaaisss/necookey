@@ -148,14 +148,7 @@ class KanaKanjiEngineEnglishKanaNumberTest {
 
     @Test
     fun eraCandidatesUseDedicatedType() {
-        val method = KanaKanjiEngine::class.java.getDeclaredMethod(
-            "createCandidatesForEra",
-            Int::class.javaPrimitiveType,
-            String::class.java
-        ).apply { isAccessible = true }
-
-        @Suppress("UNCHECKED_CAST")
-        val candidates = method.invoke(engine, 2024, "2024ねん") as List<Candidate>
+        val candidates = createCandidatesForEra(2024, "2024ねん")
 
         assertTrue(candidates.isNotEmpty())
         assertTrue(candidates.all { it.type == CANDIDATE_TYPE_ERA })

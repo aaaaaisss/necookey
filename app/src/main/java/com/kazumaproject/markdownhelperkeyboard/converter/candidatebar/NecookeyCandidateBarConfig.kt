@@ -1,8 +1,8 @@
 package com.kazumaproject.markdownhelperkeyboard.converter.candidatebar
 
-/** Tunables for necookey's two-row candidate bar and Zenzai (zenz-verified conversion). */
+/** Tunables for necookey's two-row candidate bar and the SUMIRE-LM reranker step. */
 data class NecookeyCandidateBarConfig(
-    /** Left context sent to zenz is truncated to this many UTF-16 units (keeps the prompt short). */
+    /** Left context sent to the reranker is truncated to this many UTF-16 units (keeps the prompt short). */
     val maxLeftContextChars: Int = DEFAULT_MAX_LEFT_CONTEXT_CHARS,
     /** Right context sent to zenz is truncated to this many UTF-16 units. */
     val maxRightContextChars: Int = DEFAULT_MAX_RIGHT_CONTEXT_CHARS,

@@ -157,7 +157,7 @@ data class BunsetsuAnalysis(
     val firstBunsetsuEnd: Int get() = slots.first().span.end
     val hasMultipleBunsetsu: Boolean get() = slots.size > 1
 
-    /** Candidate built from one output per slot (used after zenz re-chose some bunsetsu). */
+    /** Candidate built from one output per slot (used when some bunsetsu were re-chosen). */
     fun primaryWithOutputs(outputs: List<String>): Candidate {
         require(outputs.size == slots.size) { "outputs/slots size mismatch" }
         if (outputs.withIndex().all { (i, o) -> o == slots[i].primaryOutput }) return primary

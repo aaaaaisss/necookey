@@ -52,31 +52,11 @@ fun BitSet.rank1GetIntArray(): IntArray {
     return rank
 }
 
-// Extension function for rank0 in O(1) time complexity
-fun BitSet.rank0GetIntArray(): IntArray {
-    val n = this.size()
-    val rank = IntArray(n + 1)
-    for (i in 1..n) {
-        rank[i] = rank[i - 1] + if (this[i - 1]) 0 else 1
-    }
-    return rank
-}
-
 fun BitSet.rank1GetShortArray(): ShortArray {
     val n = this.size()
     val rank = ShortArray(n + 1)
     for (i in 1..n) {
         rank[i] = (rank[i - 1] + if (this[i - 1]) 1 else 0).toShort()
-    }
-    return rank
-}
-
-// Extension function for rank0 in O(1) time complexity
-fun BitSet.rank0GetShortArray(): ShortArray {
-    val n = this.size()
-    val rank = ShortArray(n + 1)
-    for (i in 1..n) {
-        rank[i] = (rank[i - 1] + if (this[i - 1]) 0 else 1).toShort()
     }
     return rank
 }
