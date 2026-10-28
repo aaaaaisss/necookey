@@ -44,6 +44,18 @@
             app:layout_constraintTop_toTopOf="parent"
             app:layout_constraintVertical_chainStyle="packed" />
 
+        <!-- necookey: top row of the chip candidate bar (bunsetsu chips), drawn over the
+             suggestion list. GONE unless the chip bar is active. -->
+        <com.kazumaproject.markdownhelperkeyboard.ime_service.candidatebar.ChipStripView
+            android:id="@+id/necookey_chip_strip"
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:visibility="gone"
+            app:layout_constraintBottom_toBottomOf="@+id/suggestion_recycler_view"
+            app:layout_constraintEnd_toEndOf="@+id/suggestion_recycler_view"
+            app:layout_constraintStart_toStartOf="@+id/suggestion_recycler_view"
+            app:layout_constraintTop_toTopOf="@+id/suggestion_recycler_view" />
+
         <!-- necookey: bottom row of the two-row candidate bar (prediction candidates).
              GONE unless the two-row bar is active, so Sumire's single-row layout is unchanged. -->
         <androidx.recyclerview.widget.RecyclerView
