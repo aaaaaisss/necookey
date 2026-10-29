@@ -90,6 +90,22 @@ class IMEServiceCommitAndSpaceContractTest {
         assertTrue(side.contains("enterTenKeyCursorMoveMode()"))
     }
 
+    /** 入力中スペースの旧文節変換（scope.launch）は例外を捕まえ、失敗したらかなのまま残す（IME ごと落ちない）。 */
+    @Test
+    fun spaceBunsetsuConversionFallbackCatchesExceptionsAndKeepsKana() {
+        val body = imeServiceSource().functionBody(
+            start = "private fun handleJapaneseModeSpaceKeyWithBunsetsu(",
+            end = "\n    private fun "
+        )
+        val tryAt = body.indexOf("try {")
+        assertTrue(tryAt >= 0 && tryAt < body.indexOf("activateBunsetsuConversionSession("))
+        assertTrue(body.contains("catch (e: CancellationException)"))
+        assertTrue(body.contains("catch (e: Exception)"))
+        assertTrue(body.contains("clearBunsetsuConversionSession()"))
+        assertTrue(body.contains("isHenkan.set(false)"))
+        assertTrue(body.contains("applyRawComposingFallback(insertString)"))
+    }
+
     private fun imeServiceSource(): String =
         listOf(
             File("app/src/main/java/com/kazumaproject/markdownhelperkeyboard/ime_service/IMEService.kt"),

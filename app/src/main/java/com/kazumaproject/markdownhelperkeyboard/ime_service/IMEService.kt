@@ -15204,12 +15204,25 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         mainView: MainLayoutBinding, suggestions: List<Candidate>, insertString: String
     ) {
         scope.launch {
-            val activated = activateBunsetsuConversionSession(
-                input = insertString,
-                mainView = mainView
-            )
-            if (!activated) {
-                handleJapaneseModeSpaceKey(mainView, suggestions, insertString)
+            // scope には例外ハンドラが無いので、ここで投げると IME ごと落ちる（打鍵中の候補更新は try/catch で守られているが、
+            // スペースの旧文節変換は守られていなかった。work/space_crash_investigation.md の候補 1）。失敗したらかなのまま残す。
+            try {
+                val activated = activateBunsetsuConversionSession(
+                    input = insertString,
+                    mainView = mainView
+                )
+                if (!activated) {
+                    handleJapaneseModeSpaceKey(mainView, suggestions, insertString)
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                Timber.e(e, "space bunsetsu conversion failed: %s", insertString)
+                clearBunsetsuConversionSession()
+                isHenkan.set(false)
+                if (inputString.value == insertString) {
+                    applyRawComposingFallback(insertString)
+                }
             }
         }
     }
