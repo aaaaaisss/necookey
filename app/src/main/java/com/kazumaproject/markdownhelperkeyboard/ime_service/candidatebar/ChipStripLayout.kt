@@ -100,15 +100,40 @@ class ChipStripLayout(
         return Hit.Chip(index)
     }
 
-    /** 展開・選択中のチップが見えるように、はみ出したときの横スクロール量を決める（無ければ右端 = 打っている所）。 */
-    fun scrollFor(laid: Laid, data: ChipStripData, viewWidth: Float, current: Float): Float {
-        val overflow = laid.width - viewWidth
+    /**
+     * はみ出したときの横スクロール量（0..[maxScroll]）。
+     * - [reveal] = true で展開・選択中のチップがあれば、[current] から最小限動かしてそのチップを見せる。
+     * - 見せるチップが無いとき: [followEnd] = true なら右端（打っている所）、false なら [current] のまま（手でスクロールした位置を保つ）。
+     */
+    fun scrollFor(
+        laid: Laid,
+        data: ChipStripData,
+        viewWidth: Float,
+        current: Float,
+        reveal: Boolean = true,
+        followEnd: Boolean = true,
+    ): Float {
+        val overflow = maxScroll(laid, viewWidth)
         if (overflow <= 0f) return 0f
         val focus = data.expandedIndex.takeIf { it >= 0 } ?: data.selectedIndex
-        val box = laid.chips.getOrNull(focus) ?: return overflow
+        if (focus >= 0 && focus < laid.chips.size) {
+            return if (reveal) revealScroll(laid, focus, viewWidth, current) else current.coerceIn(0f, overflow)
+        }
+        return if (followEnd) overflow else current.coerceIn(0f, overflow)
+    }
+
+    /** スクロールできる最大量（はみ出していなければ 0）。 */
+    fun maxScroll(laid: Laid, viewWidth: Float): Float = (laid.width - viewWidth).coerceAtLeast(0f)
+
+    /** チップ [index] が（両側の隙間ごと）見えるように [current] から最小限動かしたスクロール量。 */
+    fun revealScroll(laid: Laid, index: Int, viewWidth: Float, current: Float): Float {
+        val overflow = maxScroll(laid, viewWidth)
+        if (overflow <= 0f) return 0f
+        val box = laid.chips.getOrNull(index) ?: return current.coerceIn(0f, overflow)
         var scroll = current.coerceIn(0f, overflow)
-        if (box.left - gap < scroll) scroll = box.left - gap
+        // チップが表示幅より広いときは左端を優先（読み始めが見える）
         if (box.right + gap > scroll + viewWidth) scroll = box.right + gap - viewWidth
+        if (box.left - gap < scroll) scroll = box.left - gap
         return scroll.coerceIn(0f, overflow)
     }
 
@@ -127,6 +152,32 @@ class ChipStripLayout(
             // サロゲートペアの間は切らない
             if (Character.isLowSurrogate(reading[at]) && at > 1) at--
             return at
+        }
+
+        /**
+         * チップ上で横に動いた指を、スクロールにするか（true）、離すまで待ってフリック（1 字ずらす）にするか（false）。
+         * フリックは短く速い（[flickMaxMs] 以内・[scrollDistance] 未満）。それより長く動かす・ゆっくり動かすとスクロール。
+         * スクロールできない（はみ出していない）ときは常に false（従来どおりフリック）。
+         */
+        fun chipSwipeIsScroll(
+            absDx: Float,
+            elapsedMs: Long,
+            canScroll: Boolean,
+            scrollDistance: Float,
+            flickMaxMs: Long,
+        ): Boolean = canScroll && (absDx >= scrollDistance || elapsedMs > flickMaxMs)
+
+        /**
+         * 区切りドラッグ中、指が表示域の端（[left]..[right] の内側 [edge] 以内）に来たときの自動スクロールの速さ（px/秒、
+         * 負 = 左へ）。端に近いほど速く、最大 [maxSpeed]。端から離れていれば 0。
+         */
+        fun edgeAutoScrollSpeed(x: Float, left: Float, right: Float, edge: Float, maxSpeed: Float): Float {
+            if (edge <= 0f || right - left <= edge * 2f) return 0f
+            return when {
+                x < left + edge -> -maxSpeed * ((left + edge - x) / edge).coerceIn(0f, 1f)
+                x > right - edge -> maxSpeed * ((x - (right - edge)) / edge).coerceIn(0f, 1f)
+                else -> 0f
+            }
         }
 
         /** 区切りドラッグで動かせる字数（左のチップ・右のチップとも 1 字は残す）。 */

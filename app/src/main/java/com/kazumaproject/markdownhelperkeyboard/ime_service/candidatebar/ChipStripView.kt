@@ -9,10 +9,13 @@ import android.graphics.RectF
 import android.util.AttributeSet
 import android.view.HapticFeedbackConstants
 import android.view.MotionEvent
+import android.view.VelocityTracker
 import android.view.View
 import android.view.ViewConfiguration
+import android.widget.OverScroller
 import androidx.core.graphics.ColorUtils
 import com.kazumaproject.markdownhelperkeyboard.converter.candidatebar.ChipStripData
+import com.kazumaproject.markdownhelperkeyboard.converter.candidatebar.ChipStripItem
 import kotlin.math.abs
 import kotlin.math.roundToInt
 
@@ -26,7 +29,12 @@ import kotlin.math.roundToInt
  *   指の位置に境界前後のかなを拡大したバブルを出す。
  * - チップ上の左右フリック = 境界を 1 字ずらす（右 = 伸ばす、左 = 縮める。区切りドラッグのフォールバック）。
  * - 展開中（旧操作。モデルに残っている）の文字の間のタップ = 切る。
- * はみ出したときは選択・展開中のチップ（無ければ右端）が見える位置に寄せる。文字は最小 [MIN_TEXT_SCALE] 倍まで縮める。
+ * はみ出したとき（文字は最小 [MIN_TEXT_SCALE] 倍まで縮めてから）は横にスクロールできる（docs/CHIP_BAR.md「チップ列のスクロール」）:
+ * - 区切りの上以外で横に長く・ゆっくり動かす = 手でスクロール（離すと慣性）。チップ上の短く速い横の動きは従来どおりフリック
+ *   （[ChipStripLayout.chipSwipeIsScroll]）。チップの無い所（右端の余白など）から動かせばすぐスクロール。
+ * - 区切りドラッグで指が表示域の端に近づくと自動でスクロールし、そのまま見えていなかった所まで境界を動かせる。
+ * - 選択・展開中のチップが変わったら（タップ・スペース・操作の結果）そのチップを見える位置まで寄せる。読みが変わったら
+ *   （打ち足し・後退）右端（打っている所）へ。それ以外の更新では手でスクロールした位置を保つ。
  */
 class ChipStripView @JvmOverloads constructor(
     context: Context,
@@ -73,6 +81,10 @@ class ChipStripView @JvmOverloads constructor(
     private var data: ChipStripData = ChipStripData.EMPTY
     private var laid: ChipStripLayout.Laid = ChipStripLayout.Laid.EMPTY
     private var scroll = 0f
+    /** 手でスクロールしたか（読みが変わるまで右端へ戻さない）。 */
+    private var userScrolled = false
+    private val scroller = OverScroller(context)
+    private var velocityTracker: VelocityTracker? = null
 
     private var backgroundFill = Color.TRANSPARENT
     private var chipFill = Color.LTGRAY
@@ -83,6 +95,39 @@ class ChipStripView @JvmOverloads constructor(
     // ジェスチャ
     private val touchSlop = ViewConfiguration.get(context).scaledTouchSlop.toFloat()
     private val flickDistance = 20f * density
+    /** チップ上でこれ以上横に動かす（または [FLICK_MAX_MS] より長く動かし続ける）とフリックではなくスクロール。 */
+    private val scrollStartDistance = 56f * density
+    /** 区切りドラッグの自動スクロール: 表示域の端からこの幅に入ると動き出す。 */
+    private val autoScrollEdge = 32f * density
+    private val autoScrollMaxSpeed = 600f * density
+    private val minFlingVelocity = ViewConfiguration.get(context).scaledMinimumFlingVelocity.toFloat()
+    private val maxFlingVelocity = ViewConfiguration.get(context).scaledMaximumFlingVelocity.toFloat()
+    private var downTime = 0L
+    /** 手でスクロール中か・スクロールを始めたときの指の x とスクロール量。 */
+    private var scrolling = false
+    private var scrollAnchorX = 0f
+    private var scrollAnchor = 0f
+    /** 区切りドラッグを始めたときの指の位置（チップ列の座標 = スクロール込み）。 */
+    private var downContentX = 0f
+    private var lastAutoScrollFrame = 0L
+    private val autoScrollRunnable = object : Runnable {
+        override fun run() {
+            if (!dragging) return
+            val now = System.nanoTime()
+            val dt = ((now - lastAutoScrollFrame) / 1_000_000_000f).coerceIn(0f, 0.05f)
+            lastAutoScrollFrame = now
+            val speed = autoScrollSpeed()
+            if (speed == 0f) return
+            val before = scroll
+            scroll = (scroll + speed * dt).coerceIn(0f, maxScroll())
+            if (scroll != before) {
+                userScrolled = true
+                updateDragDelta()
+                invalidate()
+            }
+            postOnAnimation(this)
+        }
+    }
     private var downX = 0f
     private var downY = 0f
     private var downHit: ChipStripLayout.Hit = ChipStripLayout.Hit.None
@@ -117,19 +162,35 @@ class ChipStripView @JvmOverloads constructor(
 
     fun setData(newData: ChipStripData) {
         if (newData == data) return
+        val old = data
         data = newData
         dragging = false
-        relayout()
+        removeCallbacks(autoScrollRunnable)
+        val readingChanged = old.items.joinToString("") { it.reading } != newData.items.joinToString("") { it.reading }
+        if (readingChanged) userScrolled = false
+        // 選択・展開中のチップ（とその表記）が変わったときだけ寄せる。手でスクロールした位置は、それ以外の更新では保つ。
+        val reveal = readingChanged || focusKey(old) != focusKey(newData)
+        if (reveal || !userScrolled) scroller.forceFinished(true)
+        relayout(reveal = reveal, followEnd = !userScrolled)
         invalidate()
     }
+
+    private fun focusKey(d: ChipStripData): Pair<Int, ChipStripItem?> {
+        val i = d.expandedIndex.takeIf { it >= 0 } ?: d.selectedIndex
+        return i to d.items.getOrNull(i)
+    }
+
+    private fun availableWidth(): Float = (width.toFloat() - confirmWidth).coerceAtLeast(0f)
+
+    private fun maxScroll(): Float = layoutSpec.maxScroll(laid, availableWidth())
 
     override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
         super.onSizeChanged(w, h, oldw, oldh)
         relayout()
     }
 
-    private fun relayout() {
-        val available = (width.toFloat() - confirmWidth).coerceAtLeast(0f)
+    private fun relayout(reveal: Boolean = true, followEnd: Boolean = !userScrolled) {
+        val available = availableWidth()
         textPaint.textSize = baseTextSize
         var result = layoutSpec.layout(data) { textPaint.measureText(it) }
         if (available > 0f && result.width > available) {
@@ -138,7 +199,37 @@ class ChipStripView @JvmOverloads constructor(
             result = layoutSpec.layout(data) { textPaint.measureText(it) }
         }
         laid = result
-        scroll = layoutSpec.scrollFor(result, data, available, scroll)
+        scroll = layoutSpec.scrollFor(result, data, available, scroll, reveal = reveal, followEnd = followEnd)
+    }
+
+    override fun computeScroll() {
+        super.computeScroll()
+        if (scroller.computeScrollOffset()) {
+            scroll = scroller.currX.toFloat().coerceIn(0f, maxScroll())
+            postInvalidateOnAnimation()
+        }
+    }
+
+    private fun autoScrollSpeed(): Float = ChipStripLayout.edgeAutoScrollSpeed(
+        x = dragX,
+        left = confirmWidth,
+        right = width.toFloat(),
+        edge = autoScrollEdge,
+        maxSpeed = autoScrollMaxSpeed,
+    )
+
+    /** 区切りドラッグの字数を、始めた位置からの指の移動（自動スクロール分を含む）で決める。 */
+    private fun updateDragDelta() {
+        val hit = downHit as? ChipStripLayout.Hit.Join ?: return
+        val left = data.items.getOrNull(hit.index)?.reading.orEmpty()
+        val right = data.items.getOrNull(hit.index + 1)?.reading.orEmpty()
+        val step = textPaint.measureText("あ").coerceAtLeast(8f * density)
+        val contentX = dragX - confirmWidth + scroll
+        val delta = ChipStripLayout.clampDelta(left.length, right.length, ((contentX - downContentX) / step).roundToInt())
+        if (delta != dragDelta) {
+            dragDelta = delta
+            performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
+        }
     }
 
     /** 表記の先頭から [x]（チップの文字の左端から）に一番近い文字の境目（0..表記の長さ）。 */
@@ -236,17 +327,29 @@ class ChipStripView @JvmOverloads constructor(
 
     @SuppressLint("ClickableViewAccessibility")
     override fun onTouchEvent(event: MotionEvent): Boolean {
+        if (event.actionMasked == MotionEvent.ACTION_DOWN) {
+            velocityTracker?.recycle()
+            velocityTracker = VelocityTracker.obtain()
+        }
+        velocityTracker?.addMovement(event)
         when (event.actionMasked) {
             MotionEvent.ACTION_DOWN -> {
                 downX = event.x
                 downY = event.y
+                downTime = event.eventTime
                 moved = false
                 longPressed = false
                 dragging = false
+                scrolling = false
                 dragDelta = 0
+                removeCallbacks(autoScrollRunnable)
+                // 慣性スクロール中のタッチは止めるだけ
+                val wasFlinging = !scroller.isFinished
+                scroller.forceFinished(true)
                 downOnConfirm = event.x < confirmWidth && data.items.isNotEmpty()
-                downHit = if (downOnConfirm) ChipStripLayout.Hit.None
-                else layoutSpec.hit(laid, event.x - confirmWidth + scroll)
+                downContentX = event.x - confirmWidth + scroll
+                downHit = if (downOnConfirm || wasFlinging) ChipStripLayout.Hit.None
+                else layoutSpec.hit(laid, downContentX)
                 removeCallbacks(longPressRunnable)
                 if (downHit is ChipStripLayout.Hit.Chip) {
                     postDelayed(longPressRunnable, ViewConfiguration.getLongPressTimeout().toLong())
@@ -255,24 +358,48 @@ class ChipStripView @JvmOverloads constructor(
             }
 
             MotionEvent.ACTION_MOVE -> {
-                if (!moved && (abs(event.x - downX) > touchSlop || abs(event.y - downY) > touchSlop)) {
+                val dx = event.x - downX
+                val dy = event.y - downY
+                if (!moved && (abs(dx) > touchSlop || abs(dy) > touchSlop)) {
                     moved = true
                     removeCallbacks(longPressRunnable)
-                    if (downHit is ChipStripLayout.Hit.Join && abs(event.x - downX) >= abs(event.y - downY)) {
-                        dragging = true
-                        parent?.requestDisallowInterceptTouchEvent(true)
+                    if (!downOnConfirm && abs(dx) >= abs(dy)) {
+                        when (downHit) {
+                            is ChipStripLayout.Hit.Join -> {
+                                dragging = true
+                                parent?.requestDisallowInterceptTouchEvent(true)
+                            }
+                            ChipStripLayout.Hit.None -> startScroll(event.x)
+                            else -> Unit
+                        }
                     }
                 }
+                // チップ上の横の動き: 短く速ければ離したときにフリック、長く・ゆっくりならスクロールに切り替える
+                if (moved && !dragging && !scrolling && !longPressed && !downOnConfirm &&
+                    (downHit is ChipStripLayout.Hit.Chip || downHit is ChipStripLayout.Hit.Cut) &&
+                    abs(dx) > touchSlop && abs(dx) >= abs(dy) &&
+                    ChipStripLayout.chipSwipeIsScroll(
+                        absDx = abs(dx),
+                        elapsedMs = event.eventTime - downTime,
+                        canScroll = maxScroll() > 0f,
+                        scrollDistance = scrollStartDistance,
+                        flickMaxMs = FLICK_MAX_MS,
+                    )
+                ) {
+                    startScroll(event.x)
+                }
+                if (scrolling) {
+                    scroll = (scrollAnchor - (event.x - scrollAnchorX)).coerceIn(0f, maxScroll())
+                    invalidate()
+                    return true
+                }
                 if (dragging) {
-                    val hit = downHit as ChipStripLayout.Hit.Join
-                    val left = data.items.getOrNull(hit.index)?.reading.orEmpty()
-                    val right = data.items.getOrNull(hit.index + 1)?.reading.orEmpty()
-                    val step = textPaint.measureText("あ").coerceAtLeast(8f * density)
-                    val delta = ChipStripLayout.clampDelta(left.length, right.length, ((event.x - downX) / step).roundToInt())
                     dragX = event.x
-                    if (delta != dragDelta) {
-                        dragDelta = delta
-                        performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
+                    updateDragDelta()
+                    if (autoScrollSpeed() != 0f) {
+                        removeCallbacks(autoScrollRunnable)
+                        lastAutoScrollFrame = System.nanoTime()
+                        postOnAnimation(autoScrollRunnable)
                     }
                     invalidate()
                 }
@@ -281,6 +408,7 @@ class ChipStripView @JvmOverloads constructor(
 
             MotionEvent.ACTION_UP -> {
                 removeCallbacks(longPressRunnable)
+                removeCallbacks(autoScrollRunnable)
                 if (downOnConfirm) {
                     if (!moved && event.x < confirmWidth) {
                         performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)
@@ -289,6 +417,11 @@ class ChipStripView @JvmOverloads constructor(
                     return true
                 }
                 if (longPressed) return true
+                if (scrolling) {
+                    scrolling = false
+                    fling()
+                    return true
+                }
                 if (dragging) {
                     dragging = false
                     invalidate()
@@ -321,6 +454,8 @@ class ChipStripView @JvmOverloads constructor(
 
             MotionEvent.ACTION_CANCEL -> {
                 removeCallbacks(longPressRunnable)
+                removeCallbacks(autoScrollRunnable)
+                scrolling = false
                 if (dragging) {
                     dragging = false
                     invalidate()
@@ -331,6 +466,26 @@ class ChipStripView @JvmOverloads constructor(
         return super.onTouchEvent(event)
     }
 
+    /** 手でのスクロールを始める（指の今の位置を基準に。切り替えた瞬間に中身が跳ばないように）。 */
+    private fun startScroll(x: Float) {
+        if (maxScroll() <= 0f) return
+        scrolling = true
+        userScrolled = true
+        scrollAnchorX = x
+        scrollAnchor = scroll
+        parent?.requestDisallowInterceptTouchEvent(true)
+    }
+
+    /** 指を離したときの慣性スクロール。 */
+    private fun fling() {
+        val tracker = velocityTracker ?: return
+        tracker.computeCurrentVelocity(1000, maxFlingVelocity)
+        val vx = tracker.xVelocity
+        if (abs(vx) < minFlingVelocity) return
+        scroller.fling(scroll.roundToInt(), 0, -vx.roundToInt(), 0, 0, maxScroll().roundToInt(), 0, 0)
+        postInvalidateOnAnimation()
+    }
+
     override fun performClick(): Boolean {
         super.performClick()
         return true
@@ -338,11 +493,17 @@ class ChipStripView @JvmOverloads constructor(
 
     override fun onDetachedFromWindow() {
         removeCallbacks(longPressRunnable)
+        removeCallbacks(autoScrollRunnable)
+        scroller.forceFinished(true)
+        velocityTracker?.recycle()
+        velocityTracker = null
         super.onDetachedFromWindow()
     }
 
     companion object {
         const val MIN_TEXT_SCALE = 0.7f
         const val BUBBLE_TEXT_SCALE = 1.3f
+        /** これより長く横に動かし続けるとフリックではなくスクロール（ms）。 */
+        const val FLICK_MAX_MS = 220L
     }
 }
