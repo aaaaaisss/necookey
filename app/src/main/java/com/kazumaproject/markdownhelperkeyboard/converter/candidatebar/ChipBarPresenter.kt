@@ -2,6 +2,7 @@ package com.kazumaproject.markdownhelperkeyboard.converter.candidatebar
 
 import com.kazumaproject.markdownhelperkeyboard.converter.candidate.Candidate
 import com.kazumaproject.markdownhelperkeyboard.converter.candidate.CandidateConversionSegment
+import com.kazumaproject.markdownhelperkeyboard.learning.session.LearningFragment
 
 /*
  * 文節チップ候補欄の「状態 → 表示データ」（View・IMEService なしの純粋関数）。docs/CHIP_BAR.md の「組み込み」参照。
@@ -35,8 +36,17 @@ data class ChipStripData(val items: List<ChipStripItem>) {
     }
 }
 
-/** 確定時に学習へ渡す 1 文節（チップ 1 つ）。[explicit] = 境界操作か候補選択で変えたチップ。 */
-data class ChipLearningFragment(val reading: String, val output: String, val explicit: Boolean)
+/**
+ * 確定時に学習へ渡す 1 文節（チップ 1 つ）。[explicit] = 境界操作か候補選択で変えたチップ。
+ * [learn] = 学習辞書に書く（どこかのチップを変えた文は、変えていないチップも書く。次に同じ読みを打ったとき文全体と
+ * 各チップの区切りを再現するため。何も変えていなければ書かない）。
+ */
+data class ChipLearningFragment(
+    val reading: String,
+    val output: String,
+    val explicit: Boolean,
+    val learn: Boolean = explicit,
+)
 
 /** 読み全体の変換を既に持っているとき（候補欄の更新で取ったもの）、同じ読み・文脈なしはそれを返す。 */
 class SeededChipConverter(private val seed: ChipConversion, private val base: ChipConverter) : ChipConverter {
@@ -138,14 +148,31 @@ object ChipBarPresenter {
      * 確定時の文節ごとの学習（チップ = 文節）。境界操作・候補選択で変えたチップと、読み全体の別候補から来て
      * 1 位経路の同じ範囲の表記と違うチップを明示選択にする。
      */
-    fun learningFragments(state: ChipBarState): List<ChipLearningFragment> = state.chips.map { chip ->
-        ChipLearningFragment(
-            reading = state.reading.substring(chip.start, chip.end),
-            output = chip.output,
-            explicit = chip.origin == Chip.Origin.PICKED || chip.origin == Chip.Origin.RESIZED ||
-                primaryOutput(state, chip.start, chip.end) != chip.output,
-        )
+    fun learningFragments(state: ChipBarState): List<ChipLearningFragment> {
+        val edited = isEdited(state)
+        return state.chips.map { chip ->
+            val explicit = chip.origin == Chip.Origin.PICKED || chip.origin == Chip.Origin.RESIZED ||
+                primaryOutput(state, chip.start, chip.end) != chip.output
+            ChipLearningFragment(
+                reading = state.reading.substring(chip.start, chip.end),
+                output = chip.output,
+                explicit = explicit,
+                learn = explicit || edited,
+            )
+        }
     }
+
+    /** 確定時に学習セッションへ渡す文節（IMEService と再現テストが同じものを使う）。 */
+    fun learningSessionFragments(state: ChipBarState, candidateScore: Int): List<LearningFragment> =
+        learningFragments(state).map { fragment ->
+            LearningFragment(
+                reading = fragment.reading,
+                output = fragment.output,
+                candidateScore = candidateScore,
+                candidateIndex = if (fragment.learn) 1 else 0,
+                explicitlySelected = fragment.explicit,
+            )
+        }
 
     /** 1 位経路で読みの範囲 [start, end) を覆う語の表記（語の境界と合わなければ null）。 */
     private fun primaryOutput(state: ChipBarState, start: Int, end: Int): String? {

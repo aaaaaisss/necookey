@@ -1,5 +1,6 @@
 package com.kazumaproject.markdownhelperkeyboard.converter.candidatebar
 
+import com.kazumaproject.markdownhelperkeyboard.converter.candidate.CANDIDATE_TYPE_LEARNED_DICTIONARY
 import com.kazumaproject.markdownhelperkeyboard.converter.candidate.CANDIDATE_TYPE_USER_DICTIONARY
 
 import com.kazumaproject.markdownhelperkeyboard.converter.candidate.Candidate
@@ -32,7 +33,7 @@ object SumireLmGate {
 
     /**
      * [candidates] のうち読み全体を覆う候補（重複なし、先頭から [POOL_SIZE] 件、Sumire の順 = rank）を採点する。
-     * 全読み候補が無い・ユーザー辞書の候補が先頭（守る）なら null。
+     * 全読み候補が無い・ユーザー辞書か学習辞書の候補が先頭（守る）なら null。
      */
     fun rerank(
         reranker: CandidateReranker,
@@ -47,7 +48,9 @@ object SumireLmGate {
             .filter { it.length.toInt() == input.length && !isExcluded(it) && seen.add(it.string) }
             .take(POOL_SIZE)
             .toList()
-        if (pool.isEmpty() || pool[0].type == CANDIDATE_TYPE_USER_DICTIONARY) return null
+        // ユーザー辞書・学習辞書の語を含む経路が先頭なら守る（学習はラティスの中で効くので、学習した文は Sumire 自身の
+        // 1 位になる。ここで差し替えると、直した変換が次も LM の好みに戻されて学習が効かない）。
+        if (pool.isEmpty() || pool[0].type == CANDIDATE_TYPE_USER_DICTIONARY || pool[0].type == CANDIDATE_TYPE_LEARNED_DICTIONARY) return null
         val inputs = pool.mapIndexed { rank, c ->
             val segs = segmentsOf(c)
             SumireLmReranker.Input(

@@ -13,6 +13,7 @@ import com.kazumaproject.markdownhelperkeyboard.converter.ngram.EmptySystemNgram
 import com.kazumaproject.markdownhelperkeyboard.converter.ngram.PackedSystemNgramDictionary
 import com.kazumaproject.markdownhelperkeyboard.converter.ngram.SystemNgramDictionary
 import com.kazumaproject.markdownhelperkeyboard.converter.path_algorithm.FindPath
+import com.kazumaproject.markdownhelperkeyboard.repository.LearnRepository
 import com.kazumaproject.markdownhelperkeyboard.repository.UserDictionaryRepository
 import kotlinx.coroutines.runBlocking
 import org.mockito.kotlin.any
@@ -47,11 +48,12 @@ internal class DeviceConfigConversion(
         reading: String,
         n: Int = DEVICE_N,
         segs: MutableMap<String, List<CandidateConversionSegment>>? = null,
+        learnRepository: LearnRepository? = null,
     ): BunsetsuCandidateResult = engine.getCandidatesWithoutPredictionWithBunsetsu(
         input = reading, n = n,
         mozcUtPersonName = false, mozcUTPlaces = false, mozcUTWiki = false,
         mozcUTNeologd = false, mozcUTWeb = false,
-        userDictionaryRepository = userDict, learnRepository = null,
+        userDictionaryRepository = userDict, learnRepository = learnRepository,
         typoCorrectionOffsetScore = 3000, omissionSearchOffsetScore = 1900,
         beamWidth = 20,
         incrementalSessionState = null,

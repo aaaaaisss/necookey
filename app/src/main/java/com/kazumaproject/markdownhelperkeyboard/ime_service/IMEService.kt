@@ -193,6 +193,8 @@ import com.kazumaproject.markdownhelperkeyboard.converter.candidatebar.CANDIDATE
 import com.kazumaproject.markdownhelperkeyboard.converter.candidatebar.ChipBarModel
 import com.kazumaproject.markdownhelperkeyboard.converter.candidatebar.ChipBarPresenter
 import com.kazumaproject.markdownhelperkeyboard.converter.candidatebar.ChipBarState
+import com.kazumaproject.markdownhelperkeyboard.converter.candidatebar.ChipSegmentation
+import com.kazumaproject.markdownhelperkeyboard.converter.candidatebar.LearnedChipSplit
 import com.kazumaproject.markdownhelperkeyboard.converter.candidatebar.ChipContext
 import com.kazumaproject.markdownhelperkeyboard.converter.candidatebar.ChipConverter
 import com.kazumaproject.markdownhelperkeyboard.converter.candidatebar.ChipConversion
@@ -13557,11 +13559,20 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         }
         necookeyLeftContext = leftContext
         necookeyLeftContextInput = insertString
+        val chipSegmentation = chipSegmentationWithLearning(
+            reading = insertString,
+            conversion = conversion,
+            base = ChipSegmentation(
+                segmentsByString = core?.candidateSegmentsByString.orEmpty(),
+                splitPatternByCandidateString = core?.bunsetsuResult?.splitPatternByCandidateString.orEmpty(),
+            ),
+        )
+        if (!shouldApplyCandidateResult(insertString, token)) return
         chipBarSource = ChipBarSource(
             input = insertString,
             conversion = conversion,
-            segmentsByString = core?.candidateSegmentsByString.orEmpty(),
-            splitPatternByCandidateString = core?.bunsetsuResult?.splitPatternByCandidateString.orEmpty(),
+            segmentsByString = chipSegmentation.segmentsByString,
+            splitPatternByCandidateString = chipSegmentation.splitPatternByCandidateString,
             editorLeftContext = context?.leftContext ?: leftContext,
         )
         val nextWords = lookupNextWords(leftContext, insertString)
@@ -14052,6 +14063,30 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         return true
     }
 
+    /**
+     * チップの元の語分割に学習を反映する: 学習した句（チップで直した文全体など）が 1 語で選ばれたとき、覚えている文節に
+     * 割り直して区切りを再現する（[LearnedChipSplit]、docs/LEARNING.md「チップ候補欄の学習」）。
+     */
+    private suspend fun chipSegmentationWithLearning(
+        reading: String,
+        conversion: List<Candidate>,
+        base: ChipSegmentation,
+    ): ChipSegmentation {
+        if (!appPreference.necookey_chip_candidate_bar_preference) return base
+        val repository = learnedRepositoryForSuggestion() ?: return base
+        return try {
+            val pieces = withContext(Dispatchers.IO) {
+                LearnedChipSplit.piecesFrom(reading, System.currentTimeMillis()) { repository.findCommonPrefixes(it) }
+            }
+            LearnedChipSplit.patch(reading, conversion, base, pieces)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            Timber.w(e, "chip learned split failed")
+            base
+        }
+    }
+
     private fun recordChipBarLearning(state: ChipBarState) {
         if (currentInputModeForSession != InputMode.ModeJapanese || !isLearningWriteEnabled()) {
             conversionLearningSession.cancel()
@@ -14059,17 +14094,8 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         }
         captureLearningSessionLeftContext(state.reading)
         conversionLearningSession.beginIfNeeded(state.reading)
-        ChipBarPresenter.learningFragments(state).forEach { fragment ->
-            conversionLearningSession.record(
-                LearningFragment(
-                    reading = fragment.reading,
-                    output = fragment.output,
-                    candidateScore = CHIP_LEARNING_CANDIDATE_SCORE,
-                    candidateIndex = if (fragment.explicit) 1 else 0,
-                    explicitlySelected = fragment.explicit,
-                )
-            )
-        }
+        ChipBarPresenter.learningSessionFragments(state, CHIP_LEARNING_CANDIDATE_SCORE)
+            .forEach(conversionLearningSession::record)
         persistCompletedLearningSession()
     }
 

@@ -1,5 +1,6 @@
 package com.kazumaproject.markdownhelperkeyboard.converter.path_algorithm
 
+import com.kazumaproject.markdownhelperkeyboard.converter.candidate.CANDIDATE_TYPE_LEARNED_DICTIONARY
 import com.kazumaproject.graph.CandidateSource
 import com.kazumaproject.graph.Node
 import com.kazumaproject.markdownhelperkeyboard.converter.candidate.Candidate
@@ -106,6 +107,8 @@ internal object TsugihagiKanaRepair {
         segmentCollector: MutableMap<String, List<CandidateConversionSegment>>?,
     ): List<Candidate> {
         if (position <= 0 || bestPath == null || ranked.isEmpty() || ranked[0].string != bestString) return ranked
+        // 学習辞書の語を含む 1 位（ユーザーが直した変換）はかなに戻さない。
+        if (ranked[0].type == CANDIDATE_TYPE_LEARNED_DICTIONARY) return ranked
         val (s, segs) = repair(bestPath) ?: return ranked
         val top = ranked[0]
         val rest = ranked.filter { it.string != s }
