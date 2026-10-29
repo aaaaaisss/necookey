@@ -237,6 +237,15 @@ class ChipBarModel(
         return state.copy(chips = chips, selected = i, expanded = -1, remembered = memo)
     }
 
+    /**
+     * 長押しで即座に切る: チップ [index] を読みの位置 [at]（読み全体のオフセット、チップの中）で 2 つに切る
+     * （展開を経ない 1 手。結果は [cutAt] と同じ）。
+     */
+    fun cutChip(state: ChipBarState, index: Int, at: Int): ChipBarState? {
+        if (index !in state.chips.indices) return null
+        return cutAt(state.copy(expanded = index), at)
+    }
+
     // ---- くっつける（チップ間タップ / スワイプ） ----
 
     /** チップ [index] と右隣をくっつけて 1 チップにし、左文脈付きで再変換して選択する。末尾チップは null。 */
@@ -268,6 +277,24 @@ class ChipBarModel(
         val newEnd = BunsetsuRangeEditor.previousCodePointBoundary(state.reading, chip.end)
         if (newEnd <= chip.start) return null
         return moveBoundary(state, index, newEnd)
+    }
+
+    /**
+     * 区切りドラッグ: チップ [index] と右隣の境界を [delta] 字（コードポイント）動かす（正 = 右へ）。
+     * 両側に 1 字以上残らない・動かない・末尾チップは null。
+     */
+    fun shiftBoundary(state: ChipBarState, index: Int, delta: Int): ChipBarState? {
+        val chips = state.chips
+        if (index !in chips.indices || index == chips.lastIndex || delta == 0) return null
+        val chip = chips[index]
+        val next = chips[index + 1]
+        var end = chip.end
+        repeat(kotlin.math.abs(delta)) {
+            end = if (delta > 0) BunsetsuRangeEditor.nextCodePointBoundary(state.reading, end)
+            else BunsetsuRangeEditor.previousCodePointBoundary(state.reading, end)
+        }
+        if (end <= chip.start || end >= next.end || end == chip.end) return null
+        return moveBoundary(state, index, end)
     }
 
     private fun moveBoundary(state: ChipBarState, index: Int, newEnd: Int): ChipBarState {

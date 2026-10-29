@@ -49,7 +49,7 @@ class ChipBarPresenterTest {
         val m = ChipBarModel(table)
         val s = m.initial("ではきもの")
         assertEquals(
-            ChipStripData(listOf(ChipStripItem("では", false), ChipStripItem("着物", false))),
+            ChipStripData(listOf(ChipStripItem("では", false, reading = "では"), ChipStripItem("着物", false, reading = "きもの"))),
             ChipBarPresenter.strip(s),
         )
         val ex = m.longPress(s, 1)!!

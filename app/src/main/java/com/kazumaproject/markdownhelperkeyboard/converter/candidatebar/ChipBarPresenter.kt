@@ -18,11 +18,15 @@ const val CANDIDATE_TYPE_CHIP_CANDIDATE: Byte = 60
 /** 下段の読み全体の別候補（タップ = その経路の文節チップに置き換える。確定はしない）。 */
 const val CANDIDATE_TYPE_CHIP_FULL_ALTERNATIVE: Byte = 61
 
-/** 上段の 1 チップの表示。[letters] が空でなければ長押しで展開中（読みを 1 文字ずつ、間をタップで切る）。 */
+/**
+ * 上段の 1 チップの表示。[reading] = チップの読み（長押しで切る位置・区切りドラッグのバブル用）。
+ * [letters] が空でなければ展開中（読みを 1 文字ずつ、間をタップで切る。旧操作）。
+ */
 data class ChipStripItem(
     val label: String,
     val selected: Boolean,
     val letters: List<String> = emptyList(),
+    val reading: String = "",
 ) {
     val expanded: Boolean get() = letters.isNotEmpty()
 }
@@ -67,6 +71,7 @@ object ChipBarPresenter {
                     label = chip.output,
                     selected = i == state.selected,
                     letters = if (i == state.expanded) letters(state.reading, chip) else emptyList(),
+                    reading = state.reading.substring(chip.start, chip.end),
                 )
             },
         )

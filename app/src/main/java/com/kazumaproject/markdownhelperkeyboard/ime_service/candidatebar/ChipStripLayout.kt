@@ -111,4 +111,33 @@ class ChipStripLayout(
         if (box.right + gap > scroll + viewWidth) scroll = box.right + gap - viewWidth
         return scroll.coerceIn(0f, overflow)
     }
+
+    companion object {
+        /**
+         * 長押しした表記の文字の境目 [labelIndex]（0..表記の長さ）を、チップの読みの切る位置（1..読みの長さ−1）にする。
+         * 表記が読みと同じ（かなのまま）なら同じ位置、漢字なら表記の中の割合で読みに割り当てる（位置は区切りドラッグで直せる）。
+         * 1 字のチップは切れないので null。
+         */
+        fun cutOffsetForLabel(label: String, reading: String, labelIndex: Int): Int? {
+            if (reading.length < 2) return null
+            val raw = if (label == reading || label.length == reading.length) labelIndex
+            else if (label.isEmpty()) reading.length / 2
+            else Math.round(labelIndex.toDouble() * reading.length / label.length).toInt()
+            var at = raw.coerceIn(1, reading.length - 1)
+            // サロゲートペアの間は切らない
+            if (Character.isLowSurrogate(reading[at]) && at > 1) at--
+            return at
+        }
+
+        /** 区切りドラッグで動かせる字数（左のチップ・右のチップとも 1 字は残す）。 */
+        fun clampDelta(leftLength: Int, rightLength: Int, delta: Int): Int =
+            delta.coerceIn(-(leftLength - 1).coerceAtLeast(0), (rightLength - 1).coerceAtLeast(0))
+
+        /** バブルに出す境界の前後のかな（それぞれ最大 [span] 字）。 */
+        fun boundaryPreview(left: String, right: String, delta: Int, span: Int = 3): Pair<String, String> {
+            val all = left + right
+            val b = (left.length + clampDelta(left.length, right.length, delta)).coerceIn(0, all.length)
+            return all.substring((b - span).coerceAtLeast(0), b) to all.substring(b, (b + span).coerceAtMost(all.length))
+        }
+    }
 }

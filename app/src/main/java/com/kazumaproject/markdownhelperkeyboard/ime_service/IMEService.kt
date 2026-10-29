@@ -13932,13 +13932,31 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
 
     private val chipStripListener = object : ChipStripView.Listener {
         override fun onChipTap(index: Int) = runChipBarOp { m, s -> m.tap(s, index) }
-        override fun onChipLongPress(index: Int) = runChipBarOp { m, s -> m.longPress(s, index) }
+        override fun onLongPressCut(index: Int, offset: Int) = runChipBarOp { m, s ->
+            s.chips.getOrNull(index)?.let { chip -> m.cutChip(s, index, chip.start + offset) }
+        }
+        override fun onBoundaryDrag(index: Int, delta: Int) = runChipBarOp { m, s -> m.shiftBoundary(s, index, delta) }
+        override fun onConfirm() = confirmChipBar()
         override fun onJoin(index: Int) = runChipBarOp { m, s -> m.join(s, index) }
         override fun onCut(gapIndex: Int) = runChipBarOp { m, s ->
             ChipBarPresenter.cutOffset(s, gapIndex)?.let { m.cutAt(s, it) }
         }
         override fun onFlick(index: Int, toRight: Boolean) = runChipBarOp { m, s ->
             if (toRight) m.flickRight(s, index) else m.flickLeft(s, index)
+        }
+    }
+
+    /**
+     * チップ列の確定ボタン = 確定キー（触った後ならチップの表記を学習付きで確定、触っていなければ従来の確定）。
+     * 先に出したチップ操作（候補の差し替え・再変換）が終わってから確定する（同じ Mutex に並ぶ）。
+     */
+    private fun confirmChipBar() {
+        scope.launch {
+            chipBarOpMutex.withLock { }
+            val input = inputString.value
+            val binding = mainLayoutBinding ?: return@launch
+            if (input.isEmpty()) return@launch
+            handleNonEmptyInputEnterKey(suggestionAdapter?.suggestions ?: emptyList(), binding, input)
         }
     }
 
