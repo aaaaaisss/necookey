@@ -5227,71 +5227,33 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
 
     private fun handleSpaceLongAction() {
         Timber.d("SideKeySpace LongPress: ${cursorMoveMode.value} $isSpaceKeyLongPressed")
-        if (switchBunsetsuSplitPattern()) {
-            markSpaceConvertLongPressConsumed()
-            return
-        }
-        val insertString = inputString.value
         markSpaceConvertLongPressConsumed()
-        if (insertString.isNotEmpty()) {
-            if (conversionKeySwipePreference == true) {
-                if (!isHenkan.get()) {
-                    enterTenKeyCursorMoveMode()
-                }
-            } else {
-                mainLayoutBinding?.let {
-                    if (currentInputModeForSession == InputMode.ModeJapanese) {
-                        if (isHenkan.get()) return
-                        if (hasConvertedKatakana) {
-                            if (isLiveConversionEnable == true) {
-                                applyFirstSuggestion(
-                                    Candidate(
-                                        string = insertString.hiraganaToKatakana(),
-                                        type = (3).toByte(),
-                                        length = insertString.length.toUByte(),
-                                        score = 4000
-                                    )
-                                )
-                            } else {
-                                applyFirstSuggestion(
-                                    Candidate(
-                                        string = insertString,
-                                        type = (3).toByte(),
-                                        length = insertString.length.toUByte(),
-                                        score = 4000
-                                    )
-                                )
-                            }
-                        } else {
-                            if (isLiveConversionEnable == true) {
-                                applyFirstSuggestion(
-                                    Candidate(
-                                        string = insertString,
-                                        type = (3).toByte(),
-                                        length = insertString.length.toUByte(),
-                                        score = 4000
-                                    )
-                                )
-                            } else {
-                                applyFirstSuggestion(
-                                    Candidate(
-                                        string = insertString.hiraganaToKatakana(),
-                                        type = (3).toByte(),
-                                        length = insertString.length.toUByte(),
-                                        score = 4000
-                                    )
-                                )
-                            }
-                        }
-                        hasConvertedKatakana = !hasConvertedKatakana
-                    }
-                }
-            }
-
-        } else {
-            enterTenKeyCursorMoveMode()
-        }
+        // 入力中なら見えている変換をそのまま確定してから、未入力のときと同じカーソル移動モードへ
+        if (!commitComposingForSpaceCursorMove()) return
+        enterTenKeyCursorMoveMode()
         Timber.d("SideKeySpace LongPress after: ${cursorMoveMode.value} $isSpaceKeyLongPressed")
+    }
+
+    /**
+     * 入力中のスペース長押し: いま入力欄に見えている変換（composing）をそのまま確定する。続けて呼び出し側が
+     * 未入力のときと同じカーソル移動モードに入る。
+     * - チップ方式でこの読みのチップ状態があれば、チップ列の表示（[ChipBarModel.composing]）を [commitChipBar] で確定
+     *   （触っていなくても。学習・負のフィードバックは確定キーと同じ経路）。
+     * - 旧文節変換中・変換中・チップ状態が無いときは確定キーと同じ（文節セッションの表示・選択中の候補・ライブ変換の表示／かな）。
+     * 未入力なら何もしないで true。確定できなかったら false（カーソル移動モードに入らない）。
+     */
+    private fun commitComposingForSpaceCursorMove(): Boolean {
+        val insertString = inputString.value
+        if (insertString.isEmpty()) return true
+        val binding = mainLayoutBinding ?: return false
+        if (bunsetsuConversionSession == null && !isHenkan.get() &&
+            commitChipBar(insertString, requireTouched = false)
+        ) {
+            setCursorLeftAfterCommitPair(insertString)
+            return true
+        }
+        handleNonEmptyInputEnterKey(suggestionAdapter?.suggestions ?: emptyList(), binding, insertString)
+        return inputString.value.isEmpty()
     }
 
     private fun handleSpaceLongActionSumire(source: SpaceConvertCursorMoveSource) {
@@ -6022,16 +5984,14 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
                     }
 
                     KeyAction.Space -> {
-                        if (switchBunsetsuSplitPattern()) {
-                            markSpaceConvertLongPressConsumed()
-                            return
-                        }
+                        // 入力中なら見えている変換をそのまま確定してから、未入力のときと同じカーソル移動モードへ
+                        markSpaceConvertLongPressConsumed()
+                        if (!commitComposingForSpaceCursorMove()) return
                         enterSpaceConvertCursorMoveMode(
                             SpaceConvertCursorMoveSource.SumireCustomSpace
                         ) {
                             flickView.setCursorMode(true)
                         }
-                        markSpaceConvertLongPressConsumed()
                     }
 
                     KeyAction.Copy -> {
@@ -6347,16 +6307,14 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
                     KeyAction.SelectRight -> {}
                     KeyAction.ShowEmojiKeyboard -> {}
                     KeyAction.Space -> {
-                        if (switchBunsetsuSplitPattern()) {
-                            markSpaceConvertLongPressConsumed()
-                            return
-                        }
+                        // 入力中なら見えている変換をそのまま確定してから、未入力のときと同じカーソル移動モードへ
+                        markSpaceConvertLongPressConsumed()
+                        if (!commitComposingForSpaceCursorMove()) return
                         enterSpaceConvertCursorMoveMode(
                             SpaceConvertCursorMoveSource.SumireCustomFlickSpace
                         ) {
                             flickView.setCursorMode(true)
                         }
-                        markSpaceConvertLongPressConsumed()
                     }
 
                     KeyAction.SwitchToNextIme -> {

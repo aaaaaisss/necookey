@@ -65,6 +65,31 @@ class IMEServiceCommitAndSpaceContractTest {
         assertTrue(enter.contains("commitChipBar(insertString, requireTouched = true)"))
     }
 
+    /**
+     * 入力中のスペース長押し: 見えている変換をそのまま確定してから、未入力のときと同じカーソル移動モードに入る
+     * （カスタム配列のタップ長押し・フリック長押し・テンキーのサイドキー）。
+     */
+    @Test
+    fun spaceLongPressWhileComposingCommitsVisibleTextThenEntersCursorMoveMode() {
+        val source = imeServiceSource()
+        val helper = source.functionBody(start = "private fun commitComposingForSpaceCursorMove()", end = "\n    private fun ")
+        assertTrue(helper.contains("commitChipBar(insertString, requireTouched = false)"))
+        assertTrue(helper.contains("handleNonEmptyInputEnterKey("))
+        assertTrue(helper.contains("return inputString.value.isEmpty()"))
+
+        val longPress = source.functionBody(start = "override fun onActionLongPress", end = "override fun onActionUpAfterLongPress")
+        val flickLongPress = source.functionBody(start = "override fun onFlickActionLongPress", end = "override fun onFlickActionUpAfterLongPress")
+        for ((body, src) in listOf(longPress to "SumireCustomSpace", flickLongPress to "SumireCustomFlickSpace")) {
+            val space = body.substring(body.indexOf("KeyAction.Space -> {"))
+            val commit = space.indexOf("if (!commitComposingForSpaceCursorMove()) return")
+            val enter = space.indexOf("SpaceConvertCursorMoveSource.$src")
+            assertTrue(commit >= 0 && enter > commit)
+        }
+        val side = source.functionBody(start = "private fun handleSpaceLongAction()", end = "\n    private fun ")
+        assertTrue(side.contains("if (!commitComposingForSpaceCursorMove()) return"))
+        assertTrue(side.contains("enterTenKeyCursorMoveMode()"))
+    }
+
     private fun imeServiceSource(): String =
         listOf(
             File("app/src/main/java/com/kazumaproject/markdownhelperkeyboard/ime_service/IMEService.kt"),
