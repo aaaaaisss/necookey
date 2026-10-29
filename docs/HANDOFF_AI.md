@@ -36,6 +36,7 @@ NGワード、キーボード自作・編集（メイン利用）、記号キー
 - 検証は `tools/verify.sh`（コンパイル 4 種＋全 JVM テストを gradle 1 回。`VERIFY_EVAL=1` で 179/reg/dia 評価も、基準値と比べて PASS/FAIL）。
 - aarch64 サンドボックスでは Robolectric ネイティブランタイム非対応のテストを除外（`tools/robolectric_aarch64_excludes.txt`、ルート build.gradle。x86_64/CI は従来どおり全件）。
 - 変換エンジン: 文節分離なしの旧経路（getCandidatesOriginal / getCandidates / getCandidatesWithoutPrediction、アプリは常に bunsetsuSeparation=true）と未使用関数を削除、特殊候補（日付・数字）を engine/SpecialInputCandidates.kt・NumberCandidates.kt に分離。
-- 2026-10-29: 日付・時刻の特殊候補を削除（「いま」→現在時刻、「ことし/きょねん/らいねん」→西暦・令和・干支、数字 3〜4 桁→「12:34」「12時34分」「12月31日」）。辞書の「今」「今日」などはそのまま。残したもの: 「2024ねん」→年号（読みどおりの変換）、「さんじ」→「3時」などの助数詞、ツールバーの日付ボタン（明示操作のポップアップ）。
+- 2026-10-29: 日付・時刻の特殊候補を削除（「いま」→現在時刻、「ことし/きょねん/らいねん」→西暦・令和・干支、数字 3〜4 桁→「12:34」「12時34分」「12月31日」）。辞書の「今」「今日」などはそのまま。残したもの: 「さんじ」→「3時」などの助数詞。
+- 2026-10-29: 日付まわりの残りも削除。ツールバーの日付ボタン（ShortcutType.DATE_PICKER、id "select_date"、日付ポップアップ、calendar_today_24px、説明文字列）、そのポップアップ専用だった ImeSelectionPopupPlacement.TOOLBAR_DROPDOWN、年号変換（「2024ねん」→「令和6年」、createCandidatesForEra・CANDIDATE_TYPE_ERA）。DB に残った "select_date" は ShortcutType.fromId が null を返して読み飛ばされる（マイグレーション不要）。
 - リランカー差し替え口: `CandidateReranker` / `CandidateRerankers`（docs/RERANKER_HOOKUP.md）。
 - 学習・後続語を「極端に覚えて極端に忘れる」方式に作り直し（docs/LEARNING.md）。半減期 3 日、1 回で先頭、上位に出して使われなければ即弱める、後続語は予測の並べ替えに統合。

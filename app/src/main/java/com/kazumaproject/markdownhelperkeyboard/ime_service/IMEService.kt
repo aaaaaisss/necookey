@@ -208,7 +208,6 @@ import com.kazumaproject.markdownhelperkeyboard.converter.candidatebar.TwoRowCan
 import com.kazumaproject.markdownhelperkeyboard.learning.session.BunsetsuLearningSplitter
 import com.kazumaproject.markdownhelperkeyboard.learning.session.LearnedBunsetsu
 import com.kazumaproject.markdownhelperkeyboard.learning.session.LearningReadingGuard
-import com.kazumaproject.markdownhelperkeyboard.converter.candidate.CANDIDATE_TYPE_ERA
 import com.kazumaproject.markdownhelperkeyboard.converter.candidate.CANDIDATE_TYPE_LEARNED_DICTIONARY
 import com.kazumaproject.markdownhelperkeyboard.converter.candidate.CANDIDATE_TYPE_TIME
 import com.kazumaproject.markdownhelperkeyboard.converter.candidate.CANDIDATE_TYPE_USER_DICTIONARY
@@ -370,11 +369,8 @@ import java.io.File
 import java.io.FileOutputStream
 import java.io.IOException
 import java.text.BreakIterator
-import java.text.SimpleDateFormat
 import java.util.ArrayDeque
-import java.util.Calendar
 import kotlin.math.roundToInt
-import java.util.Locale
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicLong
 import java.util.concurrent.atomic.AtomicReference
@@ -4563,7 +4559,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
             adapter = ArrayAdapter(this@IMEService, R.layout.list_item_layout, items)
         }
         val reference = when (placement) {
-            ImeSelectionPopupPlacement.TOOLBAR_DROPDOWN -> resolveSelectionToolbarAnchor(request.mainView)
             ImeSelectionPopupPlacement.KEYBOARD_CENTER -> requireActiveKeyboardSurface()?.rootView
             else -> null
         }
@@ -4585,15 +4580,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         val visible = listOf(mainView.keyboardBackgroundContainer, mainView.suggestionViewParent,
             mainView.candidateTabLayout, mainView.shortcutToolbarRecyclerview).filter { it.isShown }
         return visible.ifEmpty { listOf(surface?.rootView ?: mainView.root) }
-    }
-
-    private fun resolveSelectionToolbarAnchor(mainView: MainLayoutBinding): View {
-        val toolbar = mainView.shortcutToolbarRecyclerview
-        val visible = Rect()
-        if (toolbar.isShown && toolbar.getGlobalVisibleRect(visible)) return toolbar
-        return requireActiveKeyboardSurface()?.suggestionRecyclerView?.takeIf {
-            it.isShown && it.getGlobalVisibleRect(visible)
-        } ?: requireActiveKeyboardSurface()?.rootView ?: mainView.root
     }
 
     private fun showKeyboardSelectionPopup(
@@ -5184,39 +5170,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         return Color.argb(a, r, g, b)
     }
 
-
-    private fun showCurrentDateListPopup() {
-        if (inputString.value.isNotEmpty()) return
-        val request = beginKeyboardPopupRequest() ?: return
-        val dates = createDateStrings(Calendar.getInstance())
-        showKeyboardSelectionList(request, dates, "dates", ImeSelectionPopupPlacement.TOOLBAR_DROPDOWN) { position -> commitText(dates[position], 1) }
-    }
-
-    private fun createDateStrings(calendar: Calendar): List<String> {
-        val formatter1 = SimpleDateFormat("M/d", Locale.getDefault())
-        val formatter2 = SimpleDateFormat("yyyy/MM/dd", Locale.getDefault())
-        val formatter3 = SimpleDateFormat("M月d日(EEE)", Locale.getDefault())
-        val formatterReiwa =
-            "令和${calendar.get(Calendar.YEAR) - 2018}年${calendar.get(Calendar.MONTH) + 1}月${
-                calendar.get(Calendar.DAY_OF_MONTH)
-            }日"
-        val formatterR06 = "R${calendar.get(Calendar.YEAR) - 2018}/${
-            String.format(
-                Locale.getDefault(), "%02d", calendar.get(Calendar.MONTH) + 1
-            )
-        }/${String.format(Locale.getDefault(), "%02d", calendar.get(Calendar.DAY_OF_MONTH))}"
-        val dayOfWeek = SimpleDateFormat("EEEE", Locale.getDefault()).format(calendar.time)
-
-        // Candidateオブジェクトを作成せず、文字列を直接リストにして返す
-        return listOf(
-            formatter1.format(calendar.time),  // M/d
-            formatter2.format(calendar.time),  // yyyy/MM/dd
-            formatter3.format(calendar.time),  // M月d日(EEE)
-            formatterReiwa,                    // 令和n年M月d日
-            formatterR06,                      // Rxx/MM/dd
-            dayOfWeek                          // EEEE (曜日)
-        )
-    }
 
     private fun handleDeleteLongPress() {
         if (isKeyboardLayoutEditModeActive()) return
@@ -11473,10 +11426,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
                 pasteAction()
             }
 
-            ShortcutType.DATE_PICKER -> {
-                showCurrentDateListPopup()
-            }
-
             ShortcutType.VOICE_INPUT -> {
                 startVoiceInput(mainView)
             }
@@ -12401,8 +12350,7 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         ) return
         val excludedType = when (candidate.type.toInt()) {
             9, 11, 12, 13, 14, 15, 28, 30,
-            CANDIDATE_TYPE_TIME.toInt(),
-            CANDIDATE_TYPE_ERA.toInt() -> true
+            CANDIDATE_TYPE_TIME.toInt() -> true
             else -> false
         }
         if (excludedType) return
@@ -12485,8 +12433,7 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
             14,
             28,
             30,
-            CANDIDATE_TYPE_TIME.toInt(),
-            CANDIDATE_TYPE_ERA.toInt() -> {
+            CANDIDATE_TYPE_TIME.toInt() -> {
                 commitAndClearInput(candidate.string)
             }
 

@@ -74,6 +74,16 @@ class ImeSelectionPopupBehaviorTest {
     private val popup get() = ReflectionHelpers.getField<PopupWindow?>(service, "keyboardSelectionPopupWindow")
     private fun call(name: String) = ReflectionHelpers.callInstanceMethod<Unit>(service, name)
 
+    /** Opens the shared IME selection list; selecting a row commits it through the current connection. */
+    private fun showSelectionList(items: List<String> = listOf("alpha", "beta", "gamma")) {
+        val request = requireNotNull(ReflectionHelpers.callInstanceMethod<Any?>(service, "beginKeyboardPopupRequest"))
+        val show = IMEService::class.java.declaredMethods.single {
+            it.name == "showKeyboardSelectionList" && it.parameterCount == 6
+        }.apply { isAccessible = true }
+        val onSelected: (Int) -> Unit = { position -> service.commitText(items[position], 1) }
+        show.invoke(service, request, items, "test", ImeSelectionPopupPlacement.SCREEN_CENTER, 5, onSelected)
+    }
+
     @After fun cleanup() {
         call("dismissKeyboardSelectionPopups")
         listOf("scope", "ioScope").forEach {
@@ -83,8 +93,8 @@ class ImeSelectionPopupBehaviorTest {
         activity.finish()
     }
 
-    @Test fun dateSelectionKeepsEditorFocusAndCommitsOnce() {
-        call("showCurrentDateListPopup")
+    @Test fun selectionKeepsEditorFocusAndCommitsOnce() {
+        showSelectionList()
         val shown = requireNotNull(popup)
         assertTrue(shown.isShowing)
         assertFalse(shown.isFocusable)
@@ -107,7 +117,7 @@ class ImeSelectionPopupBehaviorTest {
         val connection = dictionaryEditor.onCreateInputConnection(android.view.inputmethod.EditorInfo())
         ReflectionHelpers.setField(service, "dictionaryInputConnection", connection)
         ReflectionHelpers.setField(service, "dictionaryEditorInfo", android.view.inputmethod.EditorInfo())
-        call("showCurrentDateListPopup")
+        showSelectionList()
         val list = requireNotNull(popup).contentView.findViewById<ListView>(R.id.popup_listview)
         val expected = list.adapter.getItem(0).toString()
         list.performItemClick(null, 0, list.adapter.getItemId(0))
@@ -163,28 +173,6 @@ class ImeSelectionPopupBehaviorTest {
     }
 
     @Config(sdk = [24, 29, 35])
-    @Test fun dropdownStartsAtTheVisibleToolbarAndRemainsInsideTheScreen() {
-        val toolbar = View(activity)
-        root.addView(toolbar, android.widget.FrameLayout.LayoutParams(600, 40))
-        root.measure(View.MeasureSpec.makeMeasureSpec(1080, View.MeasureSpec.EXACTLY),
-            View.MeasureSpec.makeMeasureSpec(300, View.MeasureSpec.EXACTLY))
-        root.layout(root.left, root.top, root.right, root.bottom)
-        val content = android.view.LayoutInflater.from(activity).inflate(R.layout.popup_list_layout, root, false)
-        content.findViewById<ListView>(R.id.popup_listview).adapter =
-            android.widget.ArrayAdapter(activity, R.layout.list_item_layout, listOf("Template"))
-        val window = ImeSelectionPopupWindow(activity, content, ImeSelectionPopupPlacement.TOOLBAR_DROPDOWN, toolbar)
-        window.showAtLocation(root, Gravity.NO_GRAVITY, 0, 0)
-        window.contentView.measure(View.MeasureSpec.makeMeasureSpec(1080, View.MeasureSpec.EXACTLY),
-            View.MeasureSpec.makeMeasureSpec(1920, View.MeasureSpec.EXACTLY))
-        window.contentView.layout(0, 0, 1080, 1920)
-        val anchor = IntArray(2).also(toolbar::getLocationOnScreen)
-        val origin = IntArray(2).also(window.contentView::getLocationOnScreen)
-        assertEquals(anchor[1] - origin[1] + toolbar.height, content.top)
-        assertTrue(content.bottom <= window.contentView.height)
-        window.dismiss()
-    }
-
-    @Config(sdk = [24, 29, 35])
     @Test fun macroListRetainsEightRowsAndScrollsToItsLastItem() {
         val content = android.view.LayoutInflater.from(activity).inflate(R.layout.popup_list_layout, root, false)
         val list = content.findViewById<ListView>(R.id.popup_listview)
@@ -221,7 +209,7 @@ class ImeSelectionPopupBehaviorTest {
     }
 
     @Test fun backClosesOnReleaseWithoutRemovingTheOverlayDuringKeyDown() {
-        call("showCurrentDateListPopup")
+        showSelectionList()
         val shown = requireNotNull(popup)
         assertTrue(service.onKeyDown(KeyEvent.KEYCODE_BACK, KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_BACK)))
         assertSame(shown, popup)
@@ -233,10 +221,10 @@ class ImeSelectionPopupBehaviorTest {
     }
 
     @Test fun outsideTapAndEscapeOnlyCloseTheMenu() {
-        call("showCurrentDateListPopup")
+        showSelectionList()
         requireNotNull(popup).contentView.performClick()
         assertNull(popup)
-        call("showCurrentDateListPopup")
+        showSelectionList()
         ReflectionHelpers.callInstanceMethod<Boolean>(service, "handleImeSwitchPopupKeyDown",
             ClassParameter.from(Int::class.javaPrimitiveType, KeyEvent.KEYCODE_ESCAPE))
         assertNull(popup)

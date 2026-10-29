@@ -1,7 +1,6 @@
 package com.kazumaproject.markdownhelperkeyboard.converter.engine
 
 import com.kazumaproject.markdownhelperkeyboard.converter.candidate.Candidate
-import com.kazumaproject.markdownhelperkeyboard.converter.candidate.CANDIDATE_TYPE_ERA
 import com.kazumaproject.markdownhelperkeyboard.converter.candidate.CANDIDATE_TYPE_TIME
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -128,15 +127,6 @@ class KanaKanjiEngineEnglishKanaNumberTest {
         assertTrue(candidates.any { it.string == "20分" && it.type == CANDIDATE_TYPE_TIME })
         assertFalse(candidates.any { it.string == "20分" && it.type == 30.toByte() })
         assertTrue(candidates.any { it.string == "２０分" && it.type == 30.toByte() })
-    }
-
-    @Test
-    fun eraCandidatesUseDedicatedType() {
-        val candidates = createCandidatesForEra(2024, "2024ねん")
-
-        assertTrue(candidates.isNotEmpty())
-        assertTrue(candidates.all { it.type == CANDIDATE_TYPE_ERA })
-        assertFalse(candidates.any { it.type == 30.toByte() })
     }
 
     @Test

@@ -12,7 +12,7 @@ import android.widget.ListView
 import android.widget.PopupWindow
 import com.kazumaproject.markdownhelperkeyboard.R
 
-internal enum class ImeSelectionPopupPlacement { SCREEN_CENTER, KEYBOARD_CENTER, TOOLBAR_DROPDOWN }
+internal enum class ImeSelectionPopupPlacement { SCREEN_CENTER, KEYBOARD_CENTER }
 
 /** Full-screen outside-tap shield and an independently positioned, compact, non-focusable list. */
 internal class ImeSelectionPopupWindow(
@@ -32,7 +32,6 @@ internal class ImeSelectionPopupWindow(
         list.isScrollbarFadingEnabled = false
         val shield = object : FrameLayout(context) {
             private val reference = Rect()
-            private var aboveAnchor = false
 
             private fun referenceBounds(): Boolean {
                 reference.setEmpty()
@@ -66,17 +65,8 @@ internal class ImeSelectionPopupWindow(
                 rowsHeight += list.dividerHeight * (count - 1).coerceAtLeast(0)
                 val panelPadding = listContent.paddingTop + listContent.paddingBottom
                 var panelBudget = (availableHeight - paddingTop - paddingBottom).coerceAtLeast(0)
-                if (referenceBounds()) {
-                    when (placement) {
-                        ImeSelectionPopupPlacement.KEYBOARD_CENTER -> panelBudget = minOf(panelBudget, reference.height())
-                        ImeSelectionPopupPlacement.TOOLBAR_DROPDOWN -> {
-                            val below = (availableHeight - paddingBottom - reference.bottom).coerceAtLeast(0)
-                            val above = (reference.top - paddingTop).coerceAtLeast(0)
-                            aboveAnchor = rowsHeight + panelPadding > below && above > below
-                            panelBudget = if (aboveAnchor) above else below
-                        }
-                        else -> Unit
-                    }
+                if (placement == ImeSelectionPopupPlacement.KEYBOARD_CENTER && referenceBounds()) {
+                    panelBudget = minOf(panelBudget, reference.height())
                 }
                 val listBudget = (panelBudget - panelPadding).coerceAtLeast(0)
                 list.layoutParams.height = minOf(rowsHeight, listBudget)
@@ -88,19 +78,9 @@ internal class ImeSelectionPopupWindow(
                 val hasReference = referenceBounds()
                 var x = (width - listContent.measuredWidth) / 2
                 var y = (height - listContent.measuredHeight) / 2
-                if (hasReference) {
-                    when (placement) {
-                        ImeSelectionPopupPlacement.KEYBOARD_CENTER -> {
-                            x = reference.centerX() - listContent.measuredWidth / 2
-                            y = reference.centerY() - listContent.measuredHeight / 2
-                        }
-                        ImeSelectionPopupPlacement.TOOLBAR_DROPDOWN -> {
-                            x = if (referenceView?.layoutDirection == View.LAYOUT_DIRECTION_RTL)
-                                reference.right - listContent.measuredWidth else reference.left
-                            y = if (aboveAnchor) reference.top - listContent.measuredHeight else reference.bottom
-                        }
-                        else -> Unit
-                    }
+                if (hasReference && placement == ImeSelectionPopupPlacement.KEYBOARD_CENTER) {
+                    x = reference.centerX() - listContent.measuredWidth / 2
+                    y = reference.centerY() - listContent.measuredHeight / 2
                 }
                 x = x.coerceIn(paddingLeft, maxOf(paddingLeft, width - paddingRight - listContent.measuredWidth))
                 y = y.coerceIn(paddingTop, maxOf(paddingTop, height - paddingBottom - listContent.measuredHeight))

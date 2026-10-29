@@ -240,7 +240,6 @@ fun ShortcutType.summary(context: android.content.Context): String =
         ShortcutType.SELECT_ALL -> context.getString(R.string.shortcut_toolbar_summary_select_all)
         ShortcutType.COPY -> context.getString(R.string.shortcut_toolbar_summary_copy)
         ShortcutType.PASTE -> context.getString(R.string.shortcut_toolbar_summary_paste)
-        ShortcutType.DATE_PICKER -> context.getString(R.string.shortcut_toolbar_summary_date_picker)
         ShortcutType.VOICE_INPUT -> context.getString(R.string.shortcut_toolbar_summary_voice_input)
         ShortcutType.CLIP_BOARD -> context.getString(R.string.shortcut_toolbar_summary_clip_board)
     }

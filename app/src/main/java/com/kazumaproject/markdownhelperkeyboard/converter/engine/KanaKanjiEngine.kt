@@ -19,7 +19,6 @@ import com.kazumaproject.hiraToKata
 import com.kazumaproject.markdownhelperkeyboard.converter.ConnectionMatrix
 import com.kazumaproject.markdownhelperkeyboard.converter.bitset.SuccinctBitVector
 import com.kazumaproject.markdownhelperkeyboard.converter.candidate.BunsetsuCandidateResult
-import com.kazumaproject.markdownhelperkeyboard.converter.candidate.CANDIDATE_TYPE_ERA
 import com.kazumaproject.markdownhelperkeyboard.converter.candidate.CANDIDATE_TYPE_TIME
 import com.kazumaproject.markdownhelperkeyboard.converter.candidate.Candidate
 import com.kazumaproject.markdownhelperkeyboard.converter.candidate.CandidateConversionSegment
@@ -1445,15 +1444,6 @@ class KanaKanjiEngine {
                 }
             }
 
-        val convertYearToEra: List<Candidate> = when {
-            input.matches(Regex("""\d{1,4}ねん""")) -> {
-                val year = input.removeSuffix("ねん").toIntOrNull()
-                if (year != null) createCandidatesForEra(year, input) else emptyList()
-            }
-
-            else -> emptyList()
-        }
-
         val numbersDeferred = generateNumberCandidates(
             input = input,
             showSymbolCandidates = predictionConfig.showSymbolCandidates,
@@ -1471,7 +1461,7 @@ class KanaKanjiEngine {
             if (mozcUTWeb == true) getMozcUTWeb(input, predictionConfig) else emptyList()
 
         val resultList =
-            resultNBestFinalDeferred.candidates + readingCorrectionListDeferred + predictiveSearchResult + mozcUTPersonNames + mozcUTPlacesList + mozcUTWikiList + mozcUTNeologdList + mozcUTWebList + numbersDeferred + convertYearToEra
+            resultNBestFinalDeferred.candidates + readingCorrectionListDeferred + predictiveSearchResult + mozcUTPersonNames + mozcUTPlacesList + mozcUTWikiList + mozcUTNeologdList + mozcUTWebList + numbersDeferred
 
         val systemNgramMatchedCandidates = resultNBestFinalDeferred.systemNgramMatchedCandidates
         val resultListFinal =
@@ -1950,15 +1940,6 @@ class KanaKanjiEngine {
                 }
             }
 
-        val convertYearToEra: List<Candidate> = when {
-            input.matches(Regex("""\d{1,4}ねん""")) -> {
-                val year = input.removeSuffix("ねん").toIntOrNull()
-                if (year != null) createCandidatesForEra(year, input) else emptyList()
-            }
-
-            else -> emptyList()
-        }
-
         val numbersDeferred = generateNumberCandidates(
             input = input,
             showSymbolCandidates = predictionConfig.showSymbolCandidates,
@@ -1976,7 +1957,7 @@ class KanaKanjiEngine {
             if (mozcUTWeb == true) getMozcUTWeb(input, predictionConfig) else emptyList()
 
         val resultList =
-            resultNBestFinalDeferred.candidates + readingCorrectionListDeferred + predictiveSearchResult + mozcUTPersonNames + mozcUTPlacesList + mozcUTWikiList + mozcUTNeologdList + mozcUTWebList + numbersDeferred + convertYearToEra
+            resultNBestFinalDeferred.candidates + readingCorrectionListDeferred + predictiveSearchResult + mozcUTPersonNames + mozcUTPlacesList + mozcUTWikiList + mozcUTNeologdList + mozcUTWebList + numbersDeferred
 
         val systemNgramMatchedCandidates = resultNBestFinalDeferred.systemNgramMatchedCandidates
         val resultListFinal = resultList.sortedWith(
@@ -2434,15 +2415,6 @@ class KanaKanjiEngine {
                 }
             }
 
-        val convertYearToEra: List<Candidate> = when {
-            input.matches(Regex("""\d{1,4}ねん""")) -> {
-                val year = input.removeSuffix("ねん").toIntOrNull()
-                if (year != null) createCandidatesForEra(year, input) else emptyList()
-            }
-
-            else -> emptyList()
-        }
-
         val numbersDeferred = generateNumberCandidates(
             input = input,
             showSymbolCandidates = predictionConfig.showSymbolCandidates,
@@ -2460,7 +2432,7 @@ class KanaKanjiEngine {
             if (mozcUTWeb == true) getMozcUTWeb(input, predictionConfig) else emptyList()
 
         val resultList =
-            resultNBestFinalDeferred.candidates + readingCorrectionListDeferred + mozcUTPersonNames + mozcUTPlacesList + mozcUTWikiList + mozcUTNeologdList + mozcUTWebList + numbersDeferred + convertYearToEra
+            resultNBestFinalDeferred.candidates + readingCorrectionListDeferred + mozcUTPersonNames + mozcUTPlacesList + mozcUTWikiList + mozcUTNeologdList + mozcUTWebList + numbersDeferred
 
         val systemNgramMatchedCandidates = resultNBestFinalDeferred.systemNgramMatchedCandidates
         val resultListFinal =

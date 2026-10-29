@@ -60,11 +60,6 @@ enum class ShortcutType(
         com.kazumaproject.core.R.drawable.content_paste_24px,
         description = "貼り付け"
     ),
-    DATE_PICKER(
-        "select_date",
-        com.kazumaproject.core.R.drawable.calendar_today_24px,
-        description = "日付"
-    ),
     VOICE_INPUT(
         "voice_input",
         com.kazumaproject.core.R.drawable.settings_voice_24px,

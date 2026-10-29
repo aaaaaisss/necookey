@@ -19,7 +19,6 @@ import com.kazumaproject.hiraToKata
 import com.kazumaproject.markdownhelperkeyboard.converter.ConnectionMatrix
 import com.kazumaproject.markdownhelperkeyboard.converter.bitset.SuccinctBitVector
 import com.kazumaproject.markdownhelperkeyboard.converter.candidate.BunsetsuCandidateResult
-import com.kazumaproject.markdownhelperkeyboard.converter.candidate.CANDIDATE_TYPE_ERA
 import com.kazumaproject.markdownhelperkeyboard.converter.candidate.CANDIDATE_TYPE_TIME
 import com.kazumaproject.markdownhelperkeyboard.converter.candidate.Candidate
 import com.kazumaproject.markdownhelperkeyboard.converter.candidate.CandidateConversionSegment
@@ -78,8 +77,8 @@ import java.io.FileInputStream
 import java.io.ObjectInputStream
 import java.util.Locale
 
-// 年号・数字・助数詞など、読みから決まる特殊候補（KanaKanjiEngine から分離）。
-// 「いま」→現在時刻・「ことし」→西暦/令和、数字 4 桁→時刻・月日のような日付・時刻の特殊候補は 2026-10-29 に削除（ユーザー要望）。
+// 数字・助数詞など、読みから決まる特殊候補（KanaKanjiEngine から分離）。
+// 日付・時刻・年号の特殊候補（「いま」→現在時刻、「ことし」→西暦/令和、数字 4 桁→時刻・月日、「2024ねん」→令和6年）は 2026-10-29 に削除（ユーザー要望）。
 
 internal fun createDigitCandidates(inputDigits: String, inputLength: UByte): List<Candidate> {
     val halfWidthDigits = inputDigits.convertFullWidthNumbersToHalfWidth()
@@ -213,37 +212,5 @@ internal fun normalizeJapaneseNumberReadingForCounter(
         numberReading.endsWith("く") && isStandaloneOrAfterPlace("く") ->
             numberReading.dropLast(1) + "きゅう"
         else -> numberReading
-    }
-}
-
-internal fun createCandidatesForEra(year: Int, input: String): List<Candidate> {
-    // 元号名、開始年、終了年（null は現在まで）
-    data class Era(val name: String, val start: Int, val end: Int?)
-
-    val eras = listOf(
-        Era("令和", 2019, null),    // 令和は継続中
-        Era("平成", 1989, 2019),    // 平成は1989～2019
-        Era("昭和", 1926, 1989),    // 昭和は1926～1989
-        Era("大正", 1912, 1926),    // 大正は1912～1926
-        Era("明治", 1868, 1912)     // 明治は1868～1912
-    )
-
-    val length = input.length.toUByte()
-
-    fun formatEra(eraName: String, eraYear: Int) =
-        eraName + if (eraYear == 1) "元年" else "${eraYear}年"
-
-    return eras.filter { (_, start, end) ->
-        year >= start && (end == null || year <= end)
-    }.map { (name, start, _) ->
-        val eraYear = year - start + 1
-        Candidate(
-            string = formatEra(name, eraYear),
-            type = CANDIDATE_TYPE_ERA,
-            length = length,
-            score = 70000,
-            leftId = 1851,
-            rightId = 1851
-        )
     }
 }
