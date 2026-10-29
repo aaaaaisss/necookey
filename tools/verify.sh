@@ -7,8 +7,8 @@
 #   テスト    : :app:testFullStandardDebugUnitTest（評価ダンプ SumireNbestDumpTest も同じ JVM で走る）
 #               :core / :custom_keyboard / :symbol_keyboard の testDebugUnitTest
 #   評価（任意）: ev3.py の数値を基準値（tools/eval_border/RESULTS.md の既定構成）と比較。
-#               179: exact 117 / lenient 158 / 致命 4 / ツギハギ 1、reg・dia: 基準ダンプ（tools/eval_border/baseline/、conv-dialect 1f22e7b）から壊れ 0
-#               （reg lenient 96、dia lenient 18 / ツギハギ 0 も確認）。
+#               179: exact 118 / lenient 160 / 致命 3 / ツギハギ 1、reg・dia: 基準ダンプ（tools/eval_border/baseline/、prep-cleanup 5fb413f）から壊れ 0
+#               （reg lenient 97、dia lenient 18 / ツギハギ 0 も確認）。
 #   VERIFY_NO_TEST=1 でコンパイルだけ。
 # 評価に必要: ラティス表 NK_LATTICE_COST（既定 ../eval/lc_np1m.slc。git show origin/lm-data:lc_np1m.slc で取得、リポジトリに入れない）。
 # --max-workers は既定 1（2 だとアプリのテスト JVM とモジュールのテストが並んでメモリ 7GB で gradle デーモンが落ちた。VERIFY_WORKERS で変更可）。
@@ -76,8 +76,8 @@ E, OUT = sys.argv[1:3]
 sys.path.insert(0, E)
 from ev2 import load_meta, load
 from ev3 import judge, row
-# 基準値（RESULTS.md 2026-10-27 既定構成: 方言活用ノード既定・かな修復 2 位・は-merge オフ）
-EXP = {'in': dict(exact=117, len=158, fatal=4, tg=1), 'reg': dict(len=96), 'dia': dict(len=18, tg=0)}
+# 基準値（RESULTS.md 2026-10-29 既定構成: かな修復 tp=1/tc=3000/ty=4・学習 ceil）
+EXP = {'in': dict(exact=118, len=160, fatal=3, tg=1), 'reg': dict(len=97), 'dia': dict(len=18, tg=0)}
 ok = True
 for s in ('in', 'reg', 'dia'):
     cur = f'{OUT}/{s}/cands.tsv'
