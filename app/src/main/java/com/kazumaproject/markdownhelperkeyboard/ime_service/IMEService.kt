@@ -16299,16 +16299,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         }
     }
 
-    private fun resolveEmptySpaceForCurrentMode(
-        isFlick: Boolean,
-        currentInputMode: InputMode
-    ): String {
-        return resolveEmptySpaceForCurrentMode(
-            isFlick = isFlick,
-            currentInputMode = currentInputMode
-        )
-    }
-
     private var isFirstClickHasStringTail = false
 
     private fun setSuggestionComposingText(suggestions: List<Candidate>, insertString: String) {

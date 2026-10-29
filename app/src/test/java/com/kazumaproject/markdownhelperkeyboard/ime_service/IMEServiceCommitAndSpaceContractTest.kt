@@ -35,6 +35,22 @@ class IMEServiceCommitAndSpaceContractTest {
         assertTrue(flickLongPress.contains("KeyAction.CommitAndInsertSpace -> {}"))
     }
 
+    /**
+     * 未入力スペース（setSpaceKeyActionEnglishAndNumberEmpty）はトップレベルの resolveEmptySpaceForCurrentMode
+     * （SpaceKeyResolver.kt）を呼ぶ。同じ名前・同じ引数のメンバー関数があるとそちらが優先され、
+     * 中で自分自身を呼ぶ無限再帰になって IME が落ちた（9107a70 で混入）。
+     */
+    @Test
+    fun emptySpaceUsesTopLevelResolverWithoutSelfRecursiveMember() {
+        val source = imeServiceSource()
+        assertTrue(!Regex("""fun\s+resolveEmptySpaceForCurrentMode\s*\(""").containsMatchIn(source))
+        val emptySpace = source.functionBody(
+            start = "private fun setSpaceKeyActionEnglishAndNumberEmpty",
+            end = "\n    private fun "
+        )
+        assertTrue(emptySpace.contains("resolveEmptySpaceForCurrentMode("))
+    }
+
     private fun imeServiceSource(): String =
         listOf(
             File("app/src/main/java/com/kazumaproject/markdownhelperkeyboard/ime_service/IMEService.kt"),
