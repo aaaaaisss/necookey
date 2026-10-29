@@ -252,4 +252,30 @@ class ChipBarTest {
         assertEquals(2 to 4, firstWrong(listOf("では", "着物"), "では着物"))
         assertEquals(1 to 1, firstWrong(listOf("で", "は"), "でわい"))
     }
+
+    @Test
+    fun typingMoreKeepsEditsLeftOfTheChange() {
+        val t = Table(
+            *table.map.toList().toTypedArray(),
+            "ではきものを" to listOf(path("ではきものを", "で|は|きもの|を", "で|は|着物|を", listOf(2))),
+            "ではきもと" to listOf(path("ではきもと", "で|は|きもと", "で|は|木許", listOf(2))),
+        )
+        val m = ChipBarModel(t)
+        val picked = m.pickCandidate(m.tap(m.initial("ではきもの"), 1), "きもの")!!
+        // 打ち足し: 選んだ「きもの」を残し、足した「を」は新しい 1 位経路の語で
+        val more = m.carryOver(picked, m.initial("ではきものを"))!!
+        assertEquals(listOf("では", "きもの", "を"), more.chips.map { it.output })
+        assertEquals(listOf(0, 2, 5, 6), more.boundaries)
+        assertEquals(-1, more.selected)
+        // 最後の字が変わった（フリックの濁点など）なら、その字を含むチップの編集は残さない
+        assertNull(m.carryOver(picked, m.initial("ではきもと")))
+        // 残す範囲の終わりが新しい 1 位経路の語の頭でないときは、残りを左文脈付きで再変換する
+        val shifted = m.shiftBoundary(m.initial("ではきもの"), 0, 1)!! // で吐き|物
+        assertNull(m.carryOver(shifted, m.initial("ではきもと"), reconvert = false))
+        val fresh = m.initial("ではきもと")
+        t.contexts.clear()
+        val re = m.carryOver(shifted, fresh)!!
+        assertEquals(listOf("で吐き", "もと"), re.chips.map { it.output })
+        assertEquals(listOf("もと" to ChipContext("で吐き", "ではき")), t.contexts)
+    }
 }

@@ -1460,6 +1460,9 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         private const val NECOOKEY_PREDICTION_ROW_HEIGHT_DP = 44
         /** チップの再変換でエンジンに頼む候補数（リランカーの並べ替え元にもなる）。 */
         private const val CHIP_RECONVERT_N_BEST = 20
+        /** スペースを押したときにチップ状態ができるのを待つ上限（間に合わなければ従来のスペース変換）。 */
+        private const val CHIP_SPACE_WAIT_MS = 600L
+        private const val CHIP_STATE_POLL_MS = 16L
         /** チップ確定の学習で使う候補スコア（文節セッションの既定と同じ）。 */
         private const val CHIP_LEARNING_CANDIDATE_SCORE = 3000
         private val DEFAULT_DELETE_KEY_FLICK_TARGETS =
@@ -1645,6 +1648,8 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
     private var chipBarEditorLeftContext: String = ""
     private val chipBarOpMutex = Mutex()
     private var chipStripDecorated = false
+    /** 打ち足し・後退の前にチップを変えていた状態（新しい読みへまだ引き継げていないとき。Main）。 */
+    private var chipBarCarryFrom: ChipBarState? = null
     /** (文脈, 読み, sumire 最良) -> リランカーの結果（変更なしは override = null）。 */
     private data class RerankCacheEntry(val override: Candidate?)
     private val necookeyRerankOverrideCache =
@@ -13848,13 +13853,15 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
     private fun clearChipBarState() {
         chipBarState = null
         chipBarModel = null
+        chipBarCarryFrom = null
         chipBarLowerRow = null
         chipBarPredictions = emptyList()
     }
 
     /**
      * Main. 2段バーの公開に合わせてチップ状態を作る（同じ読みで触った後なら保つ。触っていなければリランカーの
-     * 差し替えも含めて上段の 1 位から作り直す）。下段に出す候補を返す。
+     * 差し替えも含めて上段の 1 位から作り直す）。読みが変わる前にチップを変えていたら、変わらなかった先頭部分の
+     * 編集を引き継ぐ（[ChipBarModel.carryOver]。再変換が要るときは裏で）。下段に出す候補を返す。
      */
     private fun updateChipBarForPublish(insertString: String, bar: TwoRowCandidateBar): List<Candidate> {
         chipBarPredictions = bar.predictions
@@ -13862,6 +13869,8 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         val keep = current != null && chipBarModel != null && current.reading == insertString &&
             ChipBarPresenter.isTouched(current)
         if (!keep) {
+            val previous = current?.takeIf { it.reading != insertString && ChipBarPresenter.isEdited(it) }
+                ?: chipBarCarryFrom?.takeIf { it.reading != insertString }
             val source = chipBarSource?.takeIf { it.input == insertString }
             val whole = ChipBarPresenter.wholeConversion(
                 reading = insertString,
@@ -13873,10 +13882,18 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
             chipBarEditorLeftContext = source?.editorLeftContext.orEmpty()
             val engine = ChipConverter { reading, context -> chipEngineConvert(reading, context) }
             val model = ChipBarModel(MemoChipConverter(SeededChipConverter(whole, engine)))
-            val state = model.initial(insertString)
+            val fresh = model.initial(insertString)
+            val carried = previous?.let { model.carryOver(it, fresh, reconvert = false) }
+            val state = carried ?: fresh
             chipBarModel = model
             chipBarState = state
             chipBarLowerRow = model.lowerRow(state)
+            chipBarCarryFrom = if (carried == null) previous else null
+            if (carried != null) {
+                applyChipComposingText(carried)
+            } else if (previous != null) {
+                carryChipEditsInBackground(insertString, previous, fresh, model)
+            }
         }
         val state = chipBarState ?: return bar.predictions
         val row = chipBarLowerRow ?: return bar.predictions
@@ -13960,11 +13977,73 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         }
     }
 
-    /** チップ操作を 1 つずつ（再変換は裏で）。終わったときに読みかチップ状態が変わっていたら捨てる。 */
-    private fun runChipBarOp(op: (ChipBarModel, ChipBarState) -> ChipBarState?) {
+    /** 引き継ぎに再変換が要るとき（残りの先頭が 1 位経路の語の頭でない）。[fresh] のままなら差し替える。 */
+    private fun carryChipEditsInBackground(
+        input: String,
+        previous: ChipBarState,
+        fresh: ChipBarState,
+        model: ChipBarModel,
+    ) {
+        scope.launch {
+            chipBarOpMutex.withLock {
+                if (chipBarState !== fresh || chipBarModel !== model || inputString.value != input) return@withLock
+                val carried = withContext(Dispatchers.Default) {
+                    try {
+                        model.carryOver(previous, fresh)
+                    } catch (e: CancellationException) {
+                        throw e
+                    } catch (e: Exception) {
+                        Timber.w(e, "chip carry-over failed")
+                        null
+                    }
+                } ?: return@withLock
+                if (chipBarState !== fresh || chipBarModel !== model || inputString.value != input) return@withLock
+                chipBarCarryFrom = null
+                applyChipBarState(input, carried, model.lowerRow(carried))
+            }
+        }
+    }
+
+    /**
+     * スペースキー（チップ方式のとき）: 旧文節変換に入らず、先頭のチップを選ぶ／次のチップへ進む（[ChipBarModel.spaceNext]）。
+     * チップ方式でない・末尾あり・変換中なら false（従来の処理）。この読みのチップがまだ無ければ少し待ち、
+     * 間に合わなければ従来のスペース変換にする。
+     */
+    private fun handleChipBarSpace(insertString: String, mainView: MainLayoutBinding): Boolean {
+        if (insertString.isEmpty() || !isChipBarMode() || currentInputModeForSession != InputMode.ModeJapanese) {
+            return false
+        }
+        runChipBarOp(waitForStateMs = CHIP_SPACE_WAIT_MS, onTimeout = {
+            val suggestions = suggestionAdapter?.suggestions ?: emptyList()
+            if (inputString.value == insertString && suggestions.isNotEmpty()) {
+                handleJapaneseModeSpaceKeyWithBunsetsu(mainView, suggestions, insertString)
+            }
+        }) { m, s -> m.spaceNext(s) }
+        return true
+    }
+
+    /**
+     * チップ操作を 1 つずつ（再変換は裏で）。終わったときに読みかチップ状態が変わっていたら捨てる。
+     * [waitForStateMs] > 0 なら、今の読みのチップ状態ができるまでその時間だけ待つ（間に合わなければ [onTimeout]）。
+     */
+    private fun runChipBarOp(
+        waitForStateMs: Long = 0L,
+        onTimeout: () -> Unit = {},
+        op: (ChipBarModel, ChipBarState) -> ChipBarState?,
+    ) {
         val input = inputString.value
         if (input.isEmpty()) return
         scope.launch {
+            if (waitForStateMs > 0L) {
+                val ready = withTimeoutOrNull(waitForStateMs) {
+                    while (chipBarState?.reading != input || chipBarModel == null) delay(CHIP_STATE_POLL_MS)
+                    true
+                }
+                if (ready == null) {
+                    if (inputString.value == input) onTimeout()
+                    return@launch
+                }
+            }
             chipBarOpMutex.withLock {
                 val model = chipBarModel ?: return@withLock
                 val state = chipBarState?.takeIf { it.reading == input && inputString.value == input }
@@ -15019,6 +15098,10 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
             resetFlagsKeySpace()
             return
         }
+        if (insertString.isNotBlank() && handleChipBarSpace(insertString, mainView)) {
+            resetFlagsKeySpace()
+            return
+        }
 
         if (insertString.isNotBlank()) {
             when (currentInputModeForSession) {
@@ -15045,6 +15128,12 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
             return
         }
         if (cycleFocusedBunsetsuCandidate(delta = 1)) {
+            resetFlagsKeySpace()
+            return
+        }
+        if (insertString.isNotBlank() && !isHenkan.get() && chipBarState?.reading == insertString &&
+            handleChipBarSpace(insertString, mainView)
+        ) {
             resetFlagsKeySpace()
             return
         }

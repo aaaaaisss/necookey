@@ -204,6 +204,73 @@ class ChipBarModel(
         return state.copy(selected = if (state.selected == index && state.expanded < 0) -1 else index, expanded = -1)
     }
 
+    /**
+     * スペースキー: 選択なし → 先頭のチップを選ぶ、選択中 → 次のチップへ（末尾の次は先頭に戻る）。展開は閉じる。
+     * 旧文節変換には入らない（チップ方式の間、スペースはチップの選択を進めるだけ）。チップが無ければ null。
+     */
+    fun spaceNext(state: ChipBarState): ChipBarState? {
+        if (state.chips.isEmpty()) return null
+        val next = if (state.selected in state.chips.indices) (state.selected + 1) % state.chips.size else 0
+        return state.copy(selected = next, expanded = -1)
+    }
+
+    // ---- 打ち足し・後退でチップの編集を引き継ぐ ----
+
+    /**
+     * 読みが [old] から [fresh]（新しい読みの [initial]）に変わったとき、[old] で変えたチップ（境界操作・候補選択・
+     * 全体候補で 1 位と違う表記）のうち、変わらなかった読みの先頭部分に収まる一番右のものまでを、その左のチップごと残す。
+     * 残りは [fresh] のチップ（境界が合わなければ 1 位経路の語の境界で割る）、それも合わなければ [reconvert] のときだけ
+     * 左文脈付きで再変換する。引き継ぐ編集が無い・[reconvert] = false で作れないときは null。
+     */
+    fun carryOver(old: ChipBarState, fresh: ChipBarState, reconvert: Boolean = true): ChipBarState? {
+        val reading = fresh.reading
+        if (old.reading == reading) return null
+        val prefix = old.reading.commonPrefixWith(reading).length
+        val last = old.chips.indexOfLast { it.end <= prefix && isChanged(old, it) }
+        if (last < 0) return null
+        val kept = old.chips.take(last + 1)
+        val k = kept.last().end
+        val tail: List<Chip> = when {
+            k >= reading.length -> emptyList()
+            fresh.chips.any { it.start == k } -> fresh.chips.filter { it.start >= k }
+            else -> splitFreshAt(fresh, k) ?: if (reconvert) convertTail(reading, kept, k) else return null
+        }
+        return fresh.copy(
+            chips = kept + tail,
+            selected = -1,
+            expanded = -1,
+            remembered = old.remembered.filterKeys { (_, end) -> end <= k },
+        )
+    }
+
+    /** [fresh] のチップ列を読みの位置 [k] から後ろだけにする（[k] が 1 位経路の語の頭でなければ null）。 */
+    private fun splitFreshAt(fresh: ChipBarState, k: Int): List<Chip>? {
+        val words = fresh.whole.primary?.words ?: return null
+        if (words.none { it.start == k }) return null
+        val i = fresh.chips.indexOfFirst { it.start < k && k < it.end }
+        if (i < 0) return null
+        val chip = fresh.chips[i]
+        val inside = words.filter { it.start >= k && it.end <= chip.end }
+        if (inside.isEmpty() || inside.last().end != chip.end) return null
+        return listOf(Chip(k, chip.end, inside.joinToString("") { it.output }, chip.origin)) + fresh.chips.drop(i + 1)
+    }
+
+    /** 読みの [k] から後ろを [kept] を左文脈にして変換し、文節チップにする。 */
+    private fun convertTail(reading: String, kept: List<Chip>, k: Int): List<Chip> {
+        val rest = reading.substring(k)
+        val conv = converter.convert(rest, leftContext(reading, kept, kept.size))
+        return chipsOf(conv, conv.primary).map { it.copy(start = it.start + k, end = it.end + k) }
+    }
+
+    /** チップを変えたか（境界操作・候補選択、または 1 位経路の同じ範囲の表記と違う）。 */
+    private fun isChanged(state: ChipBarState, chip: Chip): Boolean {
+        if (chip.origin == Chip.Origin.PICKED || chip.origin == Chip.Origin.RESIZED) return true
+        val words = state.whole.primary?.words ?: return false
+        val inside = words.filter { it.start >= chip.start && it.end <= chip.end }
+        if (inside.isEmpty() || inside.first().start != chip.start || inside.last().end != chip.end) return true
+        return inside.joinToString("") { it.output } != chip.output
+    }
+
     // ---- 切る（長押しで展開 → 文字の間をタップ） ----
 
     /** 長押し = そのチップをかな 1 文字ずつに展開（選択も兼ねる）。1 字のチップは切れないので null。 */
