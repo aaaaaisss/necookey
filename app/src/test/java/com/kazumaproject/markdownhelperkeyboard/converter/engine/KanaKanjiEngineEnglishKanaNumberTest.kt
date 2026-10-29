@@ -11,7 +11,6 @@ import org.junit.Test
 import org.mockito.kotlin.doAnswer
 import org.mockito.kotlin.mock
 import org.mockito.kotlin.whenever
-import java.util.Calendar
 
 class KanaKanjiEngineEnglishKanaNumberTest {
 
@@ -123,21 +122,6 @@ class KanaKanjiEngineEnglishKanaNumberTest {
     }
 
     @Test
-    fun timeCandidatesDoNotUseFullWidthCandidateType() {
-        val candidates = engine.getCandidatesEnglishKana("1234")
-
-        assertEquals(
-            CANDIDATE_TYPE_TIME,
-            candidates.first { it.string == "12:34" }.type
-        )
-        assertEquals(
-            CANDIDATE_TYPE_TIME,
-            candidates.first { it.string == "12時34分" }.type
-        )
-        assertFalse(candidates.any { it.string in setOf("12:34", "12時34分") && it.type == 30.toByte() })
-    }
-
-    @Test
     fun halfWidthTimeUnitUsesTimeTypeAndFullWidthVariantKeepsFullWidthType() {
         val candidates = engine.getCandidatesEnglishKana("にじゅっぷん")
 
@@ -169,34 +153,4 @@ class KanaKanjiEngineEnglishKanaNumberTest {
         assertTrue(engine.getCandidatesEnglishKana("らいねん").any { it.string == "らいねん" })
         assertTrue(engine.getCandidatesEnglishKana("2025/04/01").any { it.string == "2025/04/01" })
     }
-
-    @Test
-    fun getCandidatesEnglishKana_returns_temporal_year_candidates_for_kotoshi() {
-        assertYearCandidates("ことし", 0)
-    }
-
-    @Test
-    fun getCandidatesEnglishKana_returns_temporal_year_candidates_for_kyonen() {
-        assertYearCandidates("きょねん", -1)
-    }
-
-    @Test
-    fun getCandidatesEnglishKana_returns_temporal_year_candidates_for_rainen() {
-        assertYearCandidates("らいねん", 1)
-    }
-
-    private fun assertYearCandidates(input: String, yearOffset: Int) {
-        val candidateStrings = engine.getCandidatesEnglishKana(input).map { it.string }
-        val calendar = Calendar.getInstance().apply { add(Calendar.YEAR, yearOffset) }
-        val year = calendar.get(Calendar.YEAR)
-        val reiwaYear = year - 2018
-        val zodiac = listOf("子", "丑", "寅", "卯", "辰", "巳", "午", "未", "申", "酉", "戌", "亥")[(year - 4).floorMod(12)]
-
-        assertTrue(candidateStrings.contains("${year}年"))
-        assertTrue(candidateStrings.contains("令和${reiwaYear}年"))
-        assertTrue(candidateStrings.contains("R${reiwaYear}"))
-        assertTrue(candidateStrings.contains("${zodiac}年"))
-    }
-
-    private fun Int.floorMod(other: Int): Int = ((this % other) + other) % other
 }

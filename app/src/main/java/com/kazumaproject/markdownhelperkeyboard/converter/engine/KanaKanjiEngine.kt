@@ -1112,8 +1112,6 @@ class KanaKanjiEngine {
                 leftId = 2040,
                 rightId = 2040
             )
-            val timeConversion = createCandidatesForTime(input)
-            val dateConversion = createCandidatesForDateInDigit(input)
 
             // 2. Correctly generate number-to-Kanji/comma candidates.
             val numberValue = input.toLongOrNull() // Safely convert the digit string to a number.
@@ -1193,7 +1191,7 @@ class KanaKanjiEngine {
             }
 
             val finalList =
-                resultNBestFinalDeferred.candidates + timeConversion + dateConversion + fullWidth + halfWidth + numberCandidates + superscriptCandidate + subscriptCandidate + valueBasedCandidates
+                resultNBestFinalDeferred.candidates + fullWidth + halfWidth + numberCandidates + superscriptCandidate + subscriptCandidate + valueBasedCandidates
             return BunsetsuCandidateResult(
                 candidates = finalList,
                 splitPatterns = resultNBestFinalDeferred.splitPatterns,
@@ -1447,8 +1445,6 @@ class KanaKanjiEngine {
                 }
             }
 
-        val listOfDictionaryToday: List<Candidate> = createTemporalDictionaryCandidates(input)
-
         val convertYearToEra: List<Candidate> = when {
             input.matches(Regex("""\d{1,4}ねん""")) -> {
                 val year = input.removeSuffix("ねん").toIntOrNull()
@@ -1475,7 +1471,7 @@ class KanaKanjiEngine {
             if (mozcUTWeb == true) getMozcUTWeb(input, predictionConfig) else emptyList()
 
         val resultList =
-            resultNBestFinalDeferred.candidates + readingCorrectionListDeferred + predictiveSearchResult + mozcUTPersonNames + mozcUTPlacesList + mozcUTWikiList + mozcUTNeologdList + mozcUTWebList + listOfDictionaryToday + numbersDeferred + convertYearToEra
+            resultNBestFinalDeferred.candidates + readingCorrectionListDeferred + predictiveSearchResult + mozcUTPersonNames + mozcUTPlacesList + mozcUTWikiList + mozcUTNeologdList + mozcUTWebList + numbersDeferred + convertYearToEra
 
         val systemNgramMatchedCandidates = resultNBestFinalDeferred.systemNgramMatchedCandidates
         val resultListFinal =
@@ -1640,8 +1636,6 @@ class KanaKanjiEngine {
                 leftId = 2040,
                 rightId = 2040
             )
-            val timeConversion = createCandidatesForTime(input)
-            val dateConversion = createCandidatesForDateInDigit(input)
 
             // 2. Correctly generate number-to-Kanji/comma candidates.
             val numberValue = input.toLongOrNull() // Safely convert the digit string to a number.
@@ -1721,7 +1715,7 @@ class KanaKanjiEngine {
             }
 
             val finalList =
-                resultNBestFinalDeferred.candidates + timeConversion + dateConversion + fullWidth + halfWidth + numberCandidates + superscriptCandidate + subscriptCandidate + valueBasedCandidates
+                resultNBestFinalDeferred.candidates + fullWidth + halfWidth + numberCandidates + superscriptCandidate + subscriptCandidate + valueBasedCandidates
 
             // 3. Combine and return all generated candidates.
             return BunsetsuCandidateResult(
@@ -1956,8 +1950,6 @@ class KanaKanjiEngine {
                 }
             }
 
-        val listOfDictionaryToday: List<Candidate> = createTemporalDictionaryCandidates(input)
-
         val convertYearToEra: List<Candidate> = when {
             input.matches(Regex("""\d{1,4}ねん""")) -> {
                 val year = input.removeSuffix("ねん").toIntOrNull()
@@ -1984,7 +1976,7 @@ class KanaKanjiEngine {
             if (mozcUTWeb == true) getMozcUTWeb(input, predictionConfig) else emptyList()
 
         val resultList =
-            resultNBestFinalDeferred.candidates + readingCorrectionListDeferred + predictiveSearchResult + mozcUTPersonNames + mozcUTPlacesList + mozcUTWikiList + mozcUTNeologdList + mozcUTWebList + listOfDictionaryToday + numbersDeferred + convertYearToEra
+            resultNBestFinalDeferred.candidates + readingCorrectionListDeferred + predictiveSearchResult + mozcUTPersonNames + mozcUTPlacesList + mozcUTWikiList + mozcUTNeologdList + mozcUTWebList + numbersDeferred + convertYearToEra
 
         val systemNgramMatchedCandidates = resultNBestFinalDeferred.systemNgramMatchedCandidates
         val resultListFinal = resultList.sortedWith(
@@ -2116,8 +2108,6 @@ class KanaKanjiEngine {
                 leftId = 2040,
                 rightId = 2040
             )
-            val timeConversion = createCandidatesForTime(input)
-            val dateConversion = createCandidatesForDateInDigit(input)
 
             // 2. Correctly generate number-to-Kanji/comma candidates.
             val numberValue = input.toLongOrNull() // Safely convert the digit string to a number.
@@ -2197,7 +2187,7 @@ class KanaKanjiEngine {
             }
 
             val finalList =
-                resultNBestFinalDeferred.candidates + timeConversion + dateConversion + fullWidth + halfWidth + numberCandidates + superscriptCandidate + subscriptCandidate + valueBasedCandidates
+                resultNBestFinalDeferred.candidates + fullWidth + halfWidth + numberCandidates + superscriptCandidate + subscriptCandidate + valueBasedCandidates
             return BunsetsuCandidateResult(
                 candidates = finalList,
                 splitPatterns = resultNBestFinalDeferred.splitPatterns,
@@ -2444,8 +2434,6 @@ class KanaKanjiEngine {
                 }
             }
 
-        val listOfDictionaryToday: List<Candidate> = createTemporalDictionaryCandidates(input)
-
         val convertYearToEra: List<Candidate> = when {
             input.matches(Regex("""\d{1,4}ねん""")) -> {
                 val year = input.removeSuffix("ねん").toIntOrNull()
@@ -2472,7 +2460,7 @@ class KanaKanjiEngine {
             if (mozcUTWeb == true) getMozcUTWeb(input, predictionConfig) else emptyList()
 
         val resultList =
-            resultNBestFinalDeferred.candidates + readingCorrectionListDeferred + mozcUTPersonNames + mozcUTPlacesList + mozcUTWikiList + mozcUTNeologdList + mozcUTWebList + listOfDictionaryToday + numbersDeferred + convertYearToEra
+            resultNBestFinalDeferred.candidates + readingCorrectionListDeferred + mozcUTPersonNames + mozcUTPlacesList + mozcUTWikiList + mozcUTNeologdList + mozcUTWebList + numbersDeferred + convertYearToEra
 
         val systemNgramMatchedCandidates = resultNBestFinalDeferred.systemNgramMatchedCandidates
         val resultListFinal =
@@ -2616,9 +2604,7 @@ class KanaKanjiEngine {
 
         val numbersConverted =
             digitCandidates + numberUnitCandidates + (englishDeferred + englishZenkaku).sortedBy { it.score }
-        val temporalCandidates = createTemporalDictionaryCandidates(input)
-
-        return listJapaneseCandidates + numbersConverted + temporalCandidates
+        return listJapaneseCandidates + numbersConverted
     }
 
 
