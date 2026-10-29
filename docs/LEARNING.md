@@ -34,7 +34,7 @@
 症状: チップで直して確定しても、同じ読みを次に打つと元の変換・元の区切りに戻る（実機 0a37fe3、チップ候補欄既定オン）。
 
 調べた結果:
-- 書き込みは行われていた。確定キー → `commitChipBarIfTouched` → `recordChipBarLearning` → `ConversionLearningSession` →
+- 書き込みは行われていた。確定キー → `commitChipBar`（当時の名前は commitChipBarIfTouched） → `recordChipBarLearning` → `ConversionLearningSession` →
   `persistCompletedLearningSession` → `upsertLearnedDataBatchReturningPrevious`。設定の既定も学習 ON（`learn_dictionary_preference`
   既定 true、予測に学習 ON、先頭候補の学習 `learn_first_candidate` は既定オフで、これは仕様）。シークレット・辞書編集中以外は書く。
 - 原因 1（主因）: **SUMIRE-LM リランカーが学習を上書きしていた。** 学習はラティスのノード（コスト 500〜）として効くので、直した文は

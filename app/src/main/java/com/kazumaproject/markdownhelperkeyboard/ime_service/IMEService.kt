@@ -13911,7 +13911,9 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
     }
 
     /**
-     * チップ列の確定ボタン = 確定キー（触った後ならチップの表記を学習付きで確定、触っていなければ従来の確定）。
+     * チップ列の確定ボタン: いま入力欄に見えている変換（チップ列の表示 = [ChipBarModel.composing]）をそのまま確定する。
+     * 触っていなくても（候補を選ばなくても）チップの表記で確定し、学習・負のフィードバックは確定キーと同じ
+     * [commitChipBar] の経路を通す。この読みのチップ状態が無い（チップ方式が外れた等）ときは確定キーと同じ。
      * 先に出したチップ操作（候補の差し替え・再変換）が終わってから確定する（同じ Mutex に並ぶ）。
      */
     private fun confirmChipBar() {
@@ -13920,6 +13922,10 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
             val input = inputString.value
             val binding = mainLayoutBinding ?: return@launch
             if (input.isEmpty()) return@launch
+            if (commitChipBar(input, requireTouched = false)) {
+                setCursorLeftAfterCommitPair(input)
+                return@launch
+            }
             handleNonEmptyInputEnterKey(suggestionAdapter?.suggestions ?: emptyList(), binding, input)
         }
     }
@@ -14080,14 +14086,16 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
     }
 
     /**
-     * 確定キー: チップに触った後なら [ChipBarModel.commit] を確定し、チップ = 文節として学習する
+     * チップの表記（[ChipBarModel.commit] = [ChipBarModel.composing] の文字列）を確定し、チップ = 文節として学習する
      * （変えたチップは明示選択。負のフィードバック・後続語・確定直後の後退での取り消しは通常の確定と同じ経路）。
-     * 触っていなければ false（従来の確定）。
+     * 確定キーは [requireTouched] = true（触っていなければ false を返して従来の確定）。確定ボタン・入力中のスペース長押しは
+     * false（触っていなくても見えている表記で確定）。この読みのチップ状態が無ければ false。
      */
-    private fun commitChipBarIfTouched(insertString: String): Boolean {
+    private fun commitChipBar(insertString: String, requireTouched: Boolean): Boolean {
         val state = chipBarState ?: return false
         val model = chipBarModel ?: return false
-        if (!isChipBarMode() || state.reading != insertString || !ChipBarPresenter.isTouched(state)) return false
+        if (!isChipBarMode() || state.reading != insertString) return false
+        if (requireTouched && !ChipBarPresenter.isTouched(state)) return false
         val text = model.commit(state)
         if (text.isEmpty()) return false
         recordChipBarLearning(state)
@@ -15257,7 +15265,7 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         if (commitBunsetsuConversionSession(explicitlySelected = true)) {
             return
         }
-        if (commitChipBarIfTouched(insertString)) {
+        if (commitChipBar(insertString, requireTouched = true)) {
             setCursorLeftAfterCommitPair(insertString)
             return
         }

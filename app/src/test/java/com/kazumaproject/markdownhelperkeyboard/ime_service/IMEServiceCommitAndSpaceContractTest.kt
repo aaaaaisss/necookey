@@ -51,6 +51,20 @@ class IMEServiceCommitAndSpaceContractTest {
         assertTrue(emptySpace.contains("resolveEmptySpaceForCurrentMode("))
     }
 
+    /** チップ列の確定ボタンは、触っていなくても見えている表記（チップ列の表示）を学習付きの経路で確定する。 */
+    @Test
+    fun chipConfirmButtonCommitsVisibleChipTextEvenWhenUntouched() {
+        val source = imeServiceSource()
+        val confirm = source.functionBody(start = "private fun confirmChipBar()", end = "\n    private fun ")
+        assertTrue(confirm.contains("commitChipBar(input, requireTouched = false)"))
+        val commit = source.functionBody(start = "private fun commitChipBar(", end = "\n    private fun ")
+        assertTrue(commit.contains("if (requireTouched && !ChipBarPresenter.isTouched(state)) return false"))
+        assertTrue(commit.contains("recordChipBarLearning(state)"))
+        assertTrue(commit.contains("model.commit(state)"))
+        val enter = source.functionBody(start = "private fun handleNonEmptyInputEnterKey(", end = "\n    private fun ")
+        assertTrue(enter.contains("commitChipBar(insertString, requireTouched = true)"))
+    }
+
     private fun imeServiceSource(): String =
         listOf(
             File("app/src/main/java/com/kazumaproject/markdownhelperkeyboard/ime_service/IMEService.kt"),
