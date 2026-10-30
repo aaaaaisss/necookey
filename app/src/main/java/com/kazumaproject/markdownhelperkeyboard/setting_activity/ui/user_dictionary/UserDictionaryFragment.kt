@@ -96,6 +96,11 @@ class UserDictionaryFragment : Fragment() {
                 menuInflater.inflate(R.menu.user_dictionary_menu, menu)
             }
 
+            override fun onPrepareMenu(menu: Menu) {
+                menu.findItem(R.id.action_preserve_whitespace)?.isChecked =
+                    AppPreference.preserve_dictionary_word_whitespace_preference
+            }
+
             override fun onMenuItemSelected(menuItem: MenuItem): Boolean {
                 // [CHANGE] メニューからのトグルロジックはここには含めない
                 return when (menuItem.itemId) {
@@ -116,6 +121,21 @@ class UserDictionaryFragment : Fragment() {
 
                     R.id.action_delete_all -> {
                         showDeleteAllConfirmationDialog()
+                        true
+                    }
+
+                    // 「単語の前後の空白を保持」（2026-10-30 に設定の「辞書と学習」からここへ移動。key は同じ）
+                    R.id.action_preserve_whitespace -> {
+                        val enabled = !AppPreference.preserve_dictionary_word_whitespace_preference
+                        AppPreference.preserve_dictionary_word_whitespace_preference = enabled
+                        menuItem.isChecked = enabled
+                        if (enabled) {
+                            Toast.makeText(
+                                requireContext(),
+                                R.string.preserve_dictionary_word_whitespace_summary,
+                                Toast.LENGTH_LONG,
+                            ).show()
+                        }
                         true
                     }
 

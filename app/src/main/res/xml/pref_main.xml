@@ -389,12 +389,6 @@
                     app:min="1"
                     app:showSeekBarValue="true"
                     app:iconSpaceReserved="false" />
-                <SwitchPreferenceCompat
-                    android:defaultValue="false"
-                    android:key="preserve_dictionary_word_whitespace_preference"
-                    android:title="@string/preserve_dictionary_word_whitespace_title"
-                    app:iconSpaceReserved="false"
-                    app:summary="@string/preserve_dictionary_word_whitespace_summary" />
             </PreferenceCategory>
         </PreferenceScreen>
     </PreferenceScreen>

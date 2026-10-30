@@ -771,7 +771,6 @@
     <string name="home_status_disabled_message">システム設定で necookey を有効にしてから、入力方法として選択してください。</string>
     <string name="home_status_enable_button">有効にする</string>
     <string name="home_status_switch_button">切り替える</string>
-    <string name="home_try_input_hint">ここで試し入力</string>
     <string name="home_category_other">その他</string>
     <string name="home_category_other_summary">クリップボード・バックアップ・情報</string>
     <string name="settings_advanced_title">詳細設定</string>
