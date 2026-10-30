@@ -106,8 +106,6 @@ object AppPreference {
     private val SYSTEM_NGRAM_DICTIONARY_ENABLE_PREFERENCE =
         Pair("system_ngram_dictionary_enable_preference", true)
     private val N_BEST_PREFERENCE = Pair("n_best_preference", 4)
-    private val INCREMENTAL_CONVERSION_SESSION_PREFERENCE =
-        Pair("incremental_conversion_session_preference", false)
     private val JAPANESE_PREDICTION_ENABLE_PREFERENCE =
         Pair("japanese_prediction_enable_preference", true)
     private val ENGLISH_PREDICTION_ENABLE_PREFERENCE =
@@ -1060,15 +1058,6 @@ object AppPreference {
         }
 
     val conversion_beam_width_preference: Int get() = 20 // S3: hardcoded, setting removed
-
-    var incremental_conversion_session_preference: Boolean
-        get() = preferences.getBoolean(
-            INCREMENTAL_CONVERSION_SESSION_PREFERENCE.first,
-            INCREMENTAL_CONVERSION_SESSION_PREFERENCE.second,
-        )
-        set(value) = preferences.edit {
-            it.putBoolean(INCREMENTAL_CONVERSION_SESSION_PREFERENCE.first, value)
-        }
 
     var japanese_prediction_enable_preference: Boolean
         get() = JAPANESE_PREDICTION_ENABLE_PREFERENCE.second // 予測設定UI削除: 既定値に固定

@@ -241,13 +241,6 @@
                     android:summary="@string/english_reading_dictionary_enable_summary"
                     android:title="@string/english_reading_dictionary_enable_title"
                     app:iconSpaceReserved="false" />
-                <SwitchPreferenceCompat
-                    android:defaultValue="false"
-                    android:key="incremental_conversion_session_preference"
-                    android:summaryOff="@string/incremental_conversion_session_summary_off"
-                    android:summaryOn="@string/incremental_conversion_session_summary_on"
-                    android:title="@string/incremental_conversion_session_title"
-                    app:iconSpaceReserved="false" />
             </PreferenceCategory>
             <PreferenceCategory
                 android:title="@string/typo_correction_title"

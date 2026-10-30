@@ -28,8 +28,9 @@ class KanaKanjiConversionSessionParityTest {
     @Test
     fun bunsetsuDisplayPreservesFullLatticeResultAcrossBackendsAndCandidateLoading() = runBlocking {
         val input = "あしたはとうきょうにいきます"
-        for (backend in ConversionBackend.entries) {
-            val session = KanaKanjiConversionSession(engine, backend)
+        run {
+            val backend = "legacy"
+            val session = KanaKanjiConversionSession(engine)
             for (mode in listOf(CandidateQueryMode.NO_TAB_DEFAULT, CandidateQueryMode.PREDICTION, CandidateQueryMode.CONVERSION)) {
                 val query = request(input, mode, bunsetsu = true)
                 val result = session.query(query)
@@ -58,55 +59,8 @@ class KanaKanjiConversionSessionParityTest {
     }
 
     @Test
-    fun incrementalSessionMatchesLegacyAcrossModesAndBunsetsu() = runBlocking {
-        val legacy = KanaKanjiConversionSession(engine, ConversionBackend.LEGACY)
-        val incremental = KanaKanjiConversionSession(
-            engine,
-            ConversionBackend.INCREMENTAL_SESSION,
-        )
-        val transitions = listOf(
-            "き" to CandidateQueryMode.PREDICTION,
-            "きょ" to CandidateQueryMode.PREDICTION,
-            "きょう" to CandidateQueryMode.PREDICTION,
-            "きょう" to CandidateQueryMode.CONVERSION,
-            "きょう" to CandidateQueryMode.NO_TAB_DEFAULT,
-            "きょう" to CandidateQueryMode.EISUKANA,
-            "きょうは" to CandidateQueryMode.PREDICTION,
-        )
-
-        for (bunsetsu in listOf(false, true)) {
-            for ((input, mode) in transitions) {
-                val request = request(input, mode, bunsetsu)
-                val legacyResult = legacy.query(request)
-                val incrementalResult = incremental.query(request)
-
-                assertEquals(
-                    "$input/$mode/bunsetsu=$bunsetsu candidates",
-                    legacyResult.candidates.fingerprint(),
-                    incrementalResult.candidates.fingerprint(),
-                )
-                assertEquals(
-                    "$input/$mode/bunsetsu=$bunsetsu splits",
-                    legacyResult.bunsetsuResult?.splitPatterns,
-                    incrementalResult.bunsetsuResult?.splitPatterns,
-                )
-                assertEquals(
-                    "$input/$mode/bunsetsu=$bunsetsu split map",
-                    legacyResult.bunsetsuResult?.splitPatternByCandidateString,
-                    incrementalResult.bunsetsuResult?.splitPatternByCandidateString,
-                )
-                assertEquals(
-                    "$input/$mode/bunsetsu=$bunsetsu conversion segments",
-                    legacyResult.candidateSegmentsByString,
-                    incrementalResult.candidateSegmentsByString,
-                )
-            }
-        }
-    }
-
-    @Test
     fun segmentCollectionUsesExactPathNodesWhenBunsetsuDisplayIsDisabled() = runBlocking {
-        val result = KanaKanjiConversionSession(engine, ConversionBackend.LEGACY).query(
+        val result = KanaKanjiConversionSession(engine).query(
             request("ひを", CandidateQueryMode.CONVERSION, bunsetsu = false),
         )
 
@@ -121,7 +75,7 @@ class KanaKanjiConversionSessionParityTest {
 
     @Test
     fun conversionKeepsExactSymbolEmojiEmoticonAndValueBasedNumberCandidates() = runBlocking {
-        val session = KanaKanjiConversionSession(engine, ConversionBackend.LEGACY)
+        val session = KanaKanjiConversionSession(engine)
 
         val neko = session.query(request("ねこ", CandidateQueryMode.CONVERSION, bunsetsu = false))
         assertTrue(neko.candidates.map { it.string }.any { it.contains("🐈") })
@@ -135,7 +89,7 @@ class KanaKanjiConversionSessionParityTest {
 
     @Test
     fun predictionIncludesExactSymbolEmojiEmoticonCandidates() = runBlocking {
-        val session = KanaKanjiConversionSession(engine, ConversionBackend.LEGACY)
+        val session = KanaKanjiConversionSession(engine)
 
         val exactEmoji = session.query(
             request("ねこ", CandidateQueryMode.PREDICTION, bunsetsu = false),
@@ -202,7 +156,7 @@ class KanaKanjiConversionSessionParityTest {
 
     @Test
     fun symbolEmojiCandidateDisplaySettingsHideCandidatesInEveryMode() = runBlocking {
-        val session = KanaKanjiConversionSession(engine, ConversionBackend.LEGACY)
+        val session = KanaKanjiConversionSession(engine)
         val hiddenConfig = PredictionConfig(
             showSymbolCandidates = false,
             showEmojiCandidates = false,
@@ -244,7 +198,7 @@ class KanaKanjiConversionSessionParityTest {
 
     @Test
     fun symbolEmojiCandidateDisplaySettingsAreIndependent() = runBlocking {
-        val session = KanaKanjiConversionSession(engine, ConversionBackend.LEGACY)
+        val session = KanaKanjiConversionSession(engine)
 
         val emojiHidden = session.query(
             request("ねこ", CandidateQueryMode.PREDICTION, bunsetsu = false).copy(
@@ -289,129 +243,6 @@ class KanaKanjiConversionSessionParityTest {
         assertTrue(
             session.query(request("ねこ", CandidateQueryMode.PREDICTION, false))
                 .candidates.any { it.string.contains("🐈") },
-        )
-    }
-
-    @Test
-    fun cancelledInPlaceAppendIsDiscardedBeforeNextRequest() = runBlocking {
-        val localEngine = TestEngineFactory.create()
-        val repository = mock<UserDictionaryRepository>()
-        var failDuringAppend = false
-        var lookupCount = 0
-        whenever(repository.commonPrefixSearchInUserDict(any())).thenAnswer {
-            lookupCount++
-            if (failDuringAppend && lookupCount == 3) {
-                throw kotlinx.coroutines.CancellationException("controlled partial append")
-            }
-            emptyList<UserWord>()
-        }
-        whenever(repository.exactMatchesForConversion(any())).thenAnswer {
-            lookupCount++
-            if (failDuringAppend && lookupCount == 3) {
-                throw kotlinx.coroutines.CancellationException("controlled partial append")
-            }
-            emptyList<UserWord>()
-        }
-        val incremental = KanaKanjiConversionSession(
-            localEngine,
-            ConversionBackend.INCREMENTAL_SESSION,
-        )
-        incremental.query(
-            request("きょ", CandidateQueryMode.PREDICTION, true).copy(
-                userDictionaryRepository = repository,
-            ),
-        )
-
-        failDuringAppend = true
-        lookupCount = 0
-        var cancellationObserved = false
-        try {
-            incremental.query(
-                request("きょう", CandidateQueryMode.PREDICTION, true).copy(
-                    userDictionaryRepository = repository,
-                ),
-            )
-        } catch (_: kotlinx.coroutines.CancellationException) {
-            cancellationObserved = true
-        }
-        assertTrue(cancellationObserved)
-        assertEquals("きょ", incremental.committedInput())
-
-        failDuringAppend = false
-        lookupCount = 0
-        val recovered = incremental.query(
-            request("きょうは", CandidateQueryMode.PREDICTION, true).copy(
-                userDictionaryRepository = repository,
-            ),
-        )
-        val rebuilt = KanaKanjiConversionSession(localEngine, ConversionBackend.LEGACY).query(
-            request("きょうは", CandidateQueryMode.PREDICTION, true).copy(
-                userDictionaryRepository = repository,
-            ),
-        )
-        assertEquals(rebuilt.candidates.fingerprint(), recovered.candidates.fingerprint())
-        assertEquals(rebuilt.bunsetsuResult?.splitPatterns, recovered.bunsetsuResult?.splitPatterns)
-        assertEquals("きょうは", incremental.committedInput())
-    }
-
-    @Test
-    fun completedGraphSurvivesCancellationAfterForwardDp() = runBlocking {
-        val localEngine = TestEngineFactory.create()
-        val incremental = KanaKanjiConversionSession(
-            localEngine,
-            ConversionBackend.INCREMENTAL_SESSION,
-        )
-        incremental.query(request("きょ", CandidateQueryMode.PREDICTION, true))
-
-        var cancelAfterForwardDp = true
-        incremental.setAfterForwardDpForTest {
-            if (cancelAfterForwardDp) {
-                cancelAfterForwardDp = false
-                throw kotlinx.coroutines.CancellationException("controlled post-forward cancellation")
-            }
-        }
-        var cancellationObserved = false
-        try {
-            incremental.query(request("きょう", CandidateQueryMode.PREDICTION, true))
-        } catch (_: kotlinx.coroutines.CancellationException) {
-            cancellationObserved = true
-        }
-
-        assertTrue(cancellationObserved)
-        assertEquals("きょう", incremental.committedInput())
-
-        incremental.setAfterForwardDpForTest(null)
-        val recovered = incremental.query(request("きょうは", CandidateQueryMode.PREDICTION, true))
-        val rebuilt = KanaKanjiConversionSession(localEngine, ConversionBackend.LEGACY).query(
-            request("きょうは", CandidateQueryMode.PREDICTION, true),
-        )
-        assertEquals(rebuilt.candidates.fingerprint(), recovered.candidates.fingerprint())
-        assertEquals(rebuilt.bunsetsuResult?.splitPatterns, recovered.bunsetsuResult?.splitPatterns)
-        assertEquals("きょうは", incremental.committedInput())
-    }
-
-    @Test
-    fun oneCharacterAppendReusesCommittedForwardDpAndMatchesLegacy() = runBlocking {
-        val localEngine = TestEngineFactory.create()
-        val incremental = KanaKanjiConversionSession(
-            localEngine,
-            ConversionBackend.INCREMENTAL_SESSION,
-        ).also { it.enablePerformanceProbe() }
-        val legacy = KanaKanjiConversionSession(localEngine, ConversionBackend.LEGACY)
-
-        incremental.query(request("きょう", CandidateQueryMode.PREDICTION, true))
-        val incrementalResult = incremental.query(
-            request("きょうは", CandidateQueryMode.PREDICTION, true),
-        )
-        val legacyResult = legacy.query(
-            request("きょうは", CandidateQueryMode.PREDICTION, true),
-        )
-
-        assertTrue(incremental.performanceSnapshot()?.forwardDpReused == true)
-        assertEquals(legacyResult.candidates.fingerprint(), incrementalResult.candidates.fingerprint())
-        assertEquals(
-            legacyResult.bunsetsuResult?.splitPatterns,
-            incrementalResult.bunsetsuResult?.splitPatterns,
         )
     }
 

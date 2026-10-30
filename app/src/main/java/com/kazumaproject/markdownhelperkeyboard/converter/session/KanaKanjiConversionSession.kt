@@ -7,14 +7,8 @@ import com.kazumaproject.markdownhelperkeyboard.converter.engine.KanaKanjiEngine
 import com.kazumaproject.markdownhelperkeyboard.converter.engine.PredictionConfig
 import com.kazumaproject.markdownhelperkeyboard.repository.LearnRepository
 import com.kazumaproject.markdownhelperkeyboard.repository.UserDictionaryRepository
-import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
-
-enum class ConversionBackend {
-    LEGACY,
-    INCREMENTAL_SESSION,
-}
 
 enum class CandidateQueryMode {
     NO_TAB_DEFAULT,
@@ -53,64 +47,29 @@ data class KanaKanjiQueryResult(
 )
 
 /**
- * Owns mutable lattice/forward-DP state for one InputConnection session.
+ * One InputConnection session's conversion entry point.
  *
  * Requests are serialized because GraphBuilder and FindPath mutate the graph nodes while searching.
- * The legacy backend deliberately supplies no session state and therefore keeps the previous engine
- * path.  The incremental backend supplies isolated state that survives candidate-mode changes.
+ * (The former INCREMENTAL_SESSION backend with per-session lattice state was removed on 2026-10-30;
+ * the engine's own one-character append cache still applies.)
  */
 class KanaKanjiConversionSession(
     private val engine: KanaKanjiEngine,
-    val backend: ConversionBackend,
 ) {
     private val mutex = Mutex()
-    private val incrementalState = if (backend == ConversionBackend.INCREMENTAL_SESSION) {
-        engine.createIncrementalSessionState()
-    } else {
-        null
-    }
-
-    internal fun enablePerformanceProbe() {
-        incrementalState?.enablePerformanceProbe()
-    }
-
-    internal fun performanceSnapshot(): KanaKanjiEngine.IncrementalPerformanceSnapshot? =
-        incrementalState?.performanceSnapshot()
-
-    internal fun committedInput(): String? = incrementalState?.committedInput()
-
-    internal fun setAfterForwardDpForTest(callback: (() -> Unit)?) {
-        incrementalState?.pathState?.afterForwardDpForTest = callback
-    }
 
     suspend fun query(request: KanaKanjiQueryRequest): KanaKanjiQueryResult = mutex.withLock {
-        incrementalState?.beginQueryTransaction()
-        try {
-            val result = when (request.mode) {
-                CandidateQueryMode.EISUKANA -> KanaKanjiQueryResult(
-                    candidates = engine.getCandidatesEnglishKana(
-                        input = request.input,
-                        predictionConfig = request.predictionConfig,
-                    ),
-                )
+        when (request.mode) {
+            CandidateQueryMode.EISUKANA -> KanaKanjiQueryResult(
+                candidates = engine.getCandidatesEnglishKana(
+                    input = request.input,
+                    predictionConfig = request.predictionConfig,
+                ),
+            )
 
-                CandidateQueryMode.NO_TAB_DEFAULT -> queryOriginal(request)
-                CandidateQueryMode.PREDICTION -> queryPrediction(request)
-                CandidateQueryMode.CONVERSION -> queryConversion(request)
-            }
-            val composedResult = result
-            incrementalState?.commitQueryTransaction()
-            composedResult
-        } catch (cancellation: CancellationException) {
-            // A completed graph has its own staged commit. Keep that newest frontier when only the
-            // later path search was cancelled; an incomplete append still rolls back entirely.
-            incrementalState?.rollbackQueryTransaction()
-            throw cancellation
-        } catch (throwable: Throwable) {
-            // Unexpected engine/repository failures may violate invariants outside the tracked
-            // append delta. Prefer a clean rebuild for those rare failures.
-            incrementalState?.reset()
-            throw throwable
+            CandidateQueryMode.NO_TAB_DEFAULT -> queryOriginal(request)
+            CandidateQueryMode.PREDICTION -> queryPrediction(request)
+            CandidateQueryMode.CONVERSION -> queryConversion(request)
         }
     }
 
@@ -132,7 +91,6 @@ class KanaKanjiConversionSession(
             typoCorrectionOffsetScore = request.typoCorrectionOffsetScore,
             omissionSearchOffsetScore = request.omissionSearchOffsetScore,
             beamWidth = request.beamWidth,
-            incrementalSessionState = incrementalState,
             predictionConfig = request.predictionConfig,
             candidateSegmentCollector = segmentCollector,
         ).asQueryResult(segmentCollector)
@@ -156,7 +114,6 @@ class KanaKanjiConversionSession(
             typoCorrectionOffsetScore = request.typoCorrectionOffsetScore,
             omissionSearchOffsetScore = request.omissionSearchOffsetScore,
             beamWidth = request.beamWidth,
-            incrementalSessionState = incrementalState,
             predictionConfig = request.predictionConfig,
             candidateSegmentCollector = segmentCollector,
         ).asQueryResult(segmentCollector)
@@ -164,7 +121,7 @@ class KanaKanjiConversionSession(
 
     /**
      * SUMIRE-LM リランカー用の候補プール（文節分離の変換候補 [n] 件と語分割）。表示用の問い合わせとは別に、
-     * セッションの逐次状態を使わず・変更せずに計算する（予測なし、学習/ユーザー辞書は表示と同じ設定）。
+     * 計算する（予測なし、学習/ユーザー辞書は表示と同じ設定）。
      */
     suspend fun queryRerankPool(request: KanaKanjiQueryRequest, n: Int): KanaKanjiQueryResult =
         mutex.withLock {
@@ -182,7 +139,6 @@ class KanaKanjiConversionSession(
                 typoCorrectionOffsetScore = request.typoCorrectionOffsetScore,
                 omissionSearchOffsetScore = request.omissionSearchOffsetScore,
                 beamWidth = request.beamWidth,
-                incrementalSessionState = null,
                 predictionConfig = request.predictionConfig.copy(
                     japanesePredictionEnabled = false,
                     englishPredictionEnabled = false,
@@ -206,7 +162,6 @@ class KanaKanjiConversionSession(
             typoCorrectionOffsetScore = request.typoCorrectionOffsetScore,
             omissionSearchOffsetScore = request.omissionSearchOffsetScore,
             beamWidth = request.beamWidth,
-            incrementalSessionState = incrementalState,
             predictionConfig = request.predictionConfig.copy(
                 japanesePredictionEnabled = false,
                 englishPredictionEnabled = false,

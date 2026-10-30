@@ -42,77 +42,8 @@ class FindPath(
         val nodesBeforePreviousEnd: Map<Int, MutableList<Node>>,
     )
 
-    internal data class PenaltyCache(
-        val inputLength: Int,
-        val conversionSignature: Int,
-        val segmenter: MozcSegmenter,
-    )
-
-    class SessionState internal constructor() {
-        internal var forwardDpCache: ForwardDpCache? = null
-        internal var penaltyCache: PenaltyCache? = null
-        internal val backwardSearchScratch = BackwardSearchScratch()
-        internal var performanceProbeEnabled: Boolean = false
-        internal var lastPenaltyNs: Long = 0
-        internal var lastForwardDpNs: Long = 0
-        internal var lastBackwardSearchNs: Long = 0
-        internal var lastQueueElementCount: Int = 0
-        internal var lastStateRejectionCount: Int = 0
-        internal var lastExpansionCacheHitCount: Int = 0
-        internal var lastExpansionCacheMissCount: Int = 0
-        internal var lastForwardDpReused: Boolean = false
-        internal var afterForwardDpForTest: (() -> Unit)? = null
-
-        private var queryCheckpoint: QueryCheckpoint? = null
-
-        private data class QueryCheckpoint(
-            val forwardDpCache: ForwardDpCache?,
-            val penaltyCache: PenaltyCache?,
-        )
-
-        internal fun beginQueryTransaction() {
-            check(queryCheckpoint == null) { "Path query transaction is already active" }
-            queryCheckpoint = QueryCheckpoint(
-                forwardDpCache = forwardDpCache,
-                penaltyCache = penaltyCache,
-            )
-        }
-
-        internal fun commitQueryTransaction() {
-            queryCheckpoint = null
-        }
-
-        internal fun rollbackQueryTransaction() {
-            val checkpoint = queryCheckpoint ?: return
-            forwardDpCache = checkpoint.forwardDpCache
-            penaltyCache = checkpoint.penaltyCache
-            queryCheckpoint = null
-            // Queue/path arenas are query-local. They are cleared at the next begin(), while
-            // node ids and expansion entries for the committed prefix remain reusable.
-            backwardSearchScratch.discardInFlightWork()
-        }
-
-        internal fun reset() {
-            queryCheckpoint = null
-            forwardDpCache = null
-            penaltyCache = null
-            backwardSearchScratch.reset()
-            lastPenaltyNs = 0
-            lastForwardDpNs = 0
-            lastBackwardSearchNs = 0
-            lastQueueElementCount = 0
-            lastStateRejectionCount = 0
-            lastExpansionCacheHitCount = 0
-            lastExpansionCacheMissCount = 0
-            lastForwardDpReused = false
-            afterForwardDpForTest = null
-        }
-    }
-
     @Volatile
     private var forwardDpCache: ForwardDpCache? = null
-
-    fun createSessionState(): SessionState = SessionState()
 
     internal class PathQueueElement {
         lateinit var node: Node
@@ -1042,7 +973,6 @@ class FindPath(
         n: Int,
         beamWidth: Int = 20,
         cancellationCheck: () -> Unit = {},
-        sessionState: SessionState? = null,
         candidateSegmentCollector: MutableMap<String, List<CandidateConversionSegment>>? = null,
     ): MutableList<Candidate> = backwardAStar(
         graph = graph,
@@ -1051,7 +981,6 @@ class FindPath(
         n = n,
         beamWidth = beamWidth,
         cancellationCheck = cancellationCheck,
-        sessionState = sessionState,
         candidateSegmentCollector = candidateSegmentCollector,
     )
 
@@ -1062,23 +991,18 @@ class FindPath(
         n: Int,
         beamWidth: Int = 20,
         cancellationCheck: () -> Unit = {},
-        sessionState: SessionState? = null,
         candidateSegmentCollector: MutableMap<String, List<CandidateConversionSegment>>? = null,
     ): MutableList<Candidate> {
         cancellationCheck()
         val effectiveBeamWidth = beamWidth.coerceAtLeast(1)
         val incrementalMetadata = graph as? IncrementalGraphMetadata
-        val activeCache = if (sessionState != null) sessionState.forwardDpCache else forwardDpCache
-        val reusableForwardDp = activeCache?.takeIf { cached ->
+        val reusableForwardDp = forwardDpCache?.takeIf { cached ->
             incrementalMetadata != null &&
                 incrementalMetadata.forwardDpReusableThroughEndIndex == cached.inputLength &&
                 incrementalMetadata.conversionSignature == cached.conversionSignature &&
                 length == cached.inputLength + 1 &&
                 cached.connectionMatrixIdentity == System.identityHashCode(connectionMatrix) &&
                 cached.beamWidth == effectiveBeamWidth
-        }
-        if (sessionState?.performanceProbeEnabled == true) {
-            sessionState.lastForwardDpReused = reusableForwardDp != null
         }
         val forwardDpStartPosition = if (reusableForwardDp != null) {
             reusableForwardDp.nodesBeforePreviousEnd.forEach { (position, nodes) ->
@@ -1096,39 +1020,27 @@ class FindPath(
             startPosition = forwardDpStartPosition,
             cancellationCheck = cancellationCheck,
         )
-        sessionState?.afterForwardDpForTest?.invoke()
         val updatedCache = incrementalMetadata?.let {
             ForwardDpCache(
                 inputLength = length,
                 conversionSignature = it.conversionSignature,
                 connectionMatrixIdentity = System.identityHashCode(connectionMatrix),
                 beamWidth = effectiveBeamWidth,
-                nodesBeforePreviousEnd = if (sessionState != null) {
-                    // The session graph itself retains the pruned node lists and their forward
-                    // costs.  Copying every position here would restore the allocation pattern
-                    // that the session backend is intended to remove.
-                    emptyMap()
-                } else {
-                    (0 until length).associateWithTo(LinkedHashMap()) { position ->
-                        graph[position]?.toMutableList() ?: mutableListOf()
-                    }
+                nodesBeforePreviousEnd = (0 until length).associateWithTo(LinkedHashMap()) { position ->
+                    graph[position]?.toMutableList() ?: mutableListOf()
                 },
             )
         }
-        if (sessionState != null) {
-            sessionState.forwardDpCache = updatedCache
-        } else {
-            forwardDpCache = updatedCache
-        }
+        forwardDpCache = updatedCache
 
         val resultFinal = mutableListOf<Candidate>()
         val foundStrings = HashSet<String>()
         val ngramRuleScorer = ngramRuleScorerProvider()
 
-        val searchScratch = sessionState?.backwardSearchScratch ?: BackwardSearchScratch()
+        val searchScratch = BackwardSearchScratch()
         searchScratch.begin(
             graph = graph,
-            preserveNodeIds = sessionState != null && reusableForwardDp != null,
+            preserveNodeIds = false,
             connectionMatrix = connectionMatrix,
             ngramRuleScorer = ngramRuleScorer,
             mozcSegmenter = null,
@@ -1184,43 +1096,24 @@ class FindPath(
                     return resultFinal
                 }
             } else {
-                if (sessionState != null) {
-                    val expansions = cachedBackwardExpansions(
-                        graph = graph,
-                        element = element,
-                        connectionMatrix = connectionMatrix,
-                        ngramRuleScorer = ngramRuleScorer,
-                        boundaryChecker = null,
-                        scratch = searchScratch,
-                    )
-                    for (index in 0 until expansions.size) {
-                        enqueueBackwardExpansion(
-                            previousNode = checkNotNull(expansions.previousNodes[index]),
-                            localCost = expansions.localCosts[index],
-                            element = element,
-                            scratch = searchScratch,
-                        )
-                    }
-                } else {
-                    val prevNodes = getPrevNodes2(
-                        graph = graph,
+                val prevNodes = getPrevNodes2(
+                    graph = graph,
+                    node = currentNode,
+                    startPosition = currentNode.sPos,
+                )
+                for (prevNode in prevNodes) {
+                    val localCost = getEdgeCost(
+                        prev = prevNode,
                         node = currentNode,
-                        startPosition = currentNode.sPos,
+                        connectionMatrix = connectionMatrix,
+                    ) + currentNode.adjustedScore + ngramRuleScorer.score(
+                        prevNode = prevNode,
+                        currentNode = currentNode,
+                        nextNode1 = element.next?.node,
+                        nextNode2 = element.next?.next?.node,
+                        nextNode3 = element.next?.next?.next?.node,
                     )
-                    for (prevNode in prevNodes) {
-                        val localCost = getEdgeCost(
-                            prev = prevNode,
-                            node = currentNode,
-                            connectionMatrix = connectionMatrix,
-                        ) + currentNode.adjustedScore + ngramRuleScorer.score(
-                            prevNode = prevNode,
-                            currentNode = currentNode,
-                            nextNode1 = element.next?.node,
-                            nextNode2 = element.next?.next?.node,
-                            nextNode3 = element.next?.next?.next?.node,
-                        )
-                        enqueueBackwardExpansion(prevNode, localCost, element, searchScratch)
-                    }
+                    enqueueBackwardExpansion(prevNode, localCost, element, searchScratch)
                 }
             }
         }
@@ -1593,7 +1486,6 @@ class FindPath(
         boundaryTrace: MutableList<BoundaryTrace>? = null,
         candidateTrace: MutableList<CandidateTrace>? = null,
         cancellationCheck: () -> Unit = {},
-        sessionState: SessionState? = null,
         candidateSegmentCollector: MutableMap<String, List<CandidateConversionSegment>>? = null,
     ): BunsetsuCandidateResult = backwardAStarWithBunsetsu(
         graph = graph,
@@ -1606,7 +1498,6 @@ class FindPath(
         boundaryTrace = boundaryTrace,
         candidateTrace = candidateTrace,
         cancellationCheck = cancellationCheck,
-        sessionState = sessionState,
         candidateSegmentCollector = candidateSegmentCollector,
     )
 
@@ -1621,57 +1512,22 @@ class FindPath(
         boundaryTrace: MutableList<BoundaryTrace>? = null,
         candidateTrace: MutableList<CandidateTrace>? = null,
         cancellationCheck: () -> Unit = {},
-        sessionState: SessionState? = null,
         candidateSegmentCollector: MutableMap<String, List<CandidateConversionSegment>>? = null,
     ): BunsetsuCandidateResult {
         cancellationCheck()
-        val performanceState = sessionState?.takeIf { it.performanceProbeEnabled }
-        val penaltyStartNs = if (performanceState != null) System.nanoTime() else 0L
         val incrementalMetadata = graph as? IncrementalGraphMetadata
         val mozcSegmenter = mozcSegmenterProvider()
         if (mozcSegmenter != null) {
-            val reusablePenalty = sessionState?.penaltyCache?.takeIf { cached ->
-                penaltyTrace == null &&
-                    incrementalMetadata != null &&
-                    incrementalMetadata.reusedThroughEndIndex == cached.inputLength &&
-                    incrementalMetadata.conversionSignature == cached.conversionSignature &&
-                    length == cached.inputLength + 1 &&
-                    cached.segmenter === mozcSegmenter
-            }
-            if (reusablePenalty != null) {
-                applyMozcPrefixSuffixPenaltyToNodes(
-                    nodes = graph[reusablePenalty.inputLength].orEmpty(),
-                    length = length,
-                    segmenter = mozcSegmenter,
-                    trace = null,
-                )
-                applyMozcPrefixSuffixPenaltyToNodes(
-                    nodes = graph[length].orEmpty(),
-                    length = length,
-                    segmenter = mozcSegmenter,
-                    trace = null,
-                )
-            } else {
-                applyMozcPrefixSuffixPenalty(
-                    graph = graph,
-                    length = length,
-                    segmenter = mozcSegmenter,
-                    trace = penaltyTrace,
-                )
-            }
-            sessionState?.penaltyCache = incrementalMetadata?.let {
-                PenaltyCache(length, it.conversionSignature, mozcSegmenter)
-            }
-        } else {
-            sessionState?.penaltyCache = null
-        }
-        if (performanceState != null) {
-            performanceState.lastPenaltyNs = System.nanoTime() - penaltyStartNs
+            applyMozcPrefixSuffixPenalty(
+                graph = graph,
+                length = length,
+                segmenter = mozcSegmenter,
+                trace = penaltyTrace,
+            )
         }
 
         val effectiveBeamWidth = beamWidth.coerceAtLeast(1)
-        val activeCache = if (sessionState != null) sessionState.forwardDpCache else forwardDpCache
-        val reusableForwardDp = activeCache?.takeIf { cached ->
+        val reusableForwardDp = forwardDpCache?.takeIf { cached ->
             forwardDpTrace == null &&
                 incrementalMetadata != null &&
                 incrementalMetadata.forwardDpReusableThroughEndIndex == cached.inputLength &&
@@ -1679,9 +1535,6 @@ class FindPath(
                 length == cached.inputLength + 1 &&
                 cached.connectionMatrixIdentity == System.identityHashCode(connectionMatrix) &&
                 cached.beamWidth == effectiveBeamWidth
-        }
-        if (sessionState?.performanceProbeEnabled == true) {
-            sessionState.lastForwardDpReused = reusableForwardDp != null
         }
         val forwardDpStartPosition = if (reusableForwardDp != null) {
             reusableForwardDp.nodesBeforePreviousEnd.forEach { (position, nodes) ->
@@ -1692,7 +1545,6 @@ class FindPath(
             1
         }
 
-        val forwardDpStartNs = if (performanceState != null) System.nanoTime() else 0L
         forwardDpTraceSink = forwardDpTrace
         try {
             forwardDp(
@@ -1706,10 +1558,6 @@ class FindPath(
         } finally {
             forwardDpTraceSink = null
         }
-        if (performanceState != null) {
-            performanceState.lastForwardDpNs = System.nanoTime() - forwardDpStartNs
-        }
-        sessionState?.afterForwardDpForTest?.invoke()
 
         val updatedCache = if (incrementalMetadata != null) {
             ForwardDpCache(
@@ -1717,48 +1565,14 @@ class FindPath(
                 conversionSignature = incrementalMetadata.conversionSignature,
                 connectionMatrixIdentity = System.identityHashCode(connectionMatrix),
                 beamWidth = effectiveBeamWidth,
-                nodesBeforePreviousEnd = if (sessionState != null) {
-                    emptyMap()
-                } else {
-                    (0 until length).associateWithTo(LinkedHashMap()) { position ->
-                        graph[position]?.toMutableList() ?: mutableListOf()
-                    }
+                nodesBeforePreviousEnd = (0 until length).associateWithTo(LinkedHashMap()) { position ->
+                    graph[position]?.toMutableList() ?: mutableListOf()
                 },
             )
         } else {
             null
         }
-        if (sessionState != null) {
-            sessionState.forwardDpCache = updatedCache
-        } else {
-            forwardDpCache = updatedCache
-        }
-        val backwardSearchStartNs = if (performanceState != null) System.nanoTime() else 0L
-        var completedQueueElementCount = 0
-        var completedStateRejectionCount = 0
-        var completedExpansionCacheHitCount = 0
-        var completedExpansionCacheMissCount = 0
-        fun retainCurrentSearchCounters(scratch: BackwardSearchScratch) {
-            completedQueueElementCount += scratch.queueElementCount()
-            completedStateRejectionCount += scratch.stateRejectionCount
-            completedExpansionCacheHitCount += scratch.expansionCacheHitCount
-            completedExpansionCacheMissCount += scratch.expansionCacheMissCount
-        }
-        fun recordBackwardSearchDuration() {
-            if (performanceState != null) {
-                performanceState.lastBackwardSearchNs = System.nanoTime() - backwardSearchStartNs
-                val scratch = performanceState.backwardSearchScratch
-                performanceState.lastQueueElementCount =
-                    completedQueueElementCount + scratch.queueElementCount()
-                performanceState.lastStateRejectionCount =
-                    completedStateRejectionCount + scratch.stateRejectionCount
-                performanceState.lastExpansionCacheHitCount =
-                    completedExpansionCacheHitCount + scratch.expansionCacheHitCount
-                performanceState.lastExpansionCacheMissCount =
-                    completedExpansionCacheMissCount + scratch.expansionCacheMissCount
-            }
-        }
-
+        forwardDpCache = updatedCache
         val boundaryMode = mozcBoundaryModeProvider()
         val boundaryChecker = mozcSegmenter?.let {
             MozcBoundaryChecker(
@@ -1806,10 +1620,10 @@ class FindPath(
             systemNgramSafetyCandidateCount
         }
 
-        val searchScratch = sessionState?.backwardSearchScratch ?: BackwardSearchScratch()
+        val searchScratch = BackwardSearchScratch()
         searchScratch.begin(
             graph = graph,
-            preserveNodeIds = sessionState != null && reusableForwardDp != null,
+            preserveNodeIds = false,
             connectionMatrix = connectionMatrix,
             ngramRuleScorer = ngramRuleScorer,
             mozcSegmenter = mozcSegmenter,
@@ -1830,7 +1644,6 @@ class FindPath(
             )
         }
             ?: return BunsetsuCandidateResult(emptyList(), emptyList()).also {
-                recordBackwardSearchDuration()
             }
 
         var cancellationPollCounter = 0
@@ -1895,7 +1708,6 @@ class FindPath(
                     systemNgramDictionary.ruleCount != 0 && !systemNgramMayAffectCandidates
                 ) {
                     if (enoughCandidates) {
-                        retainCurrentSearchCounters(searchScratch)
                         val preservedSplitPatterns = collectBunsetsuSplitPatterns(
                             graph = graph,
                             length = length,
@@ -1913,7 +1725,6 @@ class FindPath(
                             systemNgramMatchedCandidates,
                             n,
                         )
-                        recordBackwardSearchDuration()
                         return BunsetsuCandidateResult(
                             candidates = withKanaRepair(ranked),
                             splitPatterns = preservedSplitPatterns,
@@ -1926,7 +1737,6 @@ class FindPath(
                         (enoughCandidates && systemRuleAlreadyMatched)
                 ) {
                     val ranked = rankSystemNgramCandidates(resultFinal, systemNgramMatchedCandidates, n)
-                    recordBackwardSearchDuration()
                     return BunsetsuCandidateResult(
                         candidates = withKanaRepair(ranked),
                         splitPatterns = splitPatterns,
@@ -1935,66 +1745,46 @@ class FindPath(
                     )
                 }
             } else {
-                if (sessionState != null && boundaryTrace == null) {
-                    val expansions = cachedBackwardExpansions(
-                        graph = graph,
-                        element = element,
-                        connectionMatrix = connectionMatrix,
-                        ngramRuleScorer = ngramRuleScorer,
-                        boundaryChecker = boundaryChecker,
-                        scratch = searchScratch,
-                    )
-                    for (index in 0 until expansions.size) {
-                        enqueueBackwardExpansion(
-                            previousNode = checkNotNull(expansions.previousNodes[index]),
-                            localCost = expansions.localCosts[index],
-                            element = element,
-                            scratch = searchScratch,
+                val prevNodes = getPrevNodes2(
+                    graph = graph,
+                    node = currentNode,
+                    startPosition = currentNode.sPos,
+                )
+                for (prevNode in prevNodes) {
+                    if (boundaryChecker != null) {
+                        val isEdge = prevNode.mozcNodeType == MozcNodeType.BOS ||
+                            currentNode.mozcNodeType == MozcNodeType.EOS
+                        val result = boundaryChecker.check(prevNode, currentNode, isEdge)
+                        boundaryTrace?.add(
+                            BoundaryTrace(
+                                leftTango = prevNode.tango,
+                                rightTango = currentNode.tango,
+                                leftRid = prevNode.r.toInt(),
+                                rightLid = currentNode.l.toInt(),
+                                isEdge = isEdge,
+                                isSingleSegment = boundaryMode == MozcBoundaryMode.ONLY_EDGE,
+                                result = result.name,
+                            ),
                         )
+                        if (result == MozcBoundaryCheckResult.INVALID) continue
                     }
-                } else {
-                    val prevNodes = getPrevNodes2(
-                        graph = graph,
+                    val localCost = getEdgeCost(
+                        prev = prevNode,
                         node = currentNode,
-                        startPosition = currentNode.sPos,
+                        connectionMatrix = connectionMatrix,
+                    ) + currentNode.adjustedScore + ngramRuleScorer.score(
+                        prevNode = prevNode,
+                        currentNode = currentNode,
+                        nextNode1 = element.next?.node,
+                        nextNode2 = element.next?.next?.node,
+                        nextNode3 = element.next?.next?.next?.node,
                     )
-                    for (prevNode in prevNodes) {
-                        if (boundaryChecker != null) {
-                            val isEdge = prevNode.mozcNodeType == MozcNodeType.BOS ||
-                                currentNode.mozcNodeType == MozcNodeType.EOS
-                            val result = boundaryChecker.check(prevNode, currentNode, isEdge)
-                            boundaryTrace?.add(
-                                BoundaryTrace(
-                                    leftTango = prevNode.tango,
-                                    rightTango = currentNode.tango,
-                                    leftRid = prevNode.r.toInt(),
-                                    rightLid = currentNode.l.toInt(),
-                                    isEdge = isEdge,
-                                    isSingleSegment = boundaryMode == MozcBoundaryMode.ONLY_EDGE,
-                                    result = result.name,
-                                ),
-                            )
-                            if (result == MozcBoundaryCheckResult.INVALID) continue
-                        }
-                        val localCost = getEdgeCost(
-                            prev = prevNode,
-                            node = currentNode,
-                            connectionMatrix = connectionMatrix,
-                        ) + currentNode.adjustedScore + ngramRuleScorer.score(
-                            prevNode = prevNode,
-                            currentNode = currentNode,
-                            nextNode1 = element.next?.node,
-                            nextNode2 = element.next?.next?.node,
-                            nextNode3 = element.next?.next?.next?.node,
-                        )
-                        enqueueBackwardExpansion(prevNode, localCost, element, searchScratch)
-                    }
+                    enqueueBackwardExpansion(prevNode, localCost, element, searchScratch)
                 }
             }
         }
 
         val ranked = rankSystemNgramCandidates(resultFinal, systemNgramMatchedCandidates, n)
-        recordBackwardSearchDuration()
         return BunsetsuCandidateResult(
             candidates = withKanaRepair(ranked),
             splitPatterns = splitPatterns,

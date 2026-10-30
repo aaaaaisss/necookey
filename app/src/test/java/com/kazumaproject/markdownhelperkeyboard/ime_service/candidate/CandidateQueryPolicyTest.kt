@@ -1,7 +1,6 @@
 package com.kazumaproject.markdownhelperkeyboard.ime_service.candidate
 
 import com.kazumaproject.markdownhelperkeyboard.converter.session.CandidateQueryMode
-import com.kazumaproject.markdownhelperkeyboard.converter.session.ConversionBackend
 import com.kazumaproject.markdownhelperkeyboard.ime_service.state.CandidateTab
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -61,17 +60,15 @@ class CandidateQueryPolicyTest {
     @Test
     fun sameInputFromPreviousTabIsRejected() {
         val tracker = CandidateRequestTracker()
-        tracker.restart(ConversionBackend.INCREMENTAL_SESSION)
+        tracker.restart()
 
         val prediction = tracker.begin(
             input = "きょう",
             mode = CandidateQueryMode.PREDICTION,
-            backend = ConversionBackend.INCREMENTAL_SESSION,
         )
         val conversion = tracker.begin(
             input = "きょう",
             mode = CandidateQueryMode.CONVERSION,
-            backend = ConversionBackend.INCREMENTAL_SESSION,
         )
 
         assertFalse(tracker.isCurrent(prediction))
@@ -81,14 +78,13 @@ class CandidateQueryPolicyTest {
     @Test
     fun previousInputSessionIsRejected() {
         val tracker = CandidateRequestTracker()
-        tracker.restart(ConversionBackend.LEGACY)
+        tracker.restart()
         val old = tracker.begin(
             input = "かな",
             mode = CandidateQueryMode.NO_TAB_DEFAULT,
-            backend = ConversionBackend.LEGACY,
         )
 
-        tracker.restart(ConversionBackend.INCREMENTAL_SESSION)
+        tracker.restart()
 
         assertFalse(tracker.isCurrent(old))
     }
@@ -97,19 +93,16 @@ class CandidateQueryPolicyTest {
     fun sameInputFromAnEarlierEditorMutationIsRejected() {
         val tracker = CandidateRequestTracker()
         tracker.restart(
-            backend = ConversionBackend.LEGACY,
             editorMutationRevision = 4L,
         )
         val beforeDelete = tracker.begin(
             input = "test",
             mode = CandidateQueryMode.NO_TAB_DEFAULT,
-            backend = ConversionBackend.LEGACY,
             editorMutationRevision = 4L,
         )
         val afterDeleteAndRetype = tracker.begin(
             input = "test",
             mode = CandidateQueryMode.NO_TAB_DEFAULT,
-            backend = ConversionBackend.LEGACY,
             editorMutationRevision = 6L,
         )
 

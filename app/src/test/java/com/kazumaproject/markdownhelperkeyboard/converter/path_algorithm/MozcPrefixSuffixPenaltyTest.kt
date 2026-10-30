@@ -76,7 +76,6 @@ class MozcPrefixSuffixPenaltyTest {
             putAll(singleNodeGraph(target))
         }
         val findPath = FindPath(mozcSegmenterProvider = { segmenter() })
-        val sessionState = findPath.createSessionState()
 
         findPath.backwardAStarWithBunsetsu(
             graph = initialGraph,
@@ -84,7 +83,6 @@ class MozcPrefixSuffixPenaltyTest {
             connectionIds = ShortArray(9),
             connectionMatrixSize = 3,
             n = 5,
-            sessionState = sessionState,
         )
         assertEquals(111, target.adjustedScore)
 
@@ -100,7 +98,6 @@ class MozcPrefixSuffixPenaltyTest {
             connectionIds = ShortArray(9),
             connectionMatrixSize = 3,
             n = 5,
-            sessionState = sessionState,
         )
 
         assertEquals(107, target.adjustedScore)

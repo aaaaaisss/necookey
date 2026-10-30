@@ -222,7 +222,6 @@ import com.kazumaproject.markdownhelperkeyboard.converter.engine.KanaKanjiEngine
 import com.kazumaproject.markdownhelperkeyboard.converter.engine.PredictionConfig
 import com.kazumaproject.markdownhelperkeyboard.converter.ngram.SystemNgramRuntime
 import com.kazumaproject.markdownhelperkeyboard.converter.session.CandidateQueryMode
-import com.kazumaproject.markdownhelperkeyboard.converter.session.ConversionBackend
 import com.kazumaproject.markdownhelperkeyboard.converter.session.KanaKanjiConversionSession
 import com.kazumaproject.markdownhelperkeyboard.converter.session.KanaKanjiQueryRequest
 import com.kazumaproject.markdownhelperkeyboard.converter.session.KanaKanjiQueryResult
@@ -1286,7 +1285,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
     private var candidateColumnsLandscape: String? = "1"
     private var candidateViewHeight: String? = "2"
     private var candidateTabVisibility: Boolean? = false
-    private var conversionBackend: ConversionBackend = ConversionBackend.LEGACY
     private var predictionConfig: PredictionConfig = PredictionConfig()
     @Volatile
     private var kanaKanjiConversionSession: KanaKanjiConversionSession? = null
@@ -1825,7 +1823,7 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
             if (awaitKanaKanjiEngineOrNull() == null) return@launch
             if (inputSessionId != flickPreviewEditorSessionId) return@launch
             if (kanaKanjiConversionSession == null) {
-                startKanaKanjiConversionSession(preferences.conversionBackend)
+                startKanaKanjiConversionSession()
             }
             initializeMozcDictionaries(preferences)
             refreshCandidateStripContent()
@@ -2106,11 +2104,9 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
             )
         )
         applyImePreferences(preferences)
-        conversionBackend = preferences.conversionBackend
         kanaKanjiConversionSession = null
         editorMutationRevision.restart()
         candidateRequestTracker.restart(
-            backend = preferences.conversionBackend,
             editorMutationRevision = editorMutationRevision.current(),
         )
         candidateRefreshCoordinator.restart()
@@ -2126,18 +2122,9 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         refreshCandidateStripContent()
     }
 
-    private fun startKanaKanjiConversionSession(backend: ConversionBackend) {
-        conversionBackend = backend
-        kanaKanjiConversionSession = KanaKanjiConversionSession(
-            engine = kanaKanjiEngine,
-            backend = backend,
-        ).also { session ->
-            if (BuildConfig.DEBUG && backend == ConversionBackend.INCREMENTAL_SESSION) {
-                session.enablePerformanceProbe()
-            }
-        }
+    private fun startKanaKanjiConversionSession() {
+        kanaKanjiConversionSession = KanaKanjiConversionSession(engine = kanaKanjiEngine)
         candidateRequestTracker.restart(
-            backend = backend,
             editorMutationRevision = editorMutationRevision.current(),
         )
         candidateRefreshCoordinator.restart()
@@ -2260,7 +2247,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
 
         keyboardOrder = preferences.keyboardOrder
         candidateTabOrder = preferences.candidateTabOrder
-        conversionBackend = preferences.conversionBackend
         predictionConfig = preferences.predictionConfig
         mozcUTPersonName = preferences.mozcUTPersonName
         mozcUTPlaces = preferences.mozcUTPlaces
@@ -10529,7 +10515,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
                             val token = candidateRequestTracker.begin(
                                 input = input,
                                 mode = mode,
-                                backend = conversionBackend,
                                 editorMutationRevision = editorMutationRevision.current(),
                             )
                             ioScope.launch {
@@ -13284,7 +13269,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         val token = candidateRequestTracker.begin(
             input = inputString,
             mode = mode,
-            backend = conversionBackend,
             editorMutationRevision = editorMutationRevision.current(),
         )
         setCandidatesForMode(inputString, mainView, mode, token)
@@ -14756,10 +14740,7 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         val engine = awaitKanaKanjiEngineOrNull()
             ?: return KanaKanjiQueryResult(candidates = emptyList())
         awaitSystemUserDictionaryLoad()
-        val session = kanaKanjiConversionSession ?: KanaKanjiConversionSession(
-            engine = engine,
-            backend = conversionBackend,
-        ).also {
+        val session = kanaKanjiConversionSession ?: KanaKanjiConversionSession(engine).also {
             kanaKanjiConversionSession = it
         }
         val result = session.query(
@@ -14786,20 +14767,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
                 collectCandidateSegments = true, // bunsetsu cursor-move session is always on (S3)
             ).also { lastKanaKanjiQueryRequest = it }
         )
-        if (BuildConfig.DEBUG) {
-            session.performanceSnapshot()?.let { snapshot ->
-                Timber.d(
-                    "conversionStages inputLength=%d graph=%.2fms penalty=%.2fms forward=%.2fms backward=%.2fms graphReused=%s forwardReused=%s",
-                    input.length,
-                    snapshot.graphNs / 1_000_000.0,
-                    snapshot.penaltyNs / 1_000_000.0,
-                    snapshot.forwardDpNs / 1_000_000.0,
-                    snapshot.backwardSearchNs / 1_000_000.0,
-                    snapshot.graphAppendReused,
-                    snapshot.forwardDpReused,
-                )
-            }
-        }
         // Attach the path before merging other sources, which can have the same display
         // text but a different reading. Each async result retains its own correspondence.
         return if (shouldCollectCandidateRubySegments()) {

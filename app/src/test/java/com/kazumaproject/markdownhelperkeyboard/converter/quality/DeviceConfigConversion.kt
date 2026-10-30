@@ -56,7 +56,6 @@ internal class DeviceConfigConversion(
         userDictionaryRepository = userDict, learnRepository = learnRepository,
         typoCorrectionOffsetScore = 3000, omissionSearchOffsetScore = 1900,
         beamWidth = 20,
-        incrementalSessionState = null,
         predictionConfig = PredictionConfig().copy(japanesePredictionEnabled = false, englishPredictionEnabled = false),
         candidateSegmentCollector = segs,
     )

@@ -107,65 +107,6 @@ internal fun createJapaneseNumberValueBasedCandidates(
 
 class KanaKanjiEngine {
 
-    data class IncrementalPerformanceSnapshot(
-        val graphNs: Long,
-        val penaltyNs: Long,
-        val forwardDpNs: Long,
-        val backwardSearchNs: Long,
-        val queueElementCount: Int,
-        val stateRejectionCount: Int,
-        val expansionCacheHitCount: Int,
-        val expansionCacheMissCount: Int,
-        val graphAppendReused: Boolean,
-        val forwardDpReused: Boolean,
-    )
-
-    class IncrementalSessionState internal constructor(
-        internal val graphState: GraphBuilder.SessionState,
-        internal val pathState: FindPath.SessionState,
-    ) {
-        internal fun beginQueryTransaction() {
-            graphState.beginQueryTransaction()
-            pathState.beginQueryTransaction()
-        }
-
-        internal fun commitQueryTransaction() {
-            graphState.commitQueryTransaction()
-            pathState.commitQueryTransaction()
-        }
-
-        internal fun rollbackQueryTransaction() {
-            graphState.rollbackQueryTransaction()
-            pathState.rollbackQueryTransaction()
-        }
-
-        internal fun reset() {
-            graphState.reset()
-            pathState.reset()
-        }
-
-        internal fun enablePerformanceProbe() {
-            graphState.performanceProbeEnabled = true
-            pathState.performanceProbeEnabled = true
-        }
-
-        internal fun performanceSnapshot(): IncrementalPerformanceSnapshot =
-            IncrementalPerformanceSnapshot(
-                graphNs = graphState.lastConstructGraphNs,
-                penaltyNs = pathState.lastPenaltyNs,
-                forwardDpNs = pathState.lastForwardDpNs,
-                backwardSearchNs = pathState.lastBackwardSearchNs,
-                queueElementCount = pathState.lastQueueElementCount,
-                stateRejectionCount = pathState.lastStateRejectionCount,
-                expansionCacheHitCount = pathState.lastExpansionCacheHitCount,
-                expansionCacheMissCount = pathState.lastExpansionCacheMissCount,
-                graphAppendReused = graphState.lastAppendReused,
-                forwardDpReused = pathState.lastForwardDpReused,
-            )
-
-        internal fun committedInput(): String? = graphState.committedInput()
-    }
-
     private lateinit var graphBuilder: GraphBuilder
     private lateinit var findPath: FindPath
     private var dictionaryBinaryReader: DictionaryBinaryReader? = null
@@ -174,11 +115,6 @@ class KanaKanjiEngine {
     private var initialOptionalDictionaryStateLoaded: Boolean = false
 
     private lateinit var connectionMatrix: ConnectionMatrix.CostTable
-
-    fun createIncrementalSessionState(): IncrementalSessionState = IncrementalSessionState(
-        graphState = graphBuilder.createSessionState(),
-        pathState = findPath.createSessionState(),
-    )
 
     private lateinit var systemYomiTrie: LOUDSWithTermId
     private lateinit var systemTangoTrie: LOUDS
@@ -1012,7 +948,6 @@ class KanaKanjiEngine {
         typoCorrectionOffsetScore: Int,
         omissionSearchOffsetScore: Int,
         beamWidth: Int = 20,
-        incrementalSessionState: IncrementalSessionState? = null,
         predictionConfig: PredictionConfig = PredictionConfig(),
         candidateSegmentCollector: MutableMap<String, List<CandidateConversionSegment>>? = null,
     ): BunsetsuCandidateResult {
@@ -1064,7 +999,6 @@ class KanaKanjiEngine {
             graphNodeDedupMode = graphNodeDedupModeForCurrentDictionary(),
             mozcNodeAttributeTable = mozcNodeAttributeTableForCurrentDictionary(),
             beamWidth = beamWidth,
-            sessionState = incrementalSessionState?.graphState,
         )
 
         val resultNBestFinalDeferred: BunsetsuCandidateResult = if (graph.isEmpty()) {
@@ -1087,7 +1021,6 @@ class KanaKanjiEngine {
                 n = n,
                 beamWidth = beamWidth,
                 cancellationCheck = { conversionContext.ensureActive() },
-                sessionState = incrementalSessionState?.pathState,
                 candidateSegmentCollector = candidateSegmentCollector,
             )
         }
@@ -1496,7 +1429,6 @@ class KanaKanjiEngine {
         typoCorrectionOffsetScore: Int,
         omissionSearchOffsetScore: Int,
         beamWidth: Int = 20,
-        incrementalSessionState: IncrementalSessionState? = null,
         predictionConfig: PredictionConfig = PredictionConfig(),
         candidateSegmentCollector: MutableMap<String, List<CandidateConversionSegment>>? = null,
         /**
@@ -1554,7 +1486,6 @@ class KanaKanjiEngine {
             graphNodeDedupMode = graphNodeDedupModeForCurrentDictionary(),
             mozcNodeAttributeTable = mozcNodeAttributeTableForCurrentDictionary(),
             beamWidth = beamWidth,
-            sessionState = incrementalSessionState?.graphState,
         )
 
         val resultNBestFinalDeferred: BunsetsuCandidateResult = if (graph.isEmpty()) {
@@ -1584,7 +1515,6 @@ class KanaKanjiEngine {
                 n = n,
                 beamWidth = beamWidth,
                 cancellationCheck = { conversionContext.ensureActive() },
-                sessionState = incrementalSessionState?.pathState,
                 candidateSegmentCollector = candidateSegmentCollector,
             ).also { nBest ->
                 if (unprunedGraph != null && splitReconversionConfig != null && splitReconversionCollector != null) {
@@ -1991,7 +1921,6 @@ class KanaKanjiEngine {
         typoCorrectionOffsetScore: Int,
         omissionSearchOffsetScore: Int,
         beamWidth: Int = 20,
-        incrementalSessionState: IncrementalSessionState? = null,
         predictionConfig: PredictionConfig = PredictionConfig(),
         candidateSegmentCollector: MutableMap<String, List<CandidateConversionSegment>>? = null,
     ): BunsetsuCandidateResult {
@@ -2042,7 +1971,6 @@ class KanaKanjiEngine {
             graphNodeDedupMode = graphNodeDedupModeForCurrentDictionary(),
             mozcNodeAttributeTable = mozcNodeAttributeTableForCurrentDictionary(),
             beamWidth = beamWidth,
-            sessionState = incrementalSessionState?.graphState,
         )
 
         val resultNBestFinalDeferred: BunsetsuCandidateResult = if (graph.isEmpty()) {
@@ -2065,7 +1993,6 @@ class KanaKanjiEngine {
                 n = n,
                 beamWidth = beamWidth,
                 cancellationCheck = { conversionContext.ensureActive() },
-                sessionState = incrementalSessionState?.pathState,
                 candidateSegmentCollector = candidateSegmentCollector,
             )
         }

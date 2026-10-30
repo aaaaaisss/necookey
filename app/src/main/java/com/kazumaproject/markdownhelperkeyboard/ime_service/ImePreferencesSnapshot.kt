@@ -8,7 +8,6 @@ import com.kazumaproject.markdownhelperkeyboard.ime_service.state.KeyboardType
 import com.kazumaproject.markdownhelperkeyboard.dictionary_override.DictionaryCategory
 import com.kazumaproject.markdownhelperkeyboard.dictionary_override.DictionaryCategoryLoadState
 import com.kazumaproject.markdownhelperkeyboard.dictionary_override.DictionarySourceResolver
-import com.kazumaproject.markdownhelperkeyboard.converter.session.ConversionBackend
 import com.kazumaproject.markdownhelperkeyboard.converter.engine.PredictionAggressiveness
 import com.kazumaproject.markdownhelperkeyboard.converter.engine.PredictionConfig
 import com.kazumaproject.markdownhelperkeyboard.setting_activity.AppPreference
@@ -68,7 +67,6 @@ data class ImePreferencesSnapshot(
     val liveConversionCandidateYomiMode: String,
     val nBest: Int,
     val conversionBeamWidth: Int,
-    val conversionBackend: ConversionBackend,
     val predictionConfig: PredictionConfig,
     val flickSensitivityPreferenceValue: Int,
     val flickThresholdShapePreferenceValue: String,
@@ -264,14 +262,6 @@ data class ImePreferencesSnapshot(
                     appPreference.live_conversion_candidate_yomi_preference ?: false,
                 nBest = appPreference.n_best_preference ?: 4,
                 conversionBeamWidth = appPreference.conversion_beam_width_preference,
-                conversionBackend = if (
-                    appPreference.incremental_conversion_session_preference ||
-                    appPreference.live_conversion_preference == true
-                ) {
-                    ConversionBackend.INCREMENTAL_SESSION
-                } else {
-                    ConversionBackend.LEGACY
-                },
                 predictionConfig = PredictionConfig(
                     japanesePredictionEnabled =
                         appPreference.japanese_prediction_enable_preference,

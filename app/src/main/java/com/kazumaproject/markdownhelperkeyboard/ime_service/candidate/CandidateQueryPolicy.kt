@@ -1,7 +1,6 @@
 package com.kazumaproject.markdownhelperkeyboard.ime_service.candidate
 
 import com.kazumaproject.markdownhelperkeyboard.converter.session.CandidateQueryMode
-import com.kazumaproject.markdownhelperkeyboard.converter.session.ConversionBackend
 import com.kazumaproject.markdownhelperkeyboard.ime_service.state.CandidateTab
 
 object CandidateQueryModeResolver {
@@ -25,7 +24,6 @@ data class CandidateRequestToken internal constructor(
     val revision: Long,
     val input: String,
     val mode: CandidateQueryMode,
-    val backend: ConversionBackend,
     val editorMutationRevision: Long = 0L,
 )
 
@@ -36,7 +34,7 @@ class CandidateRequestTracker {
     private var current: CandidateRequestToken? = null
 
     @Synchronized
-    fun restart(backend: ConversionBackend, editorMutationRevision: Long = 0L) {
+    fun restart(editorMutationRevision: Long = 0L) {
         sessionId += 1
         revision = 0
         current = CandidateRequestToken(
@@ -44,7 +42,6 @@ class CandidateRequestTracker {
             revision = revision,
             input = "",
             mode = CandidateQueryMode.NO_TAB_DEFAULT,
-            backend = backend,
             editorMutationRevision = editorMutationRevision,
         )
     }
@@ -53,7 +50,6 @@ class CandidateRequestTracker {
     fun begin(
         input: String,
         mode: CandidateQueryMode,
-        backend: ConversionBackend,
         editorMutationRevision: Long = 0L,
     ): CandidateRequestToken {
         revision += 1
@@ -62,7 +58,6 @@ class CandidateRequestTracker {
             revision = revision,
             input = input,
             mode = mode,
-            backend = backend,
             editorMutationRevision = editorMutationRevision,
         ).also { current = it }
     }
