@@ -1,4 +1,20 @@
-# 設定画面の棚卸し（2026-10-30、コードを読んだだけ・設定はまだ変えていない）
+# 設定画面の棚卸し（2026-10-30。下の「2026-10-30 実施した整理」で一部を削除・移動済み）
+
+## 2026-10-30 実施した整理（ユーザー判断にもとづく）
+| 対象 | 実施内容 |
+|---|---|
+| `incremental_conversion_session_preference`「セッション型変換エンジン」 | 設定と **INCREMENTAL_SESSION の経路ごと削除**（常に従来経路 = 評価の基準と同じ）。`ConversionBackend`・`CandidateRequestToken.backend`・`KanaKanjiEngine.IncrementalSessionState`/`createIncrementalSessionState`/性能プローブ・`GraphBuilder.SessionState`/`FindPath.SessionState` と `sessionState` 分岐（セッション用の差分探索・ペナルティ／展開キャッシュ経路）・IMEService の DEBUG 計測フックを削除。エンジン内の「1 文字追記キャッシュ」（従来経路の `cachedGraph` / `forwardDpCache`）は残る。インクリメンタル専用テストは削除、`DialectIncrementalParityTest` は従来の追記キャッシュの確認に置き換え |
+| タイピングミス補正（`enable_typo_correction_japanese_flick_keyboard_preference`＋しきい値）・修飾キー省略入力（`omission_search_preference`＋しきい値） | **機能ごと削除**（GraphBuilder の誤り補正・省略検索ノード、LOUDSWithTermId の省略／誤り補正検索、EnglishEngine の英語タイプミス候補、エンジン・`KanaKanjiQueryRequest` の引数）。どちらも既定オフ（タイピングミス補正は IMEService で常に false だった）なのでオフ時の変換は同じ |
+| `conversion_key_swipe_cursor_move_preference`「スペース長押しでカーソル移動」 | スイッチを削除。スペース長押しのカーソル移動は常時のまま。入力中の変換キー長押しは「文節パターン切り替え → できなければ `handleSpaceLongActionSumire`（カタカナ切り替え等）」に固定（スイッチ既定オフの動作。オン時の「入力中でもカーソル移動」は無くなった） |
+| 試し入力欄 `try_input` | 設定ホームから削除 |
+| `preserve_dictionary_word_whitespace_preference` | 「辞書と学習」から**ユーザー辞書画面のメニュー（チェック項目）**へ移動（key は同じ） |
+| 説明 | `keyboard_screen_preference`（タイトル「位置とサイズ（縦画面）」・横画面は変えられない・チップ方式の候補欄は常に画面幅）、`keyboard_key_letter_size_fragment_preference`（キーの文字にも触れる）、`henkan_delete_key_action_preference`（オン／オフの summary を書き直し。※ もともと summaryOn/Off はあった） |
+| 位置とサイズ画面の「TenKey」ボタン | 削除（1 ページしかないプレビューの 0 ページへ移るだけだった） |
+| N-Best・列数・読みを戻す | **残した**（コード上まだ効く）: `n_best_preference` は予測候補数と変換の n（`max(nBest, conversionNBest)`）に効く。`candidate_column_preference` は `setMainSuggestionColumn`（候補の RecyclerView の列数）が読む。`reconversion_preference` は未入力時の候補欄のクイック操作「読みを戻す」（`shouldShowReconversionButton` → `CandidateStripContentResolver`）。チップ方式での見え方は要実機確認 |
+| 設定のインポート | 機能ごと削除した key（`AppPreference.REMOVED_PREFERENCE_KEYS`）は古いバックアップに入っていても読み飛ばす（その他の未知の key は従来どおり保存されるだけで使われない） |
+| フリーズ記録（新規） | 下の「フリーズ調査」の続き。メインスレッドの見張り（`diagnostics/FreezeWatchdog`）と「その他 → アプリについて → フリーズ記録」（表示・コピー・消去） |
+
+以下の表は棚卸し時点（整理前）の内容。削除・移動した項目には「→ 削除済み」等を付けた。
 
 対象: 設定ホーム（`SettingMainFragment`）→ カテゴリ画面（`MainPreferenceFragment` = `res/xml/pref_main.xml` の `screen_*`）と、
 そこから開く「位置とサイズ」画面（`KeyboardSettingFragment`）。カスタムキーボード編集・辞書画面などの個別画面の中身は対象外。
@@ -10,7 +26,7 @@
 | 項目 | 内容 | 判定 |
 |---|---|---|
 | キーボードの状態カード | 有効化／選択の確認とシステム設定・入力方法の選択への導線（`isImeEnabled` / `isImeSelected`、onResume・フォーカス復帰で更新） | 使用中 |
-| 試し入力欄（TextInputEditText `try_input`） | 設定画面の中で入力を試す | 使用中（※ 下の「フリーズ調査」: IME が同じプロセスなので、ここにフォーカスが入ると IME の起動処理が設定画面と同じメインスレッドで走る） |
+| 試し入力欄（TextInputEditText `try_input`） | 設定画面の中で入力を試す | **→ 削除済み**。使用中（※ 下の「フリーズ調査」: IME が同じプロセスなので、ここにフォーカスが入ると IME の起動処理が設定画面と同じメインスレッドで走る） |
 | カテゴリタイル 4 つ | キーボード / 変換 / 辞書と学習 / その他 | 使用中 |
 
 ## キーボード（`screen_keyboard`）
@@ -28,7 +44,7 @@
 | `flick_sensitivity_preference` | フリック入力の感度 | フリック判定距離（`syncRuntimeInputPreferences`） | 使用中 |
 | `undo_enable_preference` | 元に戻す機能 | 確定の取り消し。summary が「元に戻す機能を無効にする」固定で、コードが on/off で summary を差し替える | 使用中 |
 | `space_key_preference` | 半角スペースの利用 | 常に半角スペース（`space_hankaku_preference`） | 使用中 |
-| `conversion_key_swipe_cursor_move_preference` | スペース長押しでカーソル移動 | 09b3320 で「入力中のスペース長押し＝見えている表記で確定してカーソル移動」が常時になったため、**今はスペース長押しには効かない**。効くのは変換キー（`KeyAction.Convert`）の長押しで文節パターン切り替えができなかったとき・カスタム配列の変換キーだけ（IMEService 5970 / 6242 付近） | **要見直し**（タイトルが実際と違う。「変換キー長押しでカーソル移動」に改名するか削除） |
+| `conversion_key_swipe_cursor_move_preference` | スペース長押しでカーソル移動（**→ 削除済み**） | 09b3320 で「入力中のスペース長押し＝見えている表記で確定してカーソル移動」が常時になったため、**今はスペース長押しには効かない**。効くのは変換キー（`KeyAction.Convert`）の長押しで文節パターン切り替えができなかったとき・カスタム配列の変換キーだけ（IMEService 5970 / 6242 付近） | **要見直し**（タイトルが実際と違う。「変換キー長押しでカーソル移動」に改名するか削除） |
 | `delete_key_flick_left_preference` | 削除キーの左フリック | 記号までまとめて削除 | 使用中 |
 | `delete_key_flick_left_targets_preference` | 削除対象の記号 | 記号の一覧画面へ | 使用中 |
 
@@ -67,9 +83,9 @@
 | `reconversion_preference` | 読みを戻す | 候補が空のとき「読みを戻す」ボタンを出し、直前に確定した読みを PreEdit に戻す（IMEService 11810 付近） | 使用中・要見直し（チップ方式の候補欄に「読みを戻す」ボタンが出る場面があるか要実機確認。確定直後の後退での学習取り消しとは別機能） |
 | `conversion_candidates_romaji_enable_preference` | ローマ字変換候補を表示 | QWERTY 削除後、ローマ字入力はカスタム配列のローマ字モードだけ | 使用中（ローマ字配列を使わない人には不要） |
 | `english_reading_dictionary_enable_preference` | 英語読み辞書 | 「かー」→「car」。AppPreference ではなく `DictionaryOverrideStore.isOptionalBundledEnabled` が直接読む | 使用中 |
-| `incremental_conversion_session_preference` | セッション型変換エンジン | `live_conversion_preference` が常に false（S3 で設定削除）なので、変換バックエンドはこのスイッチだけで決まる | 使用中・**要見直し**（開発者向け。既定 false のままでよければ隠す候補） |
+| `incremental_conversion_session_preference` | セッション型変換エンジン（**→ 経路ごと削除済み**） | `live_conversion_preference` が常に false（S3 で設定削除）なので、変換バックエンドはこのスイッチだけで決まる | 使用中・**要見直し**（開発者向け。既定 false のままでよければ隠す候補） |
 
-### タイピングミス補正
+### タイピングミス補正（**→ 4 項目とも機能ごと削除済み**）
 | key | タイトル | 内容 | 判定 |
 |---|---|---|---|
 | `enable_typo_correction_japanese_flick_keyboard_preference` | フリック（日本語） | | 使用中 |
@@ -93,7 +109,7 @@
 | `user_dictionary_preference` | ユーザー辞書 | | 使用中 |
 | `user_dictionary_prefix_match_number` | 予測変換（ユーザー辞書） | key だけ `_preference` が付かない | 使用中 |
 | `user_dictionary_prediction_candidate_limit_preference` | 予測候補数（ユーザー辞書） | | 使用中 |
-| `preserve_dictionary_word_whitespace_preference` | 単語の前後の空白を保持する | ユーザー辞書の登録画面だけが読む | 使用中（**要見直し**: ユーザー辞書画面の中に置く方が自然） |
+| `preserve_dictionary_word_whitespace_preference` | 単語の前後の空白を保持する（**→ ユーザー辞書画面のメニューへ移動済み**） | ユーザー辞書の登録画面だけが読む | 使用中（**要見直し**: ユーザー辞書画面の中に置く方が自然） |
 
 ## その他（`screen_other`）
 | key | タイトル | 内容 | 判定 |
@@ -163,3 +179,16 @@ AppPreference の未使用プロパティの掃除は別作業。
 `AppPreference`（object のシングルトン）をプロセス間で共有している前提が崩れるので大きな作業。次の一手は、固まったときのメインスレッドのスタックを取ること:
 `adb shell kill -3 <pid>` か `adb bugreport`（ANR になれば `/data/anr/` に出る）、または debug ビルドで StrictMode（`detectDiskReads` / `penaltyLog`）を
 `Application.onCreate` に入れて、IME の起動処理と設定画面のどちらが止めているかを確かめる。
+
+## フリーズ記録（2026-10-30 追加）
+- **仕組み**: `Application.onCreate` で `FreezeWatchdog.start` → 優先度最低のデーモンスレッドが 2 秒ごとにメインの Looper へ tick を投げ、
+  2 秒以内に処理されなければ「メインスレッドのスタック（最大 60 行）・他スレッドの状態（BLOCKED/RUNNABLE は先頭 6 行）・時刻・アプリのバージョン・
+  そのとき生きていた画面（IME 表示中／常駐、前面のアクティビティ名）」を `files/freeze_log.txt` に追記。解除されたら止まっていた時間を 1 行足す（120 秒で打ち切り）。
+- **軽さ**: 見張るのは「IME のキーボード表示中（onStartInputView〜onFinishInputView）」「アクティビティが前面（onResume〜onPause）」「IME の onCreate から 10 秒」だけ。
+  それ以外は wait で眠る。メインスレッドでは tick の代入と状態フラグの更新だけ。ファイル I/O は別スレッド（FreezeLogWriter）。デバッガ接続中は記録しない。debug / release とも有効。
+- **ファイル**: 上限 200KB。超えたら最後の 30 件・100KB 以下まで古い記録から捨てる（`FreezeLogFile.trim`、`FreezeLogFileTest`）。
+- **AppPreference の初期化待ち**: メインスレッドが `initialization.join()` で 300ms 以上待ったら、待った時間と呼び出し元のスタックを「メモ」として同じ記録に残す。
+- **見方**: 設定 → その他 → アプリについて → **フリーズ記録**。コピー（クリップボードへ）／消去／閉じる。記録が無いときは「記録はありません」。
+- **未修正のまま（調査結果）**: `AppPreference.preferences` の `join()` はメインから呼ばれうる（IMEService.onCreate の設定読み込み）。IME の起動処理を非同期化しないと
+  安全に外せないので今回は記録だけ。`Application.onCreate` の `runBlocking(Dispatchers.IO)`（既定配列の初回シード）は初回起動だけで、
+  「IME が既定配列より先に起動しない」ための意図的な待ちなので変更なし。記録が集まったら、メインのスタックで IME の起動処理か設定画面かを切り分ける。
