@@ -117,4 +117,82 @@ class ChipStripLayoutTest {
         assertEquals(600f, speed(400f))
         assertEquals(0f, ChipStripLayout.edgeAutoScrollSpeed(50f, 0f, 50f, 30f, 600f)) // 狭すぎる
     }
+
+    // ---- 長押しの切るカーソル（磁石つき） ----
+
+    /** 1 字 20px、境目 k の x = 20k（とうきょうと = 6 字）。 */
+    private val xs6 = (0..6).map { it * 20f }
+
+    @Test
+    fun snapCutGapPicksNearestCharBoundaryWithoutWordGaps() {
+        fun gap(x: Float) = ChipStripLayout.snapCutGap(xs6, emptySet(), x, snapBonus = 12f)
+        assertEquals(1, gap(22f))
+        assertEquals(3, gap(55f))
+        assertEquals(5, gap(95f))
+        // 両端（とその外）は切らない = null（離すと取り消し）
+        assertEquals(null, gap(3f))
+        assertEquals(null, gap(-40f))
+        assertEquals(null, gap(118f))
+        assertEquals(null, gap(300f))
+    }
+
+    @Test
+    fun snapCutGapPullsTowardWordBoundaryWithinAboutOneChar() {
+        // 語の境目 = 5（とうきょう｜と）。吸い付き 12px（字幅 20 の 0.6）
+        val words = setOf(5)
+        fun gap(x: Float) = ChipStripLayout.snapCutGap(xs6, words, x, snapBonus = 12f)
+        assertEquals(5, gap(100f))
+        assertEquals(5, gap(85f)) // 4 との中間 (90) より 4 寄りでも、吸い付き圏内（境目まで 15 − 12 = 3 < 5）なら 5
+        assertEquals(5, gap(115f)) // 右端寄りでも 5（端より境目が強い）
+        // それでも隣の文字の境目 4 には止まれる（真上なら 0 < 20 − 12）
+        assertEquals(4, gap(80f))
+        assertEquals(4, gap(77f))
+        assertEquals(3, gap(60f))
+    }
+
+    @Test
+    fun snapCutGapKeepsEveryBoundaryReachableEvenWithHugeBonus() {
+        // 語の境目が並んでいても、ボーナスは隣との間隔の 3/4 までなので全部の境目に止まれる
+        val words = setOf(1, 2, 4, 5)
+        for (k in 1..5) {
+            assertEquals(k, ChipStripLayout.snapCutGap(xs6, words, k * 20f, snapBonus = 1000f))
+        }
+        // 1 字のチップ（境目なし）は常に null
+        assertEquals(null, ChipStripLayout.snapCutGap(listOf(0f, 20f), emptySet(), 10f, 12f))
+    }
+
+    @Test
+    fun snapCutGapHandlesUnevenLetterWidths() {
+        // 文字幅がばらばら: 境目 x = 0, 10, 40, 50
+        val xs = listOf(0f, 10f, 40f, 50f)
+        assertEquals(2, ChipStripLayout.snapCutGap(xs, setOf(2), 28f, snapBonus = 12f))
+        assertEquals(1, ChipStripLayout.snapCutGap(xs, setOf(2), 12f, snapBonus = 12f))
+        // 語の境目 2 の隣の間隔は 10 → ボーナスは 7.5 まで。x = 46 なら端 (50) と 2 (40) で 2 が勝つ（6 − 7.5 < 4）
+        assertEquals(2, ChipStripLayout.snapCutGap(xs, setOf(2), 46f, snapBonus = 12f))
+        assertEquals(null, ChipStripLayout.snapCutGap(xs, setOf(2), 49f, snapBonus = 12f))
+    }
+
+    @Test
+    fun wordGapIndicesAndGapOffsetMapBetweenLettersAndReading() {
+        val letters = listOf("と", "う", "き", "ょ", "う", "と")
+        assertEquals(setOf(5), ChipStripLayout.wordGapIndices(letters, listOf(5)))
+        assertEquals(emptySet<Int>(), ChipStripLayout.wordGapIndices(letters, emptyList()))
+        assertEquals(5, ChipStripLayout.gapOffset(letters, 5))
+        // サロゲートペア（𠮷 = 2 UTF-16）: 読みの位置 2 は文字の境目 1
+        val sp = ChipStripLayout.codePoints("𠮷やの")
+        assertEquals(listOf("𠮷", "や", "の"), sp)
+        assertEquals(setOf(1, 2), ChipStripLayout.wordGapIndices(sp, listOf(2, 3)))
+        assertEquals(3, ChipStripLayout.gapOffset(sp, 2))
+    }
+
+    @Test
+    fun cutPreviewShowsReadingWithMark() {
+        val letters = ChipStripLayout.codePoints("とうきょうと")
+        assertEquals("とうきょう｜と", ChipStripLayout.cutPreview(letters, 5))
+        assertEquals("とうきょうと", ChipStripLayout.cutPreview(letters, null))
+        assertEquals("とうきょうと", ChipStripLayout.cutPreview(letters, 0)) // 端 = 切らない
+        val long = ChipStripLayout.codePoints("あいうえおかきくけこさしすせそ")
+        assertEquals("…うえおかきく｜けこさしすせ…", ChipStripLayout.cutPreview(long, 8))
+        assertEquals("あいうえおかきくけこさし…", ChipStripLayout.cutPreview(long, null))
+    }
 }

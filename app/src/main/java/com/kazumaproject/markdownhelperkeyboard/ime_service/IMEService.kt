@@ -13854,9 +13854,12 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
 
     private val chipStripListener = object : ChipStripView.Listener {
         override fun onChipTap(index: Int) = runChipBarOp { m, s -> m.tap(s, index) }
+        // 長押し = 展開 → 指を滑らせて切るカーソル → 離して切る（取り消しなら閉じる）。docs/CHIP_BAR.md「長押しの切るカーソル」
+        override fun onLongPressExpand(index: Int) = runChipBarOp { m, s -> m.expandForCut(s, index) }
         override fun onLongPressCut(index: Int, offset: Int) = runChipBarOp { m, s ->
             s.chips.getOrNull(index)?.let { chip -> m.cutChip(s, index, chip.start + offset) }
         }
+        override fun onCutCancel(index: Int) = runChipBarOp { m, s -> m.collapse(s) }
         override fun onBoundaryDrag(index: Int, delta: Int) = runChipBarOp { m, s -> m.shiftBoundary(s, index, delta) }
         override fun onConfirm() = confirmChipBar()
         override fun onJoin(index: Int) = runChipBarOp { m, s -> m.join(s, index) }

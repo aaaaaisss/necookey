@@ -1,12 +1,14 @@
 package com.kazumaproject.markdownhelperkeyboard.ime_service.candidatebar
 
 import com.kazumaproject.markdownhelperkeyboard.converter.candidatebar.ChipStripData
+import kotlin.math.abs
 
 /**
  * 文節チップ列の並べ方と当たり判定（Android なし。文字幅は [measure] で注入）。
  *
  * - チップ = 左右に [chipPadding] を付けた表記。チップの間は [gap]。
- * - 展開中のチップ = かな 1 文字ずつの箱（左右 [letterPadding]）を並べたもの。箱の間（文字の間）をタップで切る。
+ * - 展開中のチップ = かな 1 文字ずつの箱（左右 [letterPadding]）を並べたもの。長押しの切るカーソル（[snapCutGap]）と、
+ *   箱の間（文字の間）のタップで切る。
  * - チップ間のタップでくっつける。隙間は狭いので、当たり領域を隙間の中心から左右 [joinSlop] まで広げる
  *   （ただし隣のチップ幅の 1/4 まで。小さいチップでもタップで選べるように）。
  */
@@ -139,19 +141,77 @@ class ChipStripLayout(
 
     companion object {
         /**
-         * 長押しした表記の文字の境目 [labelIndex]（0..表記の長さ）を、チップの読みの切る位置（1..読みの長さ−1）にする。
-         * 表記が読みと同じ（かなのまま）なら同じ位置、漢字なら表記の中の割合で読みに割り当てる（位置は区切りドラッグで直せる）。
-         * 1 字のチップは切れないので null。
+         * 長押しの切るカーソル（磁石つき）。展開中のチップの文字の境目 k（0..n、n = 文字数）の x 座標 [boundaryX]（n+1 個、
+         * 左から順）と指の [x] から、切る位置（文字の間 1..n−1）を選ぶ。
+         * - 語の境目 [wordGaps]（自立語｜付属語など）は当たり幅が広い: 距離から [snapBonus] を引いて比べる（≒ 1 字以内なら吸い付く）。
+         *   ただし隣の境目との間隔の 3/4 までに抑えるので、語の境目の隣の文字の境目にも必ず止まれる（どの境目にも届く）。
+         * - いちばん近いのがチップの両端（k = 0, n。チップの外に出た指を含む）なら null = 切らない（離すと取り消し）。
          */
-        fun cutOffsetForLabel(label: String, reading: String, labelIndex: Int): Int? {
-            if (reading.length < 2) return null
-            val raw = if (label == reading || label.length == reading.length) labelIndex
-            else if (label.isEmpty()) reading.length / 2
-            else Math.round(labelIndex.toDouble() * reading.length / label.length).toInt()
-            var at = raw.coerceIn(1, reading.length - 1)
-            // サロゲートペアの間は切らない
-            if (Character.isLowSurrogate(reading[at]) && at > 1) at--
-            return at
+        fun snapCutGap(boundaryX: List<Float>, wordGaps: Set<Int>, x: Float, snapBonus: Float): Int? {
+            val n = boundaryX.size - 1
+            if (n < 2) return null
+            var best = -1
+            var bestScore = Float.MAX_VALUE
+            for (k in 0..n) {
+                val d = abs(x - boundaryX[k])
+                val score = if (k in 1 until n && k in wordGaps) {
+                    val spacing = minOf(boundaryX[k] - boundaryX[k - 1], boundaryX[k + 1] - boundaryX[k])
+                    d - minOf(snapBonus, spacing * 0.75f).coerceAtLeast(0f)
+                } else d
+                if (score < bestScore) {
+                    bestScore = score
+                    best = k
+                }
+            }
+            return best.takeIf { it in 1 until n }
+        }
+
+        /** 文字（コードポイント）の並び [letters] で、読みの位置（UTF-16）[wordBoundaries] に当たる文字の境目の番号。 */
+        fun wordGapIndices(letters: List<String>, wordBoundaries: List<Int>): Set<Int> {
+            if (wordBoundaries.isEmpty()) return emptySet()
+            val targets = wordBoundaries.toHashSet()
+            val out = HashSet<Int>()
+            var offset = 0
+            for (k in 1 until letters.size) {
+                offset += letters[k - 1].length
+                if (offset in targets) out += k
+            }
+            return out
+        }
+
+        /** 文字の境目 [gap] の、チップの読みの中の位置（UTF-16）。 */
+        fun gapOffset(letters: List<String>, gap: Int): Int = letters.take(gap.coerceIn(0, letters.size)).sumOf { it.length }
+
+        /**
+         * 切るカーソルのバブルの文字列（例: 「とうきょう｜と」）。[gap] が null（切らない位置）なら読みだけ（区切り記号なし）。
+         * 長い読みはカーソルの左右 [span] 字ずつに縮めて「…」を付ける。
+         */
+        fun cutPreview(letters: List<String>, gap: Int?, span: Int = 6, mark: String = "｜"): String {
+            if (gap == null || gap !in 1 until letters.size) {
+                val all = letters.joinToString("")
+                return if (letters.size <= span * 2) all else letters.take(span * 2).joinToString("") + "…"
+            }
+            val from = (gap - span).coerceAtLeast(0)
+            val to = (gap + span).coerceAtMost(letters.size)
+            return buildString {
+                if (from > 0) append('…')
+                append(letters.subList(from, gap).joinToString(""))
+                append(mark)
+                append(letters.subList(gap, to).joinToString(""))
+                if (to < letters.size) append('…')
+            }
+        }
+
+        /** チップの読みを 1 文字（コードポイント）ずつ（View がモデルを待たずに展開して見せる用。presenter の letters と同じ分け方）。 */
+        fun codePoints(reading: String): List<String> {
+            val out = ArrayList<String>()
+            var i = 0
+            while (i < reading.length) {
+                val next = reading.offsetByCodePoints(i, 1)
+                out += reading.substring(i, next)
+                i = next
+            }
+            return out
         }
 
         /**

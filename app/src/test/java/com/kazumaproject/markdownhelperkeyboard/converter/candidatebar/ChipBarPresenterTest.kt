@@ -49,7 +49,13 @@ class ChipBarPresenterTest {
         val m = ChipBarModel(table)
         val s = m.initial("ではきもの")
         assertEquals(
-            ChipStripData(listOf(ChipStripItem("では", false, reading = "では"), ChipStripItem("着物", false, reading = "きもの"))),
+            ChipStripData(
+                listOf(
+                    // では = で|は（語の境目 1）、着物 = 1 語
+                    ChipStripItem("では", false, reading = "では", wordBoundaries = listOf(1)),
+                    ChipStripItem("着物", false, reading = "きもの"),
+                ),
+            ),
             ChipBarPresenter.strip(s),
         )
         val ex = m.longPress(s, 1)!!
@@ -58,6 +64,30 @@ class ChipBarPresenterTest {
         assertTrue(strip.items[1].selected)
         assertEquals(1, strip.expandedIndex)
         assertEquals(ChipStripData.EMPTY, ChipBarPresenter.strip(null))
+    }
+
+    @Test
+    fun wordBoundariesComeFromPrimaryWordsInsideChip() {
+        val m = ChipBarModel(table)
+        val s = m.initial("ではきもの")
+        assertEquals(listOf(1), ChipBarPresenter.wordBoundaries(s, s.chips[0]))
+        assertEquals(emptyList<Int>(), ChipBarPresenter.wordBoundaries(s, s.chips[1]))
+        // くっつけたチップ（ではきもの）: 1 位経路の語の頭 1・2 が内側の境目（チップの端 0・5 は入らない）
+        val joined = m.join(s, 0)!!
+        assertEquals(listOf(1, 2), ChipBarPresenter.wordBoundaries(joined, joined.chips[0]))
+        assertEquals(listOf(1, 2), ChipBarPresenter.strip(joined).items[0].wordBoundaries)
+    }
+
+    @Test
+    fun expandForCutShowsLettersWithoutChangingSelection() {
+        val m = ChipBarModel(table)
+        val s = m.initial("ではきもの")
+        val ex = m.expandForCut(s, 1)!!
+        val strip = ChipBarPresenter.strip(ex)
+        assertEquals(listOf("き", "も", "の"), strip.items[1].letters)
+        assertEquals(-1, strip.selectedIndex)
+        // 展開したチップの letters は View の自前展開（codePoints）と同じ
+        assertEquals(strip.items[1].letters, com.kazumaproject.markdownhelperkeyboard.ime_service.candidatebar.ChipStripLayout.codePoints("きもの"))
     }
 
     @Test

@@ -305,6 +305,21 @@ class ChipBarModel(
     }
 
     /**
+     * 長押しで切る（View の切るカーソル）の始まり: チップ [index] をかな 1 文字ずつに展開する。選択は変えない
+     * （取り消したとき元に戻るように）。1 字のチップは null。
+     */
+    fun expandForCut(state: ChipBarState, index: Int): ChipBarState? {
+        val chip = state.chips.getOrNull(index) ?: return null
+        if (BunsetsuRangeEditor.nextCodePointBoundary(state.reading, chip.start) >= chip.end) return null
+        if (state.expanded == index) return null
+        return state.copy(expanded = index)
+    }
+
+    /** 展開を閉じる（切るカーソルの取り消し）。展開していなければ null。 */
+    fun collapse(state: ChipBarState): ChipBarState? =
+        if (state.expanded < 0) null else state.copy(expanded = -1)
+
+    /**
      * 長押しで即座に切る: チップ [index] を読みの位置 [at]（読み全体のオフセット、チップの中）で 2 つに切る
      * （展開を経ない 1 手。結果は [cutAt] と同じ）。
      */

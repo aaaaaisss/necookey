@@ -54,6 +54,26 @@ class ChipBarTest {
     }
 
     @Test
+    fun expandForCutKeepsSelectionAndCollapseOrCutCloses() {
+        val m = ChipBarModel(table)
+        val s = m.tap(m.initial("ではきもの"), 0)
+        val ex = m.expandForCut(s, 1)!!
+        assertEquals(1, ex.expanded)
+        assertEquals(0, ex.selected) // 選択は変えない（取り消しで元どおり）
+        assertNull(m.expandForCut(ex, 1)) // もう展開している
+        val back = m.collapse(ex)!!
+        assertEquals(s, back)
+        assertNull(m.collapse(back))
+        // 離して切る: 左の片が選択、展開は閉じる
+        val cut = m.cutChip(ex, 1, 4)!!
+        assertEquals(listOf("では", "肝", "の"), cut.chips.map { it.output })
+        assertEquals(1, cut.selected)
+        assertEquals(-1, cut.expanded)
+        // 1 字のチップは展開しない
+        assertNull(m.expandForCut(cut, 2))
+    }
+
+    @Test
     fun longPressExpandsAndTapBetweenLettersCuts() {
         val t = Table(*table.map.toList().toTypedArray())
         val m = ChipBarModel(t)
