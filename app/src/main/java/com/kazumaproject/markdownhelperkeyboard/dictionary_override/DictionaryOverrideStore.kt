@@ -145,7 +145,7 @@ class DictionaryOverrideStore private constructor(
      */
     fun isOptionalBundledEnabled(category: DictionaryCategory): Boolean =
         if (category == DictionaryCategory.ENGLISH_READING) {
-            defaultPrefs.getBoolean(ENGLISH_READING_ENABLED_PREFERENCE, true)
+            false // 英語読み辞書は 2026-10-30 に設定ごと削除＝常にオフ（保存値は読まない）
         } else {
             category in ALWAYS_ENABLED_OPTIONAL_DICTIONARIES
         }

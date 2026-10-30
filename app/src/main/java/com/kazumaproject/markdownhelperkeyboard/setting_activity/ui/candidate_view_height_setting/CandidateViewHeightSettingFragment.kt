@@ -39,7 +39,6 @@ import com.kazumaproject.markdownhelperkeyboard.setting_activity.AppPreference
 import com.kazumaproject.markdownhelperkeyboard.short_cut.ShortcutType
 import dagger.hilt.android.AndroidEntryPoint
 import timber.log.Timber
-import java.util.Locale
 import javax.inject.Inject
 import kotlin.math.roundToInt
 
@@ -60,15 +59,11 @@ class CandidateViewHeightSettingFragment : Fragment() {
 
     private var isCandidateListVisible = true
     private var isSyncingHeightControls = false
-    private var isSyncingLetterSizeControls = false
-    private var isSyncingColumnControls = false
     private var isSyncingPreviewModeControls = false
     private lateinit var inspectorBehavior: BottomSheetBehavior<MaterialCardView>
 
     private val minHeightDp = 30
     private val maxHeightDp = 300
-    private val minCandidateTextSize = 10f
-    private val maxCandidateTextSize = 40f
     private val defaultCandidateTextSize = 14.0f
 
     private val previewCandidates = createCandidateHeightPreviewCandidates()
@@ -101,16 +96,14 @@ class CandidateViewHeightSettingFragment : Fragment() {
         )
         setupInspectorBottomSheet()
         setupPreviewModeControls()
-        setupColumnControls()
         setupResizeHandle()
         setupHeightSeekBar()
         setupHeightEditText()
-        setupCandidateLetterSizeSeekBar()
-        setupCandidateLetterSizeEditText()
         setupKeyboardPreview()
         setSuggestionView()
 
-        applyCandidateTextSize(appPreference.candidate_letter_size ?: defaultCandidateTextSize, persist = false)
+        // 候補の文字サイズ・列数は固定（2026-10-30 設定削除）
+        suggestionAdapter.setCandidateTextSize(defaultCandidateTextSize)
         updateCandidateListAndHeight()
         applyHeightDp(selectedHeightDp(), persist = false)
         updateInspectorSummary()
@@ -272,25 +265,9 @@ class CandidateViewHeightSettingFragment : Fragment() {
         }
     }
 
-    private fun setupColumnControls() {
-        syncColumnControls()
-        binding.candidateColumnToggleGroup.addOnButtonCheckedListener { _, checkedId, isChecked ->
-            if (!isChecked || isSyncingColumnControls) return@addOnButtonCheckedListener
-            val column = columnForButtonId(checkedId) ?: return@addOnButtonCheckedListener
-            appPreference.setCandidateColumnAndSyncHeight(isLandscape = false, column = column)
-            setSuggestionView()
-            syncColumnControls()
-            applyHeightDp(selectedHeightDp(), persist = false)
-            updateInspectorSummary()
-        }
-    }
-
     private fun resetSettings() {
         appPreference.resetCandidateHeightSettingsToUserDefaults(isLandscape = false)
         appPreference.syncActiveCandidateVisibleHeightToImePreference(isLandscape = false)
-        appPreference.candidate_letter_size = defaultCandidateTextSize
-        applyCandidateTextSize(defaultCandidateTextSize, persist = false)
-        syncColumnControls()
         updateCandidateListAndHeight()
         applyHeightDp(selectedHeightDp(), persist = false)
         updateInspectorSummary()
@@ -498,89 +475,9 @@ class CandidateViewHeightSettingFragment : Fragment() {
         applyHeightDp(value.coerceIn(minHeightDp, maxHeightDp), persist = true)
     }
 
-    private fun setupCandidateLetterSizeSeekBar() {
-        binding.candidateLetterSizeSeekbar.valueFrom = minCandidateTextSize
-        binding.candidateLetterSizeSeekbar.valueTo = maxCandidateTextSize
-        binding.candidateLetterSizeSeekbar.stepSize = 0.1f
-        binding.candidateLetterSizeSeekbar.value =
-            (appPreference.candidate_letter_size ?: defaultCandidateTextSize)
-                .coerceIn(minCandidateTextSize, maxCandidateTextSize)
-        binding.candidateLetterSizeSeekbar.addOnChangeListener { _, value, fromUser ->
-            if (!fromUser || isSyncingLetterSizeControls) return@addOnChangeListener
-            applyCandidateTextSize(value, persist = false)
-        }
-        binding.candidateLetterSizeSeekbar.addOnSliderTouchListener(
-            object : Slider.OnSliderTouchListener {
-                override fun onStartTrackingTouch(slider: Slider) = Unit
-
-                override fun onStopTrackingTouch(slider: Slider) {
-                    applyCandidateTextSize(slider.value, persist = true)
-                }
-            }
-        )
-    }
-
-    private fun setupCandidateLetterSizeEditText() {
-        binding.candidateLetterSizeEditText.setOnEditorActionListener { _, _, _ ->
-            applyCandidateLetterSizeFromEditText()
-            false
-        }
-        binding.candidateLetterSizeEditText.setOnFocusChangeListener { _, hasFocus ->
-            if (!hasFocus) {
-                applyCandidateLetterSizeFromEditText()
-            }
-        }
-    }
-
-    private fun applyCandidateLetterSizeFromEditText() {
-        if (isSyncingLetterSizeControls) return
-        val value = binding.candidateLetterSizeEditText.text?.toString()?.trim()?.toFloatOrNull()
-        if (value == null) {
-            binding.candidateLetterSizeInputLayout.error =
-                getString(R.string.candidate_letter_size_invalid_value)
-            return
-        }
-        applyCandidateTextSize(value.coerceIn(minCandidateTextSize, maxCandidateTextSize), persist = true)
-    }
-
-    private fun applyCandidateTextSize(size: Float, persist: Boolean) {
-        val clamped = ((size.coerceIn(minCandidateTextSize, maxCandidateTextSize) * 10).roundToInt() / 10f)
-        suggestionAdapter.setCandidateTextSize(clamped)
-        if (persist) {
-            appPreference.candidate_letter_size = clamped
-        }
-        syncCandidateLetterSizeControls(clamped)
-        updateInspectorSummary(textSize = clamped)
-    }
-
-    private fun syncCandidateLetterSizeControls(size: Float) {
-        if (isSyncingLetterSizeControls) return
-        isSyncingLetterSizeControls = true
-        try {
-            val clamped = size.coerceIn(minCandidateTextSize, maxCandidateTextSize)
-            binding.candidateLetterSizeSeekbar.value = clamped
-            val text = String.format(Locale.US, "%.1f", clamped)
-            if (binding.candidateLetterSizeEditText.text?.toString() != text) {
-                binding.candidateLetterSizeEditText.setText(text)
-                binding.candidateLetterSizeEditText.setSelection(text.length)
-            }
-            binding.candidateLetterSizeInputLayout.error = null
-            binding.candidateLetterSizeValueText.text = getString(
-                R.string.candidate_letter_size_current_value,
-                clamped
-            )
-        } finally {
-            isSyncingLetterSizeControls = false
-        }
-    }
-
     private fun updateInspectorSummary(
         heightDp: Int = selectedHeightDp(),
-        textSize: Float = appPreference.candidate_letter_size ?: defaultCandidateTextSize
     ) {
-        val clampedTextSize = (textSize
-            .coerceIn(minCandidateTextSize, maxCandidateTextSize) * 10)
-            .roundToInt() / 10f
         val previewMode = getString(
             if (isCandidateListVisible) {
                 R.string.candidate_height_preview_candidates
@@ -592,16 +489,11 @@ class CandidateViewHeightSettingFragment : Fragment() {
         binding.inspectorSummaryText.text = getString(
             R.string.candidate_height_sheet_summary_format,
             previewMode,
-            appPreference.getCandidateColumn(isLandscape = false),
             clampedHeight.toString()
         )
         binding.candidateHeightValueText.text = getString(
             R.string.candidate_height_current_value,
             clampedHeight
-        )
-        binding.candidateLetterSizeValueText.text = getString(
-            R.string.candidate_letter_size_current_value,
-            clampedTextSize
         )
     }
 
@@ -670,30 +562,6 @@ class CandidateViewHeightSettingFragment : Fragment() {
         )
         return finalHeightDp
     }
-
-    private fun syncColumnControls() {
-        if (isSyncingColumnControls) return
-        isSyncingColumnControls = true
-        try {
-            binding.candidateColumnToggleGroup.check(
-                when (appPreference.getCandidateColumn(isLandscape = false)) {
-                    "2" -> R.id.candidate_column_two_button
-                    "3" -> R.id.candidate_column_three_button
-                    else -> R.id.candidate_column_one_button
-                }
-            )
-        } finally {
-            isSyncingColumnControls = false
-        }
-    }
-
-    private fun columnForButtonId(id: Int): String? =
-        when (id) {
-            R.id.candidate_column_one_button -> "1"
-            R.id.candidate_column_two_button -> "2"
-            R.id.candidate_column_three_button -> "3"
-            else -> null
-        }
 
     private fun updateCandidateTabPreview() {
         val presentation = resolveCandidateHeightPreviewPresentation()

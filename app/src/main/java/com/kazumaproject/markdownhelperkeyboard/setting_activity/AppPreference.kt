@@ -114,17 +114,10 @@ object AppPreference {
         "symbol_emoji_candidate_enable_preference"
 
     private val CLIPBOARD_HISTORY_ENABLE = Pair("clipboard_history_preference", false)
-    private val FLICK_SENSITIVITY = Pair(FLICK_SENSITIVITY_KEY, 100)
     private val TFBI_DIAGONAL_RECOGNITION_MODE = Pair(
         TFBI_DIAGONAL_RECOGNITION_MODE_KEY,
         TfbiDiagonalRecognitionMode.LEGACY.preferenceValue
     )
-    private val LEARN_DICTIONARY_PREFERENCE = Pair("learn_dictionary_preference", true)
-    private val USER_DICTIONARY_PREFERENCE = Pair("user_dictionary_preference", true)
-    private val USER_DICTIONARY_PREFIX_PREFERENCE = Pair("user_dictionary_prefix_match_number", 2)
-    private val SYSTEM_NGRAM_DICTIONARY_ENABLE_PREFERENCE =
-        Pair("system_ngram_dictionary_enable_preference", true)
-    private val N_BEST_PREFERENCE = Pair("n_best_preference", 4)
     private val JAPANESE_PREDICTION_ENABLE_PREFERENCE =
         Pair("japanese_prediction_enable_preference", true)
     private val ENGLISH_PREDICTION_ENABLE_PREFERENCE =
@@ -245,7 +238,6 @@ object AppPreference {
         Pair("candidate_view_empty_height_dp_landscape_preference", 60)
 
     private val UNDO_ENABLE = Pair("undo_enable_preference", false)
-    private val SPACE_HANKAKU_ENABLE = Pair("space_key_preference", false)
     const val CANDIDATE_YOMI_MODE_WHOLE = "whole"
     const val DEFAULT_LIVE_CONVERSION_CANDIDATE_YOMI_SIZE = 14
     const val PRESERVE_DICTIONARY_WORD_WHITESPACE_KEY =
@@ -260,7 +252,6 @@ object AppPreference {
     private val SUMIRE_LAST_INPUT_MODE_SAVED_AT_EPOCH_MILLIS_PREFERENCE =
         Pair("sumire_last_input_mode_saved_at_epoch_millis_preference", 0L)
 
-    private val DELETE_KEY_HIGH_LIGHT = Pair("henkan_delete_key_action_preference", true)
     private val CUSTOM_KEYBOARD_INPUT_IN_EMPTY_AREAS_PREFERENCE =
         Pair(CUSTOM_KEYBOARD_INPUT_IN_EMPTY_AREAS_KEY, false)
     private val LAST_USED_CUSTOM_KEYBOARD_STABLE_ID =
@@ -288,8 +279,6 @@ object AppPreference {
         Pair("candidate_tab_preference", defaultCandidateTabJson)
 
     private val SYMBOL_MODE_PREFERENCE = Pair("symbol_mode_preference", "EMOJI")
-    private val DEFAULT_EMOJI_SKIN_TONE_PREFERENCE =
-        Pair("default_emoji_skin_tone_preference", EmojiSkinToneSupport.DEFAULT_SKIN_TONE)
 
     private val CANDIDATE_COLUMN_PREFERENCE = Pair("candidate_column_preference", "1")
     private val CANDIDATE_COLUMN_LANDSCAPE_PREFERENCE =
@@ -336,7 +325,6 @@ object AppPreference {
     private val CUSTOM_THEME_BORDER_ENABLE = Pair("theme_custom_border_enable", false)
     private val CUSTOM_THEME_BORDER_COLOR = Pair("theme_custom_border_color", Color.BLACK)
 
-    private val DELETE_KEY_LEFT_FLICK_PREFERENCE = Pair("delete_key_flick_left_preference", true)
     private val DEFAULT_CURSOR_MOVE_AFTER_COMMIT_TARGET_PAIRS = listOf(
         "()",
         "[]",
@@ -362,7 +350,6 @@ object AppPreference {
         gson.toJson(DEFAULT_CURSOR_MOVE_AFTER_COMMIT_TARGET_PAIRS)
     )
 
-    private val KEY_LETTER_SIZE = Pair("key_letter_size_preference", 0.0f)
     private val FLICK_KEY_WIDTH_SCALE_PERCENT =
         Pair("flick_key_width_scale_percent_preference", 160)
     private val FLICK_KEY_HEIGHT_SCALE_PERCENT =
@@ -397,7 +384,6 @@ object AppPreference {
             TfbiFlickStartPositionMode.TOUCH_POINT.preferenceValue
         )
 
-    private val CANDIDATE_LETTER_SIZE = Pair("candidate_letter_size_preference", 14.0f)
 
     private val CANDIDATE_VIEW_HEIGHT_DP = Pair("candidate_view_height_dp_preference", 60)
     private val CANDIDATE_VIEW_EMPTY_HEIGHT_DP =
@@ -479,8 +465,6 @@ object AppPreference {
     private val ROMAJI_MAP_DATA_VERSION = Pair("romaji_map_data_version", 0)
 
 
-    private val TABLET_GOJUON_LAYOUT_PREFERENCE =
-        Pair("tablet_use_gojuon_layout_preference", true)
 
     private val LAST_PASTED_CLIPBOARD_TEXT_PREFERENCE =
         Pair("last_pasted_clipboard_text_preference", "")
@@ -494,12 +478,6 @@ object AppPreference {
 
 
     // necookey
-    private val NECOOKEY_TWO_ROW_CANDIDATE_BAR_PREFERENCE =
-        Pair("necookey_two_row_candidate_bar_preference", true)
-    private val NECOOKEY_CHIP_CANDIDATE_BAR_PREFERENCE =
-        Pair("necookey_chip_candidate_bar_preference", true)
-    private val NECOOKEY_ZENZ_BUNSETSU_GATE_PREFERENCE =
-        Pair("necookey_zenz_bunsetsu_gate_preference", true)
 
 
 
@@ -521,23 +499,10 @@ object AppPreference {
     private val CUSTOM_THEME_POST_EDIT_TEXT = Pair("theme_custom_post_edit_text_color", Color.WHITE)
 
 
-    private val CONVERSION_CANDIDATES_ROMAJI_ENABLE_PREFERENCE =
-        Pair("conversion_candidates_romaji_enable_preference", false)
 
-    private val LEARN_FIRST_CANDIDATE_DICTIONARY_PREFERENCE =
-        Pair("learn_first_candidate_dictionary_preference", false)
 
-    private val LEARN_DICTIONARY_ALLOW_MIXED_SYMBOLS_NUMBERS_PREFERENCE =
-        Pair("learn_dictionary_allow_mixed_symbols_numbers_preference", true)
 
-    private val ENABLE_PREDICTION_SEARCH_LEARN_DICTIONARY_PREFERENCE =
-        Pair("enable_prediction_search_learn_dictionary_preference", true)
 
-    private val LEARN_PREDICTION_PREFERENCE = Pair("learn_prediction_preference", 2)
-    private val LEARN_PREDICTION_CANDIDATE_LIMIT_PREFERENCE =
-        Pair("learn_dictionary_prediction_candidate_limit_preference", 4)
-    private val USER_DICTIONARY_PREDICTION_CANDIDATE_LIMIT_PREFERENCE =
-        Pair("user_dictionary_prediction_candidate_limit_preference", 4)
 
 
 
@@ -559,9 +524,7 @@ object AppPreference {
     /** 同音異義 UI の迷い印の判定にリランカーの文節マージン（SumireLmSpanMargin）を使う（既定オフ、設定画面なし）。 */
     private val SUMIRE_LM_HOMOPHONE_MARGIN_PREFERENCE = Pair("sumire_lm_homophone_margin_preference", false)
     /** 案2: 経路探索の辺コストに単語 bigram LM 補正（LatticeLmCost、表はアセット）を足す（既定オン）。 */
-    private val LATTICE_LM_COST_PREFERENCE = Pair("lattice_lm_cost_preference", true)
 
-    private val SAVE_LAST_USED_KEYBOARD = Pair("save_last_used_keyboard", false)
     private val SAVE_LAST_USED_KEYBOARD_POSITION = Pair("save_last_used_keyboard_int", 0)
 
 
@@ -1001,26 +964,8 @@ object AppPreference {
             it.putString(SYMBOL_MODE_PREFERENCE.first, value.name)
         }
 
-    var default_emoji_skin_tone_preference: String
-        get() {
-            val skinTone = preferences.getString(
-                DEFAULT_EMOJI_SKIN_TONE_PREFERENCE.first,
-                DEFAULT_EMOJI_SKIN_TONE_PREFERENCE.second
-            ) ?: DEFAULT_EMOJI_SKIN_TONE_PREFERENCE.second
-            return if (EmojiSkinToneSupport.isSupportedSkinToneValue(skinTone)) {
-                skinTone
-            } else {
-                DEFAULT_EMOJI_SKIN_TONE_PREFERENCE.second
-            }
-        }
-        set(value) = preferences.edit {
-            val skinTone = if (EmojiSkinToneSupport.isSupportedSkinToneValue(value)) {
-                value
-            } else {
-                DEFAULT_EMOJI_SKIN_TONE_PREFERENCE.second
-            }
-            it.putString(DEFAULT_EMOJI_SKIN_TONE_PREFERENCE.first, skinTone)
-        }
+    /** 設定画面から削除（2026-10-30）。保存値は読まず EmojiSkinToneSupport.DEFAULT_SKIN_TONE に固定。 */
+    val default_emoji_skin_tone_preference: String get() = EmojiSkinToneSupport.DEFAULT_SKIN_TONE
 
 
     val ng_word_preference: Boolean get() = true // NG words always applied; edit list in settings (empty list = no effect)
@@ -1028,13 +973,8 @@ object AppPreference {
 
 
 
-    var flick_sensitivity_preference: Int?
-        get() = preferences.getInt(
-            FLICK_SENSITIVITY.first, FLICK_SENSITIVITY.second
-        )
-        set(value) = preferences.edit {
-            it.putInt(FLICK_SENSITIVITY.first, value ?: 100)
-        }
+    /** 設定画面から削除（2026-10-30）。保存値は読まず 100 に固定。 */
+    val flick_sensitivity_preference: Int? get() = 100
 
     val flick_threshold_shape_preference: String get() = "radial" // S3: hardcoded, setting removed
 
@@ -1056,13 +996,8 @@ object AppPreference {
 
     val delete_long_press_conversion_behavior: String get() = "deferred" // hardcoded: vibration/long-press group removed
 
-    var n_best_preference: Int?
-        get() = preferences.getInt(
-            N_BEST_PREFERENCE.first, N_BEST_PREFERENCE.second
-        )
-        set(value) = preferences.edit {
-            it.putInt(N_BEST_PREFERENCE.first, value ?: 4)
-        }
+    /** 設定画面から削除（2026-10-30）。保存値は読まず 4 に固定。 */
+    val n_best_preference: Int? get() = 4
 
     val conversion_beam_width_preference: Int get() = 20 // S3: hardcoded, setting removed
 
@@ -1190,61 +1125,28 @@ object AppPreference {
         }
 
 
-    var learn_dictionary_preference: Boolean?
-        get() = preferences.getBoolean(
-            LEARN_DICTIONARY_PREFERENCE.first, LEARN_DICTIONARY_PREFERENCE.second
-        )
-        set(value) = preferences.edit {
-            it.putBoolean(LEARN_DICTIONARY_PREFERENCE.first, value ?: true)
-        }
+    /** 設定画面から削除（2026-10-30）。保存値は読まず true に固定。 */
+    val learn_dictionary_preference: Boolean? get() = true
 
     val incognito_mode_detection_preference: Boolean get() = true // S3: hardcoded, setting removed
 
     val show_learned_candidates_in_incognito_preference: Boolean get() = true // S3: hardcoded, setting removed
 
-    var user_dictionary_preference: Boolean?
-        get() = preferences.getBoolean(
-            USER_DICTIONARY_PREFERENCE.first, USER_DICTIONARY_PREFERENCE.second
-        )
-        set(value) = preferences.edit {
-            it.putBoolean(USER_DICTIONARY_PREFERENCE.first, value ?: true)
-        }
+    /** 設定画面から削除（2026-10-30）。保存値は読まず true に固定。 */
+    val user_dictionary_preference: Boolean? get() = true
 
-    var user_dictionary_prefix_match_number_preference: Int?
-        get() = preferences.getInt(
-            USER_DICTIONARY_PREFIX_PREFERENCE.first, USER_DICTIONARY_PREFIX_PREFERENCE.second
-        )
-        set(value) = preferences.edit {
-            it.putInt(USER_DICTIONARY_PREFIX_PREFERENCE.first, value ?: 2)
-        }
+    /** 設定画面から削除（2026-10-30）。保存値は読まず 2 に固定。 */
+    val user_dictionary_prefix_match_number_preference: Int? get() = 2
 
-    var user_dictionary_prediction_candidate_limit_preference: Int
-        get() = preferences.getInt(
-            USER_DICTIONARY_PREDICTION_CANDIDATE_LIMIT_PREFERENCE.first,
-            USER_DICTIONARY_PREDICTION_CANDIDATE_LIMIT_PREFERENCE.second,
-        ).coerceIn(1, 8)
-        set(value) = preferences.edit {
-            it.putInt(
-                USER_DICTIONARY_PREDICTION_CANDIDATE_LIMIT_PREFERENCE.first,
-                value.coerceIn(1, 8),
-            )
-        }
+    /** 設定画面から削除（2026-10-30）。保存値は読まず 4 に固定。 */
+    val user_dictionary_prediction_candidate_limit_preference: Int get() = 4
 
-    var system_ngram_dictionary_enable_preference: Boolean
-        get() = preferences.getBoolean(
-            SYSTEM_NGRAM_DICTIONARY_ENABLE_PREFERENCE.first,
-            SYSTEM_NGRAM_DICTIONARY_ENABLE_PREFERENCE.second,
-        )
-        set(value) = preferences.edit {
-            it.putBoolean(SYSTEM_NGRAM_DICTIONARY_ENABLE_PREFERENCE.first, value)
-        }
+    /** 設定画面から削除（2026-10-30）。保存値は読まず true に固定。 */
+    val system_ngram_dictionary_enable_preference: Boolean get() = true
 
 
-    var preserve_dictionary_word_whitespace_preference: Boolean
-        get() = preferences.getBoolean(PRESERVE_DICTIONARY_WORD_WHITESPACE_KEY, false)
-        set(value) = preferences.edit {
-            it.putBoolean(PRESERVE_DICTIONARY_WORD_WHITESPACE_KEY, value)
-        }
+    /** 設定画面から削除（2026-10-30）。保存値は読まず false に固定。 */
+    val preserve_dictionary_word_whitespace_preference: Boolean get() = false
 
     val show_dictionary_candidate_labels_preference: Boolean get() = false // S3: hardcoded, setting removed
 
@@ -1404,11 +1306,8 @@ object AppPreference {
 
 
 
-    var space_hankaku_preference: Boolean?
-        get() = preferences.getBoolean(SPACE_HANKAKU_ENABLE.first, SPACE_HANKAKU_ENABLE.second)
-        set(value) = preferences.edit {
-            it.putBoolean(SPACE_HANKAKU_ENABLE.first, value ?: false)
-        }
+    /** 設定画面から削除（2026-10-30）。保存値は読まず false に固定。 */
+    val space_hankaku_preference: Boolean? get() = false
 
     val live_conversion_preference: Boolean? get() = false // S3: hardcoded, setting removed
 
@@ -1420,11 +1319,8 @@ object AppPreference {
 
     val live_conversion_candidate_yomi_size: Int get() = DEFAULT_LIVE_CONVERSION_CANDIDATE_YOMI_SIZE // S3: hardcoded, setting removed
 
-    var delete_key_high_light_preference: Boolean?
-        get() = preferences.getBoolean(DELETE_KEY_HIGH_LIGHT.first, DELETE_KEY_HIGH_LIGHT.second)
-        set(value) = preferences.edit {
-            it.putBoolean(DELETE_KEY_HIGH_LIGHT.first, value ?: true)
-        }
+    /** 設定画面から削除（2026-10-30）。保存値は読まず true に固定。 */
+    val delete_key_high_light_preference: Boolean? get() = true
 
     val custom_keyboard_suggestion_preference: Boolean? get() = false // 候補欄のキーボード一覧表示は廃止
 
@@ -1510,13 +1406,8 @@ object AppPreference {
             )
         }
 
-    var candidate_column_preference: String
-        get() = preferences.getString(
-            CANDIDATE_COLUMN_PREFERENCE.first, CANDIDATE_COLUMN_PREFERENCE.second
-        ) ?: "1"
-        set(value) = preferences.edit {
-            it.putString(CANDIDATE_COLUMN_PREFERENCE.first, value)
-        }
+    /** 設定画面から削除（2026-10-30）。保存値は読まず "1" に固定。 */
+    val candidate_column_preference: String get() = "1"
 
     val candidate_column_landscape_preference: String get() = "1" // S3: hardcoded, setting removed
 
@@ -1812,11 +1703,8 @@ object AppPreference {
 
     val shortcut_toolbar_integrated_in_suggestion_preference: Boolean get() = false // S3: hardcoded, setting removed
 
-    var stabilize_candidate_strip_height_preference: Boolean
-        get() = preferences.getBoolean(STABILIZE_CANDIDATE_STRIP_HEIGHT_KEY, false)
-        set(value) = preferences.edit {
-            it.putBoolean(STABILIZE_CANDIDATE_STRIP_HEIGHT_KEY, value)
-        }
+    /** 設定画面から削除（2026-10-30）。保存値は読まず false に固定。 */
+    val stabilize_candidate_strip_height_preference: Boolean get() = false
 
     var shortcut_toolbar_height_dp_preference: Int
         get() = preferences.getInt(
@@ -1978,14 +1866,8 @@ object AppPreference {
         return readIntPreference(CUSTOM_THEME_SHORTCUT_ICON_COLOR.first, defaultColor)
     }
 
-    var delete_key_left_flick_preference: Boolean
-        get() = preferences.getBoolean(
-            DELETE_KEY_LEFT_FLICK_PREFERENCE.first,
-            DELETE_KEY_LEFT_FLICK_PREFERENCE.second
-        )
-        set(value) = preferences.edit {
-            it.putBoolean(DELETE_KEY_LEFT_FLICK_PREFERENCE.first, value)
-        }
+    /** 設定画面から削除（2026-10-30）。保存値は読まず true に固定。 */
+    val delete_key_left_flick_preference: Boolean get() = true
 
     val delete_key_up_flick_preference: Boolean get() = false // S3: hardcoded, setting removed
 
@@ -2019,17 +1901,11 @@ object AppPreference {
     fun defaultCursorMoveAfterCommitTargetPairs(): List<String> =
         DEFAULT_CURSOR_MOVE_AFTER_COMMIT_TARGET_PAIRS
 
-    var key_letter_size: Float?
-        get() = preferences.getFloat(KEY_LETTER_SIZE.first, KEY_LETTER_SIZE.second)
-        set(value) = preferences.edit {
-            it.putFloat(KEY_LETTER_SIZE.first, value ?: KEY_LETTER_SIZE.second)
-        }
+    /** 設定画面から削除（2026-10-30）。保存値は読まず 0.0f に固定。 */
+    val key_letter_size: Float? get() = 0.0f
 
-    var candidate_letter_size: Float?
-        get() = preferences.getFloat(CANDIDATE_LETTER_SIZE.first, CANDIDATE_LETTER_SIZE.second)
-        set(value) = preferences.edit {
-            it.putFloat(CANDIDATE_LETTER_SIZE.first, value ?: CANDIDATE_LETTER_SIZE.second)
-        }
+    /** 設定画面から削除（2026-10-30）。保存値は読まず 14.0f に固定。 */
+    val candidate_letter_size: Float? get() = 14.0f
 
 
 
@@ -2366,32 +2242,14 @@ object AppPreference {
         }
 
     /** 2段候補バーの上段を文節チップにする（既定オン。オフで従来の2段表示）。 */
-    var necookey_chip_candidate_bar_preference: Boolean
-        get() = preferences.getBoolean(
-            NECOOKEY_CHIP_CANDIDATE_BAR_PREFERENCE.first,
-            NECOOKEY_CHIP_CANDIDATE_BAR_PREFERENCE.second
-        )
-        set(value) = preferences.edit {
-            it.putBoolean(NECOOKEY_CHIP_CANDIDATE_BAR_PREFERENCE.first, value)
-        }
+    /** 設定画面から削除（2026-10-30）。保存値は読まず true に固定。 */
+    val necookey_chip_candidate_bar_preference: Boolean get() = true
 
-    var necookey_two_row_candidate_bar_preference: Boolean
-        get() = preferences.getBoolean(
-            NECOOKEY_TWO_ROW_CANDIDATE_BAR_PREFERENCE.first,
-            NECOOKEY_TWO_ROW_CANDIDATE_BAR_PREFERENCE.second
-        )
-        set(value) = preferences.edit {
-            it.putBoolean(NECOOKEY_TWO_ROW_CANDIDATE_BAR_PREFERENCE.first, value)
-        }
+    /** 設定画面から削除（2026-10-30）。保存値は読まず true に固定。 */
+    val necookey_two_row_candidate_bar_preference: Boolean get() = true
 
-    var necookey_zenz_bunsetsu_gate_preference: Boolean
-        get() = preferences.getBoolean(
-            NECOOKEY_ZENZ_BUNSETSU_GATE_PREFERENCE.first,
-            NECOOKEY_ZENZ_BUNSETSU_GATE_PREFERENCE.second
-        )
-        set(value) = preferences.edit {
-            it.putBoolean(NECOOKEY_ZENZ_BUNSETSU_GATE_PREFERENCE.first, value)
-        }
+    /** 設定画面から削除（2026-10-30）。保存値は読まず true に固定。 */
+    val necookey_zenz_bunsetsu_gate_preference: Boolean get() = true
 
 
 
@@ -2491,60 +2349,23 @@ object AppPreference {
 
 
 
-    var conversion_candidates_romaji_enable_preference: Boolean
-        get() = preferences.getBoolean(
-            CONVERSION_CANDIDATES_ROMAJI_ENABLE_PREFERENCE.first,
-            CONVERSION_CANDIDATES_ROMAJI_ENABLE_PREFERENCE.second
-        )
-        set(value) = preferences.edit {
-            it.putBoolean(CONVERSION_CANDIDATES_ROMAJI_ENABLE_PREFERENCE.first, value)
-        }
+    /** 設定画面から削除（2026-10-30）。保存値は読まず false に固定。 */
+    val conversion_candidates_romaji_enable_preference: Boolean get() = false
 
-    var learn_first_candidate_dictionary_preference: Boolean
-        get() = preferences.getBoolean(
-            LEARN_FIRST_CANDIDATE_DICTIONARY_PREFERENCE.first,
-            LEARN_FIRST_CANDIDATE_DICTIONARY_PREFERENCE.second
-        )
-        set(value) = preferences.edit {
-            it.putBoolean(LEARN_FIRST_CANDIDATE_DICTIONARY_PREFERENCE.first, value)
-        }
+    /** 設定画面から削除（2026-10-30）。保存値は読まず false に固定。 */
+    val learn_first_candidate_dictionary_preference: Boolean get() = false
 
-    var learn_dictionary_allow_mixed_symbols_numbers_preference: Boolean
-        get() = preferences.getBoolean(
-            LEARN_DICTIONARY_ALLOW_MIXED_SYMBOLS_NUMBERS_PREFERENCE.first,
-            LEARN_DICTIONARY_ALLOW_MIXED_SYMBOLS_NUMBERS_PREFERENCE.second
-        )
-        set(value) = preferences.edit {
-            it.putBoolean(LEARN_DICTIONARY_ALLOW_MIXED_SYMBOLS_NUMBERS_PREFERENCE.first, value)
-        }
+    /** 設定画面から削除（2026-10-30）。保存値は読まず true に固定。 */
+    val learn_dictionary_allow_mixed_symbols_numbers_preference: Boolean get() = true
 
-    var enable_prediction_search_learn_dictionary_preference: Boolean
-        get() = preferences.getBoolean(
-            ENABLE_PREDICTION_SEARCH_LEARN_DICTIONARY_PREFERENCE.first,
-            ENABLE_PREDICTION_SEARCH_LEARN_DICTIONARY_PREFERENCE.second
-        )
-        set(value) = preferences.edit {
-            it.putBoolean(ENABLE_PREDICTION_SEARCH_LEARN_DICTIONARY_PREFERENCE.first, value)
-        }
+    /** 設定画面から削除（2026-10-30）。保存値は読まず true に固定。 */
+    val enable_prediction_search_learn_dictionary_preference: Boolean get() = true
 
-    var learn_prediction_preference: Int
-        get() = preferences.getInt(
-            LEARN_PREDICTION_PREFERENCE.first,
-            LEARN_PREDICTION_PREFERENCE.second
-        )
-        set(value) = preferences.edit { it.putInt(LEARN_PREDICTION_PREFERENCE.first, value) }
+    /** 設定画面から削除（2026-10-30）。保存値は読まず 2 に固定。 */
+    val learn_prediction_preference: Int get() = 2
 
-    var learn_dictionary_prediction_candidate_limit_preference: Int
-        get() = preferences.getInt(
-            LEARN_PREDICTION_CANDIDATE_LIMIT_PREFERENCE.first,
-            LEARN_PREDICTION_CANDIDATE_LIMIT_PREFERENCE.second,
-        ).coerceIn(1, 8)
-        set(value) = preferences.edit {
-            it.putInt(
-                LEARN_PREDICTION_CANDIDATE_LIMIT_PREFERENCE.first,
-                value.coerceIn(1, 8),
-            )
-        }
+    /** 設定画面から削除（2026-10-30）。保存値は読まず 4 に固定。 */
+    val learn_dictionary_prediction_candidate_limit_preference: Int get() = 4
 
 
     var custom_theme_border_width: Int
@@ -2617,23 +2438,11 @@ object AppPreference {
             it.putBoolean(SUMIRE_LM_HOMOPHONE_MARGIN_PREFERENCE.first, value)
         }
 
-    var lattice_lm_cost_preference: Boolean
-        get() = preferences.getBoolean(
-            LATTICE_LM_COST_PREFERENCE.first,
-            LATTICE_LM_COST_PREFERENCE.second
-        )
-        set(value) = preferences.edit {
-            it.putBoolean(LATTICE_LM_COST_PREFERENCE.first, value)
-        }
+    /** 設定画面から削除（2026-10-30）。保存値は読まず true に固定。 */
+    val lattice_lm_cost_preference: Boolean get() = true
 
-    var save_last_used_keyboard_enable_preference: Boolean
-        get() = preferences.getBoolean(
-            SAVE_LAST_USED_KEYBOARD.first,
-            SAVE_LAST_USED_KEYBOARD.second
-        )
-        set(value) = preferences.edit {
-            it.putBoolean(SAVE_LAST_USED_KEYBOARD.first, value)
-        }
+    /** 設定画面から削除（2026-10-30）。保存値は読まず true に固定。 */
+    val save_last_used_keyboard_enable_preference: Boolean get() = true
 
     var save_last_used_keyboard_position_preference: Int
         get() = preferences.getInt(
@@ -2694,6 +2503,35 @@ object AppPreference {
         "omission_search_preference",
         "omission_search_preference_offset_score_preference",
         "conversion_key_swipe_cursor_move_preference",
+        // 2026-10-30: 値を固定して設定画面から削除（保存値は読まない）
+        "necookey_two_row_candidate_bar_preference",
+        "necookey_chip_candidate_bar_preference",
+        "necookey_zenz_bunsetsu_gate_preference",
+        "lattice_lm_cost_preference",
+        "learn_dictionary_preference",
+        "learn_dictionary_allow_mixed_symbols_numbers_preference",
+        "system_ngram_dictionary_enable_preference",
+        "user_dictionary_preference",
+        "delete_key_flick_left_preference",
+        "save_last_used_keyboard",
+        "stabilize_candidate_strip_height_preference",
+        "english_reading_dictionary_enable_preference",
+        "conversion_candidates_romaji_enable_preference",
+        "learn_first_candidate_dictionary_preference",
+        "preserve_dictionary_word_whitespace_preference",
+        "space_key_preference",
+        "n_best_preference",
+        "enable_prediction_search_learn_dictionary_preference",
+        "learn_prediction_preference",
+        "learn_dictionary_prediction_candidate_limit_preference",
+        "user_dictionary_prefix_match_number",
+        "user_dictionary_prediction_candidate_limit_preference",
+        "key_letter_size_preference",
+        "candidate_letter_size_preference",
+        "flick_sensitivity_preference",
+        "henkan_delete_key_action_preference",
+        "default_emoji_skin_tone_preference",
+        "candidate_column_preference",
     )
 
     fun importAllFromJson(json: String, replaceAll: Boolean = true) {

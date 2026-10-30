@@ -16,7 +16,6 @@ import androidx.appcompat.app.AlertDialog
 import androidx.lifecycle.lifecycleScope
 import androidx.preference.ListPreference
 import androidx.preference.Preference
-import androidx.preference.SeekBarPreference
 import androidx.preference.SwitchPreferenceCompat
 import com.kazumaproject.markdownhelperkeyboard.R
 import com.kazumaproject.markdownhelperkeyboard.diagnostics.FreezeLogFile
@@ -113,17 +112,14 @@ class MainPreferenceFragment : AsyncPreferenceFragment() {
         bindInputSection()
         bindCandidateSection()
         bindDictionarySection()
-        bindRerankSection()
         bindSymbolSection()
         bindClipboardSection()
         bindBackupAndAboutSection()
     }
 
     override fun onPreferencesResumed() {
-        syncDefaultEmojiSkinTonePreference()
         updateCursorMoveTargetPairsSummary()
         refreshNextWordSummary()
-        syncRerankEnabled()
     }
 
     override fun onDestroyView() {
@@ -134,22 +130,6 @@ class MainPreferenceFragment : AsyncPreferenceFragment() {
     // ---- 入力・キー操作 ----
 
     private fun bindInputSection() {
-        findPreference<SeekBarPreference>("flick_sensitivity_preference")?.apply {
-            summary = sensitivityLabel(value)
-            setOnPreferenceChangeListener { pref, newValue ->
-                val sbp = pref as SeekBarPreference
-                val raw = newValue as Int
-                val inc = sbp.seekBarIncrement
-                val rounded = (raw + inc / 2) / inc * inc
-                summary = sensitivityLabel(rounded)
-                if (rounded != raw) {
-                    sbp.value = rounded
-                    false
-                } else {
-                    true
-                }
-            }
-        }
 
         findPreference<SwitchPreferenceCompat>("undo_enable_preference")?.apply {
             fun label(on: Boolean) = getString(
@@ -176,15 +156,6 @@ class MainPreferenceFragment : AsyncPreferenceFragment() {
         }
     }
 
-    private fun sensitivityLabel(value: Int): String = when (value) {
-        in 0..50 -> getString(R.string.sensitivity_very_high)
-        in 51..90 -> getString(R.string.sensitivity_high)
-        in 91..110 -> getString(R.string.sensitivity_normal)
-        in 111..150 -> getString(R.string.sensitivity_less)
-        in 151..200 -> getString(R.string.sensitivity_low)
-        else -> ""
-    }
-
     private fun updateCursorMoveTargetPairsSummary() {
         findPreference<Preference>("cursor_move_after_commit_target_pairs_preference")?.summary =
             getString(
@@ -202,12 +173,6 @@ class MainPreferenceFragment : AsyncPreferenceFragment() {
             true
         }
 
-        findPreference<ListPreference>("candidate_column_preference")?.setOnPreferenceChangeListener { _, newValue ->
-            if (newValue is String) {
-                appPreference.setCandidateColumnAndSyncHeight(isLandscape = false, column = newValue)
-            }
-            true
-        }
     }
 
     // ---- 辞書・学習 ----
@@ -219,10 +184,6 @@ class MainPreferenceFragment : AsyncPreferenceFragment() {
         }
         findPreference<Preference>("keyboard_screen_preference")?.setOnPreferenceClickListener {
             navigateSafely(R.id.keyboardSettingFragment)
-            true
-        }
-        findPreference<Preference>("keyboard_key_letter_size_fragment_preference")?.setOnPreferenceClickListener {
-            navigateSafely(R.id.keyCandidateLetterSizeFragment)
             true
         }
         findPreference<Preference>("home_learn_dictionary_preference")?.setOnPreferenceClickListener {
@@ -258,26 +219,7 @@ class MainPreferenceFragment : AsyncPreferenceFragment() {
         }
         refreshNextWordSummary()
 
-        findPreference<SeekBarPreference>("learn_prediction_preference")?.apply {
-            summary = getString(
-                R.string.learn_dictionary_prefix_match_summary,
-                appPreference.learn_prediction_preference,
-            )
-            setOnPreferenceChangeListener { _, newValue ->
-                summary = getString(R.string.learn_dictionary_prefix_match_summary, newValue as Int)
-                true
-            }
-        }
 
-        findPreference<SeekBarPreference>("user_dictionary_prefix_match_number")?.apply {
-            appPreference.user_dictionary_prefix_match_number_preference?.let {
-                summary = getString(R.string.user_dictionary_prefix_match_summary, it)
-            }
-            setOnPreferenceChangeListener { _, newValue ->
-                summary = getString(R.string.user_dictionary_prefix_match_summary, newValue as Int)
-                true
-            }
-        }
     }
 
     private fun refreshNextWordSummary() {
@@ -328,19 +270,6 @@ class MainPreferenceFragment : AsyncPreferenceFragment() {
 
     private fun NextWordEntity.label(): String = "…$context → $output（$reading）×$usageCount"
 
-    // ---- 変換補正（SUMIRE-LM） ----
-
-    private fun bindRerankSection() {
-        syncRerankEnabled()
-    }
-
-    // 文節ゲートは「2段候補バー」(変換・予測カテゴリ) に依存する。別画面にあるため XML の
-    // android:dependency ではなくコードで有効/無効を切り替える。
-    private fun syncRerankEnabled() {
-        findPreference<Preference>("necookey_zenz_bunsetsu_gate_preference")?.isEnabled =
-            appPreference.necookey_two_row_candidate_bar_preference
-    }
-
     // ---- 記号・クリップボード ----
 
     private fun bindSymbolSection() {
@@ -357,16 +286,6 @@ class MainPreferenceFragment : AsyncPreferenceFragment() {
                 summary = label(newValue)
                 true
             }
-        }
-        findPreference<ListPreference>("default_emoji_skin_tone_preference")?.summaryProvider =
-            ListPreference.SimpleSummaryProvider.getInstance()
-        syncDefaultEmojiSkinTonePreference()
-    }
-
-    private fun syncDefaultEmojiSkinTonePreference() {
-        findPreference<ListPreference>("default_emoji_skin_tone_preference")?.apply {
-            val saved = appPreference.default_emoji_skin_tone_preference
-            if (value != saved) value = saved
         }
     }
 

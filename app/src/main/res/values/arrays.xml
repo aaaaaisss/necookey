@@ -11,9 +11,6 @@
         <item>continuous</item>
     </string-array>
 
-
-
-
     <string-array name="type_null_input_behavior_entries">
         <item>@string/type_null_input_behavior_default</item>
         <item>@string/type_null_input_behavior_direct_commit</item>
@@ -38,62 +35,6 @@
         <item>aggressive</item>
     </string-array>
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-    <string-array name="default_emoji_skin_tone_entries">
-        <item>@string/default_emoji_skin_tone_default</item>
-        <item>@string/default_emoji_skin_tone_light</item>
-        <item>@string/default_emoji_skin_tone_medium_light</item>
-        <item>@string/default_emoji_skin_tone_medium</item>
-        <item>@string/default_emoji_skin_tone_medium_dark</item>
-        <item>@string/default_emoji_skin_tone_dark</item>
-    </string-array>
-
-    <string-array name="default_emoji_skin_tone_values">
-        <item>default</item>
-        <item>1F3FB</item>
-        <item>1F3FC</item>
-        <item>1F3FD</item>
-        <item>1F3FE</item>
-        <item>1F3FF</item>
-    </string-array>
-
-
-
-
-
-
-
-    <string-array name="candidate_column_entries">
-        <item>@string/candidate_column_one</item>
-        <item>@string/candidate_column_two</item>
-        <item>@string/candidate_column_three</item>
-    </string-array>
-
-    <string-array name="candidate_column_values">
-        <item>1</item>
-        <item>2</item>
-        <item>3</item>
-    </string-array>
-
     <string-array name="candidate_column_entries_landscape">
         <item>@string/candidate_column_one</item>
         <item>@string/candidate_column_two</item>
@@ -105,9 +46,6 @@
         <item>2</item>
         <item>3</item>
     </string-array>
-
-
-
 
     <string-array name="ng_word_match_mode_entries">
         <item>@string/ng_word_match_mode_partial</item>

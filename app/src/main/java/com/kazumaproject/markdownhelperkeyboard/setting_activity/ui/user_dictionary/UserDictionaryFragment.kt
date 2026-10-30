@@ -28,7 +28,6 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
-import com.kazumaproject.markdownhelperkeyboard.setting_activity.AppPreference
 import com.kazumaproject.markdownhelperkeyboard.user_dictionary.DictionaryWordInput
 import com.kazumaproject.markdownhelperkeyboard.R
 import com.kazumaproject.markdownhelperkeyboard.databinding.FragmentUserDictionaryBinding
@@ -96,11 +95,6 @@ class UserDictionaryFragment : Fragment() {
                 menuInflater.inflate(R.menu.user_dictionary_menu, menu)
             }
 
-            override fun onPrepareMenu(menu: Menu) {
-                menu.findItem(R.id.action_preserve_whitespace)?.isChecked =
-                    AppPreference.preserve_dictionary_word_whitespace_preference
-            }
-
             override fun onMenuItemSelected(menuItem: MenuItem): Boolean {
                 // [CHANGE] メニューからのトグルロジックはここには含めない
                 return when (menuItem.itemId) {
@@ -121,21 +115,6 @@ class UserDictionaryFragment : Fragment() {
 
                     R.id.action_delete_all -> {
                         showDeleteAllConfirmationDialog()
-                        true
-                    }
-
-                    // 「単語の前後の空白を保持」（2026-10-30 に設定の「辞書と学習」からここへ移動。key は同じ）
-                    R.id.action_preserve_whitespace -> {
-                        val enabled = !AppPreference.preserve_dictionary_word_whitespace_preference
-                        AppPreference.preserve_dictionary_word_whitespace_preference = enabled
-                        menuItem.isChecked = enabled
-                        if (enabled) {
-                            Toast.makeText(
-                                requireContext(),
-                                R.string.preserve_dictionary_word_whitespace_summary,
-                                Toast.LENGTH_LONG,
-                            ).show()
-                        }
                         true
                     }
 
@@ -458,7 +437,7 @@ class UserDictionaryFragment : Fragment() {
     private fun addWord() {
         val word = DictionaryWordInput.normalize(
             binding.editTextWord.text.toString(),
-            AppPreference.preserve_dictionary_word_whitespace_preference,
+            preserveWhitespace = false,
         )
         val reading = binding.editTextReading.text.toString().trim()
 
@@ -516,7 +495,7 @@ class UserDictionaryFragment : Fragment() {
             .setPositiveButton(getString(R.string.save_string)) { _, _ ->
                 val updatedWord = DictionaryWordInput.normalize(
                     editWord.text.toString(),
-                    AppPreference.preserve_dictionary_word_whitespace_preference,
+                    preserveWhitespace = false,
                 )
                 val updatedReading = editReading.text.toString().trim()
                 val updatedPosIndex = spinnerPosDialog.selectedItemPosition

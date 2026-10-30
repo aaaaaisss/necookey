@@ -728,8 +728,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
     private lateinit var runtimeInputSharedPreferences: SharedPreferences
     private var runtimeInputPreferenceListenerRegistered = false
     private val runtimeInputPreferenceKeys = setOf(
-        AppPreference.STABILIZE_CANDIDATE_STRIP_HEIGHT_KEY,
-        AppPreference.FLICK_SENSITIVITY_KEY,
         AppPreference.TFBI_DIAGONAL_RECOGNITION_MODE_KEY,
         AppPreference.TENKEY_USE_THREE_STATE_KEY,
         AppPreference.TENKEY_NUMBER_SYMBOL_KEY_GAP_KEY,
@@ -1321,14 +1319,12 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
 
     private var keyboardContainer: FrameLayout? = null
     private var dockedCandidateContainerActive = false
-    private var dockedCandidateHeightStabilized = false
     /** 浮いた候補帯としてコンテナに出している候補欄（null = 従来どおりキーボードのルートの中）。 */
     private var floatingBandView: View? = null
     private var floatingBandRootIndex = 1
     private var floatingBandSavedParams: FrameLayout.LayoutParams? = null
     /** 物理キーボード用の候補だけの表示（キーボードを隠している）。浮いた候補帯にしない。 */
     private var physicalKeyboardCandidateOnlyMode = false
-    private var stabilizeCandidateStripHeightPreference = false
 
     private var isSpaceKeyLongPressed = false
     private var suppressSpaceConvertTapUntilUptimeMillis = 0L
@@ -2152,12 +2148,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         listOfNotNull(suggestionAdapter, suggestionAdapterFull)
             .forEach { it.setCandidateYomiTextSize(readingTextSize) }
 
-        val previousStabilizeCandidateStripHeight = stabilizeCandidateStripHeightPreference
-        stabilizeCandidateStripHeightPreference =
-            appPreference.stabilize_candidate_strip_height_preference
-        if (previousStabilizeCandidateStripHeight != stabilizeCandidateStripHeightPreference && isInputViewActive) {
-            mainLayoutBinding?.let { updateKeyboardLayout(it) }
-        }
 
 
 
@@ -2298,7 +2288,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         candidateColumns = preferences.candidateColumns
         candidateColumnsLandscape = preferences.candidateColumnsLandscape
         candidateTabVisibility = preferences.candidateTabVisibility
-        stabilizeCandidateStripHeightPreference = preferences.stabilizeCandidateStripHeightPreference
         symbolKeyboardFirstItem = preferences.symbolKeyboardFirstItem
         defaultEmojiSkinTonePreference = preferences.defaultEmojiSkinTone
         tenkeyUseThreeStateKeyboard = preferences.tenkeyUseThreeStateKeyboard
@@ -2977,8 +2966,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         candidateColumnsLandscape = null
         candidateViewHeight = null
         candidateTabVisibility = null
-        stabilizeCandidateStripHeightPreference = false
-        dockedCandidateHeightStabilized = false
         isTablet = null
         isNgWordEnable = null
         deleteKeyHighLight = null
@@ -3039,7 +3026,7 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
             val container = keyboardContainer ?: return
             applyDockedCandidateInsets(
                 container,
-                dockedCandidateContainerActive && dockedCandidateHeightStabilized,
+                false, // 候補欄の高さ固定（高さ安定）は 2026-10-30 に設定ごと削除＝常にオフ
                 outInsets
             )
         }
@@ -8431,11 +8418,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
      * 読み込んで設定し、無効なら外す（表なし = 従来の変換）。アセットが無い・壊れている場合も表なしのまま。
      */
     private fun syncLatticeLmCost() {
-        if (!AppPreference.lattice_lm_cost_preference) {
-            LatticeLmCost.table = null
-            latticeLmLoadStarted = false
-            return
-        }
         if (LatticeLmCost.table != null || latticeLmLoadStarted) return
         latticeLmLoadStarted = true
         ioScope.launch {
@@ -8451,7 +8433,7 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
                 Timber.w(e, "lattice-lm: table load failed")
                 null
             }
-            if (table != null && AppPreference.lattice_lm_cost_preference && latticeLmLoadStarted) LatticeLmCost.table = table
+            if (table != null && latticeLmLoadStarted) LatticeLmCost.table = table
         }
     }
 
@@ -8707,7 +8689,7 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         val isSymbol = isSymbolOverride ?: keyboardSymbolViewState.value.isShown
         // 文節チップ方式: 候補欄をキーボードのルートから外し、画面幅の浮いた帯にする（docs/CHIP_BAR.md「浮いた候補帯」）
         val floatCandidateBand = FloatingCandidateBand.shouldFloat(
-            chipBarPreference = appPreference.necookey_chip_candidate_bar_preference,
+            chipBarPreference = true,
             twoRowBarPreference = isNecookeyTwoRowSurfaceAvailable(),
             symbolKeyboardShown = isSymbol,
             candidateOnlyMode = physicalKeyboardCandidateOnlyMode,
@@ -8820,7 +8802,7 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         val reserveCandidateDrawingSpace = !isSymbol && !false &&
             true &&
             true && !isFullscreenMode &&
-            (stabilizeCandidateStripHeightPreference || presentation.showIndependentShortcutToolbar ||
+            (presentation.showIndependentShortcutToolbar ||
                 presentation.reserveIndependentShortcutToolbarSpace)
         val transparentContainerHeight = if (reserveCandidateDrawingSpace) {
             resolveDockedCandidateContainerHeightPx(
@@ -8855,7 +8837,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         updateDockedCandidateContainerHeight(
             heightPx = transparentContainerHeight?.plus(finalBottomMargin)
                 ?.plus(floatingBandGeometry?.extraHeightPx ?: 0),
-            stabilizeInsets = stabilizeCandidateStripHeightPreference
         )
 
         val positionIsEnd =
@@ -8937,10 +8918,9 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         }
     }
 
-    private fun updateDockedCandidateContainerHeight(heightPx: Int?, stabilizeInsets: Boolean = false) {
+    private fun updateDockedCandidateContainerHeight(heightPx: Int?) {
         val container = keyboardContainer ?: return
         dockedCandidateContainerActive = heightPx != null
-        dockedCandidateHeightStabilized = heightPx != null && stabilizeInsets
         val height = heightPx ?: ViewGroup.LayoutParams.WRAP_CONTENT
         val params = container.layoutParams ?: FrameLayout.LayoutParams(
             ViewGroup.LayoutParams.MATCH_PARENT, height
@@ -11596,8 +11576,8 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
             setOnClipboardHistoryToggleListener(this@IMEService)
             setDefaultEmojiSkinTone(defaultEmojiSkinTonePreference)
             setOnDefaultEmojiSkinToneChangeListener { skinTone ->
+                // 既定の肌色は 2026-10-30 に固定（設定削除）。記号キーボードでの変更はこの入力の間だけ効き、保存しない。
                 defaultEmojiSkinTonePreference = skinTone
-                appPreference.default_emoji_skin_tone_preference = skinTone
             }
         }
 
@@ -13492,13 +13472,8 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
     // henkan / bunsetsu-session / tail state). Every other state falls back to Sumire's own bar.
     // ------------------------------------------------------------------------------------------
 
-    private fun isNecookeyTwoRowSurfaceAvailable(): Boolean =
-        appPreference.necookey_two_row_candidate_bar_preference &&
-            true &&
-            !false &&
-            true &&
-            true &&
-            true
+    /** 2段候補バーは常にオン（設定は 2026-10-30 に削除）。 */
+    private fun isNecookeyTwoRowSurfaceAvailable(): Boolean = true
 
     private fun shouldUseNecookeyTwoRowBar(): Boolean =
         isNecookeyTwoRowSurfaceAvailable() &&
@@ -13512,8 +13487,7 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         if (isNecookeyTwoRowSurfaceAvailable()) NECOOKEY_PREDICTION_ROW_HEIGHT_DP else 0
 
     /** SUMIRE-LM リランカーの経路を使うか（設定キーは旧 zenz ゲートのまま）。 */
-    private fun necookeyRerankEnabled(): Boolean =
-        appPreference.necookey_zenz_bunsetsu_gate_preference
+    private fun necookeyRerankEnabled(): Boolean = true
 
     @Suppress("UNUSED_PARAMETER")
     private fun isNecookeyActionCandidate(candidate: Candidate): Boolean = false
@@ -13856,8 +13830,7 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
     // [ChipBarModel.commit] を学習付きで確定する。触っていなければ従来どおり（ライブ変換・確定）。
     // ------------------------------------------------------------------------------------------
 
-    private fun isChipBarMode(): Boolean =
-        shouldUseNecookeyTwoRowBar() && appPreference.necookey_chip_candidate_bar_preference
+    private fun isChipBarMode(): Boolean = shouldUseNecookeyTwoRowBar()
 
     /** チップに触った後か（触った後はライブ変換・リランカーの結果で入力欄を上書きしない）。 */
     private fun isChipBarTouched(insertString: String): Boolean {
@@ -14195,7 +14168,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         conversion: List<Candidate>,
         base: ChipSegmentation,
     ): ChipSegmentation {
-        if (!appPreference.necookey_chip_candidate_bar_preference) return base
         val repository = learnedRepositoryForSuggestion() ?: return base
         return try {
             val pieces = withContext(Dispatchers.IO) {

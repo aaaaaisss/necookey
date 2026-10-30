@@ -84,7 +84,6 @@ data class ImePreferencesSnapshot(
     val candidateColumns: String,
     val candidateColumnsLandscape: String,
     val candidateTabVisibility: Boolean,
-    val stabilizeCandidateStripHeightPreference: Boolean,
     val symbolKeyboardFirstItem: SymbolMode,
     val defaultEmojiSkinTone: String,
     val tenkeyUseThreeStateKeyboard: Boolean,
@@ -313,8 +312,6 @@ data class ImePreferencesSnapshot(
                 candidateColumns = appPreference.candidate_column_preference,
                 candidateColumnsLandscape = appPreference.candidate_column_landscape_preference,
                 candidateTabVisibility = appPreference.candidate_tab_preference,
-                stabilizeCandidateStripHeightPreference =
-                    appPreference.stabilize_candidate_strip_height_preference,
                 symbolKeyboardFirstItem = appPreference.symbol_mode_preference,
                 defaultEmojiSkinTone = appPreference.default_emoji_skin_tone_preference,
                 independentMultiTouchEnabled = appPreference.independent_multi_touch_preference,

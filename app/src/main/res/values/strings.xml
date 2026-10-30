@@ -101,10 +101,6 @@
     <string name="keyboard_height_fix_specific_device_summary_on">一部端末向けの高さ補正は有効です（例：Galaxy）。</string>
     <string name="keyboard_height_fix_specific_device_summary_off">一部端末向けの高さ補正は無効です。</string>
     <string name="conversion_preference_title">変換候補</string>
-    <string name="n_best_preference_summary">表示する変換候補の最大数を設定します。</string>
-    <string name="preference_title_num_columns_conversion">変換候補の列数</string>
-    <string name="preference_summary_num_column_conversion">変換候補を表示するときの列数を設定します</string>
-    <string name="preference_dialog_title_num_columns_conversion">候補の列数を選んでください</string>
     <string name="candidate_view_height_title">変換候補の高さ</string>
     <string name="candidate_view_height_summary">変換候補を表示する View の高さの設定</string>
     <string name="password_compose_title">パスワード入力中の文字列の設定</string>
@@ -114,9 +110,6 @@
     <string name="type_null_input_behavior_default">デフォルト（直接入力）</string>
     <string name="type_null_input_behavior_direct_commit">常に直接入力</string>
     <string name="type_null_input_behavior_composing_text">ComposingText を使う</string>
-    <string name="henkan_delete_key_action_title">候補ハイライト時の削除キー動作</string>
-    <string name="henkan_delete_key_action_summary_on">変換候補を選んでいる間の削除キー\nタップ：選択を1つ前の候補に戻す\n長押し：変換をやめて読みに戻す\n（文節チップ方式で文節を編集中は、タップで読みに戻ります）</string>
-    <string name="henkan_delete_key_action_summary_off">変換候補を選んでいる間の削除キー\nタップ：変換をやめて読みに戻す\n（文節チップ方式で文節を編集中は、タップで読みに戻ります）</string>
     <string name="category_function_title">機能</string>
     <string name="category_flick_input_title">フリック入力</string>
     <string name="category_qwerty_keyboard_title">QWERTY キーボード</string>
@@ -124,8 +117,6 @@
     <string name="category_operation_title">操作</string>
     <string name="category_vibration_title">バイブレーション</string>
     <string name="category_learning_dictionary_title">学習辞書</string>
-    <string name="learn_dictionary_allow_mixed_symbols_numbers_title">記号・数字を含む日本語を学習</string>
-    <string name="learn_dictionary_allow_mixed_symbols_numbers_summary">「令和8年」などを学習します。記号・数字だけの候補は学習しません。</string>
     <string name="category_user_dictionary_title">ユーザー辞書</string>
 
     <string name="undo_enable_title">元に戻す機能</string>
@@ -133,11 +124,8 @@
     <string name="reconversion_preference_title">読みを戻す</string>
     <string name="reconversion_preference_summary">候補が空のときに「読みを戻す」ボタンを表示し、直前に確定した読みを PreEdit に戻せます。</string>
     <string name="reconversion_symbol">読みを戻す</string>
-    <string name="space_key_title">半角スペースの利用</string>
-    <string name="space_key_summary">入力モードに関わらず、常に半角スペースを使用します。</string>
     <string name="custom_direct_mode_space_hankaku_title">直接入力時に半角スペースを使用</string>
     <string name="custom_direct_mode_space_hankaku_summary">直接入力モードでPreEditに文字がない場合、スペースキーで半角スペースを入力します。</string>
-    <string name="flick_sensitivity_title">フリック入力の感度</string>
     <string name="long_press_timeout_preference_title">長押し時間</string>
     <string name="long_press_timeout_preference_summary">長押しと判定するまでの時間を変更します。</string>
     <string name="long_press_timeout_preference_value">%1$d ms</string>
@@ -150,15 +138,6 @@
     <string name="symbol_mode_title">記号キーボードの初期画面</string>
     <string name="symbol_mode_summary">記号キーボードの初期画面を選択します</string>
     <string name="symbol_mode_dialog_title">初期画面を選択</string>
-    <string name="default_emoji_skin_tone_title">絵文字のデフォルト肌色</string>
-    <string name="default_emoji_skin_tone_summary">肌色変更に対応した絵文字の表示色を選択します。</string>
-    <string name="default_emoji_skin_tone_dialog_title">絵文字の肌色を選択</string>
-    <string name="default_emoji_skin_tone_default">デフォルト</string>
-    <string name="default_emoji_skin_tone_light">明るい</string>
-    <string name="default_emoji_skin_tone_medium_light">やや明るい</string>
-    <string name="default_emoji_skin_tone_medium">中間</string>
-    <string name="default_emoji_skin_tone_medium_dark">やや暗い</string>
-    <string name="default_emoji_skin_tone_dark">暗い</string>
 
     <string name="custom_keyboard_two_words_title">Auto-commit for 2+ characters</string>
     <string name="custom_keyboard_two_words_summary_on">Automatically commits when a custom key outputs 2 or more characters.</string>
@@ -185,13 +164,7 @@
     <string name="key_sound_volume_percent">%1$d%%</string>
 
 
-    <string name="learn_dictionary_title">学習辞書</string>
-    <string name="learn_dictionary_summary_on">学習辞書を有効化\n学習した変換候補を表示します</string>
-    <string name="learn_dictionary_summary_off">学習辞書を無効化\n学習した変換候補を表示しません</string>
 
-    <string name="user_dictionary_summary_on">ユーザー辞書の予測変換を有効化\n登録した単語を予測変換として変換候補を表示します</string>
-    <string name="user_dictionary_summary_off">ユーザー辞書の予測変換を無効化</string>
-    <string name="user_dictionary_prefix_match_title">予測変換</string>
 
     <string name="candidate_action_close">閉じる</string>
 
@@ -221,9 +194,7 @@
     <string name="open_source_libraries_title">使用した Open Source のライブラリ</string>
     <string name="app_version_title">アプリのバージョン</string>
 
-    <string name="learn_dictionary_prefix_match_summary">学習辞書に登録された単語を、前方 %1$d 文字一致で変換候補として表示します</string>
 
-    <string name="user_dictionary_prefix_match_summary">ユーザー辞書に登録された単語を、前方 %1$d 文字一致で変換候補として表示します</string>
 
     <string name="undo_enable_summary_on">確定した文字を削除したときに、元に戻せる機能を有効にします</string>
     <string name="undo_enable_summary_off">確定した文字を削除したときに、元に戻せる機能を無効にします</string>
@@ -387,11 +358,6 @@
     <string name="symbol">記号</string>
     <string name="clipboard_history">クリップボードの履歴</string>
     <string name="choose_initial_symbol_keyboard_open">記号キーボードの初期画面を選択します。</string>
-    <string name="sensitivity_very_high">非常に繊細</string>
-    <string name="sensitivity_high">やや繊細</string>
-    <string name="sensitivity_normal">普通</string>
-    <string name="sensitivity_less">やや鈍感</string>
-    <string name="sensitivity_low">非常に鈍感</string>
     <string name="edit_ng_word_dialog_title">NG ワードを編集</string>
     <string name="add">追加</string>
     <string name="close">閉じる</string>
@@ -404,8 +370,6 @@
     <string name="shortcut_entry_content_description">ショートカットを表示</string>
     <string name="keyboard_theme_title">キーボードテーマ</string>
     <string name="keyboard_theme_dialog_title">ベースカラーの選択</string>
-    <string name="delete_key_left_flick_title">削除キーの左フリック</string>
-    <string name="delete_key_left_summary">削除キーを左にフリックすると、カーソルの前にある特定の記号までの文字列もしくは全ての文字列をまとめて削除します。</string>
     <string name="delete_key_flick_targets_title">削除対象の記号</string>
     <string name="delete_key_flick_targets_summary">初期値: 。、！？「」『』ー.</string>
     <string name="delete_key_flick_targets_fragment_title">削除対象の記号</string>
@@ -432,12 +396,7 @@
     <string name="cursor_move_target_pair_duplicate">このペアはすでに登録されています。</string>
     <string name="cursor_move_target_pair_delete_message">「%1$s」を削除しますか？</string>
     <string name="cursor_move_target_pair_reset_message">初期値のペアに戻します。</string>
-    <string name="key_candidate_letter_size_preference_title">キー・変換候補の文字サイズ</string>
-    <string name="key_candidate_letter_size_preference_summary">キーに表示される文字と、変換候補の文字の大きさを設定できます</string>
-    <string name="fragment_key_candidate_letter_size_title">文字の大きさ</string>
 
-    <string name="setting_candidate_letter_size">候補欄の文字サイズ</string>
-    <string name="setting_key_letter_size">キーの文字サイズ</string>
     <string name="setting_key_icon_size">キーアイコンのサイズ（通常）</string>
     <string name="setting_mode_switch_key_icon_size">モード切替キーのアイコンサイズ</string>
     <string name="candidate_view_height_setting_fragment_title">変換欄の高さ</string>
@@ -456,8 +415,6 @@
     <string name="candidate_height_preview_empty">未入力時プレビュー</string>
     <string name="candidate_height_section_title">変換欄の高さ</string>
     <string name="candidate_height_current_value">現在の高さ: %1$ddp</string>
-    <string name="candidate_letter_size_section_title">候補欄の文字サイズ</string>
-    <string name="candidate_letter_size_current_value">現在のサイズ: %1$.1fsp</string>
     <string name="candidate_default_height_screen_title_portrait">リセット時の高さ（縦画面）</string>
     <string name="candidate_default_height_screen_title_landscape">リセット時の高さ（横画面）</string>
     <string name="candidate_default_height_title">リセット時の高さ</string>
@@ -466,17 +423,12 @@
     <string name="candidate_default_height_restore_factory">アプリ初期値に戻す</string>
     <string name="candidate_default_height_save">保存</string>
     <string name="candidate_empty_height_default">未入力時</string>
-    <string name="candidate_height_sheet_summary_format">%1$s ・ %2$s列 ・ %3$sdp</string>
-    <string name="candidate_column_count_label">候補欄の列数</string>
+    <string name="candidate_height_sheet_summary_format">%1$s ・ %2$sdp</string>
     <string name="candidate_column_one">1列</string>
     <string name="candidate_column_two">2列</string>
     <string name="candidate_column_three">3列</string>
-    <string name="candidate_letter_size_input_hint">候補欄の文字サイズ</string>
-    <string name="candidate_letter_size_range_helper">10.0〜40.0 sp の範囲で指定してください</string>
-    <string name="candidate_letter_size_invalid_value">10.0〜40.0 sp の範囲で指定してください</string>
     <string name="keyboard_preview_label">キーボードプレビュー</string>
     <string name="unit_dp">dp</string>
-    <string name="unit_sp">sp</string>
 
     <string name="pref_clipboard_preview_title">クリップボードの内容を変換欄に表示</string>
     <string name="pref_clipboard_preview_summary">クリップボードにコピーした文字や画像を検知したとき、変換欄に表示します。</string>
@@ -576,12 +528,6 @@
     <string name="reset_to_default">初期値に戻す</string>
     <string name="preview">プレビュー</string>
     <string name="composing_text">入力テキスト色</string>
-    <string name="conversion_candidates_romaji_enable_preference_title">ローマ字変換候補を表示</string>
-    <string name="conversion_candidates_romaji_enable_preference_summary">ローマ字の変換候補を末尾に追加します</string>
-    <string name="learn_dictionary_preference_title">先頭の変換候補を学習</string>
-    <string name="learn_dictionary_preference_summary">先頭の変換候補を選択したときに学習します</string>
-    <string name="enable_prediction_search_learn_dictionary_preference_titile">学習辞書で予測変換</string>
-    <string name="enable_prediction_search_learn_dictionary_preference_summary">学習辞書を使った予測変換を有効にします</string>
 
     <string name="label_input_style">入力方式</string>
     <string name="input_style_petal">1段フリック</string>
@@ -591,8 +537,6 @@
     <string name="setting_two_step_flick">2段フリック設定</string>
     <string name="two_step_output_label">出力文字</string>
     <string name="drag_item">drag item</string>
-    <string name="save_last_used_keyboard_title">最後に使ったキーボードを表示</string>
-    <string name="save_last_used_keyboard_summey">アプリ再起動時に、前回使用したキーボードを自動で表示します</string>
     <string name="back_up">設定のバックアップ</string>
     <string name="pref_backup_export_title">設定をエクスポート</string>
     <string name="pref_backup_export_summary">現在の設定をバックアップファイルとして保存します</string>
@@ -606,9 +550,6 @@
     <string name="label_key_type">キータイプ</string>
     <string name="done_text">完了</string>
     <string name="direction_action_label">%1$s の設定</string>
-    <string name="system_ngram_dictionary_enable_title">システムN-gram辞書を使用</string>
-    <string name="system_ngram_dictionary_enable_summary_on">同梱されたスコアレス辞書に一致する候補を優先します。</string>
-    <string name="system_ngram_dictionary_enable_summary_off">システムN-gram辞書による候補の並べ替えを行いません。</string>
     <string name="custom_ngram_dictionary_enable_title">カスタムN-gram辞書を使用</string>
     <string name="custom_ngram_dictionary_enable_summary_on">カスタムルールと従来のN-gramスコア補正を適用します。</string>
     <string name="custom_ngram_dictionary_enable_summary_off">カスタムルールと従来のN-gramスコア補正を適用しません。</string>
@@ -678,8 +619,6 @@
     <string name="japanese_prediction_enable_summary">入力した読みより長い日本語候補を表示します。</string>
     <string name="english_prediction_enable_title">英語の予測変換</string>
     <string name="english_prediction_enable_summary">英語辞書の前方一致候補を表示します。OFFでも入力文字と大文字・小文字候補は残ります。</string>
-    <string name="english_reading_dictionary_enable_title">英語読み辞書</string>
-    <string name="english_reading_dictionary_enable_summary">「かー」から「car」のような英語候補を表示します。</string>
     <string name="system_dictionary_prediction_enable_title">システム辞書の予測変換</string>
     <string name="system_dictionary_prediction_enable_summary">内蔵システム辞書を日本語の前方一致予測に使用します。</string>
     <string name="system_user_dictionary_prediction_enable_title">システムユーザー辞書</string>
@@ -696,9 +635,6 @@
     <string name="emoji_candidate_enable_summary">絵文字の変換候補を表示します。</string>
     <string name="emoticon_candidate_enable_title">顔文字の変換候補</string>
     <string name="emoticon_candidate_enable_summary">顔文字の変換候補を表示します。</string>
-    <string name="dictionary_prediction_candidate_limit_title">予測候補数</string>
-    <string name="user_dictionary_prediction_candidate_limit_summary">ユーザー辞書から前方一致で取得する予測候補の最大数です。</string>
-    <string name="learn_dictionary_prediction_candidate_limit_summary">学習辞書から前方一致で取得する予測候補の最大数です。</string>
 
 
     <string name="keyboard_type_tenkey">日本語 - かな</string>
@@ -709,21 +645,11 @@
     <string name="keyboard_type_custom">カスタム - ユーザー定義</string>
     <string name="floating_keyboard_hide">キーボードを非表示</string>
     <string name="ime_popup_unavailable">一覧を表示できませんでした。もう一度お試しください。</string>
-    <string name="stabilize_candidate_strip_height_title">変換候補欄の高さを安定させる</string>
-    <string name="stabilize_candidate_strip_height_summary">入力・確定時に入力欄の位置が変わりにくくなります。高さの差分は透明にし、背後へのタッチを通します。</string>
     <string name="dictionary_word_registration_category_title">単語の登録</string>
-    <string name="preserve_dictionary_word_whitespace_title">単語の前後の空白を保持する</string>
-    <string name="preserve_dictionary_word_whitespace_summary">ユーザー辞書・定型文の登録や編集で、単語の前後の空白を保持します。フローティング登録にも適用されます。空白だけの単語は登録できません。</string>
     <string name="settings_loading">設定を読み込んでいます…</string>
     <string name="settings_loading_failed">設定を読み込めませんでした。</string>
     <string name="settings_loading_retry">再試行</string>
     <string name="necookey_candidate_bar_category_title">necookey（2段候補バー）</string>
-    <string name="necookey_two_row_candidate_bar_title">2段の候補バー</string>
-    <string name="necookey_two_row_candidate_bar_summary">上段に変換結果と最初の文節の別候補、下段に予測候補を表示します（通常のソフトウェアキーボードのみ）。</string>
-    <string name="necookey_chip_candidate_bar_title">文節チップ方式</string>
-    <string name="necookey_chip_candidate_bar_summary">2段の候補バーの上段を文節チップにします。チップをタップでその文節の候補、長押しで文字の間を切る、チップの間をタップでくっつける、左右フリックで1字ずらす。オフで従来の2段表示。</string>
-    <string name="necookey_zenz_bunsetsu_gate_title">リランカーで変換を補正（SUMIRE-LM）</string>
-    <string name="necookey_zenz_bunsetsu_gate_summary">辞書の候補を端末内の軽量モデル（SUMIRE-LM）で並べ替えて、第一候補を選び直します。2段候補バーが必要です。</string>
     <string name="cursor_move_target_pairs_not_set">未設定</string>
     <string name="next_word_learning_category_title">後続語</string>
     <string name="next_word_learning_view_title">後続語の学習を表示</string>
@@ -743,8 +669,6 @@
     <string name="settings_backup_export_failed">エクスポートに失敗しました: %1$s</string>
     <string name="settings_backup_imported">設定をインポートしました</string>
     <string name="settings_backup_import_failed">インポートに失敗しました: %1$s</string>
-    <string name="lattice_lm_cost_title">単語のつながりで変換を補正（ラティス LM）</string>
-    <string name="lattice_lm_cost_summary">内蔵の単語 bigram 表で変換経路を補正します（メモリ約 11MB）。遅いと感じたらオフにしてください。</string>
 
     <!-- 設定ホーム（UI 再設計） -->
     <string name="home_category_keyboard">キーボード</string>
@@ -779,7 +703,6 @@
     <string name="settings_section_key_behavior">キーの細かい動き</string>
     <string name="settings_section_candidate_detail">候補の詳細</string>
     <string name="settings_section_next_word">後続語</string>
-    <string name="settings_section_learning">学習</string>
     <string name="settings_ut_dictionary_category">追加辞書（Mozc UT）</string>
     <string name="settings_ut_person_title">人名辞書</string>
     <string name="settings_ut_person_summary">人名を変換候補に出します</string>
