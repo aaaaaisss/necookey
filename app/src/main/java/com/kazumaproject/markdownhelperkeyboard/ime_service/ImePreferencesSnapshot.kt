@@ -101,7 +101,6 @@ data class ImePreferencesSnapshot(
     val keyboardCornerBottomLeft: Boolean,
     val keyboardCornerBottomRight: Boolean,
     val reconversionEnabled: Boolean,
-    val conversionKeySwipePreference: Boolean,
     val physicalKeyboardInputMode: String,
     val shortcutTollbarVisibility: Boolean,
     val shortcutToolbarIntegratedInSuggestion: Boolean,
@@ -336,8 +335,6 @@ data class ImePreferencesSnapshot(
                 keyboardCornerBottomLeft = appPreference.keyboard_corner_bottom_left_preference,
                 keyboardCornerBottomRight = appPreference.keyboard_corner_bottom_right_preference,
                 reconversionEnabled = appPreference.reconversion_preference,
-                conversionKeySwipePreference =
-                    appPreference.conversion_key_swipe_cursor_move_preference,
                 physicalKeyboardInputMode = appPreference.physical_keyboard_input_mode_preference,
                 shortcutTollbarVisibility =
                     appPreference.shortcut_toolbar_visibility_preference,

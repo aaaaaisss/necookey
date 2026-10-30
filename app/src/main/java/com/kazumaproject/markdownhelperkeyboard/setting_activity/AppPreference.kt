@@ -453,8 +453,6 @@ object AppPreference {
     private val RECONVERSION_PREFERENCE =
         Pair("reconversion_preference", false)
 
-    private val CONVERSION_KEY_SWIPE_CURSOR_MOVE_PREFERENCE =
-        Pair("conversion_key_swipe_cursor_move_preference", false)
 
     private val PHYSICAL_KEYBOARD_INPUT_MODE_PREFERENCE =
         Pair("physical_keyboard_input_mode_preference", "romaji")
@@ -2314,15 +2312,6 @@ object AppPreference {
             it.putBoolean(RECONVERSION_PREFERENCE.first, value)
         }
 
-    var conversion_key_swipe_cursor_move_preference: Boolean
-        get() = preferences.getBoolean(
-            CONVERSION_KEY_SWIPE_CURSOR_MOVE_PREFERENCE.first,
-            CONVERSION_KEY_SWIPE_CURSOR_MOVE_PREFERENCE.second
-        )
-        set(value) = preferences.edit {
-            it.putBoolean(CONVERSION_KEY_SWIPE_CURSOR_MOVE_PREFERENCE.first, value)
-        }
-
     var physical_keyboard_input_mode_preference: String
         get() = preferences.getString(
             PHYSICAL_KEYBOARD_INPUT_MODE_PREFERENCE.first,
@@ -2677,6 +2666,17 @@ object AppPreference {
      * JSON を読み込んで SharedPreferences に反映
      * @param replaceAll true の場合は一旦 clear() してから復元（バックアップ復元向け）
      */
+    /** 機能ごと削除した設定の key（2026-10-30）。古いバックアップのインポートで読み飛ばす。 */
+    internal val REMOVED_PREFERENCE_KEYS: Set<String> = setOf(
+        "incremental_conversion_session_preference",
+        "enable_typo_correction_japanese_flick_keyboard_preference",
+        "enable_typo_correction_japanese_flick_keyboard_offset_score_preference",
+        "enable_typo_correction_qwerty_english_keyboard_preference",
+        "omission_search_preference",
+        "omission_search_preference_offset_score_preference",
+        "conversion_key_swipe_cursor_move_preference",
+    )
+
     fun importAllFromJson(json: String, replaceAll: Boolean = true) {
         val backup = try {
             gson.fromJson(json, PrefBackup::class.java)
@@ -2687,7 +2687,9 @@ object AppPreference {
         preferences.edit { editor ->
             if (replaceAll) editor.clear()
 
-            backup.entries.forEach { e ->
+            backup.entries.orEmpty().forEach { e ->
+                // 機能ごと削除した設定は古いバックアップに入っていても読み込まない（未知の key は残っても使われない）
+                if (e.key == null || e.key in REMOVED_PREFERENCE_KEYS) return@forEach
                 when (e.type) {
                     "null" -> editor.remove(e.key)
                     "boolean" -> editor.putBoolean(e.key, (e.value as Boolean))

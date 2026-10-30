@@ -485,8 +485,6 @@
 
     <!-- TODO: Remove or change this placeholder text -->
     <string name="hello_blank_fragment">空のフラグメント</string>
-    <string name="pref_title_space_longpress_cursor">スペース長押しでカーソル移動</string>
-    <string name="pref_summary_space_longpress_cursor">未確定（プリエディット）入力中、スペースキーを長押しするとカーソルを移動します</string>
     <string name="pref_qwerty_shift_key_action_title">Shift キー動作 (ローマ字)</string>
     <string name="pref_qwerty_shift_key_action_summary">Shift 直後の 1 キーのみ大文字英字に統一します</string>
     <string name="pref_clipboard_tap_delete_title">クリップボード タップで候補から削除</string>

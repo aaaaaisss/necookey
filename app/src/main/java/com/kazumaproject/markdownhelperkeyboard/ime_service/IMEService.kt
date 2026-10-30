@@ -563,7 +563,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
     private var isRestoringReconversionInput = false
 
     private var henkanPressedWithBunsetsuDetect: Boolean = false
-    private var conversionKeySwipePreference: Boolean? = false
 
     private var speechRecognizer: SpeechRecognizer? = null
     private var isListening = false
@@ -2312,7 +2311,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         keyboardCornerBottomLeft = preferences.keyboardCornerBottomLeft
         keyboardCornerBottomRight = preferences.keyboardCornerBottomRight
         reconversionEnabledPreference = preferences.reconversionEnabled
-        conversionKeySwipePreference = preferences.conversionKeySwipePreference
         shortcutTollbarVisibility = preferences.shortcutTollbarVisibility
         shortcutToolbarIntegratedInSuggestion = preferences.shortcutToolbarIntegratedInSuggestion
         shortcutToolbarHeightDp = preferences.shortcutToolbarHeightDp
@@ -2989,7 +2987,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         tenkeyNumberSymbolKeyGapDp = 4
         isKeyboardRounded = null
         reconversionEnabledPreference = false
-        conversionKeySwipePreference = null
         bunsetsuPositionList = null
         bunsetsuSplitPatterns = emptyList()
         bunsetsuConversionSession = null
@@ -5190,7 +5187,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         enterCursorMoveMode: () -> Unit
     ): Boolean {
         if (!SpaceConvertCursorMovePolicy.shouldEnterCursorMoveMode(
-                conversionKeySwipeCursorMovePreference = conversionKeySwipePreference,
                 hasInputString = inputString.value.isNotEmpty(),
                 source = source
             )
@@ -5953,19 +5949,12 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
                                 flickView.setCursorMode(true)
                             }
                         } else {
-                            if (conversionKeySwipePreference == true) {
-                                if (!isHenkan.get()) {
-                                    enterSpaceConvertCursorMoveMode(
-                                        SpaceConvertCursorMoveSource.SumireCustomConvert
-                                    ) {
-                                        flickView.setCursorMode(true)
-                                    }
-                                }
-                            } else {
-                                handleSpaceLongActionSumire(
-                                    SpaceConvertCursorMoveSource.SumireCustomConvert
-                                )
-                            }
+                            // 入力中の変換キー長押し: 文節パターンを切り替えられなければ、カタカナ⇔ひらがなの切り替え等
+                            // （旧「スペース長押しでカーソル移動」スイッチ conversion_key_swipe_cursor_move_preference の
+                            // 既定オフと同じ動作。2026-10-30 にスイッチを削除してこの動作に固定）
+                            handleSpaceLongActionSumire(
+                                SpaceConvertCursorMoveSource.SumireCustomConvert
+                            )
                         }
                     }
 
@@ -6225,19 +6214,9 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
                             return
                         }
                         markSpaceConvertLongPressConsumed()
-                        if (conversionKeySwipePreference == true) {
-                            if (!isHenkan.get()) {
-                                enterSpaceConvertCursorMoveMode(
-                                    SpaceConvertCursorMoveSource.SumireCustomFlickConvert
-                                ) {
-                                    flickView.setCursorMode(true)
-                                }
-                            }
-                        } else {
-                            handleSpaceLongActionSumire(
-                                SpaceConvertCursorMoveSource.SumireCustomFlickConvert
-                            )
-                        }
+                        handleSpaceLongActionSumire(
+                            SpaceConvertCursorMoveSource.SumireCustomFlickConvert
+                        )
                     }
 
                     KeyAction.Copy -> {
