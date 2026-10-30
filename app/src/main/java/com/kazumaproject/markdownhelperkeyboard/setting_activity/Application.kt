@@ -3,6 +3,7 @@ package com.kazumaproject.markdownhelperkeyboard.setting_activity
 import android.app.Application
 import com.kazumaproject.markdownhelperkeyboard.BuildConfig
 import com.kazumaproject.markdownhelperkeyboard.custom_keyboard.seed.NecookeyDefaultLayoutSeeder
+import com.kazumaproject.markdownhelperkeyboard.diagnostics.FreezeWatchdog
 import com.kazumaproject.markdownhelperkeyboard.repository.KeyboardRepository
 import dagger.hilt.android.HiltAndroidApp
 import java.io.File
@@ -19,6 +20,8 @@ class Application : Application() {
 
     override fun onCreate() {
         super.onCreate()
+        // メインスレッドの固まりの記録（設定 → その他 → フリーズ記録）。別スレッドで動き、メインは止めない。
+        FreezeWatchdog.start(this)
         // Opening preferences (including directory lookup) happens on AppPreferenceInit.
         AppPreference.startInitialization(this)
         if (BuildConfig.DEBUG) {

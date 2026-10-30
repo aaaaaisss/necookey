@@ -3,6 +3,8 @@ package com.kazumaproject.markdownhelperkeyboard.setting_activity
 import android.content.Context
 import android.content.SharedPreferences
 import android.graphics.Color
+import android.os.Looper
+import android.os.SystemClock
 import androidx.core.graphics.toColorInt
 import androidx.preference.PreferenceManager
 import com.google.gson.Gson
@@ -20,6 +22,7 @@ import com.kazumaproject.domain.EmojiSkinToneSupport
 import com.kazumaproject.markdownhelperkeyboard.converter.engine.PredictionConfig
 import com.kazumaproject.markdownhelperkeyboard.ime_service.state.CandidateTab
 import com.kazumaproject.markdownhelperkeyboard.ime_service.state.KeyboardType
+import com.kazumaproject.markdownhelperkeyboard.diagnostics.FreezeWatchdog
 import com.kazumaproject.markdownhelperkeyboard.setting_activity.backup.PrefBackup
 import com.kazumaproject.markdownhelperkeyboard.setting_activity.backup.PrefEntry
 import java.util.concurrent.CompletableFuture
@@ -73,6 +76,7 @@ object AppPreference {
     private const val MAX_CANDIDATE_VISIBLE_HEIGHT_DP = 300
     private const val CURRENT_CANDIDATE_HEIGHT_DEFAULTS_MIGRATION_VERSION = 1
 
+    private const val MAIN_THREAD_INIT_WAIT_NOTE_MS = 300L
     private val initializationLock = Any()
     @Volatile private var initialization = CompletableFuture<Unit>()
     private val initializationStartLock = Any()
@@ -84,7 +88,22 @@ object AppPreference {
         get() {
             if (!initialized && Thread.currentThread() !== initializingThread) {
                 check(initializationStarted.get()) { "AppPreference has not been initialized" }
-                initialization.join()
+                val onMainThread = runCatching { Looper.myLooper() === Looper.getMainLooper() }
+                    .getOrDefault(false)
+                if (onMainThread && !initialization.isDone) {
+                    // メインスレッドで初期化を待つと画面が固まる。長く待ったらフリーズ記録に残す（原因調査用）
+                    val waitStart = SystemClock.uptimeMillis()
+                    initialization.join()
+                    val waitedMs = SystemClock.uptimeMillis() - waitStart
+                    if (waitedMs >= MAIN_THREAD_INIT_WAIT_NOTE_MS) {
+                        FreezeWatchdog.note(
+                            "AppPreference の初期化待ちでメインスレッドが $waitedMs ms 止まった\n" +
+                                Throwable().stackTrace.take(12).joinToString("\n") { "  at $it" },
+                        )
+                    }
+                } else {
+                    initialization.join()
+                }
             }
             return loadedPreferences
         }

@@ -223,6 +223,7 @@ import com.kazumaproject.markdownhelperkeyboard.converter.engine.PredictionConfi
 import com.kazumaproject.markdownhelperkeyboard.converter.ngram.SystemNgramRuntime
 import com.kazumaproject.markdownhelperkeyboard.converter.session.CandidateQueryMode
 import com.kazumaproject.markdownhelperkeyboard.converter.session.KanaKanjiConversionSession
+import com.kazumaproject.markdownhelperkeyboard.diagnostics.FreezeWatchdog
 import com.kazumaproject.markdownhelperkeyboard.converter.session.KanaKanjiQueryRequest
 import com.kazumaproject.markdownhelperkeyboard.converter.session.KanaKanjiQueryResult
 import com.kazumaproject.markdownhelperkeyboard.custom_keyboard.data.CustomKeyboardLayout
@@ -1827,6 +1828,7 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
 
     override fun onCreate() {
         super.onCreate()
+        FreezeWatchdog.onImeCreated()
         window.window?.let { imeWindow ->
             if (supportsNavbarExtension) {
                 WindowCompat.setDecorFitsSystemWindows(imeWindow, false)
@@ -2692,6 +2694,7 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
 
     override fun onStartInputView(editorInfo: EditorInfo?, restarting: Boolean) {
         super.onStartInputView(editorInfo, restarting)
+        FreezeWatchdog.onImeInputViewShown(true)
         flickInputPreviewCoordinator.cancel(restore = true)
         // The input view can restart without onStartInput() after returning from settings.
         // Re-read preferences that may change while the existing input session is retained.
@@ -2801,6 +2804,7 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
     }
 
     override fun onFinishInputView(finishingInput: Boolean) {
+        FreezeWatchdog.onImeInputViewShown(false)
         dismissKeyboardSelectionPopups()
         modeSwitchAwaitingCursorPosition = false
         dismissJob?.cancel()
@@ -2844,6 +2848,7 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
     }
 
     override fun onDestroy() {
+        FreezeWatchdog.onImeDestroyed()
         dismissKeyboardSelectionPopups()
         unregisterCrossWindowBlurListener()
         flickInputPreviewCoordinator.cancel(restore = false)

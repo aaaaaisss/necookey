@@ -1,9 +1,15 @@
 package com.kazumaproject.markdownhelperkeyboard.setting_activity.ui.setting
 
+import android.content.ClipData
+import android.content.ClipboardManager
 import android.content.Intent
+import android.graphics.Typeface
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.util.TypedValue
+import android.widget.ScrollView
+import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
@@ -13,6 +19,8 @@ import androidx.preference.Preference
 import androidx.preference.SeekBarPreference
 import androidx.preference.SwitchPreferenceCompat
 import com.kazumaproject.markdownhelperkeyboard.R
+import com.kazumaproject.markdownhelperkeyboard.diagnostics.FreezeLogFile
+import com.kazumaproject.markdownhelperkeyboard.diagnostics.FreezeWatchdog
 import com.kazumaproject.markdownhelperkeyboard.learning.nextword.NextWordEntity
 import com.kazumaproject.markdownhelperkeyboard.learning.nextword.NextWordRepository
 import com.kazumaproject.markdownhelperkeyboard.setting_activity.AppPreference
@@ -384,6 +392,10 @@ class MainPreferenceFragment : AsyncPreferenceFragment() {
             navigateSafely(R.id.openSourceFragment)
             true
         }
+        findPreference<Preference>("freeze_log_preference")?.setOnPreferenceClickListener {
+            showFreezeLogDialog()
+            true
+        }
         findPreference<Preference>("app_version_preference")?.summary =
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
                 "${packageInfo.versionName}（${packageInfo.longVersionCode}）"
@@ -391,6 +403,46 @@ class MainPreferenceFragment : AsyncPreferenceFragment() {
                 @Suppress("DEPRECATION")
                 "${packageInfo.versionName}（${packageInfo.versionCode}）"
             }
+    }
+
+    /** フリーズ記録（FreezeWatchdog）を表示する。ファイルの読み書きは IO で行う。 */
+    private fun showFreezeLogDialog() {
+        val context = requireContext()
+        val file = FreezeWatchdog.logFile(context)
+        viewLifecycleOwner.lifecycleScope.launch {
+            val log = withContext(Dispatchers.IO) { runCatching { FreezeLogFile.read(file) }.getOrDefault("") }
+            if (!isAdded) return@launch
+            val padding = (16 * resources.displayMetrics.density).toInt()
+            val textView = TextView(context).apply {
+                text = log.ifEmpty { getString(R.string.freeze_log_empty) }
+                setTextIsSelectable(true)
+                typeface = Typeface.MONOSPACE
+                setTextSize(TypedValue.COMPLEX_UNIT_SP, 11f)
+                setPadding(padding, padding, padding, padding)
+            }
+            val scroll = ScrollView(context).apply { addView(textView) }
+            AlertDialog.Builder(context)
+                .setTitle(R.string.freeze_log_title)
+                .setView(scroll)
+                .setPositiveButton(R.string.freeze_log_copy) { _, _ ->
+                    val clipboard = context.getSystemService(ClipboardManager::class.java)
+                    clipboard?.setPrimaryClip(ClipData.newPlainText("necookey freeze log", log))
+                    Toast.makeText(context, R.string.freeze_log_copied, Toast.LENGTH_SHORT).show()
+                }
+                .setNeutralButton(R.string.freeze_log_clear) { _, _ ->
+                    viewLifecycleOwner.lifecycleScope.launch(Dispatchers.IO) {
+                        runCatching { FreezeLogFile.clear(file) }
+                    }
+                    Toast.makeText(context, R.string.freeze_log_cleared, Toast.LENGTH_SHORT).show()
+                }
+                .setNegativeButton(R.string.freeze_log_close, null)
+                .show()
+                .also { dialog ->
+                    val empty = log.isEmpty()
+                    dialog.getButton(AlertDialog.BUTTON_POSITIVE)?.isEnabled = !empty
+                    dialog.getButton(AlertDialog.BUTTON_NEUTRAL)?.isEnabled = !empty
+                }
+        }
     }
 
     private fun readTextFromUri(uri: Uri): String {

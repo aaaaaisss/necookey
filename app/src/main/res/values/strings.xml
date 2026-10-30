@@ -788,4 +788,12 @@
     <string name="settings_ut_wiki_title">Wikipedia 辞書</string>
     <string name="settings_ut_wiki_summary">固有名詞や用語を増やします</string>
     <string name="home_hero_subtitle">AIなしで賢い日本語キーボード</string>
+    <string name="freeze_log_title">フリーズ記録</string>
+    <string name="freeze_log_summary">設定画面やキーボードが2秒以上反応しなかったときの記録を表示します（不具合の報告用）</string>
+    <string name="freeze_log_empty">記録はありません</string>
+    <string name="freeze_log_copy">コピー</string>
+    <string name="freeze_log_clear">消去</string>
+    <string name="freeze_log_close">閉じる</string>
+    <string name="freeze_log_copied">フリーズ記録をコピーしました</string>
+    <string name="freeze_log_cleared">フリーズ記録を消去しました</string>
 </resources>

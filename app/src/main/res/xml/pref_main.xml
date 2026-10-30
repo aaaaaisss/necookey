@@ -460,6 +460,11 @@
                 android:key="app_version_preference"
                 android:title="@string/app_version_title"
                 app:iconSpaceReserved="false" />
+            <Preference
+                android:key="freeze_log_preference"
+                android:summary="@string/freeze_log_summary"
+                android:title="@string/freeze_log_title"
+                app:iconSpaceReserved="false" />
         </PreferenceCategory>
     </PreferenceScreen>
 </androidx.preference.PreferenceScreen>
