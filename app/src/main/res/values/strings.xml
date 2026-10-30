@@ -92,11 +92,8 @@
     <string name="open_sorce_title">使用したライブラリ一覧</string>
     <string name="user_dictionary_explanation">この画面では、キーボードの予測変換に表示させたい単語を自由に登録できます。\n登録した単語は、その「読み」を設定した文字数以上入力することで、キーボードの変換候補として表示されるようになります。\n\n例：\n単語:「お疲れ様です。」 読み:「おつかれさまです」\n→「おつ」と入力すると「お疲れ様です。」が候補に表示されます。</string>
     <string name="user_dictionary_about_title">ユーザー辞書とは</string>
-    <string name="clipboard_history_title">クリップボードの履歴</string>
     <string name="dialog_image_description">dialog_image_description</string>
     <string name="category_title_keyboard">キーボード</string>
-    <string name="keyboard_screen_size_preference_title">位置とサイズ（縦画面）</string>
-    <string name="keyboard_screen_preference_summary">縦画面でのキーボード本体の位置・幅・高さを変更できます。横画面の位置とサイズはこの画面では変えられません（文節チップ方式の候補欄は常に画面幅）</string>
     <string name="keyboard_height_fix_specific_device_title">端末別の高さ補正</string>
     <string name="keyboard_height_fix_specific_device_summary_on">一部端末向けの高さ補正は有効です（例：Galaxy）。</string>
     <string name="keyboard_height_fix_specific_device_summary_off">一部端末向けの高さ補正は無効です。</string>
@@ -106,23 +103,17 @@
     <string name="password_compose_title">パスワード入力中の文字列の設定</string>
     <string name="password_compose_summary_on">パスワード入力中に未確定文字として扱います。</string>
     <string name="password_compose_summary_off">パスワード入力中に確定文字として扱います。</string>
-    <string name="type_null_input_behavior_title">TYPE_NULL 入力欄の動作</string>
     <string name="type_null_input_behavior_default">デフォルト（直接入力）</string>
     <string name="type_null_input_behavior_direct_commit">常に直接入力</string>
     <string name="type_null_input_behavior_composing_text">ComposingText を使う</string>
     <string name="category_function_title">機能</string>
     <string name="category_flick_input_title">フリック入力</string>
     <string name="category_qwerty_keyboard_title">QWERTY キーボード</string>
-    <string name="category_symbol_keyboard_title">記号キーボード</string>
     <string name="category_operation_title">操作</string>
     <string name="category_vibration_title">バイブレーション</string>
     <string name="category_learning_dictionary_title">学習辞書</string>
     <string name="category_user_dictionary_title">ユーザー辞書</string>
 
-    <string name="undo_enable_title">元に戻す機能</string>
-    <string name="undo_enable_summary">元に戻す機能を無効にする</string>
-    <string name="reconversion_preference_title">読みを戻す</string>
-    <string name="reconversion_preference_summary">候補が空のときに「読みを戻す」ボタンを表示し、直前に確定した読みを PreEdit に戻せます。</string>
     <string name="reconversion_symbol">読みを戻す</string>
     <string name="custom_direct_mode_space_hankaku_title">直接入力時に半角スペースを使用</string>
     <string name="custom_direct_mode_space_hankaku_summary">直接入力モードでPreEditに文字がない場合、スペースキーで半角スペースを入力します。</string>
@@ -135,9 +126,6 @@
 
 
 
-    <string name="symbol_mode_title">記号キーボードの初期画面</string>
-    <string name="symbol_mode_summary">記号キーボードの初期画面を選択します</string>
-    <string name="symbol_mode_dialog_title">初期画面を選択</string>
 
     <string name="custom_keyboard_two_words_title">Auto-commit for 2+ characters</string>
     <string name="custom_keyboard_two_words_summary_on">Automatically commits when a custom key outputs 2 or more characters.</string>
@@ -147,8 +135,6 @@
     <string name="delete_layout_with_references_title">参照中のレイアウトを削除しますか？</string>
     <string name="delete_layout_with_references_message">このカスタムキーボードは %1$d 個のキーから参照されています。削除すると、参照しているキーは「削除済みのカスタムキーボード」と表示され、切り替えできなくなります。それでも削除しますか？</string>
 
-    <string name="clipboard_history_fragment_title">クリップボードの履歴</string>
-    <string name="clipboard_history_fragment_summary">クリップボードの履歴を表示</string>
 
 
 
@@ -169,7 +155,6 @@
     <string name="candidate_action_close">閉じる</string>
 
     <string name="category_mozc_ut_title">Mozc UT</string>
-    <string name="category_about_app_title">アプリについて</string>
 
     <string name="mozc_ut_person_name_title">人名</string>
     <string name="mozc_ut_person_name_summary_on">人名辞書を追加します</string>
@@ -191,13 +176,9 @@
     <string name="mozc_ut_neologd_summary_on">Neologd にのみ収録されている単語を摘出して作成された辞書を追加します</string>
     <string name="mozc_ut_neologd_summary_off">無効</string>
 
-    <string name="open_source_libraries_title">使用した Open Source のライブラリ</string>
-    <string name="app_version_title">アプリのバージョン</string>
 
 
 
-    <string name="undo_enable_summary_on">確定した文字を削除したときに、元に戻せる機能を有効にします</string>
-    <string name="undo_enable_summary_off">確定した文字を削除したときに、元に戻せる機能を無効にします</string>
 
     <string name="space_key_title_hankaku">空白を半角入力</string>
     <string name="space_key_title_zenkaku">空白を全角入力</string>
@@ -218,7 +199,6 @@
     <string name="learn_dictionary_fragment_title">学習辞書</string>
     <string name="open_source_fragment_label">オープンソースライブラリ</string>
     <string name="key_editor_fragment_label">キーの編集</string>
-    <string name="custom_keyboard_list_preference_summary">入力に使うキーボードの追加・編集・並べ替え</string>
     <string name="custom_keyboard_fragment_label">カスタムキーボード</string>
     <string name="key_size_position_button_text_right">右寄せ</string>
     <string name="key_size_position_button_text_left">左寄せ</string>
@@ -353,11 +333,6 @@
     <string name="flick_up_right">右上</string>
     <string name="flick_down_left">左下</string>
     <string name="flick_down_right">右下</string>
-    <string name="emoji">絵文字</string>
-    <string name="emoticon">顔文字</string>
-    <string name="symbol">記号</string>
-    <string name="clipboard_history">クリップボードの履歴</string>
-    <string name="choose_initial_symbol_keyboard_open">記号キーボードの初期画面を選択します。</string>
     <string name="edit_ng_word_dialog_title">NG ワードを編集</string>
     <string name="add">追加</string>
     <string name="close">閉じる</string>
@@ -370,8 +345,6 @@
     <string name="shortcut_entry_content_description">ショートカットを表示</string>
     <string name="keyboard_theme_title">キーボードテーマ</string>
     <string name="keyboard_theme_dialog_title">ベースカラーの選択</string>
-    <string name="delete_key_flick_targets_title">削除対象の記号</string>
-    <string name="delete_key_flick_targets_summary">初期値: 。、！？「」『』ー.</string>
     <string name="delete_key_flick_targets_fragment_title">削除対象の記号</string>
     <string name="delete_key_flick_targets_description">削除キーの左フリックで区切りとして扱う記号です。スペースと改行は常に単語の区切りとして扱います。</string>
     <string name="delete_key_flick_targets_empty">登録されている記号がありません。</string>
@@ -383,9 +356,6 @@
     <string name="delete_key_flick_target_delete_message">「%1$s」を削除しますか？</string>
     <string name="delete_key_flick_target_delete_last_error">少なくとも1文字は残してください。</string>
     <string name="delete_key_flick_target_reset_message">初期値「。、！？「」『』ー.」に戻します。</string>
-    <string name="cursor_move_target_pairs_title">確定後にカーソル移動する記号ペア</string>
-    <string name="cursor_move_target_pairs_summary">確定後にカーソルをペアの間へ移動する2文字ペアを設定します。</string>
-    <string name="cursor_move_target_pairs_summary_current">現在の設定: %1$s</string>
     <string name="cursor_move_target_pairs_fragment_title">カーソル移動する記号ペア</string>
     <string name="cursor_move_target_pairs_description">PreEdit の確定文字列がここに登録した2文字ペアと完全一致した場合、確定後にカーソルを1つ左へ動かしてペアの間に移動します。</string>
     <string name="cursor_move_target_pairs_empty">登録されているペアがありません。空の場合はカーソルを自動移動しません。</string>
@@ -400,9 +370,7 @@
     <string name="setting_key_icon_size">キーアイコンのサイズ（通常）</string>
     <string name="setting_mode_switch_key_icon_size">モード切替キーのアイコンサイズ</string>
     <string name="candidate_view_height_setting_fragment_title">変換欄の高さ</string>
-    <string name="candidate_height_preference_title">変換欄の高さ</string>
     <string name="candidate_height_portrait_preference_title">変換欄の高さ(縦画面)</string>
-    <string name="candidate_height_preference_sumary">変換候補を表示するレイアウトの高さの設定ができます</string>
     <string name="candidate_height_input_hint">変換欄の高さ（dp）</string>
     <string name="candidate_height_range_helper">30-300 dp</string>
     <string name="candidate_height_invalid_value">正しい高さを入力してください</string>
@@ -430,8 +398,6 @@
     <string name="keyboard_preview_label">キーボードプレビュー</string>
     <string name="unit_dp">dp</string>
 
-    <string name="pref_clipboard_preview_title">クリップボードの内容を変換欄に表示</string>
-    <string name="pref_clipboard_preview_summary">クリップボードにコピーした文字や画像を検知したとき、変換欄に表示します。</string>
     <string name="clipboard_sensitive_content_hidden">機密性の高いクリップボードの内容</string>
 
 
@@ -439,12 +405,6 @@
     <string name="hello_blank_fragment">空のフラグメント</string>
     <string name="pref_qwerty_shift_key_action_title">Shift キー動作 (ローマ字)</string>
     <string name="pref_qwerty_shift_key_action_summary">Shift 直後の 1 キーのみ大文字英字に統一します</string>
-    <string name="pref_clipboard_tap_delete_title">クリップボード タップで候補から削除</string>
-    <string name="pref_clipboard_tap_delete_summary">クリップボード項目をタップしたとき、変換欄から削除します。</string>
-    <string name="pref_clipboard_delete_unpinned_after_hours_title">ピン留めしていない項目を自動削除</string>
-    <string name="pref_clipboard_delete_unpinned_after_hours_summary">オンにすると、ピン留めしていないクリップボード項目を指定時間後に削除します。</string>
-    <string name="pref_clipboard_unpinned_retention_hours_title">削除までの時間</string>
-    <string name="pref_clipboard_unpinned_retention_hours_summary">ピン留めしていないクリップボード項目を保持する時間を選択します。</string>
     <string name="category_common">共通</string>
     <string name="category_dictionary">辞書</string>
     <string name="external_dictionary_settings_title">外部辞書ファイル</string>
@@ -537,11 +497,6 @@
     <string name="setting_two_step_flick">2段フリック設定</string>
     <string name="two_step_output_label">出力文字</string>
     <string name="drag_item">drag item</string>
-    <string name="back_up">設定のバックアップ</string>
-    <string name="pref_backup_export_title">設定をエクスポート</string>
-    <string name="pref_backup_export_summary">現在の設定をバックアップファイルとして保存します</string>
-    <string name="pref_backup_import_summary">バックアップファイルから設定を復元します。</string>
-    <string name="pref_backup_import_title">設定をインポート</string>
     <string name="custom_romaji_zenkaku_conversion_enable_preference_title">カスタムローマ字での全角nの動作</string>
     <string name="custom_romaji_zenkaku_conversion_enable_preference_summary">カスタムローマ字を使用している場合、この設定を有効にすると、全角の n の後に文字を入力した際に「ん」に変換されます</string>
     <string name="system_user_dictionary">システムユーザー辞書</string>
@@ -629,12 +584,6 @@
     <string name="external_mozc_prediction_enable_summary">有効な人名・地名・Wiki・NEologd・Web辞書を前方一致予測に使用します。</string>
     <string name="symbol_emoji_prediction_enable_title">記号・絵文字・顔文字</string>
     <string name="symbol_emoji_prediction_enable_summary">記号、絵文字、顔文字の辞書を前方一致予測に使用します。</string>
-    <string name="symbol_candidate_enable_title">記号の変換候補</string>
-    <string name="symbol_candidate_enable_summary">記号の変換候補を表示します。</string>
-    <string name="emoji_candidate_enable_title">絵文字の変換候補</string>
-    <string name="emoji_candidate_enable_summary">絵文字の変換候補を表示します。</string>
-    <string name="emoticon_candidate_enable_title">顔文字の変換候補</string>
-    <string name="emoticon_candidate_enable_summary">顔文字の変換候補を表示します。</string>
 
 
     <string name="keyboard_type_tenkey">日本語 - かな</string>
@@ -653,17 +602,10 @@
     <string name="cursor_move_target_pairs_not_set">未設定</string>
     <string name="next_word_learning_category_title">後続語</string>
     <string name="next_word_learning_view_title">後続語の学習を表示</string>
-    <string name="next_word_learning_view_summary">%1$d 件。タップで一覧、項目をタップで削除します。</string>
-    <string name="next_word_learning_clear_title">後続語の学習をすべて削除</string>
-    <string name="next_word_learning_clear_summary">学習した後続語をすべて削除します</string>
     <string name="next_word_learning_clear_confirm">学習した後続語をすべて削除しますか？</string>
     <string name="next_word_learning_empty">学習した後続語はありません</string>
     <string name="next_word_learning_delete_entry_confirm">この後続語を削除しますか？</string>
-    <string name="settings_section_input">入力</string>
-    <string name="settings_section_candidates">候補</string>
     <string name="settings_section_dictionary">辞書・学習</string>
-    <string name="ng_word_list_title">NG ワード（非表示にする単語）</string>
-    <string name="ng_word_list_summary">変換候補に出したくない単語を登録・編集します。変換候補の長押しからも登録できます</string>
     <string name="ng_word_fragment_title">NG ワード一覧</string>
     <string name="settings_backup_exported">設定をエクスポートしました</string>
     <string name="settings_backup_export_failed">エクスポートに失敗しました: %1$s</string>
@@ -671,48 +613,13 @@
     <string name="settings_backup_import_failed">インポートに失敗しました: %1$s</string>
 
     <!-- 設定ホーム（UI 再設計） -->
-    <string name="home_category_keyboard">キーボード</string>
-    <string name="home_category_keyboard_summary">配列・サイズ・キー操作</string>
-    <string name="home_category_conversion">変換</string>
-    <string name="home_category_conversion_summary">候補の出し方と変換補正</string>
-    <string name="home_category_dictionary">辞書と学習</string>
-    <string name="home_category_dictionary_summary">ユーザー辞書・学習・NGワード</string>
     <string name="home_category_symbol_clipboard">クリップボード・記号</string>
     <string name="home_category_symbol_clipboard_summary">履歴・プレビュー・記号/絵文字</string>
     <string name="home_category_backup">バックアップ</string>
     <string name="home_category_backup_summary">設定の書き出し・読み込み</string>
     <string name="home_category_about">アプリについて</string>
     <string name="home_category_about_summary">バージョン・オープンソースライセンス</string>
-    <string name="home_settings_header">設定</string>
-    <string name="home_dictionary_manage_category">辞書の管理</string>
-    <string name="home_learn_dictionary_summary">学習した単語の確認・削除</string>
-    <string name="home_user_dictionary_summary">単語の登録・編集</string>
-    <string name="home_status_ready_title">necookey は使用中です</string>
-    <string name="home_status_ready_message">キーボードは有効で、現在の入力方法として選択されています。</string>
-    <string name="home_status_not_selected_title">入力方法として選択されていません</string>
-    <string name="home_status_not_selected_message">キーボードは有効です。「切り替える」から necookey を選んでください。</string>
-    <string name="home_status_disabled_title">キーボードが有効になっていません</string>
-    <string name="home_status_disabled_message">システム設定で necookey を有効にしてから、入力方法として選択してください。</string>
-    <string name="home_status_enable_button">有効にする</string>
-    <string name="home_status_switch_button">切り替える</string>
-    <string name="home_category_other">その他</string>
-    <string name="home_category_other_summary">クリップボード・バックアップ・情報</string>
-    <string name="settings_advanced_title">詳細設定</string>
-    <string name="settings_advanced_summary">ふだんは触らなくて大丈夫な項目</string>
-    <string name="settings_section_look">見た目とサイズ</string>
-    <string name="settings_section_key_behavior">キーの細かい動き</string>
-    <string name="settings_section_candidate_detail">候補の詳細</string>
-    <string name="settings_section_next_word">後続語</string>
-    <string name="settings_ut_dictionary_category">追加辞書（Mozc UT）</string>
-    <string name="settings_ut_person_title">人名辞書</string>
-    <string name="settings_ut_person_summary">人名を変換候補に出します</string>
-    <string name="settings_ut_places_title">地名辞書</string>
-    <string name="settings_ut_places_summary">地名を変換候補に出します</string>
-    <string name="settings_ut_wiki_title">Wikipedia 辞書</string>
-    <string name="settings_ut_wiki_summary">固有名詞や用語を増やします</string>
-    <string name="home_hero_subtitle">AIなしで賢い日本語キーボード</string>
     <string name="freeze_log_title">フリーズ記録</string>
-    <string name="freeze_log_summary">設定画面やキーボードが2秒以上反応しなかったときの記録を表示します（不具合の報告用）</string>
     <string name="freeze_log_empty">記録はありません</string>
     <string name="freeze_log_copy">コピー</string>
     <string name="freeze_log_clear">消去</string>

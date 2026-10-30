@@ -4,7 +4,10 @@ import android.content.Intent
 import android.graphics.drawable.Drawable
 import android.os.Bundle
 import android.view.View
+import android.graphics.Color
+import androidx.activity.SystemBarStyle
 import androidx.activity.enableEdgeToEdge
+import androidx.appcompat.app.AppCompatDelegate
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.graphics.Insets
 import androidx.core.view.ViewCompat
@@ -73,8 +76,9 @@ class MainActivity : AppCompatActivity() {
         R.id.candidateViewHeightSettingFragment,
         R.id.candidateHeightDefaultsFragment,
     )
+    /** 設定ホームは自前の見出し（アプリ名）を持つので上部バーを出さない。 */
     private val destinationsWithoutSharedActionBar =
-        destinationsWithOwnToolbar
+        destinationsWithOwnToolbar + R.id.settingMainFragment
 
     override fun onCreate(savedInstanceState: Bundle?) {
         // ComponentActivity consumes the nested saved-state bundle while restoring
@@ -92,11 +96,17 @@ class MainActivity : AppCompatActivity() {
             ?.getBoolean(PENDING_INTENT_RECEIVED_KEY) ?: false
         pendingIntentRequest = savedInstanceState?.getString(PENDING_INTENT_REQUEST_KEY)
 
+        // 設定画面はダーク固定（端末の設定に関係なく。values-night の色も使わせる）。IME 側は影響を受けない。
+        delegate.localNightMode = AppCompatDelegate.MODE_NIGHT_YES
         super.onCreate(savedInstanceState)
         // Window fitting must be configured before the delayed preferences load.
         // Configuring it after the Activity has started can leave AppCompat's
         // ActionBar and content with different system-bar insets.
-        enableEdgeToEdge()
+        // ダーク固定なので、システムバーは常に明るいアイコン＋透明（端末がライトでも暗い文字にならない）
+        enableEdgeToEdge(
+            statusBarStyle = SystemBarStyle.dark(Color.TRANSPARENT),
+            navigationBarStyle = SystemBarStyle.dark(Color.TRANSPARENT),
+        )
         initializationUi = SettingsLoadingUi(this, ::loadSettingsContent)
         contentContainer = FrameLayout(this)
         // Keep the inset receiver attached while replacing loading content. AppCompat
@@ -204,7 +214,8 @@ class MainActivity : AppCompatActivity() {
         val appBarConfiguration = AppBarConfiguration(setOf(R.id.settingMainFragment))
         setupActionBarWithNavController(navController, appBarConfiguration)
         if (dynamicColorsAvailable) {
-            themedBackground(com.google.android.material.R.attr.colorSurfaceContainer)
+            // 上部バーは背景と同じ色（影なし）で、画面と一体に見せる
+            themedBackground(com.google.android.material.R.attr.colorSurface)
                 ?.let { supportActionBar?.setBackgroundDrawable(it) }
         }
         navController.addOnDestinationChangedListener { _, destination, _ ->

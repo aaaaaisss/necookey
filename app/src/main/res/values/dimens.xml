@@ -1,2 +1,17 @@
 <resources>
+    <!-- 設定画面（8dp グリッド。カードの間の 2dp だけ例外） -->
+    <dimen name="settings_screen_padding_h">16dp</dimen>
+    <dimen name="settings_row_min_height">64dp</dimen>
+    <dimen name="settings_home_row_min_height">72dp</dimen>
+    <dimen name="settings_row_padding_h">16dp</dimen>
+    <dimen name="settings_row_padding_v">16dp</dimen>
+    <dimen name="settings_card_radius">20dp</dimen>
+    <dimen name="settings_card_inner_radius">4dp</dimen>
+    <dimen name="settings_card_gap">2dp</dimen>
+    <dimen name="settings_icon_chip">40dp</dimen>
+    <dimen name="settings_list_top">8dp</dimen>
+    <dimen name="settings_list_bottom">32dp</dimen>
+    <dimen name="settings_section_gap">24dp</dimen>
+    <dimen name="settings_group_gap">16dp</dimen>
+    <dimen name="settings_section_label_bottom">8dp</dimen>
 </resources>

@@ -1,0 +1,89 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 設定アプリ（MainActivity）専用のテーマ。ダーク固定（MainActivity でも localNightMode = YES）。
+     IME は Theme.MarkdownKeyboard のまま。 -->
+<resources>
+
+    <style name="Theme.Necookey.Settings" parent="Theme.Material3.Dark">
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+        <item name="android:splitMotionEvents">false</item>
+        <item name="actionBarStyle">@style/Widget.Necookey.ActionBar</item>
+        <item name="preferenceTheme">@style/ThemeOverlay.Necookey.Preference</item>
+        <item name="materialAlertDialogTheme">@style/ThemeOverlay.Material3.MaterialAlertDialog</item>
+        <item name="alertDialogTheme">@style/ThemeOverlay.Material3.Dialog.Alert</item>
+    </style>
+
+    <!-- 上部バー: 背景と同じ色・影なし。タイトルは TitleLarge -->
+    <style name="Widget.Necookey.ActionBar" parent="Widget.Material3.ActionBar.Solid">
+        <item name="background">?attr/colorSurface</item>
+        <item name="elevation">0dp</item>
+        <item name="titleTextStyle">@style/TextAppearance.Necookey.BarTitle</item>
+    </style>
+
+    <!-- 文字の階層（4 段だけ） -->
+    <style name="TextAppearance.Necookey.Display" parent="TextAppearance.Material3.HeadlineLarge">
+        <item name="android:textColor">?attr/colorOnSurface</item>
+        <item name="android:letterSpacing">-0.01</item>
+    </style>
+    <style name="TextAppearance.Necookey.BarTitle" parent="TextAppearance.Material3.TitleLarge">
+        <item name="android:textColor">?attr/colorOnSurface</item>
+    </style>
+    <style name="TextAppearance.Necookey.HomeRowTitle" parent="TextAppearance.Material3.TitleMedium">
+        <item name="android:textColor">?attr/colorOnSurface</item>
+    </style>
+    <style name="TextAppearance.Necookey.RowTitle" parent="TextAppearance.Material3.BodyLarge">
+        <item name="android:textColor">?attr/colorOnSurface</item>
+    </style>
+    <style name="TextAppearance.Necookey.RowSummary" parent="TextAppearance.Material3.BodyMedium">
+        <item name="android:textColor">?attr/colorOnSurfaceVariant</item>
+    </style>
+    <style name="TextAppearance.Necookey.SectionLabel" parent="TextAppearance.Material3.LabelLarge">
+        <item name="android:textColor">?attr/colorPrimary</item>
+    </style>
+    <style name="TextAppearance.Necookey.Value" parent="TextAppearance.Material3.LabelLarge">
+        <item name="android:textColor">?attr/colorOnSurfaceVariant</item>
+    </style>
+
+    <!-- 設定一覧の行（androidx.preference） -->
+    <style name="ThemeOverlay.Necookey.Preference" parent="PreferenceThemeOverlay">
+        <item name="preferenceStyle">@style/Necookey.Preference</item>
+        <item name="preferenceScreenStyle">@style/Necookey.Preference.Screen</item>
+        <item name="preferenceCategoryStyle">@style/Necookey.Preference.Category</item>
+        <item name="switchPreferenceCompatStyle">@style/Necookey.Preference.Switch</item>
+        <item name="dialogPreferenceStyle">@style/Necookey.Preference.Dialog</item>
+        <item name="seekBarPreferenceStyle">@style/Necookey.Preference.SeekBar</item>
+    </style>
+    <style name="Necookey.Preference" parent="Preference.Material">
+        <item name="android:layout">@layout/settings_pref_row</item>
+        <item name="iconSpaceReserved">false</item>
+        <item name="singleLineTitle">false</item>
+    </style>
+    <!-- 入れ子の画面（詳細）へ進む行は矢印付き -->
+    <style name="Necookey.Preference.Screen" parent="Preference.PreferenceScreen.Material">
+        <item name="android:layout">@layout/settings_pref_row</item>
+        <item name="android:widgetLayout">@layout/settings_widget_chevron</item>
+        <item name="iconSpaceReserved">false</item>
+    </style>
+    <style name="Necookey.Preference.Category" parent="Preference.Category.Material">
+        <item name="android:layout">@layout/settings_pref_category</item>
+        <item name="iconSpaceReserved">false</item>
+    </style>
+    <style name="Necookey.Preference.Switch" parent="Preference.SwitchPreferenceCompat.Material">
+        <item name="android:layout">@layout/settings_pref_row</item>
+        <item name="android:widgetLayout">@layout/settings_widget_switch</item>
+        <item name="iconSpaceReserved">false</item>
+        <item name="singleLineTitle">false</item>
+    </style>
+    <style name="Necookey.Preference.Dialog" parent="Preference.DialogPreference.Material">
+        <item name="android:layout">@layout/settings_pref_row</item>
+        <item name="iconSpaceReserved">false</item>
+        <item name="singleLineTitle">false</item>
+    </style>
+    <style name="Necookey.Preference.SeekBar" parent="Preference.SeekBarPreference.Material">
+        <item name="android:layout">@layout/settings_pref_seekbar</item>
+        <item name="iconSpaceReserved">false</item>
+        <item name="adjustable">true</item>
+        <item name="showSeekBarValue">true</item>
+    </style>
+</resources>

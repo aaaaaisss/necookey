@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- 設定ホーム: 状態カード + 試し入力 + カテゴリ一覧 -->
+<!-- 設定ホーム: アプリ名 / キーボードが使えないときだけの小さなお知らせ / セクションごとの角丸カード（SettingMainFragment が組み立てる） -->
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:id="@+id/setting_root"
@@ -16,109 +16,66 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical"
-            android:padding="16dp">
+            android:paddingStart="@dimen/settings_screen_padding_h"
+            android:paddingEnd="@dimen/settings_screen_padding_h"
+            android:paddingBottom="@dimen/settings_list_bottom">
 
             <TextView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginStart="4dp"
-                android:layout_marginTop="24dp"
-                android:text="necookey"
-                android:textAppearance="?attr/textAppearanceDisplaySmall"
-                android:textColor="?attr/colorOnSurface" />
-
-            <TextView
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginStart="4dp"
-                android:layout_marginBottom="20dp"
-                android:text="@string/home_hero_subtitle"
-                android:textAppearance="?attr/textAppearanceBodyLarge"
-                android:textColor="?attr/colorOnSurfaceVariant" />
+                android:layout_marginTop="48dp"
+                android:layout_marginBottom="24dp"
+                android:paddingStart="@dimen/settings_row_padding_h"
+                android:paddingEnd="@dimen/settings_row_padding_h"
+                android:text="@string/st_app_name"
+                android:textAppearance="@style/TextAppearance.Necookey.Display" />
 
             <com.google.android.material.card.MaterialCardView
-                android:id="@+id/status_card"
+                android:id="@+id/status_banner"
                 style="?attr/materialCardViewFilledStyle"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                app:cardBackgroundColor="?attr/colorSecondaryContainer"
-                app:cardCornerRadius="24dp">
+                android:layout_marginBottom="16dp"
+                android:visibility="gone"
+                app:cardCornerRadius="@dimen/settings_card_radius">
 
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:orientation="vertical"
-                    android:padding="20dp">
+                    android:gravity="center_vertical"
+                    android:minHeight="@dimen/settings_row_min_height"
+                    android:orientation="horizontal"
+                    android:paddingStart="@dimen/settings_row_padding_h"
+                    android:paddingTop="8dp"
+                    android:paddingEnd="8dp"
+                    android:paddingBottom="8dp">
 
-                    <LinearLayout
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:gravity="center_vertical"
-                        android:orientation="horizontal">
-
-                        <ImageView
-                            android:id="@+id/status_icon"
-                            android:layout_width="24dp"
-                            android:layout_height="24dp"
-                            android:importantForAccessibility="no"
-                            android:src="@drawable/ic_home_status_warning"
-                            app:tint="?attr/colorPrimary" />
-
-                        <TextView
-                            android:id="@+id/status_title"
-                            android:layout_width="0dp"
-                            android:layout_height="wrap_content"
-                            android:layout_marginStart="12dp"
-                            android:layout_weight="1"
-                            android:textAppearance="?attr/textAppearanceTitleMedium"
-                            android:textColor="?attr/colorOnSecondaryContainer" />
-                    </LinearLayout>
+                    <ImageView
+                        android:id="@+id/status_icon"
+                        android:layout_width="24dp"
+                        android:layout_height="24dp"
+                        android:importantForAccessibility="no"
+                        android:src="@drawable/ic_ms_warning" />
 
                     <TextView
-                        android:id="@+id/status_message"
-                        android:layout_width="match_parent"
+                        android:id="@+id/status_title"
+                        android:layout_width="0dp"
                         android:layout_height="wrap_content"
-                        android:layout_marginTop="8dp"
-                        android:textAppearance="?attr/textAppearanceBodyMedium"
-                        android:textColor="?attr/colorOnSecondaryContainer" />
+                        android:layout_marginStart="16dp"
+                        android:layout_marginEnd="8dp"
+                        android:layout_weight="1"
+                        android:textAppearance="?attr/textAppearanceTitleSmall" />
 
-                    <LinearLayout
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="12dp"
-                        android:gravity="end"
-                        android:orientation="horizontal">
-
-                        <com.google.android.material.button.MaterialButton
-                            android:id="@+id/status_enable_button"
-                            style="@style/Widget.Material3.Button.TonalButton"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="@string/home_status_enable_button" />
-
-                        <com.google.android.material.button.MaterialButton
-                            android:id="@+id/status_switch_button"
-                            style="@style/Widget.Material3.Button"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:layout_marginStart="8dp"
-                            android:text="@string/home_status_switch_button" />
-                    </LinearLayout>
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/status_action"
+                        style="@style/Widget.Material3.Button.TextButton"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content" />
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
 
-            <TextView
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginStart="4dp"
-                android:layout_marginTop="24dp"
-                android:layout_marginBottom="8dp"
-                android:text="@string/home_settings_header"
-                android:textAppearance="?attr/textAppearanceLabelLarge"
-                android:textColor="?attr/colorPrimary" />
-
             <LinearLayout
-                android:id="@+id/category_list"
+                android:id="@+id/section_list"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="vertical" />

@@ -14,9 +14,7 @@ import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
 import androidx.lifecycle.lifecycleScope
-import androidx.preference.ListPreference
 import androidx.preference.Preference
-import androidx.preference.SwitchPreferenceCompat
 import com.kazumaproject.markdownhelperkeyboard.R
 import com.kazumaproject.markdownhelperkeyboard.diagnostics.FreezeLogFile
 import com.kazumaproject.markdownhelperkeyboard.diagnostics.FreezeWatchdog
@@ -37,6 +35,7 @@ import javax.inject.Inject
 /**
  * necookey の設定カテゴリ画面 (res/xml/pref_main.xml)。
  * 設定ホーム ([SettingMainFragment]) から rootKey = screen_* で開かれ、そのカテゴリの項目だけを表示する。
+ * 行の見た目: Theme.Necookey.Settings の preferenceTheme（settings_pref_*）＋ [SettingsPreferenceAdapter]（角丸カード）。
  * 他カテゴリの項目は findPreference が null を返すので bind* は何もしない。
  */
 @AndroidEntryPoint
@@ -91,8 +90,13 @@ class MainPreferenceFragment : AsyncPreferenceFragment() {
         super.onViewCreated(view, savedInstanceState)
         setDivider(null)
         listView.clipToPadding = false
-        listView.addItemDecoration(SettingsCardDecoration(listView))
+        listView.itemAnimator = null
+        listView.addItemDecoration(SettingsCardDecoration())
     }
+
+    /** 行の背景（角丸カード・押下の波紋）と見出しの間隔を付けるアダプタ。 */
+    override fun onCreateAdapter(preferenceScreen: androidx.preference.PreferenceScreen): androidx.recyclerview.widget.RecyclerView.Adapter<*> =
+        SettingsPreferenceAdapter(preferenceScreen)
 
     /** 入れ子の PreferenceScreen（各カテゴリの「詳細設定」）を同じ画面クラスで開く。 */
     override fun onNavigateToScreen(preferenceScreen: androidx.preference.PreferenceScreen) {
@@ -104,6 +108,7 @@ class MainPreferenceFragment : AsyncPreferenceFragment() {
                 androidx.preference.PreferenceFragmentCompat.ARG_PREFERENCE_ROOT to preferenceScreen.key,
                 ARG_TITLE to preferenceScreen.title?.toString().orEmpty(),
             ),
+            settingsNavOptions,
             )
         }.onFailure { Timber.w(it, "Cannot open nested settings screen") }
     }
@@ -112,7 +117,6 @@ class MainPreferenceFragment : AsyncPreferenceFragment() {
         bindInputSection()
         bindCandidateSection()
         bindDictionarySection()
-        bindSymbolSection()
         bindClipboardSection()
         bindBackupAndAboutSection()
     }
@@ -131,17 +135,6 @@ class MainPreferenceFragment : AsyncPreferenceFragment() {
 
     private fun bindInputSection() {
 
-        findPreference<SwitchPreferenceCompat>("undo_enable_preference")?.apply {
-            fun label(on: Boolean) = getString(
-                if (on) R.string.undo_enable_summary_on else R.string.undo_enable_summary_off
-            )
-            summary = label(appPreference.undo_enable_preference == true)
-            setOnPreferenceChangeListener { _, newValue ->
-                summary = label(newValue == true)
-                true
-            }
-        }
-
         findPreference<Preference>("delete_key_flick_left_targets_preference")?.setOnPreferenceClickListener {
             navigateSafely(R.id.deleteKeyFlickTargetsFragment)
             true
@@ -157,12 +150,10 @@ class MainPreferenceFragment : AsyncPreferenceFragment() {
     }
 
     private fun updateCursorMoveTargetPairsSummary() {
+        // 説明は今の記号だけ（例「「」 （）」）。未設定なら「未設定」
         findPreference<Preference>("cursor_move_after_commit_target_pairs_preference")?.summary =
-            getString(
-                R.string.cursor_move_target_pairs_summary_current,
-                appPreference.cursor_move_after_commit_target_pairs_preference.joinToString(" ")
-                    .ifBlank { getString(R.string.cursor_move_target_pairs_not_set) }
-            )
+            appPreference.cursor_move_after_commit_target_pairs_preference.joinToString(" ")
+                .ifBlank { getString(R.string.cursor_move_target_pairs_not_set) }
     }
 
     // ---- 変換候補 ----
@@ -227,7 +218,7 @@ class MainPreferenceFragment : AsyncPreferenceFragment() {
         viewLifecycleOwner.lifecycleScope.launch {
             val count = nextWordRepository.count()
             findPreference<Preference>("next_word_learning_view_preference")?.summary =
-                getString(R.string.next_word_learning_view_summary, count)
+                getString(R.string.st_next_word_count, count)
         }
     }
 
@@ -271,23 +262,6 @@ class MainPreferenceFragment : AsyncPreferenceFragment() {
     private fun NextWordEntity.label(): String = "…$context → $output（$reading）×$usageCount"
 
     // ---- 記号・クリップボード ----
-
-    private fun bindSymbolSection() {
-        findPreference<ListPreference>("symbol_mode_preference")?.apply {
-            fun label(v: Any?) = when (v) {
-                "EMOJI" -> getString(R.string.emoji)
-                "EMOTICON" -> getString(R.string.emoticon)
-                "SYMBOL" -> getString(R.string.symbol)
-                "CLIPBOARD" -> getString(R.string.clipboard_history)
-                else -> getString(R.string.choose_initial_symbol_keyboard_open)
-            }
-            summary = label(value)
-            setOnPreferenceChangeListener { _, newValue ->
-                summary = label(newValue)
-                true
-            }
-        }
-    }
 
     private fun bindClipboardSection() {
         findPreference<Preference>("clipboard_history_preference_fragment")?.setOnPreferenceClickListener {

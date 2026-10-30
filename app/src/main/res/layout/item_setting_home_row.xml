@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 設定ホームの 1 行: 丸いアイコン・短いタイトル・右端の矢印。背景は SettingsRowBackground。 -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:clickable="true"
+    android:focusable="true"
+    android:gravity="center_vertical"
+    android:minHeight="@dimen/settings_home_row_min_height"
+    android:orientation="horizontal"
+    android:paddingStart="@dimen/settings_row_padding_h"
+    android:paddingEnd="@dimen/settings_row_padding_h">
+
+    <FrameLayout
+        android:layout_width="@dimen/settings_icon_chip"
+        android:layout_height="@dimen/settings_icon_chip"
+        android:background="@drawable/bg_settings_icon_chip">
+
+        <ImageView
+            android:id="@+id/row_icon"
+            android:layout_width="24dp"
+            android:layout_height="24dp"
+            android:layout_gravity="center"
+            android:importantForAccessibility="no"
+            app:tint="?attr/colorOnSecondaryContainer" />
+    </FrameLayout>
+
+    <TextView
+        android:id="@+id/row_title"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="16dp"
+        android:layout_marginEnd="16dp"
+        android:layout_weight="1"
+        android:ellipsize="end"
+        android:maxLines="1"
+        android:textAppearance="@style/TextAppearance.Necookey.HomeRowTitle" />
+
+    <ImageView
+        android:layout_width="24dp"
+        android:layout_height="24dp"
+        android:importantForAccessibility="no"
+        android:src="@drawable/ic_ms_chevron_right"
+        app:tint="?attr/colorOnSurfaceVariant" />
+</LinearLayout>

@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 画面遷移（進む）: 右から少しずれて浮かび上がる（Material の shared axis X に近い） -->
+<set xmlns:android="http://schemas.android.com/apk/res/android"
+    android:interpolator="@android:interpolator/fast_out_slow_in"
+    android:shareInterpolator="true">
+    <translate android:duration="300" android:fromXDelta="8%" android:toXDelta="0" />
+    <alpha android:duration="210" android:startOffset="90" android:fromAlpha="0" android:toAlpha="1" />
+</set>

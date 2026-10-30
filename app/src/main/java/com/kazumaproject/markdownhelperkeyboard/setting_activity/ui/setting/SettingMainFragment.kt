@@ -8,12 +8,15 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.view.inputmethod.InputMethodManager
+import android.widget.LinearLayout
+import android.widget.TextView
 import androidx.activity.OnBackPressedCallback
 import androidx.annotation.DrawableRes
 import androidx.annotation.StringRes
 import androidx.core.content.ContextCompat.getSystemService
 import androidx.core.os.bundleOf
 import androidx.core.view.isVisible
+import androidx.core.view.updatePadding
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
 import androidx.navigation.fragment.findNavController
@@ -21,17 +24,15 @@ import androidx.preference.PreferenceFragmentCompat
 import com.google.android.material.color.MaterialColors
 import com.kazumaproject.markdownhelperkeyboard.R
 import com.kazumaproject.markdownhelperkeyboard.databinding.FragmentSettingMainBinding
-import com.kazumaproject.markdownhelperkeyboard.databinding.ItemSettingCategoryBinding
-import com.kazumaproject.markdownhelperkeyboard.setting_activity.AppPreference
-import com.kazumaproject.markdownhelperkeyboard.variant.AppVariantConfig
+import com.kazumaproject.markdownhelperkeyboard.databinding.ItemSettingHomeRowBinding
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.launch
 import timber.log.Timber
 import javax.inject.Inject
 
 /**
- * 設定ホーム。上部にキーボードの状態カード（有効化/選択の確認とシステム設定への導線）、
- * 試し入力欄、その下にカテゴリ一覧。各カテゴリは [MainPreferenceFragment] を
+ * 設定ホーム（2026-10-30 作り直し）。上から「アプリ名」「キーボードが使えないときだけの小さなお知らせ」
+ * 「セクションごとの角丸カード（アイコン・短いタイトル・矢印）」。各行は [MainPreferenceFragment] を
  * pref_main.xml の PreferenceScreen(key=screen_*) を rootKey として開く。
  */
 @AndroidEntryPoint
@@ -44,30 +45,33 @@ class SettingMainFragment : Fragment() {
     private var initializationJob: kotlinx.coroutines.Job? = null
 
     @Inject
-    lateinit var appPreference: AppPreference
-
-    @Inject
     lateinit var settingDataInitializer: SettingDataInitializer
 
-    private data class Category(
+    private data class Entry(
         val screenKey: String,
         @StringRes val title: Int,
-        @StringRes val summary: Int,
         @DrawableRes val icon: Int,
     )
 
-    private val categories: List<Category>
-        get() = listOf(
-            Category("screen_keyboard", R.string.home_category_keyboard, R.string.home_category_keyboard_summary, com.kazumaproject.core.R.drawable.keyboard_24px),
-            Category(
-                "screen_conversion",
-                R.string.home_category_conversion,
-                R.string.home_category_conversion_summary,
-                R.drawable.ic_home_conversion,
+    private data class Section(@StringRes val label: Int, val entries: List<Entry>)
+
+    private val sections = listOf(
+        Section(
+            R.string.st_section_input,
+            listOf(
+                Entry("screen_keyboard", R.string.st_keyboard, R.drawable.ic_ms_keyboard),
+                Entry("screen_dictionary", R.string.st_dictionary, R.drawable.ic_ms_dictionary),
             ),
-            Category("screen_dictionary", R.string.home_category_dictionary, R.string.home_category_dictionary_summary, com.kazumaproject.core.R.drawable.dictionary_24px),
-            Category("screen_other", R.string.home_category_other, R.string.home_category_other_summary, R.drawable.ic_home_info),
-        )
+        ),
+        Section(
+            R.string.st_section_manage,
+            listOf(
+                Entry("screen_clipboard", R.string.st_clipboard, R.drawable.ic_ms_content_paste),
+                Entry("screen_backup", R.string.st_backup, R.drawable.ic_ms_backup),
+                Entry("screen_other", R.string.st_other, R.drawable.ic_ms_more_horiz),
+            ),
+        ),
+    )
 
     override fun onCreateView(
         inflater: LayoutInflater,
@@ -86,11 +90,7 @@ class SettingMainFragment : Fragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
-        buildCategoryList()
-        binding.statusEnableButton.setOnClickListener { openSystemImeSettings() }
-        binding.statusSwitchButton.setOnClickListener {
-            getSystemService(requireContext(), InputMethodManager::class.java)?.showInputMethodPicker()
-        }
+        buildSections()
         updateImeStatus()
         // 入力方法の選択ダイアログを閉じたとき（onResume が来ない）にも状態を更新する。
         view.viewTreeObserver.addOnWindowFocusChangeListener(focusListener)
@@ -108,41 +108,39 @@ class SettingMainFragment : Fragment() {
             })
     }
 
-    private fun buildCategoryList() {
-        val list = binding.categoryList
+    private fun buildSections() {
+        val list = binding.sectionList
         list.removeAllViews()
-        val gap = (12 * resources.displayMetrics.density).toInt()
-        categories.chunked(2).forEachIndexed { rowIndex, rowItems ->
-            val row = android.widget.LinearLayout(requireContext()).apply {
-                orientation = android.widget.LinearLayout.HORIZONTAL
-                layoutParams = android.widget.LinearLayout.LayoutParams(-1, -2).apply {
-                    if (rowIndex > 0) topMargin = gap
+        sections.forEachIndexed { sectionIndex, section ->
+            val label = layoutInflater.inflate(R.layout.item_setting_home_section, list, false) as TextView
+            label.setText(section.label)
+            if (sectionIndex == 0) label.updatePadding(top = 0)
+            list.addView(label)
+            val gap = resources.getDimensionPixelSize(R.dimen.settings_card_gap)
+            section.entries.forEachIndexed { index, entry ->
+                val row = ItemSettingHomeRowBinding.inflate(layoutInflater, list, false)
+                row.rowIcon.setImageResource(entry.icon)
+                row.rowTitle.setText(entry.title)
+                SettingsRowBackground.apply(
+                    row.root,
+                    first = index == 0,
+                    last = index == section.entries.lastIndex,
+                )
+                row.root.setOnClickListener { openScreen(entry) }
+                if (index > 0) {
+                    (row.root.layoutParams as LinearLayout.LayoutParams).topMargin = gap
                 }
+                list.addView(row.root)
             }
-            rowItems.forEachIndexed { index, category ->
-                val tile = ItemSettingCategoryBinding.inflate(layoutInflater, row, false)
-                tile.categoryIcon.setImageResource(category.icon)
-                tile.categoryTitle.setText(category.title)
-                tile.categorySummary.setText(category.summary)
-                tile.root.setOnClickListener { openCategory(category) }
-                (tile.root.layoutParams as android.widget.LinearLayout.LayoutParams).apply {
-                    if (index > 0) marginStart = gap
-                }
-                row.addView(tile.root)
-            }
-            if (rowItems.size == 1) {
-                row.addView(View(requireContext()), android.widget.LinearLayout.LayoutParams(0, 0, 1f).apply { marginStart = gap })
-            }
-            list.addView(row)
         }
     }
 
-    private fun openCategory(category: Category) {
+    private fun openScreen(entry: Entry) {
         navigateSafely(
             R.id.categorySettingsFragment,
             bundleOf(
-                PreferenceFragmentCompat.ARG_PREFERENCE_ROOT to category.screenKey,
-                MainPreferenceFragment.ARG_TITLE to getString(category.title),
+                PreferenceFragmentCompat.ARG_PREFERENCE_ROOT to entry.screenKey,
+                MainPreferenceFragment.ARG_TITLE to getString(entry.title),
             ),
         )
     }
@@ -169,29 +167,35 @@ class SettingMainFragment : Fragment() {
         return current.substringBefore('/') == context.packageName
     }
 
+    /** 有効で選択済みならお知らせは出さない。無効 → 「オンにする」、別のキーボード → 「切り替える」。 */
     private fun updateImeStatus() {
         val b = _binding ?: return
         val enabled = isImeEnabled()
         val selected = enabled && isImeSelected()
-        val (title, message) = when {
-            selected -> R.string.home_status_ready_title to R.string.home_status_ready_message
-            enabled -> R.string.home_status_not_selected_title to R.string.home_status_not_selected_message
-            else -> R.string.home_status_disabled_title to R.string.home_status_disabled_message
-        }
-        b.statusTitle.setText(title)
-        b.statusMessage.setText(message)
-        b.statusIcon.setImageResource(
-            if (selected) R.drawable.ic_home_status_ok else R.drawable.ic_home_status_warning
-        )
-        val tintAttr = if (selected) {
-            androidx.appcompat.R.attr.colorPrimary
+        b.statusBanner.isVisible = !selected
+        if (selected) return
+        val (container, onContainer) = if (!enabled) {
+            com.google.android.material.R.attr.colorErrorContainer to
+                com.google.android.material.R.attr.colorOnErrorContainer
         } else {
-            androidx.appcompat.R.attr.colorError
+            com.google.android.material.R.attr.colorSecondaryContainer to
+                com.google.android.material.R.attr.colorOnSecondaryContainer
         }
-        b.statusIcon.imageTintList =
-            ColorStateList.valueOf(MaterialColors.getColor(b.statusIcon, tintAttr))
-        b.statusEnableButton.isVisible = !enabled
-        b.statusSwitchButton.isVisible = enabled && !selected
+        val containerColor = MaterialColors.getColor(b.statusBanner, container)
+        val onColor = MaterialColors.getColor(b.statusBanner, onContainer)
+        b.statusBanner.setCardBackgroundColor(containerColor)
+        b.statusIcon.imageTintList = ColorStateList.valueOf(onColor)
+        b.statusTitle.setTextColor(onColor)
+        b.statusAction.setTextColor(onColor)
+        b.statusTitle.setText(if (enabled) R.string.st_banner_not_selected else R.string.st_banner_disabled)
+        b.statusAction.setText(if (enabled) R.string.st_banner_switch else R.string.st_banner_enable)
+        b.statusAction.setOnClickListener {
+            if (enabled) {
+                getSystemService(requireContext(), InputMethodManager::class.java)?.showInputMethodPicker()
+            } else {
+                openSystemImeSettings()
+            }
+        }
     }
 
     override fun onResume() {

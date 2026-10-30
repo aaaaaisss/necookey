@@ -43,6 +43,7 @@
         <activity
             android:name=".setting_activity.MainActivity"
             android:exported="true"
+            android:theme="@style/Theme.Necookey.Settings"
             android:label="@string/title_activity_main" />
 
         <activity-alias

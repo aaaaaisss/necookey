@@ -1,267 +1,198 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- necookey の設定。ホームの4カテゴリが screen_* を rootKey として開く。
-     各カテゴリ末尾の screen_*_advanced（詳細設定）は同じ画面クラスで入れ子として開く。 -->
+<!-- necookey の設定（2026-10-30 作り直し）。ホーム（SettingMainFragment）のカードが screen_* を rootKey として開く。
+     行の見た目は Theme.Necookey.Settings の preferenceTheme（settings_pref_* レイアウト）と SettingsRowBackground。
+     別の画面へ進む行だけ settings_widget_chevron を付ける。 -->
 <androidx.preference.PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto">
 
     <PreferenceScreen
-            android:key="screen_keyboard"
-            android:title="@string/home_category_keyboard"
-            app:iconSpaceReserved="false">
-        <PreferenceCategory
-            android:title="@string/settings_section_look"
-            app:iconSpaceReserved="false">
+        android:key="screen_keyboard"
+        android:title="@string/st_keyboard">
+        <PreferenceCategory android:key="group_keyboard_look">
             <Preference
                 android:key="custom_keyboard_list_preference"
-                android:summary="@string/custom_keyboard_list_preference_summary"
-                android:title="@string/custom_layout_fragment_title"
-                app:iconSpaceReserved="false" />
+                android:title="@string/st_layouts"
+                android:widgetLayout="@layout/settings_widget_chevron" />
             <Preference
                 android:key="keyboard_screen_preference"
-                android:summary="@string/keyboard_screen_preference_summary"
-                android:title="@string/keyboard_screen_size_preference_title"
-                app:iconSpaceReserved="false" />
+                android:title="@string/st_position_size"
+                android:widgetLayout="@layout/settings_widget_chevron" />
             <Preference
                 android:key="candidate_view_height_setting_fragment_preference"
-                android:title="@string/candidate_height_preference_title"
-                app:summary="@string/candidate_height_preference_sumary"
-                app:iconSpaceReserved="false" />
+                android:title="@string/st_candidate_height"
+                android:widgetLayout="@layout/settings_widget_chevron" />
         </PreferenceCategory>
         <PreferenceCategory
-            android:title="@string/settings_section_input"
-            app:iconSpaceReserved="false">
+            android:key="group_keyboard_keys"
+            android:title="@string/st_section_keys">
             <SwitchPreferenceCompat
                 android:defaultValue="false"
                 android:key="undo_enable_preference"
-                android:summary="@string/undo_enable_summary"
-                android:title="@string/undo_enable_title"
-                app:iconSpaceReserved="false" />
+                android:title="@string/st_undo" />
+            <SwitchPreferenceCompat
+                android:defaultValue="false"
+                android:key="reconversion_preference"
+                android:title="@string/st_reconversion" />
             <Preference
                 android:key="delete_key_flick_left_targets_preference"
-                android:summary="@string/delete_key_flick_targets_summary"
-                android:title="@string/delete_key_flick_targets_title"
-                app:iconSpaceReserved="false" />
+                android:title="@string/st_delete_targets"
+                android:widgetLayout="@layout/settings_widget_chevron" />
+            <Preference
+                android:key="cursor_move_after_commit_target_pairs_preference"
+                android:title="@string/st_cursor_pairs"
+                android:widgetLayout="@layout/settings_widget_chevron" />
         </PreferenceCategory>
-        <PreferenceScreen
+        <PreferenceCategory android:key="group_keyboard_more">
+            <PreferenceScreen
                 android:key="screen_keyboard_advanced"
-                android:title="@string/settings_advanced_title"
-                android:summary="@string/settings_advanced_summary"
-                app:iconSpaceReserved="false">
-            <PreferenceCategory
-                android:title="@string/settings_section_key_behavior"
-                app:iconSpaceReserved="false">
-                <Preference
-                    android:key="cursor_move_after_commit_target_pairs_preference"
-                    android:summary="@string/cursor_move_target_pairs_summary"
-                    android:title="@string/cursor_move_target_pairs_title"
-                    app:iconSpaceReserved="false" />
-                <ListPreference
-                    android:defaultValue="default"
-                    android:entries="@array/type_null_input_behavior_entries"
-                    android:entryValues="@array/type_null_input_behavior_values"
-                    android:key="type_null_input_behavior_preference"
-                    android:summary="%s"
-                    android:title="@string/type_null_input_behavior_title"
-                    app:iconSpaceReserved="false" />
-            </PreferenceCategory>
-            <PreferenceCategory
-                android:title="@string/category_symbol_keyboard_title"
-                app:iconSpaceReserved="false">
-                <ListPreference
-                    android:defaultValue="EMOJI"
-                    android:dialogTitle="@string/symbol_mode_dialog_title"
-                    android:entries="@array/symbol_mode_entries"
-                    android:entryValues="@array/symbol_mode_values"
-                    android:key="symbol_mode_preference"
-                    android:summary="@string/symbol_mode_summary"
-                    android:title="@string/symbol_mode_title"
-                    app:iconSpaceReserved="false" />
-            </PreferenceCategory>
-        </PreferenceScreen>
+                android:title="@string/st_advanced">
+                <PreferenceCategory android:key="group_keyboard_advanced">
+                    <ListPreference
+                        android:defaultValue="EMOJI"
+                        android:dialogTitle="@string/st_symbol_first"
+                        android:entries="@array/symbol_mode_entries"
+                        android:entryValues="@array/symbol_mode_values"
+                        android:key="symbol_mode_preference"
+                        android:title="@string/st_symbol_first"
+                        app:useSimpleSummaryProvider="true" />
+                    <ListPreference
+                        android:defaultValue="default"
+                        android:dialogTitle="@string/st_type_null"
+                        android:entries="@array/type_null_input_behavior_entries"
+                        android:entryValues="@array/type_null_input_behavior_values"
+                        android:key="type_null_input_behavior_preference"
+                        android:title="@string/st_type_null"
+                        app:useSimpleSummaryProvider="true" />
+                </PreferenceCategory>
+            </PreferenceScreen>
+        </PreferenceCategory>
     </PreferenceScreen>
 
     <PreferenceScreen
-            android:key="screen_conversion"
-            android:title="@string/home_category_conversion"
-            app:iconSpaceReserved="false">
+        android:key="screen_dictionary"
+        android:title="@string/st_dictionary">
+        <PreferenceCategory android:key="group_dictionary_manage">
+            <Preference
+                android:key="home_user_dictionary_preference"
+                android:title="@string/st_user_dictionary"
+                android:widgetLayout="@layout/settings_widget_chevron" />
+            <Preference
+                android:key="home_learn_dictionary_preference"
+                android:title="@string/st_learn_dictionary"
+                android:widgetLayout="@layout/settings_widget_chevron" />
+            <Preference
+                android:key="ng_word_list_preference"
+                android:title="@string/st_ng_words"
+                android:widgetLayout="@layout/settings_widget_chevron" />
+        </PreferenceCategory>
         <PreferenceCategory
-            android:title="@string/settings_section_candidates"
-            app:iconSpaceReserved="false">
+            android:key="group_dictionary_candidates"
+            android:title="@string/st_section_candidates">
             <SwitchPreferenceCompat
                 android:defaultValue="true"
                 android:key="emoji_candidate_enable_preference"
-                android:summary="@string/emoji_candidate_enable_summary"
-                android:title="@string/emoji_candidate_enable_title"
-                app:iconSpaceReserved="false" />
+                android:title="@string/st_emoji" />
             <SwitchPreferenceCompat
                 android:defaultValue="true"
                 android:key="symbol_candidate_enable_preference"
-                android:summary="@string/symbol_candidate_enable_summary"
-                android:title="@string/symbol_candidate_enable_title"
-                app:iconSpaceReserved="false" />
+                android:title="@string/st_symbol" />
             <SwitchPreferenceCompat
                 android:defaultValue="true"
                 android:key="emoticon_candidate_enable_preference"
-                android:summary="@string/emoticon_candidate_enable_summary"
-                android:title="@string/emoticon_candidate_enable_title"
-                app:iconSpaceReserved="false" />
-        </PreferenceCategory>
-        <PreferenceScreen
-                android:key="screen_conversion_advanced"
-                android:title="@string/settings_advanced_title"
-                android:summary="@string/settings_advanced_summary"
-                app:iconSpaceReserved="false">
-            <PreferenceCategory
-                android:title="@string/settings_section_candidate_detail"
-                app:iconSpaceReserved="false">
-                <SwitchPreferenceCompat
-                    android:defaultValue="false"
-                    android:key="reconversion_preference"
-                    android:title="@string/reconversion_preference_title"
-                    app:summary="@string/reconversion_preference_summary"
-                    app:iconSpaceReserved="false" />
-            </PreferenceCategory>
-        </PreferenceScreen>
-    </PreferenceScreen>
-
-    <PreferenceScreen
-            android:key="screen_dictionary"
-            android:title="@string/home_category_dictionary"
-            app:iconSpaceReserved="false">
-        <PreferenceCategory
-            android:title="@string/home_dictionary_manage_category"
-            app:iconSpaceReserved="false">
-            <Preference
-                android:key="home_user_dictionary_preference"
-                android:summary="@string/home_user_dictionary_summary"
-                android:title="@string/user_dictionary_title"
-                app:iconSpaceReserved="false" />
-            <Preference
-                android:key="home_learn_dictionary_preference"
-                android:summary="@string/home_learn_dictionary_summary"
-                android:title="@string/learn_dictionary_fragment_title"
-                app:iconSpaceReserved="false" />
-            <Preference
-                android:key="ng_word_list_preference"
-                android:summary="@string/ng_word_list_summary"
-                android:title="@string/ng_word_list_title"
-                app:iconSpaceReserved="false" />
+                android:title="@string/st_emoticon" />
         </PreferenceCategory>
         <PreferenceCategory
-            android:title="@string/settings_section_next_word"
-            app:iconSpaceReserved="false">
+            android:key="group_dictionary_extra"
+            android:title="@string/st_section_extra_dictionaries">
+            <SwitchPreferenceCompat
+                android:defaultValue="true"
+                android:key="ut_person_name_enabled_preference"
+                android:title="@string/st_person_names" />
+            <SwitchPreferenceCompat
+                android:defaultValue="true"
+                android:key="ut_places_enabled_preference"
+                android:title="@string/st_places" />
+            <SwitchPreferenceCompat
+                android:defaultValue="true"
+                android:key="ut_wiki_enabled_preference"
+                android:title="@string/st_wikipedia" />
+        </PreferenceCategory>
+        <PreferenceCategory
+            android:key="group_dictionary_next_word"
+            android:title="@string/st_section_next_word">
             <Preference
                 android:key="next_word_learning_view_preference"
-                android:title="@string/next_word_learning_view_title"
-                app:iconSpaceReserved="false" />
+                android:title="@string/st_next_word_list" />
             <Preference
                 android:key="next_word_learning_clear_preference"
-                android:title="@string/next_word_learning_clear_title"
-                android:summary="@string/next_word_learning_clear_summary"
-                app:iconSpaceReserved="false" />
+                android:title="@string/st_next_word_clear" />
         </PreferenceCategory>
-        <PreferenceScreen
-                android:key="screen_dictionary_advanced"
-                android:title="@string/settings_advanced_title"
-                android:summary="@string/settings_advanced_summary"
-                app:iconSpaceReserved="false">
-            <PreferenceCategory
-                android:title="@string/settings_ut_dictionary_category"
-                app:iconSpaceReserved="false">
-                <SwitchPreferenceCompat
-                    android:defaultValue="true"
-                    android:key="ut_person_name_enabled_preference"
-                    android:title="@string/settings_ut_person_title"
-                    android:summary="@string/settings_ut_person_summary"
-                    app:iconSpaceReserved="false" />
-                <SwitchPreferenceCompat
-                    android:defaultValue="true"
-                    android:key="ut_places_enabled_preference"
-                    android:title="@string/settings_ut_places_title"
-                    android:summary="@string/settings_ut_places_summary"
-                    app:iconSpaceReserved="false" />
-                <SwitchPreferenceCompat
-                    android:defaultValue="true"
-                    android:key="ut_wiki_enabled_preference"
-                    android:title="@string/settings_ut_wiki_title"
-                    android:summary="@string/settings_ut_wiki_summary"
-                    app:iconSpaceReserved="false" />
-            </PreferenceCategory>
-        </PreferenceScreen>
     </PreferenceScreen>
 
     <PreferenceScreen
-            android:key="screen_other"
-            android:title="@string/home_category_other"
-            app:iconSpaceReserved="false">
-        <PreferenceCategory
-            android:title="@string/clipboard_history_title"
-            app:iconSpaceReserved="false">
+        android:key="screen_clipboard"
+        android:title="@string/st_clipboard">
+        <PreferenceCategory android:key="group_clipboard_history">
             <Preference
                 android:key="clipboard_history_preference_fragment"
-                android:title="@string/clipboard_history_fragment_title"
-                app:summary="@string/clipboard_history_fragment_summary"
-                app:iconSpaceReserved="false" />
+                android:title="@string/st_clipboard_history"
+                android:widgetLayout="@layout/settings_widget_chevron" />
+        </PreferenceCategory>
+        <PreferenceCategory android:key="group_clipboard_preview">
             <SwitchPreferenceCompat
                 android:defaultValue="true"
                 android:key="clipboard_preview_enable_preference"
-                android:summary="@string/pref_clipboard_preview_summary"
-                android:title="@string/pref_clipboard_preview_title"
-                app:iconSpaceReserved="false" />
+                android:title="@string/st_clipboard_preview" />
             <SwitchPreferenceCompat
                 android:defaultValue="false"
                 android:dependency="clipboard_preview_enable_preference"
                 android:key="clipboard_preview_tap_delete_preference"
-                android:summary="@string/pref_clipboard_tap_delete_summary"
-                android:title="@string/pref_clipboard_tap_delete_title"
-                app:iconSpaceReserved="false" />
+                android:title="@string/st_clipboard_tap_delete" />
+        </PreferenceCategory>
+        <PreferenceCategory android:key="group_clipboard_cleanup">
             <SwitchPreferenceCompat
                 android:defaultValue="false"
                 android:key="clipboard_delete_unpinned_after_hours_preference"
-                android:title="@string/pref_clipboard_delete_unpinned_after_hours_title"
-                app:summary="@string/pref_clipboard_delete_unpinned_after_hours_summary"
-                app:iconSpaceReserved="false" />
+                android:title="@string/st_clipboard_auto_delete" />
             <SeekBarPreference
                 android:defaultValue="1"
                 android:dependency="clipboard_delete_unpinned_after_hours_preference"
                 android:key="clipboard_unpinned_retention_hours_preference"
                 android:max="72"
-                android:title="@string/pref_clipboard_unpinned_retention_hours_title"
+                android:title="@string/st_clipboard_retention"
                 app:min="1"
-                app:showSeekBarValue="true"
-                app:summary="@string/pref_clipboard_unpinned_retention_hours_summary"
-                app:iconSpaceReserved="false" />
+                app:showSeekBarValue="true" />
         </PreferenceCategory>
-        <PreferenceCategory
-            android:title="@string/back_up"
-            app:iconSpaceReserved="false">
+    </PreferenceScreen>
+
+    <PreferenceScreen
+        android:key="screen_backup"
+        android:title="@string/st_backup">
+        <PreferenceCategory android:key="group_backup">
             <Preference
                 android:key="pref_backup_export"
-                android:summary="@string/pref_backup_export_summary"
-                android:title="@string/pref_backup_export_title"
-                app:iconSpaceReserved="false" />
+                android:title="@string/st_backup_export" />
             <Preference
                 android:key="pref_backup_import"
-                android:summary="@string/pref_backup_import_summary"
-                android:title="@string/pref_backup_import_title"
-                app:iconSpaceReserved="false" />
+                android:title="@string/st_backup_import" />
         </PreferenceCategory>
-        <PreferenceCategory
-            android:title="@string/category_about_app_title"
-            app:iconSpaceReserved="false">
-            <Preference
-                android:key="preference_open_source"
-                android:title="@string/open_source_libraries_title"
-                app:iconSpaceReserved="false" />
-            <Preference
-                android:key="app_version_preference"
-                android:title="@string/app_version_title"
-                app:iconSpaceReserved="false" />
+    </PreferenceScreen>
+
+    <PreferenceScreen
+        android:key="screen_other"
+        android:title="@string/st_other">
+        <PreferenceCategory android:key="group_other">
             <Preference
                 android:key="freeze_log_preference"
-                android:summary="@string/freeze_log_summary"
-                android:title="@string/freeze_log_title"
-                app:iconSpaceReserved="false" />
+                android:title="@string/st_freeze_log" />
+            <Preference
+                android:key="preference_open_source"
+                android:title="@string/st_licenses"
+                android:widgetLayout="@layout/settings_widget_chevron" />
+            <Preference
+                android:key="app_version_preference"
+                android:selectable="false"
+                android:title="@string/st_version" />
         </PreferenceCategory>
     </PreferenceScreen>
 </androidx.preference.PreferenceScreen>

@@ -1,4 +1,71 @@
-# 設定画面の棚卸し（2026-10-30。下の「2026-10-30 実施した整理」で一部を削除・移動済み）
+# 設定画面の棚卸し（2026-10-30。下の「値の固定と設定画面の作り直し」が現在の形。その下は経緯）
+
+## 値の固定と設定画面の作り直し（2026-10-30・2 回目、ユーザー判断）
+### 値を固定して設定画面から削除した key
+保存値は読まない（`AppPreference` の getter が固定値を返す。setter は無い）。key は `AppPreference.REMOVED_PREFERENCE_KEYS` に入れたので、
+古いバックアップに入っていてもインポートで読み飛ばす。
+
+| 固定値 | key（タイトル） | コード側の整理 |
+|---|---|---|
+| オン | `necookey_two_row_candidate_bar_preference`（2段候補バー） | `isNecookeyTwoRowSurfaceAvailable()` = true |
+| オン | `necookey_chip_candidate_bar_preference`（文節チップ） | `isChipBarMode()` = 2段バーの条件だけ、チップ学習の分岐・`FloatingCandidateBand.shouldFloat(chipBarPreference = true)` |
+| オン | `necookey_zenz_bunsetsu_gate_preference`（リランカー） | `necookeyRerankEnabled()` = true |
+| オン | `lattice_lm_cost_preference`（ラティス LM） | `syncLatticeLmCost` のオフ分岐を削除（IMEService.onCreate で AppPreference を読まなくなった） |
+| オン | `learn_dictionary_preference`（学習辞書を使う） | |
+| オン | `learn_dictionary_allow_mixed_symbols_numbers_preference`（記号・数字を含む語を学習） | |
+| オン | `system_ngram_dictionary_enable_preference`（システム n-gram） | |
+| オン | `user_dictionary_preference`（ユーザー辞書を使う） | |
+| オン | `delete_key_flick_left_preference`（削除キーの左フリック） | 「左フリックで消す記号」画面は残す |
+| オン | `save_last_used_keyboard`（最後に使ったキーボードを表示） | |
+| オン | （スペース長押しでカーソル移動） | もともと常時オン・UI なし（前回 `conversion_key_swipe_cursor_move_preference` 削除済み） |
+| オフ | `stabilize_candidate_strip_height_preference`（変換候補欄の高さを安定させる） | IMEService の `stabilizeCandidateStripHeightPreference`・`dockedCandidateHeightStabilized`・`updateDockedCandidateContainerHeight(stabilizeInsets)` を削除。浮いた候補帯（e59940e）の経路は常に「高さ固定なし」（`applyDockedCandidateInsets(..., stabilizeHeight = false)`）。スナップショットの項目も削除 |
+| オフ | `english_reading_dictionary_enable_preference`（英語読み辞書） | `DictionaryOverrideStore.isOptionalBundledEnabled(ENGLISH_READING)` = false |
+| オフ | `conversion_candidates_romaji_enable_preference`（ローマ字変換候補） | |
+| オフ | `learn_first_candidate_dictionary_preference`（先頭の変換候補を学習） | |
+| オフ | `preserve_dictionary_word_whitespace_preference`（単語の前後の空白を保持） | ユーザー辞書画面のメニューからも削除。登録・編集は常に前後の空白を削る |
+| オフ | `space_key_preference`（半角スペースの利用） | `space_hankaku_preference` = false |
+| 4 | `n_best_preference`（N-Best） | |
+| オン / 2 / 4 | `enable_prediction_search_learn_dictionary_preference` / `learn_prediction_preference` / `learn_dictionary_prediction_candidate_limit_preference`（学習辞書の予測・前方一致の文字数・候補数） | |
+| 2 / 4 | `user_dictionary_prefix_match_number` / `user_dictionary_prediction_candidate_limit_preference`（ユーザー辞書の予測） | |
+| 0.0 / 14sp | `key_letter_size_preference` / `candidate_letter_size_preference`（キー・変換候補の文字サイズ） | 文字サイズ画面（`KeyCandidateLetterSizeFragment`）を削除。「変換欄の高さ」画面の文字サイズ欄も削除 |
+| 100 | `flick_sensitivity_preference`（フリック感度） | |
+| オン | `henkan_delete_key_action_preference`（候補ハイライト時の削除キー動作） | |
+| default | `default_emoji_skin_tone_preference`（絵文字の既定の肌色） | 記号キーボードで肌色を変えると、その入力の間だけ効く（保存しない） |
+| 1 | `candidate_column_preference`（候補の列数） | 「変換欄の高さ」画面の列数ボタンも削除 |
+
+### 設定画面の構成（作り直し後）
+ダーク固定（`Theme.Necookey.Settings` = Material3 Dark ＋ `localNightMode = YES`、システムバーは透明・明るいアイコン）。動的カラーはそのまま（Android 12+）。
+行は角丸カード（グループの先頭・末尾だけ 20dp、間は 4dp・2dp の隙間、押下の波紋もカードの形の中）、8dp グリッド、
+アイコンは Material Symbols Rounded、スイッチは MaterialSwitch、別画面へ進む行だけ右端に矢印。画面遷移は右からの shared axis 風。
+
+```
+設定ホーム（上部バーなし。アプリ名＋キーボードが無効／未選択のときだけ小さなお知らせ「オンにする」「切り替える」）
+├─ 入力
+│   ├─ キーボード（screen_keyboard）
+│   │   ├─ 配列 → カスタムキーボード一覧
+│   │   ├─ 位置とサイズ → KeyboardSettingFragment
+│   │   ├─ 変換欄の高さ → CandidateViewHeightSettingFragment
+│   │   ├─ 入力: 確定を元に戻す（undo_enable）/ 読みに戻す（reconversion）/ 左フリックで消す記号 → / 確定後にカーソルを戻す記号 →（説明 = 今の記号）
+│   │   └─ 詳細 → 記号キーボードの初期表示（symbol_mode）/ ターミナルなどの入力欄（type_null_input_behavior）
+│   └─ 辞書（screen_dictionary）
+│       ├─ ユーザー辞書 → / 学習辞書 → / NG ワード →
+│       ├─ 候補に出す: 絵文字 / 記号 / 顔文字
+│       ├─ 追加の辞書: 人名 / 地名 / Wikipedia
+│       └─ 次の言葉の学習: 学習した組み合わせ（説明 = 件数）/ すべて削除
+└─ 管理
+    ├─ クリップボード（screen_clipboard）: 履歴 → / 変換欄に表示 / タップで削除 / 自動で削除 / 削除までの時間
+    ├─ バックアップ（screen_backup）: 書き出す / 読み込む
+    └─ その他（screen_other）: フリーズ記録 / ライセンス → / バージョン
+```
+- 旧「変換」カテゴリ（`screen_conversion`）は無くなった（候補の種類は「辞書」、読みに戻すは「キーボード」へ）。
+- 見た目（テーマ）の画面はもともと無い（`theme_mode` などの値は IME が読むが設定 UI は無い）ので、ホームにも置いていない。
+- 説明文は値・件数など必要なものだけ（記号キーボードの初期表示・TYPE_NULL は選んだ値、カーソルを戻す記号は今の記号、学習した組み合わせは件数、バージョン）。
+- 実装: `res/xml/pref_main.xml`、`values/settings_theme.xml`（テーマ・文字の階層・preferenceTheme）、`values/strings_settings.xml`（短い文言）、
+  `layout/settings_pref_*`・`settings_widget_*`（行・見出し・スライダー・スイッチ・矢印）、`SettingsPreferenceAdapter` / `SettingsCardDecoration` / `SettingsRowBackground`（角丸カード）、
+  `SettingMainFragment` ＋ `fragment_setting_main.xml` / `item_setting_home_row.xml` / `item_setting_home_section.xml`（ホーム）、`SafeNavigation.settingsNavOptions`（遷移アニメ）。
+- 配列エディタ・位置とサイズ画面の中身は今回は触っていない（入口だけ）。
+
+## 経緯（1 回目の整理と最初の棚卸し）
 
 ## 2026-10-30 実施した整理（ユーザー判断にもとづく）
 | 対象 | 実施内容 |

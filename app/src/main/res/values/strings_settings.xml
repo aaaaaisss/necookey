@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 設定画面（2026-10-30 作り直し）の文言。短く、説明は値や件数など必要なものだけ。 -->
+<resources>
+    <!-- ホーム -->
+    <string name="st_app_name">necookey</string>
+    <string name="st_section_input">入力</string>
+    <string name="st_section_manage">管理</string>
+    <string name="st_keyboard">キーボード</string>
+    <string name="st_dictionary">辞書</string>
+    <string name="st_clipboard">クリップボード</string>
+    <string name="st_backup">バックアップ</string>
+    <string name="st_other">その他</string>
+    <string name="st_banner_disabled">キーボードがオフです</string>
+    <string name="st_banner_not_selected">別のキーボードを使用中</string>
+    <string name="st_banner_enable">オンにする</string>
+    <string name="st_banner_switch">切り替える</string>
+
+    <!-- キーボード -->
+    <string name="st_layouts">配列</string>
+    <string name="st_position_size">位置とサイズ</string>
+    <string name="st_candidate_height">変換欄の高さ</string>
+    <string name="st_section_keys">入力</string>
+    <string name="st_undo">確定を元に戻す</string>
+    <string name="st_reconversion">読みに戻す</string>
+    <string name="st_delete_targets">左フリックで消す記号</string>
+    <string name="st_cursor_pairs">確定後にカーソルを戻す記号</string>
+    <string name="st_advanced">詳細</string>
+    <string name="st_symbol_first">記号キーボードの初期表示</string>
+    <string name="st_type_null">ターミナルなどの入力欄</string>
+
+    <!-- 辞書 -->
+    <string name="st_user_dictionary">ユーザー辞書</string>
+    <string name="st_learn_dictionary">学習辞書</string>
+    <string name="st_ng_words">NG ワード</string>
+    <string name="st_section_candidates">候補に出す</string>
+    <string name="st_emoji">絵文字</string>
+    <string name="st_symbol">記号</string>
+    <string name="st_emoticon">顔文字</string>
+    <string name="st_section_extra_dictionaries">追加の辞書</string>
+    <string name="st_person_names">人名</string>
+    <string name="st_places">地名</string>
+    <string name="st_wikipedia">Wikipedia</string>
+    <string name="st_section_next_word">次の言葉の学習</string>
+    <string name="st_next_word_list">学習した組み合わせ</string>
+    <string name="st_next_word_count">%1$d 件</string>
+    <string name="st_next_word_clear">すべて削除</string>
+
+    <!-- クリップボード -->
+    <string name="st_clipboard_history">履歴</string>
+    <string name="st_clipboard_preview">変換欄に表示</string>
+    <string name="st_clipboard_tap_delete">タップで削除</string>
+    <string name="st_clipboard_auto_delete">自動で削除</string>
+    <string name="st_clipboard_retention">削除までの時間</string>
+
+    <!-- バックアップ -->
+    <string name="st_backup_export">書き出す</string>
+    <string name="st_backup_import">読み込む</string>
+
+    <!-- その他 -->
+    <string name="st_freeze_log">フリーズ記録</string>
+    <string name="st_licenses">ライセンス</string>
+    <string name="st_version">バージョン</string>
+</resources>

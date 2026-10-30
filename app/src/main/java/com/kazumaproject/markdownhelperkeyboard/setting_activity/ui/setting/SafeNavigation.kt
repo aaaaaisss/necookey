@@ -5,6 +5,8 @@ import androidx.annotation.IdRes
 import androidx.fragment.app.Fragment
 import androidx.navigation.NavController
 import androidx.navigation.NavDestination
+import androidx.navigation.NavOptions
+import com.kazumaproject.markdownhelperkeyboard.R
 import androidx.navigation.fragment.findNavController
 import timber.log.Timber
 
@@ -44,7 +46,7 @@ internal fun NavController.navigateSafely(@IdRes resId: Int, args: Bundle?): Boo
     }
 
     return runCatching {
-        navigate(resId, args)
+        navigate(resId, args, settingsNavOptions)
         true
     }.getOrElse { error ->
         Timber.w(
@@ -56,6 +58,14 @@ internal fun NavController.navigateSafely(@IdRes resId: Int, args: Bundle?): Boo
         false
     }
 }
+
+/** 設定画面の遷移アニメーション（右から少しずれて浮かぶ／戻るときは逆）。 */
+internal val settingsNavOptions: NavOptions = NavOptions.Builder()
+    .setEnterAnim(R.anim.settings_enter)
+    .setExitAnim(R.anim.settings_exit)
+    .setPopEnterAnim(R.anim.settings_pop_enter)
+    .setPopExitAnim(R.anim.settings_pop_exit)
+    .build()
 
 private fun NavDestination.safeLogName(): String {
     return label?.toString() ?: id.toString()

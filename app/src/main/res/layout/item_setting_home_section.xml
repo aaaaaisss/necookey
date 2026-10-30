@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 設定ホームのセクション見出し（各画面の見出しと同じ文字・同じ左端） -->
+<TextView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:paddingStart="@dimen/settings_row_padding_h"
+    android:paddingTop="@dimen/settings_section_gap"
+    android:paddingEnd="@dimen/settings_row_padding_h"
+    android:paddingBottom="@dimen/settings_section_label_bottom"
+    android:textAppearance="@style/TextAppearance.Necookey.SectionLabel" />
