@@ -22,7 +22,7 @@ import kotlin.math.roundToInt
 /**
  * 文節チップ候補欄の上段（チップ列）。描画とジェスチャだけで、状態は持たない（[setData] で受け取り、操作は [Listener] へ）。
  *
- * - 左端の小さい確定ボタン = 確定キーと同じ（いま見えている表記で確定）。
+ * - 右端の小さい確定ボタン = 確定キーと同じ（いま見えている表記で確定）。
  * - タップ = 選択 / 選択解除。チップ間（広めの当たり判定）のタップ = くっつける。
  * - 長押し = 押した文字の位置でそのチップを切る（表記の文字位置を読みの位置に割り当てる。[ChipStripLayout.cutOffsetForLabel]）。
  * - 区切り（チップ間）に指を置いて左右に滑らせる = 境界を 1 字ずつ吸い付かせて動かし、離したところで確定。動かしている間は
@@ -63,8 +63,11 @@ class ChipStripView @JvmOverloads constructor(
         letterPadding = 6f * density,
         joinSlop = 12f * density,
     )
-    /** 左端の確定ボタンの幅（チップ列はこの右から並べる。スクロールしない）。 */
+    /** 右端の確定ボタンの幅（チップ列はこの左に並べる。スクロールしない）。 */
     private val confirmWidth = 34f * density
+
+    /** チップ列の表示域の右端（この右が確定ボタン）。 */
+    private fun contentRight(): Float = (width.toFloat() - confirmWidth).coerceAtLeast(0f)
     private val baseTextSize = 17f * density
     private val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { textSize = baseTextSize }
     private val bubblePaint = Paint(Paint.ANTI_ALIAS_FLAG)
@@ -143,7 +146,7 @@ class ChipStripView @JvmOverloads constructor(
         if (moved || hit !is ChipStripLayout.Hit.Chip) return@Runnable
         val item = data.items.getOrNull(hit.index) ?: return@Runnable
         val box = laid.chips.getOrNull(hit.index) ?: return@Runnable
-        val labelIndex = labelIndexAt(item.label, downX - confirmWidth + scroll - box.left - layoutSpec.chipPadding)
+        val labelIndex = labelIndexAt(item.label, downX + scroll - box.left - layoutSpec.chipPadding)
         val offset = ChipStripLayout.cutOffsetForLabel(item.label, item.reading, labelIndex) ?: return@Runnable
         longPressed = true
         performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
@@ -212,8 +215,8 @@ class ChipStripView @JvmOverloads constructor(
 
     private fun autoScrollSpeed(): Float = ChipStripLayout.edgeAutoScrollSpeed(
         x = dragX,
-        left = confirmWidth,
-        right = width.toFloat(),
+        left = 0f,
+        right = contentRight(),
         edge = autoScrollEdge,
         maxSpeed = autoScrollMaxSpeed,
     )
@@ -224,7 +227,7 @@ class ChipStripView @JvmOverloads constructor(
         val left = data.items.getOrNull(hit.index)?.reading.orEmpty()
         val right = data.items.getOrNull(hit.index + 1)?.reading.orEmpty()
         val step = textPaint.measureText("あ").coerceAtLeast(8f * density)
-        val contentX = dragX - confirmWidth + scroll
+        val contentX = dragX + scroll
         val delta = ChipStripLayout.clampDelta(left.length, right.length, ((contentX - downContentX) / step).roundToInt())
         if (delta != dragDelta) {
             dragDelta = delta
@@ -256,8 +259,8 @@ class ChipStripView @JvmOverloads constructor(
         val baseline = h / 2f - (textPaint.descent() + textPaint.ascent()) / 2f
         drawConfirm(canvas, h, vPad)
         canvas.save()
-        canvas.clipRect(confirmWidth, 0f, width.toFloat(), h)
-        canvas.translate(confirmWidth - scroll, 0f)
+        canvas.clipRect(0f, 0f, contentRight(), h)
+        canvas.translate(-scroll, 0f)
         data.items.forEachIndexed { i, item ->
             val box = laid.chips.getOrNull(i) ?: return@forEachIndexed
             val fill = if (item.selected) selectedFill else chipFill
@@ -284,9 +287,9 @@ class ChipStripView @JvmOverloads constructor(
         if (dragging) drawBubble(canvas, h)
     }
 
-    /** 左端の確定ボタン（丸の中にチェック）。 */
+    /** 右端の確定ボタン（丸の中にチェック）。 */
     private fun drawConfirm(canvas: Canvas, h: Float, vPad: Float) {
-        val cx = confirmWidth / 2f + 2f * density
+        val cx = width - confirmWidth / 2f - 2f * density
         val cy = h / 2f
         val r = ((h - vPad * 2f) / 2f).coerceAtMost(confirmWidth / 2f - 2f * density)
         fillPaint.color = selectedFill
@@ -346,8 +349,8 @@ class ChipStripView @JvmOverloads constructor(
                 // 慣性スクロール中のタッチは止めるだけ
                 val wasFlinging = !scroller.isFinished
                 scroller.forceFinished(true)
-                downOnConfirm = event.x < confirmWidth && data.items.isNotEmpty()
-                downContentX = event.x - confirmWidth + scroll
+                downOnConfirm = event.x >= contentRight() && data.items.isNotEmpty()
+                downContentX = event.x + scroll
                 downHit = if (downOnConfirm || wasFlinging) ChipStripLayout.Hit.None
                 else layoutSpec.hit(laid, downContentX)
                 removeCallbacks(longPressRunnable)
@@ -410,7 +413,7 @@ class ChipStripView @JvmOverloads constructor(
                 removeCallbacks(longPressRunnable)
                 removeCallbacks(autoScrollRunnable)
                 if (downOnConfirm) {
-                    if (!moved && event.x < confirmWidth) {
+                    if (!moved && event.x >= contentRight()) {
                         performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)
                         listener?.onConfirm()
                     }
