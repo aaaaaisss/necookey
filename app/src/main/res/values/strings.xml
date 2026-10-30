@@ -95,8 +95,8 @@
     <string name="clipboard_history_title">クリップボードの履歴</string>
     <string name="dialog_image_description">dialog_image_description</string>
     <string name="category_title_keyboard">キーボード</string>
-    <string name="keyboard_screen_size_preference_title">位置とサイズの設定(縦画面)</string>
-    <string name="keyboard_screen_preference_summary">キーボードの位置とサイズの設定を変更できます</string>
+    <string name="keyboard_screen_size_preference_title">位置とサイズ（縦画面）</string>
+    <string name="keyboard_screen_preference_summary">縦画面でのキーボード本体の位置・幅・高さを変更できます。横画面の位置とサイズはこの画面では変えられません（文節チップ方式の候補欄は常に画面幅）</string>
     <string name="keyboard_height_fix_specific_device_title">端末別の高さ補正</string>
     <string name="keyboard_height_fix_specific_device_summary_on">一部端末向けの高さ補正は有効です（例：Galaxy）。</string>
     <string name="keyboard_height_fix_specific_device_summary_off">一部端末向けの高さ補正は無効です。</string>
@@ -115,8 +115,8 @@
     <string name="type_null_input_behavior_direct_commit">常に直接入力</string>
     <string name="type_null_input_behavior_composing_text">ComposingText を使う</string>
     <string name="henkan_delete_key_action_title">候補ハイライト時の削除キー動作</string>
-    <string name="henkan_delete_key_action_summary_on">削除キー長押し：ハイライト解除\n削除キータップ：選択位置を1つ前に戻す</string>
-    <string name="henkan_delete_key_action_summary_off">削除キータップ：ハイライト解除</string>
+    <string name="henkan_delete_key_action_summary_on">変換候補を選んでいる間の削除キー\nタップ：選択を1つ前の候補に戻す\n長押し：変換をやめて読みに戻す\n（文節チップ方式で文節を編集中は、タップで読みに戻ります）</string>
+    <string name="henkan_delete_key_action_summary_off">変換候補を選んでいる間の削除キー\nタップ：変換をやめて読みに戻す\n（文節チップ方式で文節を編集中は、タップで読みに戻ります）</string>
     <string name="category_function_title">機能</string>
     <string name="category_flick_input_title">フリック入力</string>
     <string name="category_qwerty_keyboard_title">QWERTY キーボード</string>
@@ -433,7 +433,7 @@
     <string name="cursor_move_target_pair_delete_message">「%1$s」を削除しますか？</string>
     <string name="cursor_move_target_pair_reset_message">初期値のペアに戻します。</string>
     <string name="key_candidate_letter_size_preference_title">キー・変換候補の文字サイズ</string>
-    <string name="key_candidate_letter_size_preference_summary">変換候補に表示される文字の大きさを設定できます</string>
+    <string name="key_candidate_letter_size_preference_summary">キーに表示される文字と、変換候補の文字の大きさを設定できます</string>
     <string name="fragment_key_candidate_letter_size_title">文字の大きさ</string>
 
     <string name="setting_candidate_letter_size">候補欄の文字サイズ</string>

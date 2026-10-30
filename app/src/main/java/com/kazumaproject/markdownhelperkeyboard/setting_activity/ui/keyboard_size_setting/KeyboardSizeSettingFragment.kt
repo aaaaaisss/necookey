@@ -86,7 +86,6 @@ class KeyboardSettingFragment : Fragment() {
                 super.onPageSelected(position)
                 previewGeneration++
                 applyCurrentPageDimensions()
-                updateTooltipUI(position)
 
                 isRightAligned = appPreference.keyboard_position ?: true
 
@@ -94,14 +93,6 @@ class KeyboardSettingFragment : Fragment() {
             }
         })
 
-        binding.tenkeyTooltipButton.setOnClickListener {
-            binding.keyboardViewPager.setCurrentItem(
-                KeyboardViewPagerAdapter.TEN_KEY_PAGE_POSITION,
-                true
-            )
-        }
-
-        updateTooltipUI(binding.keyboardViewPager.currentItem)
     }
 
     private fun applyCurrentPageDimensions() {
@@ -544,25 +535,12 @@ class KeyboardSettingFragment : Fragment() {
         lp.marginEnd = if (isRightAligned) marginPx else 0
         binding.keyboardContainer.layoutParams = lp
     }
-    private fun updateTooltipUI(selectedPosition: Int) {
-        val selectedColor =
-            ContextCompat.getColor(requireContext(), com.kazumaproject.core.R.color.blue)
-        val defaultColor = ContextCompat.getColor(
-            requireContext(),
-            com.kazumaproject.core.R.color.qwety_key_bg_color
-        )
-
-        binding.tenkeyTooltipButton.setBackgroundColor(
-            if (selectedPosition == KeyboardViewPagerAdapter.TEN_KEY_PAGE_POSITION) selectedColor else defaultColor
-        )
-    }
 
     private fun updateControlsVisibility() {
         val visibility = if (areControlsVisible) View.VISIBLE else View.GONE
         binding.keyboardPositionTitle.visibility = visibility
         binding.keyboardPositionButton.visibility = visibility
         binding.resetLayoutButton.visibility = visibility
-        binding.tenkeyTooltipButton.visibility = visibility
     }
 
     override fun onDestroyView() {

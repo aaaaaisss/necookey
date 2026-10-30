@@ -106,8 +106,8 @@ class KeyboardSizeEditorRegressionTest {
         val originalOrientation = activity.requestedOrientation
         listOf(R.id.keyboardSettingFragment).forEach { destination ->
             val root = openEditor(destination)
-            listOf(R.id.tenkey_tooltip_button).forEach { pageButton ->
-                root.findViewById<View>(pageButton).performClick()
+            run {
+                // 「TenKey」ボタン（1 ページだけのプレビューの 0 ページへ移るだけ）は 2026-10-30 に削除
                 drainNavigation()
                 layoutEditor(root)
                 listOf(R.id.handle_top, R.id.handle_bottom, R.id.handle_left, R.id.handle_right, R.id.handle_move)
