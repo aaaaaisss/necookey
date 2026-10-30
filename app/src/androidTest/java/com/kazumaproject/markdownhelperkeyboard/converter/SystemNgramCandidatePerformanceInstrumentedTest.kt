@@ -393,11 +393,6 @@ class SystemNgramCandidatePerformanceInstrumentedTest {
         mozcUTWeb = false,
         userDictionaryRepository = repository,
         learnRepository = null,
-        isOmissionSearchEnable = false,
-        enableTypoCorrectionJapaneseFlick = false,
-        enableTypoCorrectionQwertyEnglish = false,
-        typoCorrectionOffsetScore = 3000,
-        omissionSearchOffsetScore = 1900,
         beamWidth = 20,
     )
 
@@ -415,11 +410,6 @@ class SystemNgramCandidatePerformanceInstrumentedTest {
         mozcUTWeb = false,
         userDictionaryRepository = repository,
         learnRepository = null,
-        isOmissionSearchEnable = false,
-        enableTypoCorrectionJapaneseFlick = false,
-        enableTypoCorrectionQwertyEnglish = false,
-        typoCorrectionOffsetScore = 3000,
-        omissionSearchOffsetScore = 1900,
         beamWidth = 20,
     )
 

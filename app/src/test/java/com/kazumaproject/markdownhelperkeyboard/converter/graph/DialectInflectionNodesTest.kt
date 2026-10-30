@@ -35,8 +35,6 @@ class DialectInflectionNodesTest {
             mozcUtPersonName = false, mozcUTPlaces = false, mozcUTWiki = false,
             mozcUTNeologd = false, mozcUTWeb = false,
             userDictionaryRepository = userDict, learnRepository = null,
-            isOmissionSearchEnable = false,
-            typoCorrectionOffsetScore = 3000, omissionSearchOffsetScore = 1900,
         ).candidates.filter { it.length.toInt() == input.length }.map { it.string }
     }
     private fun top(input: String) = convert(input).first()

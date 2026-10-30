@@ -149,11 +149,6 @@ class JapaneseNumberConversionInstrumentedTest {
         mozcUTWeb = false,
         userDictionaryRepository = repository,
         learnRepository = null,
-        isOmissionSearchEnable = false,
-        enableTypoCorrectionJapaneseFlick = false,
-        enableTypoCorrectionQwertyEnglish = false,
-        typoCorrectionOffsetScore = 3_000,
-        omissionSearchOffsetScore = 3_000,
         beamWidth = 20,
     )
 

@@ -50,7 +50,6 @@ data class ImePreferencesSnapshot(
     val isFlickOnlyMode: Boolean,
     val flickEditorPreviewPreference: Boolean,
     val flickEditorPreviewDelayMillis: Int,
-    val isOmissionSearchEnable: Boolean,
     val delayTime: Int,
     val isLearnDictionaryMode: Boolean,
     val incognitoModeDetectionPreference: Boolean,
@@ -141,9 +140,6 @@ data class ImePreferencesSnapshot(
     val learnDictionaryPredictionCandidateLimit: Int,
     val customKeyBorderWidth: Int,
     val customRomajiZenkakuConversionEnablePreference: Boolean,
-    val omissionSearchOffsetScorePreference: Int,
-    val enableTypoCorrectionJapaneseFlickKeyboardOffsetScorePreference: Int,
-    val enableTypoCorrectionJapaneseFlickKeyboardPreference: Boolean,
     val keyboardSkin: KeyboardSkinId = KeyboardSkinId.DEFAULT,
 ) {
     val keyboardThemeMode get() = appearance.keyboardThemeMode
@@ -238,7 +234,6 @@ data class ImePreferencesSnapshot(
                 isFlickOnlyMode = appPreference.flick_input_only_preference ?: false,
                 flickEditorPreviewPreference = appPreference.flick_editor_preview_preference,
                 flickEditorPreviewDelayMillis = appPreference.flick_editor_preview_delay_ms,
-                isOmissionSearchEnable = appPreference.omission_search_preference ?: false,
                 delayTime = appPreference.time_same_pronounce_typing_preference ?: 1000,
                 isLearnDictionaryMode = appPreference.learn_dictionary_preference ?: true,
                 incognitoModeDetectionPreference =
@@ -444,12 +439,6 @@ data class ImePreferencesSnapshot(
                 customKeyBorderWidth = appPreference.custom_theme_border_width,
                 customRomajiZenkakuConversionEnablePreference =
                     appPreference.custom_romaji_zenkaku_conversion_enable_preference,
-                omissionSearchOffsetScorePreference =
-                    appPreference.omission_search_offset_score_preference,
-                enableTypoCorrectionJapaneseFlickKeyboardOffsetScorePreference =
-                    appPreference.enable_typo_correction_japanese_flick_keyboard_offset_score_preference,
-                enableTypoCorrectionJapaneseFlickKeyboardPreference =
-                    appPreference.enable_typo_correction_japanese_flick_keyboard_preference,
             )
         }
     }

@@ -243,11 +243,6 @@ class EnglishReadingDictionaryInstrumentedTest {
         mozcUTWeb = false,
         userDictionaryRepository = repository,
         learnRepository = null,
-        isOmissionSearchEnable = false,
-        enableTypoCorrectionJapaneseFlick = false,
-        enableTypoCorrectionQwertyEnglish = false,
-        typoCorrectionOffsetScore = 3000,
-        omissionSearchOffsetScore = 1900,
         beamWidth = 20,
     ).candidates
 
@@ -267,11 +262,6 @@ class EnglishReadingDictionaryInstrumentedTest {
         mozcUTWeb = false,
         userDictionaryRepository = repository,
         learnRepository = null,
-        isOmissionSearchEnable = false,
-        enableTypoCorrectionJapaneseFlick = false,
-        enableTypoCorrectionQwertyEnglish = false,
-        typoCorrectionOffsetScore = 3000,
-        omissionSearchOffsetScore = 1900,
         beamWidth = 20,
         candidateSegmentCollector = candidateSegmentCollector,
     )

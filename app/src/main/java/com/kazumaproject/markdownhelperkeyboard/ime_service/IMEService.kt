@@ -1174,7 +1174,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
             context = currentFlickPreviewContext(FlickPreviewSource.SUMIRE),
         )
     }
-    private var isOmissionSearchEnable: Boolean? = false
     private var delayTime: Int? = 1000
     private var isLearnDictionaryMode: Boolean? = false
     private var isUserDictionaryEnable: Boolean? = false
@@ -1276,7 +1275,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
     private var inputConversionBackgroundColor: Int? = "#55FF8800".toColorInt()
     private var inputConversionTextColor: Int? = Color.WHITE
 
-    private var enableTypoCorrectionJapaneseFlickKeyboardPreference: Boolean? = false
 
     @Deprecated(
         message = "Use the new input key type management system instead. This field is kept only for backward compatibility."
@@ -1314,8 +1312,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
 
 
 
-    private var omissionSearchOffsetScorePreference: Int? = 1900
-    private var enableTypoCorrectionJapaneseFlickKeyboardOffsetScorePreference: Int? = 3000
 
     private val _ngWordsList = MutableStateFlow<List<NgWord>>(emptyList())
     private val ngWordsList: StateFlow<List<NgWord>> = _ngWordsList
@@ -2256,7 +2252,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         isFlickOnlyMode = preferences.isFlickOnlyMode
         flickEditorPreviewPreference = preferences.flickEditorPreviewPreference
         flickEditorPreviewDelayMillis = preferences.flickEditorPreviewDelayMillis
-        isOmissionSearchEnable = preferences.isOmissionSearchEnable
         delayTime = preferences.delayTime
         isLearnDictionaryMode = preferences.isLearnDictionaryMode
         incognitoModeDetectionPreference = preferences.incognitoModeDetectionPreference
@@ -2419,11 +2414,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         learnDictionaryPredictionCandidateLimit =
             preferences.learnDictionaryPredictionCandidateLimit.coerceIn(1, 8)
         customKeyBorderWidth = preferences.customKeyBorderWidth
-        omissionSearchOffsetScorePreference = preferences.omissionSearchOffsetScorePreference
-        enableTypoCorrectionJapaneseFlickKeyboardOffsetScorePreference =
-            preferences.enableTypoCorrectionJapaneseFlickKeyboardOffsetScorePreference
-        enableTypoCorrectionJapaneseFlickKeyboardPreference =
-            preferences.enableTypoCorrectionJapaneseFlickKeyboardPreference
         refreshReconversionUi()
     }
 
@@ -2905,7 +2895,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
             }
         }
         isFlickOnlyMode = null
-        isOmissionSearchEnable = null
         delayTime = null
         isLearnDictionaryMode = null
         incognitoModeDetectionPreference = true
@@ -3031,10 +3020,7 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         userDictionaryPredictionCandidateLimit = 4
         learnDictionaryPredictionCandidateLimit = 4
         customKeyBorderWidth = null
-        omissionSearchOffsetScorePreference = null
-        enableTypoCorrectionJapaneseFlickKeyboardOffsetScorePreference = null
 
-        enableTypoCorrectionJapaneseFlickKeyboardPreference = null
 
         actionInDestroy()
         speechRecognizer?.destroy()
@@ -14398,18 +14384,11 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         val ngWords: List<NgWord> =
             if (isNgWordEnable == true) ngWordsList.value else emptyList()
 
-        // Typo correction only applied to the removed built-in (Sumire / QWERTY) keyboards.
-        val enableTypoCorrectionJapaneseFlick = false
-        val enableTypoCorrectionQwertyEnglish = false
-
         val coreResult = withContext(kanaKanjiConversionDispatcher) {
             queryKanaKanjiCore(
                 input = insertString,
                 mode = CandidateQueryMode.NO_TAB_DEFAULT,
                 learnRepository = suggestionLearnRepository,
-                omissionSearchEnabled = isOmissionSearchEnable ?: false,
-                typoCorrectionJapaneseFlickEnabled = enableTypoCorrectionJapaneseFlick,
-                typoCorrectionQwertyEnglishEnabled = enableTypoCorrectionQwertyEnglish,
             )
         }
         val engineResult = coreResult.bunsetsuResult
@@ -14511,19 +14490,12 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
             if (isNgWordEnable == true) ngWordsList.value else emptyList()
         }
 
-        // Typo correction only applied to the removed built-in (Sumire / QWERTY) keyboards.
-        val enableTypoCorrectionJapaneseFlick = false
-        val enableTypoCorrectionQwertyEnglish = false
-
         val coreResultDeferred = async(kanaKanjiConversionDispatcher) {
             measureDebugStage("IMEService.getSuggestionList.kanaKanjiEngine") {
                 queryKanaKanjiCore(
                     input = insertString,
                     mode = CandidateQueryMode.PREDICTION,
                     learnRepository = suggestionLearnRepository,
-                    omissionSearchEnabled = isOmissionSearchEnable ?: false,
-                    typoCorrectionJapaneseFlickEnabled = enableTypoCorrectionJapaneseFlick,
-                    typoCorrectionQwertyEnglishEnabled = enableTypoCorrectionQwertyEnglish,
                 )
             }
         }
@@ -14732,9 +14704,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         input: String,
         mode: CandidateQueryMode,
         learnRepository: LearnRepository?,
-        omissionSearchEnabled: Boolean = false,
-        typoCorrectionJapaneseFlickEnabled: Boolean = false,
-        typoCorrectionQwertyEnglishEnabled: Boolean = false,
         nOverride: Int? = null,
     ): KanaKanjiQueryResult {
         val engine = awaitKanaKanjiEngineOrNull()
@@ -14756,12 +14725,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
                 mozcUtWeb = mozcUTWeb,
                 userDictionaryRepository = userDictionaryRepository,
                 learnRepository = learnRepository,
-                omissionSearchEnabled = omissionSearchEnabled,
-                typoCorrectionJapaneseFlickEnabled = typoCorrectionJapaneseFlickEnabled,
-                typoCorrectionQwertyEnglishEnabled = typoCorrectionQwertyEnglishEnabled,
-                typoCorrectionOffsetScore =
-                    enableTypoCorrectionJapaneseFlickKeyboardOffsetScorePreference ?: 3000,
-                omissionSearchOffsetScore = omissionSearchOffsetScorePreference ?: 1900,
                 beamWidth = conversionBeamWidth,
                 predictionConfig = predictionConfig,
                 collectCandidateSegments = true, // bunsetsu cursor-move session is always on (S3)

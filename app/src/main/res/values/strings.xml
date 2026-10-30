@@ -137,9 +137,6 @@
     <string name="space_key_summary">入力モードに関わらず、常に半角スペースを使用します。</string>
     <string name="custom_direct_mode_space_hankaku_title">直接入力時に半角スペースを使用</string>
     <string name="custom_direct_mode_space_hankaku_summary">直接入力モードでPreEditに文字がない場合、スペースキーで半角スペースを入力します。</string>
-    <string name="omission_search_title">修飾キー省略入力</string>
-    <string name="omission_search_summary_on">修飾キー省略入力は有効です\nかつこう → がっこう</string>
-    <string name="omission_search_summary_off">修飾キー省略入力は無効です</string>
     <string name="flick_sensitivity_title">フリック入力の感度</string>
     <string name="long_press_timeout_preference_title">長押し時間</string>
     <string name="long_press_timeout_preference_summary">長押しと判定するまでの時間を変更します。</string>
@@ -598,9 +595,6 @@
     <string name="drag_item">drag item</string>
     <string name="save_last_used_keyboard_title">最後に使ったキーボードを表示</string>
     <string name="save_last_used_keyboard_summey">アプリ再起動時に、前回使用したキーボードを自動で表示します</string>
-    <string name="typo_correction_title">タイピングミス補正</string>
-    <string name="enable_typo_correction_japanese_flick_keyboard_preference_title">フリック（日本語）</string>
-    <string name="enable_typo_correction_japanese_flick_keyboard_preference_sumary">フリック入力でミスを検知した場合、補正した変換候補を表示します。</string>
     <string name="back_up">設定のバックアップ</string>
     <string name="pref_backup_export_title">設定をエクスポート</string>
     <string name="pref_backup_export_summary">現在の設定をバックアップファイルとして保存します</string>
@@ -608,10 +602,6 @@
     <string name="pref_backup_import_title">設定をインポート</string>
     <string name="custom_romaji_zenkaku_conversion_enable_preference_title">カスタムローマ字での全角nの動作</string>
     <string name="custom_romaji_zenkaku_conversion_enable_preference_summary">カスタムローマ字を使用している場合、この設定を有効にすると、全角の n の後に文字を入力した際に「ん」に変換されます</string>
-    <string name="enable_typo_correction_japanese_flick_keyboard_offset_score_preference_tittle">タイピングミス補正のしきい値</string>
-    <string name="enable_typo_correction_japanese_flick_keyboard_offset_score_preference_summary">日本語フリック入力でのタイピングミス補正の強さを設定します。数値を大きくするほど、補正は弱くなります。(デフォルト：3000)</string>
-    <string name="omission_search_preference_offset_score_preference_title">修飾キー省略入力のしきい値</string>
-    <string name="omission_search_preference_offset_score_preference_summary">修飾キー省略入力補正の強さを設定します。数値を大きくするほど、補正は弱くなります。(デフォルト: 1900)</string>
     <string name="system_user_dictionary">システムユーザー辞書</string>
     <string name="next_string">次へ</string>
 

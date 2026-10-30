@@ -95,9 +95,6 @@ class ConversionQualityRegressionTest {
             mozcUTWeb = false,
             userDictionaryRepository = userDictionaryRepository,
             learnRepository = null,
-            isOmissionSearchEnable = false,
-            typoCorrectionOffsetScore = 3000,
-            omissionSearchOffsetScore = 1900,
         ).candidates.map { it.string }
     }
 

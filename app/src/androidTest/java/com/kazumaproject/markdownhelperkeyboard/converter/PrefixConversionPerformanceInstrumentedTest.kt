@@ -207,11 +207,6 @@ class PrefixConversionPerformanceInstrumentedTest {
                 mozcUTWeb = optionalDictionariesEnabled,
                 userDictionaryRepository = repository,
                 learnRepository = null,
-                isOmissionSearchEnable = omissionSearchEnabled,
-                enableTypoCorrectionJapaneseFlick = flickTypoCorrectionEnabled,
-                enableTypoCorrectionQwertyEnglish = false,
-                typoCorrectionOffsetScore = 3000,
-                omissionSearchOffsetScore = 1900,
                 beamWidth = 20,
             ).candidates
         } else {
@@ -225,11 +220,6 @@ class PrefixConversionPerformanceInstrumentedTest {
                 mozcUTWeb = optionalDictionariesEnabled,
                 userDictionaryRepository = repository,
                 learnRepository = null,
-                isOmissionSearchEnable = omissionSearchEnabled,
-                enableTypoCorrectionJapaneseFlick = flickTypoCorrectionEnabled,
-                enableTypoCorrectionQwertyEnglish = false,
-                typoCorrectionOffsetScore = 3000,
-                omissionSearchOffsetScore = 1900,
                 beamWidth = 20,
             )
         }

@@ -299,11 +299,6 @@ class LearningDictionaryPerformanceInstrumentedTest {
         mozcUTWeb = false,
         userDictionaryRepository = userDictionaryRepository,
         learnRepository = learnRepository,
-        isOmissionSearchEnable = false,
-        enableTypoCorrectionJapaneseFlick = false,
-        enableTypoCorrectionQwertyEnglish = false,
-        typoCorrectionOffsetScore = 3000,
-        omissionSearchOffsetScore = 1900,
         beamWidth = 20,
     ).candidates
 

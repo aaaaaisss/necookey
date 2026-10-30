@@ -174,8 +174,6 @@ class SumireNbestDumpTest {
                         mozcUtPersonName = false, mozcUTPlaces = false, mozcUTWiki = false,
                         mozcUTNeologd = false, mozcUTWeb = false,
                         userDictionaryRepository = userDict, learnRepository = null,
-                        isOmissionSearchEnable = false,
-                        typoCorrectionOffsetScore = 3000, omissionSearchOffsetScore = 1900,
                         candidateSegmentCollector = segL,
                     )
                 }?.let { write(outLegacy, id, reading, it.candidates, segL, 50) }

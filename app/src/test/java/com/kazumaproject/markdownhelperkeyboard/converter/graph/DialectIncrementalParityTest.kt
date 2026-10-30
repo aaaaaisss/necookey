@@ -27,7 +27,6 @@ class DialectIncrementalParityTest {
             mozcUtPersonName = false, mozcUTPlaces = false, mozcUTWiki = false,
             mozcUTNeologd = false, mozcUTWeb = false,
             userDictionaryRepository = userDict, learnRepository = null,
-            typoCorrectionOffsetScore = 3000, omissionSearchOffsetScore = 1900,
             predictionConfig = PredictionConfig().copy(japanesePredictionEnabled = false, englishPredictionEnabled = false),
         )
         return r.candidates.map { "${it.string}:${it.score}" }

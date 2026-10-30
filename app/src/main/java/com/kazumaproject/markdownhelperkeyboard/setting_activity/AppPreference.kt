@@ -225,7 +225,6 @@ object AppPreference {
     private val CANDIDATE_VIEW_EMPTY_HEIGHT_DP_LANDSCAPE =
         Pair("candidate_view_empty_height_dp_landscape_preference", 60)
 
-    private val OMISSION_SEARCH = Pair("omission_search_preference", false)
     private val UNDO_ENABLE = Pair("undo_enable_preference", false)
     private val SPACE_HANKAKU_ENABLE = Pair("space_key_preference", false)
     const val CANDIDATE_YOMI_MODE_WHOLE = "whole"
@@ -548,18 +547,9 @@ object AppPreference {
     private val SAVE_LAST_USED_KEYBOARD = Pair("save_last_used_keyboard", false)
     private val SAVE_LAST_USED_KEYBOARD_POSITION = Pair("save_last_used_keyboard_int", 0)
 
-    private val TYPO_CORRECTION_JA_FLICK =
-        Pair("enable_typo_correction_japanese_flick_keyboard_preference", false)
-
 
     private val CUSTOM_ROMAJI_ZENKAKU_CONVERSION_ENABLE_PREFERENCE =
         Pair("custom_romaji_zenkaku_conversion_enable_preference", true)
-
-    private val OMISSION_SEARCH_OFFSET_SCORE_PREFERENCE =
-        Pair("omission_search_preference_offset_score_preference", 1900)
-
-    private val TYPO_CORRECTION_JA_FLICK_OFFSET_SCORE_PREFERENCE =
-        Pair("enable_typo_correction_japanese_flick_keyboard_offset_score_preference", 3000)
 
     fun startInitialization(context: Context) {
         synchronized(initializationStartLock) {
@@ -1387,12 +1377,6 @@ object AppPreference {
         get() = preferences.getBoolean(UNDO_ENABLE.first, UNDO_ENABLE.second)
         set(value) = preferences.edit {
             it.putBoolean(UNDO_ENABLE.first, value ?: false)
-        }
-
-    var omission_search_preference: Boolean?
-        get() = preferences.getBoolean(OMISSION_SEARCH.first, OMISSION_SEARCH.second)
-        set(value) = preferences.edit {
-            it.putBoolean(OMISSION_SEARCH.first, value ?: false)
         }
 
     var tenkey_space_flick_preference: Boolean
@@ -2652,16 +2636,6 @@ object AppPreference {
             it.putInt(SAVE_LAST_USED_KEYBOARD_POSITION.first, value)
         }
 
-    var enable_typo_correction_japanese_flick_keyboard_preference: Boolean
-        get() = preferences.getBoolean(
-            TYPO_CORRECTION_JA_FLICK.first,
-            TYPO_CORRECTION_JA_FLICK.second
-        )
-        set(value) = preferences.edit {
-            it.putBoolean(TYPO_CORRECTION_JA_FLICK.first, value)
-        }
-
-
     var custom_romaji_zenkaku_conversion_enable_preference: Boolean
         get() = CUSTOM_ROMAJI_ZENKAKU_CONVERSION_ENABLE_PREFERENCE.second // 設定UI削除済み: 保存値を無視して既定値に固定
         set(value) = preferences.edit {
@@ -2670,25 +2644,6 @@ object AppPreference {
                 value
             )
         }
-
-    var omission_search_offset_score_preference: Int
-        get() = OMISSION_SEARCH_OFFSET_SCORE_PREFERENCE.second // 設定UI削除済み: 保存値を無視して既定値に固定
-        set(value) = preferences.edit {
-            it.putInt(OMISSION_SEARCH_OFFSET_SCORE_PREFERENCE.first, value)
-        }
-
-    var enable_typo_correction_japanese_flick_keyboard_offset_score_preference: Int
-        get() = preferences.getInt(
-            TYPO_CORRECTION_JA_FLICK_OFFSET_SCORE_PREFERENCE.first,
-            TYPO_CORRECTION_JA_FLICK_OFFSET_SCORE_PREFERENCE.second
-        )
-        set(value) = preferences.edit {
-            it.putInt(TYPO_CORRECTION_JA_FLICK_OFFSET_SCORE_PREFERENCE.first, value)
-        }
-
-
-
-
 
     /**
      * SharedPreferences 全体を JSON として書き出す（将来キーが増えても自動対応）

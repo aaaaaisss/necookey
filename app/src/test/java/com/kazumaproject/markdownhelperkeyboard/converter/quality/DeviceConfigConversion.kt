@@ -54,7 +54,6 @@ internal class DeviceConfigConversion(
         mozcUtPersonName = false, mozcUTPlaces = false, mozcUTWiki = false,
         mozcUTNeologd = false, mozcUTWeb = false,
         userDictionaryRepository = userDict, learnRepository = learnRepository,
-        typoCorrectionOffsetScore = 3000, omissionSearchOffsetScore = 1900,
         beamWidth = 20,
         predictionConfig = PredictionConfig().copy(japanesePredictionEnabled = false, englishPredictionEnabled = false),
         candidateSegmentCollector = segs,

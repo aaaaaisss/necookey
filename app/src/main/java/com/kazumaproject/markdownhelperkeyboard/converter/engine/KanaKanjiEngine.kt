@@ -343,10 +343,6 @@ class KanaKanjiEngine {
             succinctBitVectorneologdTangoLBS = neologdSuccinctBitVectorLBSTango,
             succinctBitVectorneologdTokenArray = neologdSuccinctBitVectorTokenArray,
             succinctBitVectorIsLeafneologdYomi = neologdSuccinctBitVectorIsLeaf,
-            isOmissionSearchEnable = false,
-            enableTypoCorrectionJapaneseFlick = false,
-            typoCorrectionOffsetScore = 0,
-            omissionSearchOffSetScore = 0,
             graphNodeDedupMode = graphNodeDedupModeForCurrentDictionary(),
             mozcNodeAttributeTable = mozcNodeAttributeTableForCurrentDictionary(),
             graphNodeTrace = graphNodeTrace,
@@ -942,11 +938,6 @@ class KanaKanjiEngine {
         mozcUTWeb: Boolean?,
         userDictionaryRepository: UserDictionaryRepository,
         learnRepository: LearnRepository?,
-        isOmissionSearchEnable: Boolean,
-        enableTypoCorrectionJapaneseFlick: Boolean = false,
-        enableTypoCorrectionQwertyEnglish: Boolean = false,
-        typoCorrectionOffsetScore: Int,
-        omissionSearchOffsetScore: Int,
         beamWidth: Int = 20,
         predictionConfig: PredictionConfig = PredictionConfig(),
         candidateSegmentCollector: MutableMap<String, List<CandidateConversionSegment>>? = null,
@@ -992,10 +983,6 @@ class KanaKanjiEngine {
             succinctBitVectorneologdTangoLBS = neologdSuccinctBitVectorLBSTango,
             succinctBitVectorneologdTokenArray = neologdSuccinctBitVectorTokenArray,
             succinctBitVectorIsLeafneologdYomi = neologdSuccinctBitVectorIsLeaf,
-            isOmissionSearchEnable = isOmissionSearchEnable,
-            enableTypoCorrectionJapaneseFlick = enableTypoCorrectionJapaneseFlick,
-            typoCorrectionOffsetScore = typoCorrectionOffsetScore,
-            omissionSearchOffSetScore = omissionSearchOffsetScore,
             graphNodeDedupMode = graphNodeDedupModeForCurrentDictionary(),
             mozcNodeAttributeTable = mozcNodeAttributeTableForCurrentDictionary(),
             beamWidth = beamWidth,
@@ -1250,13 +1237,11 @@ class KanaKanjiEngine {
         val englishDeferred = if (input.isAllEnglishLetters()) {
             getEnglishCandidates(
                 input = input,
-                enableTypoCorrection = enableTypoCorrectionQwertyEnglish,
                 enablePrediction = predictionConfig.englishPredictionEnabled,
             )
         } else if (input.isAllFullWidthAscii()) {
             getEnglishCandidates(
                 input = input.toHankakuAlphabet(),
-                enableTypoCorrection = enableTypoCorrectionQwertyEnglish,
                 enablePrediction = predictionConfig.englishPredictionEnabled,
             )
         } else {
@@ -1423,11 +1408,6 @@ class KanaKanjiEngine {
         mozcUTWeb: Boolean?,
         userDictionaryRepository: UserDictionaryRepository,
         learnRepository: LearnRepository?,
-        isOmissionSearchEnable: Boolean,
-        enableTypoCorrectionJapaneseFlick: Boolean = false,
-        enableTypoCorrectionQwertyEnglish: Boolean = false,
-        typoCorrectionOffsetScore: Int,
-        omissionSearchOffsetScore: Int,
         beamWidth: Int = 20,
         predictionConfig: PredictionConfig = PredictionConfig(),
         candidateSegmentCollector: MutableMap<String, List<CandidateConversionSegment>>? = null,
@@ -1479,10 +1459,6 @@ class KanaKanjiEngine {
             succinctBitVectorneologdTangoLBS = neologdSuccinctBitVectorLBSTango,
             succinctBitVectorneologdTokenArray = neologdSuccinctBitVectorTokenArray,
             succinctBitVectorIsLeafneologdYomi = neologdSuccinctBitVectorIsLeaf,
-            isOmissionSearchEnable = isOmissionSearchEnable,
-            enableTypoCorrectionJapaneseFlick = enableTypoCorrectionJapaneseFlick,
-            typoCorrectionOffsetScore = typoCorrectionOffsetScore,
-            omissionSearchOffSetScore = omissionSearchOffsetScore,
             graphNodeDedupMode = graphNodeDedupModeForCurrentDictionary(),
             mozcNodeAttributeTable = mozcNodeAttributeTableForCurrentDictionary(),
             beamWidth = beamWidth,
@@ -1677,13 +1653,11 @@ class KanaKanjiEngine {
         val englishDeferred = if (input.isAllEnglishLetters()) {
             getEnglishCandidates(
                 input = input,
-                enableTypoCorrection = enableTypoCorrectionQwertyEnglish,
                 enablePrediction = predictionConfig.englishPredictionEnabled,
             )
         } else if (input.isAllFullWidthAscii()) {
             getEnglishCandidates(
                 input = input.toHankakuAlphabet(),
-                enableTypoCorrection = enableTypoCorrectionQwertyEnglish,
                 enablePrediction = predictionConfig.englishPredictionEnabled,
             )
         } else {
@@ -1918,8 +1892,6 @@ class KanaKanjiEngine {
         mozcUTWeb: Boolean?,
         userDictionaryRepository: UserDictionaryRepository,
         learnRepository: LearnRepository?,
-        typoCorrectionOffsetScore: Int,
-        omissionSearchOffsetScore: Int,
         beamWidth: Int = 20,
         predictionConfig: PredictionConfig = PredictionConfig(),
         candidateSegmentCollector: MutableMap<String, List<CandidateConversionSegment>>? = null,
@@ -1965,9 +1937,6 @@ class KanaKanjiEngine {
             succinctBitVectorneologdTangoLBS = neologdSuccinctBitVectorLBSTango,
             succinctBitVectorneologdTokenArray = neologdSuccinctBitVectorTokenArray,
             succinctBitVectorIsLeafneologdYomi = neologdSuccinctBitVectorIsLeaf,
-            isOmissionSearchEnable = false,
-            typoCorrectionOffsetScore = typoCorrectionOffsetScore,
-            omissionSearchOffSetScore = omissionSearchOffsetScore,
             graphNodeDedupMode = graphNodeDedupModeForCurrentDictionary(),
             mozcNodeAttributeTable = mozcNodeAttributeTableForCurrentDictionary(),
             beamWidth = beamWidth,
@@ -2380,20 +2349,11 @@ class KanaKanjiEngine {
 
     private fun getEnglishCandidates(
         input: String,
-        enableTypoCorrection: Boolean = false,
         enablePrediction: Boolean,
-    ): List<Candidate> = if (enablePrediction) {
-        englishEngine.getCandidates(
-            input = input,
-            enableTypoCorrection = enableTypoCorrection,
-        )
-    } else {
-        englishEngine.getCandidates(
-            input = input,
-            enableTypoCorrection = enableTypoCorrection,
-            enablePrediction = false,
-        )
-    }
+    ): List<Candidate> = englishEngine.getCandidates(
+        input = input,
+        enablePrediction = enablePrediction,
+    )
 
     fun getCandidatesEnglishKana(
         input: String,

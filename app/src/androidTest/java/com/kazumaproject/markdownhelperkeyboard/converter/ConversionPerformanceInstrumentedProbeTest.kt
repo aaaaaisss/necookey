@@ -492,11 +492,6 @@ class ConversionPerformanceInstrumentedProbeTest {
             mozcUTWeb = false,
             userDictionaryRepository = userDictionaryRepository,
             learnRepository = null,
-            isOmissionSearchEnable = false,
-            enableTypoCorrectionJapaneseFlick = false,
-            enableTypoCorrectionQwertyEnglish = false,
-            typoCorrectionOffsetScore = 3000,
-            omissionSearchOffsetScore = 1900,
             beamWidth = 20,
             candidateSegmentCollector = candidateSegmentCollector,
         ).candidates

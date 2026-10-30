@@ -12,12 +12,6 @@ import com.kazumaproject.connection_id.inflate
 import com.kazumaproject.markdownhelperkeyboard.converter.bitset.SuccinctBitVector
 import com.kazumaproject.markdownhelperkeyboard.converter.compact.PackedCharArray
 import com.kazumaproject.markdownhelperkeyboard.converter.compact.PackedIntArray
-import com.kazumaproject.markdownhelperkeyboard.converter.graph.FlickDir
-import com.kazumaproject.markdownhelperkeyboard.converter.graph.KanaFlickLayout
-import com.kazumaproject.markdownhelperkeyboard.converter.graph.OmissionSearchResult
-import com.kazumaproject.markdownhelperkeyboard.converter.graph.TypoCandidate
-import com.kazumaproject.markdownhelperkeyboard.converter.graph.TypoCategory
-import com.kazumaproject.markdownhelperkeyboard.converter.graph.TypoCorrectionResult
 import com.kazumaproject.toBitSet
 import com.kazumaproject.toByteArray
 import com.kazumaproject.toByteArrayFromListChar
@@ -27,7 +21,6 @@ import java.io.IOException
 import java.io.ObjectInput
 import java.io.ObjectOutput
 import java.util.BitSet
-import java.util.concurrent.ConcurrentHashMap
 
 
 class LOUDSWithTermId {
@@ -42,30 +35,6 @@ class LOUDSWithTermId {
         val nodeIndex: Int,
     )
 
-    data class OmissionSearchState(
-        val nodeIndex: Int,
-        val omissionOccurred: Boolean,
-        val yomi: String = "",
-    )
-
-    data class OmissionSearchProgress(
-        val results: List<OmissionSearchResult>,
-        val terminalStates: List<OmissionSearchState>,
-    )
-
-    data class TypoSearchState(
-        val nodeIndex: Int,
-        val penaltyUsed: Int,
-        val depth: Int,
-        val yomi: String = "",
-    )
-
-    data class TypoSearchProgress(
-        val results: List<TypoCorrectionResult>,
-        val terminalStates: List<TypoSearchState>,
-        val acceptedPenalties: Map<String, Int>,
-    )
-
     val LBSTemp: MutableList<Boolean> = arrayListOf()
     var LBS: BitSet = BitSet()
     var labels: CharArray = charArrayOf()
@@ -76,7 +45,6 @@ class LOUDSWithTermId {
     private var packedTermIds: PackedIntArray? = null
     var isLeaf: BitSet = BitSet()
     val isLeafTemp: MutableList<Boolean> = arrayListOf()
-    private val typoCandidateCache = ConcurrentHashMap<Char, List<TypoCandidate>>(64)
 
     init {
         LBSTemp.apply {
@@ -382,33 +350,6 @@ class LOUDSWithTermId {
             }
         }
         return CommonPrefixSearchProgress(resultWithNodeIndex, n)
-    }
-
-    fun advanceCommonPrefixSearch(
-        previousNodeIndex: Int,
-        char: Char,
-        input: CharSequence,
-        start: Int,
-        succinctBitVector: SuccinctBitVector,
-    ): CommonPrefixSearchProgress {
-        if (previousNodeIndex < 0) {
-            return CommonPrefixSearchProgress(emptyList(), -1)
-        }
-        val nextNodeIndex = traverse(previousNodeIndex, char, succinctBitVector)
-        if (nextNodeIndex < 0) {
-            return CommonPrefixSearchProgress(emptyList(), -1)
-        }
-        val result = if (isLeaf[nextNodeIndex]) {
-            listOf(
-                CommonPrefixSearchResult(
-                    yomi = input.subSequence(start, input.length).toString(),
-                    nodeIndex = nextNodeIndex,
-                )
-            )
-        } else {
-            emptyList()
-        }
-        return CommonPrefixSearchProgress(result, nextNodeIndex)
     }
 
     private fun collectWords(
@@ -719,317 +660,6 @@ class LOUDSWithTermId {
             }
         }
         return LOUDSWithTermId(LBS, labels, isLeaf, termIdsSaved)
-    }
-
-    /**
-     * 修飾キー省略を考慮した共通接頭辞検索を行います。
-     *
-     * @return OmissionSearchResultのリスト。省略が発生したかのフラグを含む。
-     */
-    fun commonPrefixSearchWithOmission(
-        str: String, succinctBitVector: SuccinctBitVector
-    ): List<OmissionSearchResult> = commonPrefixSearchWithOmissionProgress(
-        str = str,
-        startIndex = 0,
-        succinctBitVector = succinctBitVector,
-    ).results
-
-    /**
-     * 省略検索の候補と、入力末尾での探索状態を同時に返す。
-     * 探索状態は1文字追加時に [advanceOmissionSearch] へ渡せる。
-     */
-    fun commonPrefixSearchWithOmissionProgress(
-        str: CharSequence,
-        startIndex: Int,
-        succinctBitVector: SuccinctBitVector,
-    ): OmissionSearchProgress {
-        if (startIndex !in str.indices) {
-            return OmissionSearchProgress(emptyList(), emptyList())
-        }
-        var states = listOf(OmissionSearchState(nodeIndex = 0, omissionOccurred = false))
-        val results = linkedSetOf<OmissionSearchResult>()
-        for (index in startIndex until str.length) {
-            states = advanceOmissionStates(states, str[index], succinctBitVector)
-            if (states.isEmpty()) break
-            states.forEach { state ->
-                if (isLeaf[state.nodeIndex]) {
-                    results.add(
-                        OmissionSearchResult(
-                            yomi = state.yomi,
-                            omissionOccurred = state.omissionOccurred,
-                        )
-                    )
-                }
-            }
-        }
-        return OmissionSearchProgress(results.toList(), states)
-    }
-
-    /** 保持した省略探索状態を1文字だけ進める。 */
-    fun advanceOmissionSearch(
-        states: List<OmissionSearchState>,
-        char: Char,
-        succinctBitVector: SuccinctBitVector,
-    ): OmissionSearchProgress {
-        val advanced = advanceOmissionStates(states, char, succinctBitVector)
-        val results = advanced.mapNotNullTo(ArrayList()) { state ->
-            if (!isLeaf[state.nodeIndex]) {
-                null
-            } else {
-                OmissionSearchResult(
-                    yomi = state.yomi,
-                    omissionOccurred = state.omissionOccurred,
-                )
-            }
-        }
-        return OmissionSearchProgress(results, advanced)
-    }
-
-    private fun advanceOmissionStates(
-        states: List<OmissionSearchState>,
-        char: Char,
-        succinctBitVector: SuccinctBitVector,
-    ): List<OmissionSearchState> {
-        if (states.isEmpty()) return emptyList()
-        val advanced = ArrayList<OmissionSearchState>(states.size * 2)
-        states.forEach { state ->
-            forEachCharVariation(char) { variant ->
-                val child = traverse(state.nodeIndex, variant, succinctBitVector)
-                if (child >= 0) {
-                    advanced.add(
-                        OmissionSearchState(
-                            nodeIndex = child,
-                            omissionOccurred = state.omissionOccurred || variant != char,
-                            yomi = state.yomi + variant,
-                        )
-                    )
-                }
-            }
-        }
-        return advanced
-    }
-
-    /**
-     * 文字のバリエーションを返すヘルパー関数。
-     * （濁点、半濁音、小文字など）
-     *
-     * @param char 変換元の文字
-     * @return 変換後の文字のリスト
-     */
-    private inline fun forEachCharVariation(char: Char, block: (Char) -> Unit) {
-        block(char)
-        when (char) {
-            'か' -> block('が')
-            'き' -> block('ぎ')
-            'く' -> block('ぐ')
-            'け' -> block('げ')
-            'こ' -> block('ご')
-            'さ' -> block('ざ')
-            'し' -> block('じ')
-            'す' -> block('ず')
-            'せ' -> block('ぜ')
-            'そ' -> block('ぞ')
-            'た' -> block('だ')
-            'ち' -> block('ぢ')
-            'つ' -> {
-                block('づ')
-                block('っ')
-            }
-            'て' -> block('で')
-            'と' -> block('ど')
-            'は' -> {
-                block('ば')
-                block('ぱ')
-            }
-            'ひ' -> {
-                block('び')
-                block('ぴ')
-            }
-            'ふ' -> {
-                block('ぶ')
-                block('ぷ')
-            }
-            'へ' -> {
-                block('べ')
-                block('ぺ')
-            }
-            'ほ' -> {
-                block('ぼ')
-                block('ぽ')
-            }
-            'や' -> block('ゃ')
-            'ゆ' -> block('ゅ')
-            'よ' -> block('ょ')
-            'あ' -> block('ぁ')
-            'い' -> block('ぃ')
-            'う' -> block('ぅ')
-            'え' -> block('ぇ')
-            'お' -> block('ぉ')
-        }
-    }
-
-    fun commonPrefixSearchWithTypoCorrectionPrefix(
-        str: String,
-        succinctBitVector: SuccinctBitVector,
-        maxPenalty: Int = 2,
-        maxLen: Int = 12,
-        maxResults: Int = 64, // 任意: 暴発防止
-    ): List<TypoCorrectionResult> = commonPrefixSearchWithTypoCorrectionProgress(
-        str = str,
-        startIndex = 0,
-        succinctBitVector = succinctBitVector,
-        maxPenalty = maxPenalty,
-        maxLen = maxLen,
-        maxResults = maxResults,
-    ).results
-
-    fun commonPrefixSearchWithTypoCorrectionProgress(
-        str: CharSequence,
-        startIndex: Int,
-        succinctBitVector: SuccinctBitVector,
-        maxPenalty: Int = 2,
-        maxLen: Int = 12,
-        maxResults: Int = 64,
-    ): TypoSearchProgress {
-        if (startIndex !in str.indices) {
-            return TypoSearchProgress(emptyList(), emptyList(), emptyMap())
-        }
-
-        // Use the exact same character-at-a-time transition as an incremental append. The old
-        // cold path used depth-first traversal while append used frontier traversal; once the
-        // bounded result set reached maxResults, they retained different typo paths and could
-        // produce different first candidates for the same input.
-        var progress = TypoSearchProgress(
-            results = emptyList(),
-            terminalStates = listOf(TypoSearchState(0, 0, 0, "")),
-            acceptedPenalties = emptyMap(),
-        )
-        val acceptedResults = LinkedHashMap<String, Int>()
-        val acceptedNodeIndices = HashMap<String, Int>()
-        val endExclusive = minOf(str.length, startIndex + maxLen)
-        for (index in startIndex until endExclusive) {
-            progress = advanceTypoCorrectionSearch(
-                previous = progress,
-                char = str[index],
-                succinctBitVector = succinctBitVector,
-                maxPenalty = maxPenalty,
-                maxLen = maxLen,
-                maxResults = maxResults,
-            )
-            progress.results.forEach { result ->
-                val previousPenalty = acceptedResults[result.yomi]
-                if (previousPenalty == null || result.penaltyUsed < previousPenalty) {
-                    acceptedResults[result.yomi] = result.penaltyUsed
-                    acceptedNodeIndices[result.yomi] = result.nodeIndex
-                }
-            }
-            if (progress.terminalStates.isEmpty()) break
-        }
-
-        val results = acceptedResults.entries
-            .sortedWith(
-                compareBy<Map.Entry<String, Int>> { it.value }
-                    .thenByDescending { it.key.length }
-                    .thenBy { it.key }
-            )
-            .map {
-                TypoCorrectionResult(
-                    yomi = it.key,
-                    penaltyUsed = it.value,
-                    nodeIndex = checkNotNull(acceptedNodeIndices[it.key]),
-                )
-            }
-        return progress.copy(results = results)
-    }
-
-    fun advanceTypoCorrectionSearch(
-        previous: TypoSearchProgress,
-        char: Char,
-        succinctBitVector: SuccinctBitVector,
-        maxPenalty: Int = 2,
-        maxLen: Int = 12,
-        maxResults: Int = 64,
-    ): TypoSearchProgress {
-        if (previous.acceptedPenalties.size >= maxResults || previous.terminalStates.isEmpty()) {
-            return TypoSearchProgress(emptyList(), emptyList(), previous.acceptedPenalties)
-        }
-        val bestPenaltyByYomi = HashMap(previous.acceptedPenalties)
-        val terminalStates = ArrayList<TypoSearchState>()
-        val newResults = LinkedHashMap<String, Int>()
-        val newResultNodeIndices = HashMap<String, Int>()
-        val typoCandidates = getTypoCandidates(char)
-        for (state in previous.terminalStates) {
-            if (bestPenaltyByYomi.size >= maxResults) break
-            if (state.depth >= maxLen) continue
-            for (candidate in typoCandidates) {
-                val nextPenalty = state.penaltyUsed + candidate.penalty
-                if (nextPenalty > maxPenalty) continue
-                val child = traverse(state.nodeIndex, candidate.ch, succinctBitVector)
-                if (child < 0) continue
-                val yomi = state.yomi + candidate.ch
-                terminalStates.add(TypoSearchState(child, nextPenalty, state.depth + 1, yomi))
-                if (!isLeaf[child]) continue
-                val oldPenalty = bestPenaltyByYomi[yomi]
-                if (oldPenalty == null || nextPenalty < oldPenalty) {
-                    bestPenaltyByYomi[yomi] = nextPenalty
-                    newResults[yomi] = nextPenalty
-                    newResultNodeIndices[yomi] = child
-                }
-            }
-        }
-        val results = newResults.entries
-            .sortedWith(
-                compareBy<Map.Entry<String, Int>> { it.value }
-                    .thenByDescending { it.key.length }
-                    .thenBy { it.key }
-            )
-            .map {
-                TypoCorrectionResult(
-                    yomi = it.key,
-                    penaltyUsed = it.value,
-                    nodeIndex = checkNotNull(newResultNodeIndices[it.key]),
-                )
-            }
-        return TypoSearchProgress(results, terminalStates, bestPenaltyByYomi)
-    }
-
-    private fun getTypoCandidates(ch: Char): List<TypoCandidate> {
-        typoCandidateCache[ch]?.let { return it }
-        val key = KanaFlickLayout.keyOf(ch) ?: return listOf(
-            TypoCandidate(ch, TypoCategory.Exact)
-        ).also { typoCandidateCache[ch] = it }
-
-        val out = ArrayList<TypoCandidate>(16)
-
-        // 1) Exact
-        out.add(TypoCandidate(ch, TypoCategory.Exact))
-
-        // 2) TapKeyInFlick: 同じgroup内の別dir
-        for (dir in FlickDir.entries) {
-            if (dir == key.dir) continue
-            val v = KanaFlickLayout.charOf(key.group, dir) ?: continue
-            out.add(TypoCandidate(v, TypoCategory.TapKeyInFlick))
-        }
-
-        // 3) DistanceNear/Middle/Far: 同dirのまま別groupへ
-        for (g in KanaFlickLayout.allGroups()) {
-            if (g == key.group) continue
-            val v = KanaFlickLayout.charOf(g, key.dir) ?: continue
-
-            val dist = KanaFlickLayout.manhattan(key.group, g)
-            val cat = when (dist) {
-                1 -> TypoCategory.DistanceNear
-                2 -> TypoCategory.DistanceMiddle
-                else -> TypoCategory.DistanceFar
-            }
-            out.add(TypoCandidate(v, cat))
-        }
-
-        // 重複排除 + penalty昇順（探索枝刈りに効く）
-        return out
-            .distinctBy { it.ch to it.category } // 同じ文字が複数カテゴリに入る設計にしたいならここは要調整
-            .sortedWith(compareBy<TypoCandidate> { it.penalty }.thenBy { it.ch })
-            .also { typoCandidateCache[ch] = it }
     }
 
     companion object {

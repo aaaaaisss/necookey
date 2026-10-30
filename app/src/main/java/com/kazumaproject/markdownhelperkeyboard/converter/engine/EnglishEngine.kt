@@ -87,17 +87,7 @@ class EnglishEngine {
 
     fun getCandidates(
         input: String,
-        enableTypoCorrection: Boolean = false,
-    ): List<Candidate> = getCandidates(
-        input = input,
-        enableTypoCorrection = enableTypoCorrection,
-        enablePrediction = true,
-    )
-
-    fun getCandidates(
-        input: String,
-        enableTypoCorrection: Boolean,
-        enablePrediction: Boolean,
+        enablePrediction: Boolean = true,
     ): List<Candidate> {
         if (input.isEmpty()) return emptyList()
         ensureDictionariesLoaded()
@@ -116,19 +106,7 @@ class EnglishEngine {
             emptyList()
         }
 
-        // ★ typo はフラグが true のときだけ
-        val typoCorrection = if (enableTypoCorrection && input.length > 2) {
-            readingLOUDS.commonPrefixSearchWithOmission(
-                str = lowerInput,
-                succinctBitVector = succinctBitVectorLBSReading
-            ).filter { it.yomi.length == lowerInput.length }
-        } else {
-            emptyList()
-        }
-
-        Timber.d(
-            "getCandidates English: [$input] predictive=$predictiveSearchReading typoEnabled=$enableTypoCorrection typo=[${typoCorrection.map { it.yomi }}]"
-        )
+        Timber.d("getCandidates English: [$input] predictive=$predictiveSearchReading")
 
         val predictions = mutableListOf<Candidate>()
 
@@ -152,8 +130,8 @@ class EnglishEngine {
             length = input.length.toUByte()
         )
 
-        // ★ fallback は predictive も (typo有効時のtypoも) 空のときだけ
-        if (predictiveSearchReading.isEmpty() && typoCorrection.isEmpty()) {
+        // ★ fallback は predictive が空のときだけ
+        if (predictiveSearchReading.isEmpty()) {
             return listOf(
                 Candidate(
                     string = input,
@@ -216,102 +194,12 @@ class EnglishEngine {
             predictions += variants
         }
 
-        // ============
-        // 2) typo（補正） - enableTypoCorrection のときだけ
-        // ============
-        if (enableTypoCorrection && typoCorrection.isNotEmpty()) {
-            val typoType = 35.toByte()
-            val predictiveSet = predictiveSearchReading.toHashSet()
-
-            val maxEdits = maxEditsByLength(lowerInput.length)
-
-            for (typo in typoCorrection) {
-                val readingStr = typo.yomi
-                if (!predictiveSet.add(readingStr)) continue
-
-                val nodeIndex = readingLOUDS.getNodeIndex(
-                    readingStr,
-                    succinctBitVector = succinctBitVectorLBSReading
-                )
-                if (nodeIndex <= 0) continue
-
-                val termId = readingLOUDS.getTermId(
-                    nodeIndex,
-                    succinctBitVector = succinctBitVectorReadingIsLeaf
-                )
-                if (termId < 0) continue
-
-                val listToken =
-                    tokenArray.getListDictionaryByYomiTermId(termId, succinctBitVectorTokenArray)
-
-                val penalty = if (typo.omissionOccurred) 9000 else 8000
-
-                val variants = listToken.flatMap { entry ->
-                    val base = when (entry.nodeId) {
-                        -1 -> readingStr
-                        else -> wordLOUDS.getLetter(
-                            entry.nodeId,
-                            succinctBitVector = succinctBitVectorLBSWord
-                        )
-                    }
-
-                    // ★ここで「input と似ているものだけ」に絞る（typo由来のみ）
-                    val baseLower = base.lowercase()
-                    if (!withinEditDistance(baseLower, lowerInput, maxEdits)) {
-                        return@flatMap emptyList<Candidate>()
-                    }
-
-                    candidateCaseVariants(input, base).map { (surface, casePenalty) ->
-                        Candidate(
-                            surface,
-                            typoType,
-                            surface.length.toUByte(),
-                            entry.wordCost.toInt() + casePenalty + penalty
-                        )
-                    }
-                }
-
-                predictions += variants
-            }
-        }
-
         // 同一文字列は最小スコアのみ残す
         val deduped = predictions
             .groupBy { it.string }
             .map { (_, list) -> list.minBy { it.score } }
 
         return deduped.sortedBy { it.score }
-    }
-
-    private fun withinEditDistance(a: String, b: String, maxEdits: Int): Boolean {
-        val la = a.length
-        val lb = b.length
-        if (kotlin.math.abs(la - lb) > maxEdits) return false
-        if (maxEdits == 0) return a == b
-        if (a == b) return true
-
-        // DP 1行で、maxEdits 超えたら早期終了
-        var prev = IntArray(lb + 1) { it }
-        var curr = IntArray(lb + 1)
-
-        for (i in 1..la) {
-            curr[0] = i
-            var rowMin = curr[0]
-            val ca = a[i - 1]
-            for (j in 1..lb) {
-                val cost = if (ca == b[j - 1]) 0 else 1
-                val v = minOf(
-                    prev[j] + 1,        // delete
-                    curr[j - 1] + 1,    // insert
-                    prev[j - 1] + cost  // replace
-                )
-                curr[j] = v
-                if (v < rowMin) rowMin = v
-            }
-            if (rowMin > maxEdits) return false
-            val tmp = prev; prev = curr; curr = tmp
-        }
-        return prev[lb] <= maxEdits
     }
 
     private fun ensureDictionariesLoaded() {
@@ -361,12 +249,5 @@ class EnglishEngine {
         val succinctBitVectorReadingIsLeaf: SuccinctBitVector,
         val succinctBitVectorTokenArray: SuccinctBitVector,
     )
-
-    private fun maxEditsByLength(len: Int): Int = when {
-        len <= 3 -> 1
-        len <= 6 -> 1
-        len <= 10 -> 2
-        else -> 3
-    }
 
 }

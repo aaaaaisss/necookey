@@ -262,11 +262,6 @@ class KanaKanjiConversionSessionParityTest {
         mozcUtWeb = false,
         userDictionaryRepository = userDictionaryRepository,
         learnRepository = null,
-        omissionSearchEnabled = false,
-        typoCorrectionJapaneseFlickEnabled = false,
-        typoCorrectionQwertyEnglishEnabled = false,
-        typoCorrectionOffsetScore = 3000,
-        omissionSearchOffsetScore = 1900,
         beamWidth = 20,
         collectCandidateSegments = true,
     )
