@@ -202,6 +202,7 @@ import com.kazumaproject.markdownhelperkeyboard.converter.candidatebar.LowerRow
 import com.kazumaproject.markdownhelperkeyboard.converter.candidatebar.MemoChipConverter
 import com.kazumaproject.markdownhelperkeyboard.converter.candidatebar.SeededChipConverter
 import com.kazumaproject.markdownhelperkeyboard.ime_service.candidatebar.ChipStripView
+import com.kazumaproject.markdownhelperkeyboard.ime_service.candidatebar.FloatingCandidateBand
 import com.kazumaproject.markdownhelperkeyboard.converter.candidatebar.NecookeyCandidateBarConfig
 import com.kazumaproject.markdownhelperkeyboard.converter.candidatebar.TwoRowCandidateBar
 import com.kazumaproject.markdownhelperkeyboard.converter.candidatebar.TwoRowCandidateBarPlanner
@@ -1327,6 +1328,12 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
     private var keyboardContainer: FrameLayout? = null
     private var dockedCandidateContainerActive = false
     private var dockedCandidateHeightStabilized = false
+    /** 浮いた候補帯としてコンテナに出している候補欄（null = 従来どおりキーボードのルートの中）。 */
+    private var floatingBandView: View? = null
+    private var floatingBandRootIndex = 1
+    private var floatingBandSavedParams: FrameLayout.LayoutParams? = null
+    /** 物理キーボード用の候補だけの表示（キーボードを隠している）。浮いた候補帯にしない。 */
+    private var physicalKeyboardCandidateOnlyMode = false
     private var stabilizeCandidateStripHeightPreference = false
 
     private var isSpaceKeyLongPressed = false
@@ -3051,9 +3058,16 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
 
     override fun onComputeInsets(outInsets: Insets?) {
         super.onComputeInsets(outInsets)
-        if (dockedCandidateContainerActive && !isFullscreenMode && outInsets != null) {
+        // 浮いた候補帯のときも同じく、見えている子（キーボードのルートと帯）だけを触れる領域にし、帯の上端を内容の上端にする
+        // （帯の余白・狭いキーボードの横の透明な所は下のアプリに通す）
+        val floatingBandShown = floatingBandView?.let { it.parent === keyboardContainer } == true
+        if ((dockedCandidateContainerActive || floatingBandShown) && !isFullscreenMode && outInsets != null) {
             val container = keyboardContainer ?: return
-            applyDockedCandidateInsets(container, dockedCandidateHeightStabilized, outInsets)
+            applyDockedCandidateInsets(
+                container,
+                dockedCandidateContainerActive && dockedCandidateHeightStabilized,
+                outInsets
+            )
         }
     }
 
@@ -8735,6 +8749,15 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         val density = resources.displayMetrics.density
         val screenWidth = resources.displayMetrics.widthPixels
         val isSymbol = isSymbolOverride ?: keyboardSymbolViewState.value.isShown
+        // 文節チップ方式: 候補欄をキーボードのルートから外し、画面幅の浮いた帯にする（docs/CHIP_BAR.md「浮いた候補帯」）
+        val floatCandidateBand = FloatingCandidateBand.shouldFloat(
+            chipBarPreference = appPreference.necookey_chip_candidate_bar_preference,
+            twoRowBarPreference = isNecookeyTwoRowSurfaceAvailable(),
+            symbolKeyboardShown = isSymbol,
+            candidateOnlyMode = physicalKeyboardCandidateOnlyMode,
+            fullscreen = isFullscreenMode,
+        )
+        syncFloatingCandidateBand(mainView, floatCandidateBand)
         val forceFullLayout = !addCandidateTabHeight && (
             lastKeyboardLayoutRootView !== mainView.root ||
                 lastKeyboardLayoutOrientation != orientation
@@ -8816,6 +8839,18 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         // The visible input view includes the safe area, while its bottom padding keeps content
         // above it. This prevents the inset from shrinking the configured candidate view.
         val inputViewHeight = contentKeyboardHeight + systemBottomInset
+        val floatingBandGeometry = if (isFloatingCandidateBandActive(mainView)) {
+            FloatingCandidateBand.geometry(
+                inputViewHeightPx = inputViewHeight,
+                candidateStripHeightPx = applicationContext.dpToPx(candidateStripHeightDp),
+                keyboardBottomMarginPx = prefs.bottomMargin,
+                sideMarginPx = applicationContext.dpToPx(FloatingCandidateBand.SIDE_MARGIN_DP),
+                gapPx = applicationContext.dpToPx(FloatingCandidateBand.GAP_DP),
+                topMarginPx = applicationContext.dpToPx(FloatingCandidateBand.TOP_MARGIN_DP),
+            )
+        } else {
+            null
+        }
         fun candidateHeightPx(configuredHeightDp: Int): Int = applicationContext.dpToPx(
             if (keyboardSkinId == KeyboardSkinId.CUPERTINO_CLASSIC) {
                 com.kazumaproject.markdownhelperkeyboard.ime_service.composing_guide.CupertinoClassicCandidateChrome
@@ -8846,7 +8881,7 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         val backgroundSurfaceHeight = if (false) {
             heightPx
         } else {
-            contentKeyboardHeight - candidateTabOffset
+            contentKeyboardHeight - candidateTabOffset - (floatingBandGeometry?.bandHeightPx ?: 0)
         }
 
         val finalKeyboardWidth =
@@ -8862,7 +8897,8 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
             prefs.bottomMargin
 
         updateDockedCandidateContainerHeight(
-            heightPx = transparentContainerHeight?.plus(finalBottomMargin),
+            heightPx = transparentContainerHeight?.plus(finalBottomMargin)
+                ?.plus(floatingBandGeometry?.extraHeightPx ?: 0),
             stabilizeInsets = stabilizeCandidateStripHeightPreference
         )
 
@@ -8881,8 +8917,9 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
                     applicationContext.dpToPx(candidateStripHeightDp)
                 else -> ViewGroup.LayoutParams.WRAP_CONTENT
             },
-            finalKeyboardHeight = inputViewHeight,
+            finalKeyboardHeight = floatingBandGeometry?.rootHeightPx ?: inputViewHeight,
             backgroundSurfaceHeight = backgroundSurfaceHeight,
+            floatingBand = floatingBandGeometry,
             finalKeyboardWidth = finalKeyboardWidth,
             gravity = gravity,
             finalBottomMargin = finalBottomMargin,
@@ -8969,11 +9006,13 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         finalBottomMargin: Int,
         finalStartMargin: Int,
         finalEndMargin: Int,
-        forceLayout: Boolean
+        forceLayout: Boolean,
+        floatingBand: FloatingCandidateBand.Geometry? = null,
     ) {
         if (shouldUseIndependentShortcutToolbar()) {
             (mainView.shortcutToolbarRecyclerview.layoutParams as? FrameLayout.LayoutParams)?.let { param ->
-                val bottomMargin = heightPx + mainView.suggestionViewParent.height
+                // 浮いた候補帯のときは候補欄がルートの外なので、ツールバーはキーボードのすぐ上
+                val bottomMargin = heightPx + if (floatingBand != null) 0 else mainView.suggestionViewParent.height
                 if (forceLayout || param.bottomMargin != bottomMargin) {
                     param.bottomMargin = bottomMargin
                     mainView.shortcutToolbarRecyclerview.layoutParams = param
@@ -8981,8 +9020,9 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
             }
         }
 
-        listOf(
-            mainView.suggestionViewParent,
+        floatingBand?.let { applyFloatingCandidateBandParams(mainView, it, forceLayout) }
+        listOfNotNull(
+            mainView.suggestionViewParent.takeIf { floatingBand == null },
             mainView.customLayoutDefault,
             mainView.candidatesRowView
         ).forEach { view ->
@@ -10551,6 +10591,9 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
                     if (customLayoutDefault.isVisible) {
                         disableKeyboardLayoutEditMode()
                         hideAllKeyboards()
+                        // 候補だけの表示は従来の配置（浮いた候補帯をルートに戻す）
+                        physicalKeyboardCandidateOnlyMode = true
+                        syncFloatingCandidateBand(mainView, false)
                         val heightPx = dpToPx(40f)
                         val widthPx = ViewGroup.LayoutParams.MATCH_PARENT
                         (mainView.suggestionViewParent.layoutParams as? FrameLayout.LayoutParams)?.let { params ->
@@ -10562,6 +10605,7 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
                             mainView.root.layoutParams = params
                         }
                     } else {
+                        physicalKeyboardCandidateOnlyMode = false
                         val resolution = resolveKeyboardForDisplay(
                             requestedType = null,
                             savedPosition = null,
@@ -11253,10 +11297,122 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         )
     }
 
+    // ------------------------------------------------------------------------------------------
+    // necookey 浮いた候補帯（docs/CHIP_BAR.md「2026-10-30 浮いた候補帯」）
+    //
+    // 文節チップ方式のとき、候補欄（suggestionView_parent）をキーボードのルート（幅・位置・左右の余白の設定で狭くなる）から
+    // IME のコンテナ（常に画面幅）へ移し、キーボードの上に少し離して浮かべる。中身（上段チップ列・下段の候補、
+    // 未入力時の従来の候補行・ツールバー、展開ボタン）とその処理は変えない。設定オフ・記号キーボード・物理キーボード用の
+    // 候補だけの表示ではルートの元の位置に戻す（従来の配置）。
+    // ------------------------------------------------------------------------------------------
+
+    private fun isFloatingCandidateBandActive(mainView: MainLayoutBinding): Boolean {
+        val band = mainView.suggestionViewParent
+        val container = keyboardContainer ?: return false
+        return floatingBandView === band && band.parent === container
+    }
+
+    /** Main. 候補欄をコンテナ（浮いた帯）とキーボードのルートの間で付け替える。 */
+    private fun syncFloatingCandidateBand(mainView: MainLayoutBinding, float: Boolean) {
+        val band = mainView.suggestionViewParent
+        val root = mainView.root
+        val container = keyboardContainer
+        if (floatingBandView != null && floatingBandView !== band) {
+            // setupKeyboardView で作り直した（古い帯はコンテナごと捨てられている）
+            floatingBandView = null
+            floatingBandSavedParams = null
+        }
+        if (float && container != null && root.parent === container) {
+            if (band.parent === container) {
+                floatingBandView = band
+                return
+            }
+            (band.parent as? ViewGroup)?.let { parent ->
+                if (parent === root) floatingBandRootIndex = root.indexOfChild(band).coerceAtLeast(0)
+                parent.removeView(band)
+            }
+            floatingBandSavedParams = (band.layoutParams as? FrameLayout.LayoutParams)
+                ?.let { FrameLayout.LayoutParams(it) }
+            container.addView(
+                band,
+                FrameLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.WRAP_CONTENT,
+                    Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL,
+                )
+            )
+            floatingBandView = band
+            applyFloatingCandidateBandChrome(band, floating = true)
+            return
+        }
+        if (band.parent === root) {
+            floatingBandView = null
+            return
+        }
+        (band.parent as? ViewGroup)?.removeView(band)
+        val params = floatingBandSavedParams ?: FrameLayout.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT,
+            ViewGroup.LayoutParams.WRAP_CONTENT,
+        )
+        root.addView(band, floatingBandRootIndex.coerceIn(0, root.childCount), params)
+        floatingBandView = null
+        floatingBandSavedParams = null
+        applyFloatingCandidateBandChrome(band, floating = false)
+    }
+
+    /** 浮いた見た目: 背景（テーマ・スキン・独自配色が塗ったもの）はそのまま、角を丸めて切り抜き、少し影を付ける。 */
+    private fun applyFloatingCandidateBandChrome(band: View, floating: Boolean) {
+        if (floating) {
+            val radius = applicationContext.dpToPx(FloatingCandidateBand.CORNER_RADIUS_DP).toFloat()
+            band.outlineProvider = object : ViewOutlineProvider() {
+                override fun getOutline(view: View, outline: android.graphics.Outline) {
+                    outline.setRoundRect(0, 0, view.width, view.height, radius)
+                    outline.alpha = 1f
+                }
+            }
+            band.clipToOutline = true
+            band.elevation = applicationContext.dpToPx(FloatingCandidateBand.ELEVATION_DP).toFloat()
+        } else {
+            band.outlineProvider = ViewOutlineProvider.BACKGROUND
+            band.clipToOutline = false
+            band.elevation = 0f
+        }
+    }
+
+    /** 帯の位置: 画面幅（左右に少し余白）、キーボードのルートの上端から少し上。高さは候補欄の予算そのまま。 */
+    private fun applyFloatingCandidateBandParams(
+        mainView: MainLayoutBinding,
+        geometry: FloatingCandidateBand.Geometry,
+        forceLayout: Boolean,
+    ) {
+        val band = mainView.suggestionViewParent
+        val params = band.layoutParams as? FrameLayout.LayoutParams ?: return
+        val gravity = Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL
+        val changed = forceLayout ||
+            params.width != ViewGroup.LayoutParams.MATCH_PARENT ||
+            params.height != geometry.bandHeightPx ||
+            params.bottomMargin != geometry.bandBottomMarginPx ||
+            params.topMargin != geometry.bandTopMarginPx ||
+            params.leftMargin != geometry.bandSideMarginPx ||
+            params.rightMargin != geometry.bandSideMarginPx ||
+            params.gravity != gravity
+        if (!changed) return
+        params.width = ViewGroup.LayoutParams.MATCH_PARENT
+        params.height = geometry.bandHeightPx
+        params.bottomMargin = geometry.bandBottomMarginPx
+        params.topMargin = geometry.bandTopMarginPx
+        params.leftMargin = geometry.bandSideMarginPx
+        params.rightMargin = geometry.bandSideMarginPx
+        params.gravity = gravity
+        band.layoutParams = params
+    }
+
     private fun applyCandidateTabSuggestionOffset(
         mainView: MainLayoutBinding,
         showCandidateTab: Boolean
     ) {
+        // 浮いた候補帯の余白は applyFloatingCandidateBandParams が持つ（タブはルートの上端、帯の下に出る）
+        if (isFloatingCandidateBandActive(mainView)) return
         val tabOffset = if (showCandidateTab) candidateTabHeightPx(mainView) else 0
         (mainView.suggestionViewParent.layoutParams as? FrameLayout.LayoutParams)?.let { params ->
             if (params.topMargin != tabOffset) {
