@@ -13,12 +13,12 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.MenuHost
 import androidx.core.view.MenuProvider
+import androidx.core.view.isVisible
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.navigation.fragment.findNavController
-import androidx.recyclerview.widget.DividerItemDecoration
 import androidx.recyclerview.widget.ItemTouchHelper
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
@@ -31,6 +31,8 @@ import com.kazumaproject.markdownhelperkeyboard.custom_keyboard.import_export.Ke
 import com.kazumaproject.markdownhelperkeyboard.custom_keyboard.ui.adapter.KeyboardLayoutAdapter
 import com.kazumaproject.markdownhelperkeyboard.databinding.FragmentKeyboardListBinding
 import com.kazumaproject.markdownhelperkeyboard.repository.CustomKeyboardDeleteImpact
+import com.kazumaproject.markdownhelperkeyboard.setting_activity.ui.setting.SettingsListCardDecoration
+import com.kazumaproject.markdownhelperkeyboard.setting_activity.ui.setting.SettingsListCards
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.launch
 import timber.log.Timber
@@ -94,9 +96,8 @@ class KeyboardListFragment : Fragment(R.layout.fragment_keyboard_list) {
 
         binding.keyboardLayoutsRecyclerView.adapter = adapter
         binding.keyboardLayoutsRecyclerView.layoutManager = LinearLayoutManager(context)
-        binding.keyboardLayoutsRecyclerView.addItemDecoration(
-            DividerItemDecoration(context, DividerItemDecoration.VERTICAL)
-        )
+        binding.keyboardLayoutsRecyclerView.addItemDecoration(SettingsListCardDecoration())
+        SettingsListCards.bindEmpty(binding.emptyState.root, R.drawable.ic_ms_keyboard, R.string.st_layouts_empty)
 
         // ★追加: ItemTouchHelper
         val callback = object : ItemTouchHelper.SimpleCallback(
@@ -152,6 +153,7 @@ class KeyboardListFragment : Fragment(R.layout.fragment_keyboard_list) {
         viewLifecycleOwner.lifecycleScope.launch {
             viewModel.layouts.collect { layouts ->
                 adapter.submitList(layouts)
+                _binding?.emptyState?.root?.isVisible = layouts.isEmpty()
             }
         }
 
@@ -170,7 +172,7 @@ class KeyboardListFragment : Fragment(R.layout.fragment_keyboard_list) {
     override fun onResume() {
         super.onResume()
         (activity as? AppCompatActivity)?.supportActionBar?.apply {
-            title = getString(R.string.custom_layout_fragment_title)
+            title = getString(R.string.st_layouts)
         }
         requireActivity().invalidateOptionsMenu()
     }

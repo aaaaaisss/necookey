@@ -1,8 +1,6 @@
 package com.kazumaproject.markdownhelperkeyboard.ng_word.ui
 
 import android.app.Activity
-import android.app.AlertDialog
-import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
@@ -12,15 +10,14 @@ import android.view.MenuInflater
 import android.view.MenuItem
 import android.view.View
 import android.view.ViewGroup
-import android.view.inputmethod.InputMethodManager
-import android.widget.ArrayAdapter
 import android.widget.EditText
-import android.widget.Spinner
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.view.MenuHost
 import androidx.core.view.MenuProvider
-import androidx.core.view.isGone
+import androidx.core.view.isVisible
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
+import com.google.android.material.textfield.MaterialAutoCompleteTextView
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
 import androidx.lifecycle.Lifecycle
@@ -31,6 +28,8 @@ import com.kazumaproject.markdownhelperkeyboard.ng_word.NgWordBackup
 import com.kazumaproject.markdownhelperkeyboard.ng_word.adapter.NgWordAdapter
 import com.kazumaproject.markdownhelperkeyboard.ng_word.database.NgWord
 import com.kazumaproject.markdownhelperkeyboard.ng_word.database.NgWordMatchMode
+import com.kazumaproject.markdownhelperkeyboard.setting_activity.ui.setting.SettingsListCardDecoration
+import com.kazumaproject.markdownhelperkeyboard.setting_activity.ui.setting.SettingsListCards
 import dagger.hilt.android.AndroidEntryPoint
 import java.io.FileOutputStream
 
@@ -74,7 +73,6 @@ class NgWordFragment : Fragment() {
         setupMenu()
         setupRecyclerView()
         setupFab()
-        setupMatchModeSpinner(binding.spinnerNgWordMatchMode, NgWordMatchMode.PARTIAL)
         observeViewModel()
     }
 
@@ -130,15 +128,14 @@ class NgWordFragment : Fragment() {
     }
 
     private fun showDeleteAllDialog() {
-        AlertDialog.Builder(requireContext())
-            .setTitle(getString(R.string.confirm_delete_title))
-            .setMessage(getString(R.string.confirm_all_words_delete_message))
-            .setPositiveButton(getString(R.string.delete_string)) { _, _ ->
+        MaterialAlertDialogBuilder(requireContext())
+            .setTitle(R.string.st_ng_delete_all)
+            .setPositiveButton(R.string.st_delete) { _, _ ->
                 viewModel.deleteAll()
                 Toast.makeText(context, getString(R.string.deleted_string), Toast.LENGTH_SHORT)
                     .show()
             }
-            .setNegativeButton(getString(R.string.cancel_string), null)
+            .setNegativeButton(R.string.st_cancel, null)
             .show()
     }
 
@@ -180,39 +177,43 @@ class NgWordFragment : Fragment() {
     }
 
     private fun setupFab() {
-        binding.fabAddNgWord.setOnClickListener {
-            val cv = binding.cardViewAddNgWord
-            cv.isGone = !cv.isGone
-            if (!cv.isGone) {
-                binding.spinnerNgWordMatchMode.setSelection(
-                    matchModes.indexOf(NgWordMatchMode.PARTIAL)
-                )
-                binding.editTextYomi.requestFocus()
-                (context?.getSystemService(Context.INPUT_METHOD_SERVICE) as? InputMethodManager)
-                    ?.showSoftInput(binding.editTextYomi, 0)
-                binding.buttonAddNgWord.setOnClickListener { addNgWord() }
-            } else {
-                hideKeyboardAndClearFocus()
-            }
-        }
+        binding.fabAddNgWord.setOnClickListener { showAddDialog() }
     }
 
-    private fun addNgWord() {
-        val yomi = binding.editTextYomi.text.toString().trim()
-        val tango = binding.editTextTango.text.toString().trim()
-        if (yomi.isEmpty() || tango.isEmpty()) {
-            Toast.makeText(
-                context,
-                getString(R.string.enter_word_and_yomi_string),
-                Toast.LENGTH_SHORT
-            ).show()
-            return
+    /** 追加（読み・単語・照合。照合の初期値は部分一致）。読み・単語が空なら案内を出してダイアログは閉じない。 */
+    private fun showAddDialog() {
+        val v = layoutInflater.inflate(R.layout.dialog_edit_ng_word, null)
+        val etYomi = v.findViewById<EditText>(R.id.edit_text_yomi_dialog)
+        val etTango = v.findViewById<EditText>(R.id.edit_text_tango_dialog)
+        val matchMode = setupMatchModeDropdown(
+            v.findViewById(R.id.spinner_ng_word_match_mode),
+            NgWordMatchMode.PARTIAL,
+        )
+        val dialog = MaterialAlertDialogBuilder(requireContext())
+            .setTitle(R.string.st_ng_add)
+            .setView(v)
+            .setPositiveButton(R.string.st_add, null)
+            .setNegativeButton(R.string.st_cancel, null)
+            .create()
+        dialog.setOnShowListener {
+            etYomi.requestFocus()
+            dialog.getButton(android.content.DialogInterface.BUTTON_POSITIVE).setOnClickListener {
+                val yomi = etYomi.text.toString().trim()
+                val tango = etTango.text.toString().trim()
+                if (yomi.isEmpty() || tango.isEmpty()) {
+                    Toast.makeText(
+                        context,
+                        getString(R.string.enter_word_and_yomi_string),
+                        Toast.LENGTH_SHORT
+                    ).show()
+                    return@setOnClickListener
+                }
+                viewModel.insert(yomi, tango, matchMode())
+                dialog.dismiss()
+            }
         }
-        val matchMode = matchModeAt(binding.spinnerNgWordMatchMode.selectedItemPosition)
-        viewModel.insert(yomi, tango, matchMode)
-        hideKeyboardAndClearFocus()
-        binding.cardViewAddNgWord.isGone = true
-        binding.spinnerNgWordMatchMode.setSelection(matchModes.indexOf(NgWordMatchMode.PARTIAL))
+        dialog.window?.setSoftInputMode(android.view.WindowManager.LayoutParams.SOFT_INPUT_STATE_VISIBLE)
+        dialog.show()
     }
 
     private fun setupRecyclerView() {
@@ -220,12 +221,15 @@ class NgWordFragment : Fragment() {
             showEditDialog(ng)
         }
         binding.recyclerViewNgWords.adapter = adapter
+        binding.recyclerViewNgWords.addItemDecoration(SettingsListCardDecoration())
+        SettingsListCards.bindEmpty(binding.emptyState.root, R.drawable.ic_ms_block, R.string.st_ng_empty)
     }
 
     private fun observeViewModel() {
         viewModel.allNgWords.observe(viewLifecycleOwner) { list ->
             (binding.recyclerViewNgWords.adapter as NgWordAdapter)
                 .submitList(list)
+            binding.emptyState.root.isVisible = list.isNullOrEmpty()
         }
     }
 
@@ -233,15 +237,17 @@ class NgWordFragment : Fragment() {
         val v = layoutInflater.inflate(R.layout.dialog_edit_ng_word, null)
         val etYomi = v.findViewById<EditText>(R.id.edit_text_yomi_dialog)
         val etTango = v.findViewById<EditText>(R.id.edit_text_tango_dialog)
-        val spinnerMatchMode = v.findViewById<Spinner>(R.id.spinner_ng_word_match_mode)
-        setupMatchModeSpinner(spinnerMatchMode, item.matchMode)
+        val matchMode = setupMatchModeDropdown(
+            v.findViewById(R.id.spinner_ng_word_match_mode),
+            item.matchMode,
+        )
         etYomi.setText(item.yomi)
         etTango.setText(item.tango)
 
-        AlertDialog.Builder(requireContext())
-            .setTitle(getString(R.string.edit_ng_word_dialog_title))
+        MaterialAlertDialogBuilder(requireContext())
+            .setTitle(R.string.st_ng_edit)
             .setView(v)
-            .setPositiveButton(getString(R.string.save_string)) { _, _ ->
+            .setPositiveButton(R.string.st_save) { _, _ ->
                 val newY = etYomi.text.toString().trim()
                 val newT = etTango.text.toString().trim()
                 if (newY.isNotEmpty() && newT.isNotEmpty()) {
@@ -249,38 +255,33 @@ class NgWordFragment : Fragment() {
                         item.copy(
                             yomi = newY,
                             tango = newT,
-                            matchMode = matchModeAt(spinnerMatchMode.selectedItemPosition),
+                            matchMode = matchMode(),
                         )
                     )
                 }
             }
-            .setNeutralButton(getString(R.string.delete_string)) { _, _ ->
+            .setNeutralButton(R.string.st_delete) { _, _ ->
                 viewModel.delete(item)
             }
-            .setNegativeButton(getString(R.string.cancel_string), null)
+            .setNegativeButton(R.string.st_cancel, null)
             .show()
     }
 
-    private fun setupMatchModeSpinner(spinner: Spinner, selectedMode: NgWordMatchMode) {
-        val adapter = ArrayAdapter.createFromResource(
-            requireContext(),
-            R.array.ng_word_match_mode_entries,
-            android.R.layout.simple_spinner_item,
-        ).apply {
-            setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
-        }
-        spinner.adapter = adapter
-        spinner.setSelection(matchModes.indexOf(selectedMode).coerceAtLeast(0))
+    /** 照合方式のドロップダウン。今の選択を返す関数を返す。 */
+    private fun setupMatchModeDropdown(
+        dropdown: MaterialAutoCompleteTextView,
+        selectedMode: NgWordMatchMode,
+    ): () -> NgWordMatchMode {
+        val entries = resources.getStringArray(R.array.ng_word_match_mode_entries)
+        var selected = matchModes.indexOf(selectedMode).coerceAtLeast(0)
+        dropdown.setSimpleItems(entries)
+        dropdown.setText(entries.getOrNull(selected).orEmpty(), false)
+        dropdown.setOnItemClickListener { _, _, position, _ -> selected = position }
+        return { matchModeAt(selected) }
     }
 
     private fun matchModeAt(position: Int): NgWordMatchMode =
         matchModes.getOrNull(position) ?: NgWordMatchMode.PARTIAL
-
-    private fun hideKeyboardAndClearFocus() {
-        (context?.getSystemService(Context.INPUT_METHOD_SERVICE) as? InputMethodManager)
-            ?.hideSoftInputFromWindow(view?.windowToken, 0)
-        view?.clearFocus()
-    }
 
     override fun onDestroyView() {
         super.onDestroyView()

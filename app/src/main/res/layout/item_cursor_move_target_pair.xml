@@ -1,35 +1,31 @@
 <?xml version="1.0" encoding="utf-8"?>
-<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<!-- 確定後にカーソルを戻す記号 の 1 行: 記号を大きく＋右に削除ボタン（タップで編集）。背景は SettingsListCards。 -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:background="?android:attr/selectableItemBackground"
-    android:minHeight="56dp"
-    android:padding="16dp">
+    android:gravity="center_vertical"
+    android:minHeight="@dimen/settings_row_min_height"
+    android:orientation="horizontal"
+    android:paddingStart="@dimen/settings_row_padding_h"
+    android:paddingEnd="4dp">
 
     <TextView
         android:id="@+id/pair_text"
         android:layout_width="0dp"
         android:layout_height="wrap_content"
-        android:textAppearance="?attr/textAppearanceListItem"
-        android:textSize="24sp"
-        app:layout_constraintBottom_toBottomOf="parent"
-        app:layout_constraintEnd_toStartOf="@id/delete_icon"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toTopOf="parent"
+        android:layout_weight="1"
+        android:textAppearance="@style/TextAppearance.Necookey.Glyph"
         tools:text="「」" />
 
-    <ImageView
+    <ImageButton
         android:id="@+id/delete_icon"
-        android:layout_width="24dp"
-        android:layout_height="24dp"
-        android:background="@drawable/keyboard_selection_delete_icon_bg"
-        android:contentDescription="@string/delete_key"
-        android:padding="4dp"
-        app:layout_constraintBottom_toBottomOf="parent"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintTop_toTopOf="parent"
-        app:srcCompat="@drawable/remove"
-        app:tint="@color/white" />
-</androidx.constraintlayout.widget.ConstraintLayout>
+        android:layout_width="48dp"
+        android:layout_height="48dp"
+        android:background="?attr/selectableItemBackgroundBorderless"
+        android:contentDescription="@string/st_delete"
+        android:scaleType="center"
+        app:srcCompat="@drawable/ic_ms_close"
+        app:tint="?attr/colorOnSurfaceVariant" />
+</LinearLayout>

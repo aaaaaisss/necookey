@@ -60,4 +60,69 @@
     <string name="st_freeze_log">フリーズ記録</string>
     <string name="st_licenses">ライセンス</string>
     <string name="st_version">バージョン</string>
+
+    <!-- 一覧画面（共通） -->
+    <string name="st_search">検索</string>
+    <string name="st_add">追加</string>
+    <string name="st_save">保存</string>
+    <string name="st_cancel">キャンセル</string>
+    <string name="st_delete">削除</string>
+    <string name="st_close">閉じる</string>
+    <string name="st_import">読み込む</string>
+    <string name="st_import_other_ime">他の IME から読み込む</string>
+    <string name="st_export">書き出す</string>
+    <string name="st_delete_all">すべて削除</string>
+    <string name="st_reset">初期値に戻す</string>
+    <string name="st_about">説明</string>
+    <string name="st_no_results">見つかりません</string>
+    <string name="st_delete_confirm">「%1$s」を削除しますか？</string>
+    <string name="st_field_word">単語</string>
+    <string name="st_field_reading">読み</string>
+    <string name="st_field_pos">品詞</string>
+    <string name="st_field_score">スコア</string>
+    <string name="st_field_score_learn">スコア（小さいほど優先）</string>
+
+    <!-- ユーザー辞書 -->
+    <string name="st_user_word_add">単語を追加</string>
+    <string name="st_user_word_edit">単語を編集</string>
+    <string name="st_user_word_register">登録</string>
+    <string name="st_user_words_empty">単語はまだありません</string>
+    <string name="st_user_words_delete_all">すべての単語を削除しますか？</string>
+    <string name="st_other_ime_format">辞書の形式</string>
+
+    <!-- 学習辞書 -->
+    <string name="st_learn_empty">学習した言葉はありません</string>
+    <string name="st_learn_edit">学習した言葉を編集</string>
+    <string name="st_learn_delete_all">学習辞書をすべて削除しますか？</string>
+    <string name="st_learn_delete_all_message">次の言葉の学習も消えます。元に戻せません。</string>
+
+    <!-- クリップボード履歴 -->
+    <string name="st_clipboard_empty">履歴はありません</string>
+    <string name="st_clipboard_edit">テキストを編集</string>
+    <string name="st_clipboard_delete_all">履歴をすべて削除しますか？</string>
+    <string name="st_clipboard_image">画像</string>
+
+    <!-- NG ワード -->
+    <string name="st_ng_add">NG ワードを追加</string>
+    <string name="st_ng_edit">NG ワードを編集</string>
+    <string name="st_ng_empty">NG ワードはありません</string>
+    <string name="st_ng_match">照合</string>
+    <string name="st_ng_delete_all">すべての NG ワードを削除しますか？</string>
+
+    <!-- 左フリックで消す記号 / 確定後にカーソルを戻す記号 -->
+    <string name="st_delete_targets_caption">スペースと改行は常に区切りです</string>
+    <string name="st_delete_targets_empty">記号がありません</string>
+    <string name="st_delete_target_add">記号を追加</string>
+    <string name="st_delete_target_edit">記号を編集</string>
+    <string name="st_delete_target_field">記号（1 文字）</string>
+    <string name="st_delete_targets_reset">初期値（。、！？「」『』ー.）に戻しますか？</string>
+    <string name="st_cursor_pairs_caption">確定した文字がペアと同じなら、間にカーソルを戻します</string>
+    <string name="st_cursor_pairs_empty">ペアがありません</string>
+    <string name="st_cursor_pair_add">ペアを追加</string>
+    <string name="st_cursor_pair_edit">ペアを編集</string>
+    <string name="st_cursor_pair_field">ペア（2 文字）</string>
+    <string name="st_cursor_pairs_reset">初期値のペアに戻しますか？</string>
+
+    <!-- 配列 -->
+    <string name="st_layouts_empty">配列はまだありません</string>
 </resources>

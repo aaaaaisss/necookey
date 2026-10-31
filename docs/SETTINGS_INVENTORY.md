@@ -63,7 +63,19 @@
 - 実装: `res/xml/pref_main.xml`、`values/settings_theme.xml`（テーマ・文字の階層・preferenceTheme）、`values/strings_settings.xml`（短い文言）、
   `layout/settings_pref_*`・`settings_widget_*`（行・見出し・スライダー・スイッチ・矢印）、`SettingsPreferenceAdapter` / `SettingsCardDecoration` / `SettingsRowBackground`（角丸カード）、
   `SettingMainFragment` ＋ `fragment_setting_main.xml` / `item_setting_home_row.xml` / `item_setting_home_section.xml`（ホーム）、`SafeNavigation.settingsNavOptions`（遷移アニメ）。
-- 配列エディタ・位置とサイズ画面の中身は今回は触っていない（入口だけ）。
+- 配列エディタ・位置とサイズ画面・変換欄の高さ画面の中身は触っていない（入口だけ）。
+
+### 一覧画面の作り直し（2026-10-31）
+対象: ユーザー辞書・学習辞書・クリップボード履歴・NG ワード・左フリックで消す記号・確定後にカーソルを戻す記号・配列一覧・ライセンス。機能は同じ（データ・ボタンの動作・確認ダイアログの有無は変えていない）。
+- 行は設定一覧と同じつながった角丸カード（`SettingsListCards.prepare` を onCreateViewHolder で、`SettingsListCardDecoration` を RecyclerView に）。区切り線・MaterialCardView・独自色（enter_key_bg など）は使わない。
+- 検索欄（ユーザー辞書・学習辞書）は `Widget.Necookey.SearchField`（丸い塗り・枠なし・虫めがね・消去）。ヒントは「検索」だけ。
+- 追加は右下の FAB（`ic_ms_add`）、それ以外の操作（読み込む・書き出す・すべて削除・初期値に戻す・説明）は上部バー右上のメニュー（⋮）にまとめた。アイコン付きの上部バーボタンは無し。
+- ユーザー辞書・NG ワードの追加は、画面上部に開くカードからダイアログに変更（空なら案内を出して閉じない）。ユーザー辞書の「説明」はメニュー → ダイアログ。記号・ペアの「初期値に戻す」はメニューへ。
+- ダイアログはすべて `MaterialAlertDialogBuilder`（ダーク）。入力欄は `Widget.Necookey.DialogField`（枠線・角丸 12dp）、品詞・照合方式は Spinner からドロップダウン（`Widget.Necookey.DialogDropdown`）。ライセンス本文も暗い色の CSS。
+- 空のとき: アイコン＋短い 1 行（`layout/settings_empty_state.xml`、検索で 0 件のときは「見つかりません」）。
+- 学習辞書: 読みの下に変換結果のチップ（タップで編集・長押しで削除。チップ全体が押せる）。読みの長押しで読みごと削除は同じ。
+- 早送りのつまみ（`RecyclerViewFastScroller`）は細い丸だけにして、スクロール中だけ表示。
+- 文言は `values/strings_settings.xml` の `st_*`。上部バーの題名も設定の行と同じ名前にした（例: NG ワード一覧 → NG ワード、カスタムキーボード → 配列）。
 
 ## 経緯（1 回目の整理と最初の棚卸し）
 

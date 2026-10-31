@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 1 つだけ入力するダイアログ（記号・ペアの追加と編集）。ヒントはコードで入れる。 -->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:paddingStart="@dimen/settings_dialog_padding_h"
+    android:paddingTop="8dp"
+    android:paddingEnd="@dimen/settings_dialog_padding_h">
+
+    <com.google.android.material.textfield.TextInputLayout
+        android:id="@+id/dialog_field_layout"
+        style="@style/Widget.Necookey.DialogField"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content">
+
+        <com.google.android.material.textfield.TextInputEditText
+            android:id="@+id/dialog_field"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:imeOptions="actionDone"
+            android:inputType="text"
+            android:maxLines="1"
+            android:textAppearance="?attr/textAppearanceTitleLarge" />
+    </com.google.android.material.textfield.TextInputLayout>
+</FrameLayout>

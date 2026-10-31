@@ -1,26 +1,32 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- 学習辞書の変換結果 1 つ（チップ）: 表記＋スコア・回数・種類。 -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="wrap_content"
     android:layout_height="wrap_content"
     android:layout_marginEnd="8dp"
-    android:background="@drawable/main_key_view_bg"
+    android:background="@drawable/bg_settings_chip"
+    android:clickable="true"
+    android:focusable="true"
     android:orientation="vertical"
-    android:paddingHorizontal="8dp"
-    android:paddingVertical="5dp">
+    android:paddingStart="12dp"
+    android:paddingTop="8dp"
+    android:paddingEnd="12dp"
+    android:paddingBottom="8dp">
 
     <com.google.android.material.textview.MaterialTextView
         android:id="@+id/learn_data_output_text"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:textColor="@color/main_text_color"
-        android:textSize="20sp" />
+        android:textAppearance="@style/TextAppearance.Necookey.RowTitle"
+        tools:text="お疲れ" />
 
     <com.google.android.material.textview.MaterialTextView
         android:id="@+id/learn_data_output_metadata"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:alpha="0.72"
-        android:textColor="@color/main_text_color"
-        android:textSize="11sp" />
-
+        android:layout_marginTop="2dp"
+        android:textAppearance="?attr/textAppearanceLabelSmall"
+        android:textColor="?attr/colorOnSurfaceVariant"
+        tools:text="スコア 0・使用 3回・文節" />
 </LinearLayout>

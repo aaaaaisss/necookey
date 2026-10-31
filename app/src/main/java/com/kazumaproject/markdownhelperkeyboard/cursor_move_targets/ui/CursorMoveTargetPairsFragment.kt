@@ -7,10 +7,14 @@ import android.view.MenuInflater
 import android.view.MenuItem
 import android.view.View
 import android.view.ViewGroup
-import android.view.inputmethod.EditorInfo
 import android.widget.EditText
 import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
+import androidx.core.view.isVisible
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
+import com.google.android.material.textfield.TextInputLayout
+import com.kazumaproject.markdownhelperkeyboard.setting_activity.ui.setting.SettingsListCardDecoration
+import com.kazumaproject.markdownhelperkeyboard.setting_activity.ui.setting.SettingsListCards
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.MenuHost
 import androidx.core.view.MenuProvider
@@ -20,7 +24,6 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import androidx.navigation.fragment.findNavController
-import androidx.recyclerview.widget.DividerItemDecoration
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.kazumaproject.markdownhelperkeyboard.R
 import com.kazumaproject.markdownhelperkeyboard.databinding.FragmentCursorMoveTargetPairsBinding
@@ -61,10 +64,17 @@ class CursorMoveTargetPairsFragment : Fragment() {
     private fun setupMenu() {
         val menuHost: MenuHost = requireActivity()
         menuHost.addMenuProvider(object : MenuProvider {
-            override fun onCreateMenu(menu: Menu, menuInflater: MenuInflater) = Unit
+            override fun onCreateMenu(menu: Menu, menuInflater: MenuInflater) {
+                menuInflater.inflate(R.menu.settings_reset_menu, menu)
+            }
 
             override fun onMenuItemSelected(menuItem: MenuItem): Boolean {
                 return when (menuItem.itemId) {
+                    R.id.action_reset_to_default -> {
+                        showResetDialog()
+                        true
+                    }
+
                     android.R.id.home -> {
                         findNavController().popBackStack()
                         true
@@ -83,17 +93,15 @@ class CursorMoveTargetPairsFragment : Fragment() {
         )
         binding.cursorMoveTargetPairsRecyclerView.apply {
             layoutManager = LinearLayoutManager(requireContext())
+            SettingsListCards.bindEmpty(binding.emptyState.root, R.drawable.ic_ms_data_array, R.string.st_cursor_pairs_empty)
             adapter = this@CursorMoveTargetPairsFragment.adapter
-            addItemDecoration(DividerItemDecoration(context, DividerItemDecoration.VERTICAL))
+            addItemDecoration(SettingsListCardDecoration())
         }
     }
 
     private fun setupButtons() {
         binding.addCursorMoveTargetPairButton.setOnClickListener {
             showTargetPairDialog(target = null)
-        }
-        binding.resetCursorMoveTargetPairsButton.setOnClickListener {
-            showResetDialog()
         }
     }
 
@@ -102,36 +110,36 @@ class CursorMoveTargetPairsFragment : Fragment() {
             repeatOnLifecycle(Lifecycle.State.STARTED) {
                 viewModel.targets.collect { targets ->
                     adapter.submitList(targets)
-                    binding.emptyTargetPairsText.visibility =
-                        if (targets.isEmpty()) View.VISIBLE else View.GONE
+                    binding.emptyState.root.isVisible = targets.isEmpty()
                 }
             }
         }
     }
 
     private fun showTargetPairDialog(target: String?) {
-        val editText = EditText(requireContext()).apply {
-            setSingleLine(true)
-            imeOptions = EditorInfo.IME_ACTION_DONE
+        val dialogView = layoutInflater.inflate(R.layout.dialog_single_field, null)
+        dialogView.findViewById<TextInputLayout>(R.id.dialog_field_layout).setHint(R.string.st_cursor_pair_field)
+        val editText = dialogView.findViewById<EditText>(R.id.dialog_field).apply {
             setText(target.orEmpty())
             setSelection(text.length)
         }
 
-        val dialog = AlertDialog.Builder(requireContext())
+        val dialog = MaterialAlertDialogBuilder(requireContext())
             .setTitle(
                 if (target == null) {
-                    R.string.cursor_move_target_pair_add_title
+                    R.string.st_cursor_pair_add
                 } else {
-                    R.string.cursor_move_target_pair_edit_title
+                    R.string.st_cursor_pair_edit
                 }
             )
-            .setMessage(R.string.cursor_move_target_pair_dialog_message)
-            .setView(editText)
-            .setPositiveButton(R.string.save_string, null)
-            .setNegativeButton(R.string.cancel_string, null)
+            .setView(dialogView)
+            .setPositiveButton(R.string.st_save, null)
+            .setNegativeButton(R.string.st_cancel, null)
             .create()
 
+        dialog.window?.setSoftInputMode(android.view.WindowManager.LayoutParams.SOFT_INPUT_STATE_VISIBLE)
         dialog.setOnShowListener {
+            editText.requestFocus()
             dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
                 val value = editText.text?.toString().orEmpty()
                 if (!isTwoCharacters(value)) {
@@ -158,24 +166,22 @@ class CursorMoveTargetPairsFragment : Fragment() {
     }
 
     private fun showDeleteDialog(target: String) {
-        AlertDialog.Builder(requireContext())
-            .setTitle(R.string.confirm_delete_title)
-            .setMessage(getString(R.string.cursor_move_target_pair_delete_message, target))
-            .setPositiveButton(R.string.delete_string) { _, _ ->
+        MaterialAlertDialogBuilder(requireContext())
+            .setTitle(getString(R.string.st_delete_confirm, target))
+            .setPositiveButton(R.string.st_delete) { _, _ ->
                 viewModel.deleteTargetPair(target)
             }
-            .setNegativeButton(R.string.cancel_string, null)
+            .setNegativeButton(R.string.st_cancel, null)
             .show()
     }
 
     private fun showResetDialog() {
-        AlertDialog.Builder(requireContext())
-            .setTitle(R.string.reset_to_default)
-            .setMessage(R.string.cursor_move_target_pair_reset_message)
-            .setPositiveButton(R.string.reset_to_default) { _, _ ->
+        MaterialAlertDialogBuilder(requireContext())
+            .setTitle(R.string.st_cursor_pairs_reset)
+            .setPositiveButton(R.string.st_reset) { _, _ ->
                 viewModel.resetToDefault()
             }
-            .setNegativeButton(R.string.cancel_string, null)
+            .setNegativeButton(R.string.st_cancel, null)
             .show()
     }
 

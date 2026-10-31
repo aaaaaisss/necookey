@@ -20,19 +20,27 @@ class RecyclerViewFastScroller @JvmOverloads constructor(
     defStyleAttr: Int = 0
 ) : View(context, attrs, defStyleAttr) {
 
-    private val thumbWidth = 16.dp
+    // 設定の一覧（2026-10-31）: 細い丸いつまみだけ（線のトラックは描かない）。カード右の余白の中に収まる位置。
+    // スクロール中・ドラッグ中だけ表示し、止まると消える。つかめる範囲（この View の幅）は従来どおり。
+    private val thumbWidth = 6.dp
+    private val thumbEdgeInset = 5.dp
     private val minThumbHeight = 48.dp
-    private val trackWidth = 4.dp
+    private val trackWidth = 0
+    private var thumbShown = false
+    private val hideThumb = Runnable {
+        thumbShown = false
+        invalidate()
+    }
     private val touchSlopExtra = 8.dp
     private val thumbRect = RectF()
     private val trackRect = RectF()
     private val trackPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = resolveThemeColor(AppCompatR.attr.colorControlNormal, 0x33000000)
-        alpha = 60
+        alpha = 0
     }
     private val thumbPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = resolveThemeColor(AppCompatR.attr.colorPrimary, 0xFF666666.toInt())
-        alpha = 210
+        alpha = 200
     }
 
     private var recyclerView: RecyclerView? = null
@@ -41,6 +49,7 @@ class RecyclerViewFastScroller @JvmOverloads constructor(
 
     private val scrollListener = object : RecyclerView.OnScrollListener() {
         override fun onScrolled(recyclerView: RecyclerView, dx: Int, dy: Int) {
+            if (dy != 0) showThumbBriefly()
             invalidate()
         }
     }
@@ -88,8 +97,10 @@ class RecyclerViewFastScroller @JvmOverloads constructor(
         if (!updateRects(rv) || thumbRect.height() <= 0f) {
             return
         }
+        if (!thumbShown && !isDragging) {
+            return
+        }
 
-        canvas.drawRoundRect(trackRect, trackRect.width() / 2f, trackRect.width() / 2f, trackPaint)
         canvas.drawRoundRect(thumbRect, thumbWidth / 2f, thumbWidth / 2f, thumbPaint)
     }
 
@@ -116,6 +127,7 @@ class RecyclerViewFastScroller @JvmOverloads constructor(
                 }
                 parent?.requestDisallowInterceptTouchEvent(true)
                 isDragging = true
+                removeCallbacks(hideThumb)
                 scrollRecyclerViewTo(event.y, rv, itemCount)
                 return true
             }
@@ -132,6 +144,7 @@ class RecyclerViewFastScroller @JvmOverloads constructor(
                 if (isDragging) {
                     parent?.requestDisallowInterceptTouchEvent(false)
                     isDragging = false
+                    showThumbBriefly()
                     invalidate()
                     return true
                 }
@@ -141,7 +154,14 @@ class RecyclerViewFastScroller @JvmOverloads constructor(
         return isDragging
     }
 
+    private fun showThumbBriefly() {
+        thumbShown = true
+        removeCallbacks(hideThumb)
+        postDelayed(hideThumb, THUMB_HIDE_DELAY_MS)
+    }
+
     override fun onDetachedFromWindow() {
+        removeCallbacks(hideThumb)
         detachFromRecyclerView()
         super.onDetachedFromWindow()
     }
@@ -165,7 +185,7 @@ class RecyclerViewFastScroller @JvmOverloads constructor(
         val extent = recyclerView.computeVerticalScrollExtent()
         val offset = recyclerView.computeVerticalScrollOffset()
 
-        val trackLeft = width - thumbWidth.toFloat()
+        val trackLeft = width - thumbEdgeInset - thumbWidth.toFloat()
         val trackCenterX = trackLeft + thumbWidth / 2f
         trackRect.set(
             trackCenterX - trackWidth / 2f,
@@ -188,7 +208,7 @@ class RecyclerViewFastScroller @JvmOverloads constructor(
         thumbRect.set(
             trackLeft,
             thumbTop,
-            width.toFloat(),
+            trackLeft + thumbWidth,
             thumbTop + thumbHeight
         )
         return true
@@ -209,4 +229,8 @@ class RecyclerViewFastScroller @JvmOverloads constructor(
 
     private val Int.dp: Int
         get() = (this * resources.displayMetrics.density).roundToInt()
+
+    private companion object {
+        const val THUMB_HIDE_DELAY_MS = 1200L
+    }
 }

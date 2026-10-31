@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 一覧が空のときの表示（アイコン＋短い 1 行）。中身は SettingsListCards.bindEmpty で入れる。 -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_gravity="center"
+    android:gravity="center_horizontal"
+    android:orientation="vertical"
+    android:paddingStart="32dp"
+    android:paddingEnd="32dp"
+    android:paddingBottom="48dp"
+    android:visibility="gone">
+
+    <ImageView
+        android:id="@+id/settings_empty_icon"
+        android:layout_width="@dimen/settings_empty_icon"
+        android:layout_height="@dimen/settings_empty_icon"
+        android:importantForAccessibility="no"
+        app:tint="?attr/colorOnSurfaceVariant" />
+
+    <TextView
+        android:id="@+id/settings_empty_text"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="16dp"
+        android:gravity="center"
+        android:textAppearance="@style/TextAppearance.Necookey.RowSummary" />
+</LinearLayout>

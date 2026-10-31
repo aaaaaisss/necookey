@@ -11,6 +11,7 @@ import androidx.recyclerview.widget.RecyclerView
 import com.kazumaproject.markdownhelperkeyboard.R
 import com.kazumaproject.markdownhelperkeyboard.custom_keyboard.data.CustomKeyboardLayout
 import com.kazumaproject.markdownhelperkeyboard.databinding.ListItemKeyboardLayoutBinding
+import com.kazumaproject.markdownhelperkeyboard.setting_activity.ui.setting.SettingsListCards
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -78,6 +79,7 @@ class KeyboardLayoutAdapter(
             parent,
             false
         )
+        SettingsListCards.prepare(binding.root)
         return ViewHolder(binding)
     }
 

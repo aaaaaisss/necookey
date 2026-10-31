@@ -6,6 +6,7 @@ import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
 import com.kazumaproject.markdownhelperkeyboard.databinding.ItemCursorMoveTargetPairBinding
+import com.kazumaproject.markdownhelperkeyboard.setting_activity.ui.setting.SettingsListCards
 
 class CursorMoveTargetPairsAdapter(
     private val onItemClick: (String) -> Unit,
@@ -18,6 +19,7 @@ class CursorMoveTargetPairsAdapter(
             parent,
             false
         )
+        SettingsListCards.prepare(binding.root)
         return ViewHolder(binding)
     }
 

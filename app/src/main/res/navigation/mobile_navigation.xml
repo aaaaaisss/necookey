@@ -25,16 +25,16 @@
     <fragment
         android:id="@+id/openSourceFragment"
         android:name="com.kazumaproject.markdownhelperkeyboard.setting_activity.ui.opensource.OpenSourceFragment"
-        android:label="@string/open_source_fragment_label"
+        android:label="@string/st_licenses"
         tools:layout="@layout/fragment_open_source" />
     <fragment
         android:id="@+id/navigation_learn_dictionary"
         android:name="com.kazumaproject.markdownhelperkeyboard.setting_activity.ui.dictionary_learn.DictionaryLearnFragment"
-        android:label="@string/learn_dictionary_fragment_title" />
+        android:label="@string/st_learn_dictionary" />
     <fragment
         android:id="@+id/navigation_user_dictionary"
         android:name="com.kazumaproject.markdownhelperkeyboard.setting_activity.ui.user_dictionary.UserDictionaryFragment"
-        android:label="@string/user_dictionary_title"
+        android:label="@string/st_user_dictionary"
         tools:layout="@layout/fragment_user_dictionary" />
     <fragment
         android:id="@+id/clipboardHistoryFragment"
@@ -58,17 +58,17 @@
     <fragment
         android:id="@+id/deleteKeyFlickTargetsFragment"
         android:name="com.kazumaproject.markdownhelperkeyboard.delete_key_flick.ui.DeleteKeyFlickTargetsFragment"
-        android:label="@string/delete_key_flick_targets_fragment_title"
+        android:label="@string/st_delete_targets"
         tools:layout="@layout/fragment_delete_key_flick_targets" />
     <fragment
         android:id="@+id/cursorMoveTargetPairsFragment"
         android:name="com.kazumaproject.markdownhelperkeyboard.cursor_move_targets.ui.CursorMoveTargetPairsFragment"
-        android:label="@string/cursor_move_target_pairs_fragment_title"
+        android:label="@string/st_cursor_pairs"
         tools:layout="@layout/fragment_cursor_move_target_pairs" />
     <fragment
         android:id="@+id/ngWordFragment"
         android:name="com.kazumaproject.markdownhelperkeyboard.ng_word.ui.NgWordFragment"
-        android:label="@string/ng_word_fragment_title"
+        android:label="@string/st_ng_words"
         tools:layout="@layout/fragment_ng_word" />
     <fragment
         android:id="@+id/keyboardSettingFragment"
@@ -102,7 +102,7 @@
     <fragment
         android:id="@+id/keyboardListFragment"
         android:name="com.kazumaproject.markdownhelperkeyboard.custom_keyboard.ui.KeyboardListFragment"
-        android:label="@string/custom_layout_fragment_title">
+        android:label="@string/st_layouts">
         <action
             android:id="@+id/action_keyboardListFragment_to_keyboardEditorFragment"
             app:destination="@id/keyboardEditorFragment" />

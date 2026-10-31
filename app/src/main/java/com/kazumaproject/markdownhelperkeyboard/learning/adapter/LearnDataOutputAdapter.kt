@@ -68,8 +68,9 @@ class LearnDataOutputAdapter :
         // 現在のアイテムを変数に入れておくと分かりやすい
         val currentItem = learnDataOutputList[position]
 
-        holder.tvOutput.apply {
-            text = currentItem.out
+        holder.tvOutput.text = currentItem.out
+        // チップ全体をタップ・長押しの対象にする（2026-10-31 の見た目の変更。動作は同じ）
+        holder.itemView.apply {
 
             // --- ここから追加 ---
             // クリックリスナーを設定

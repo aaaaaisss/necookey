@@ -1,23 +1,30 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout
-    xmlns:android="http://schemas.android.com/apk/res/android"
+<!-- 学習辞書の 1 行: 読み（長押しで読みごと削除）＋変換結果のチップ（タップで編集・長押しで削除）。背景は SettingsListCards。 -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:orientation="vertical"
-    android:padding="8dp">
+    android:paddingTop="12dp"
+    android:paddingBottom="16dp">
 
     <com.google.android.material.textview.MaterialTextView
         android:id="@+id/tvInput"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:textSize="24sp"
-        android:textStyle="bold"
-        android:textColor="@color/keyboard_icon_color"/>
+        android:layout_marginStart="@dimen/settings_row_padding_h"
+        android:layout_marginEnd="@dimen/settings_row_padding_h"
+        android:textAppearance="@style/TextAppearance.Necookey.RowSummary"
+        tools:text="おつかれ" />
 
     <androidx.recyclerview.widget.RecyclerView
         android:id="@+id/rvOutput"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:clipToPadding="false"
         android:nestedScrollingEnabled="false"
-        android:layout_marginTop="8dp"/>
+        android:overScrollMode="never"
+        android:paddingStart="@dimen/settings_row_padding_h"
+        android:paddingEnd="8dp" />
 </LinearLayout>

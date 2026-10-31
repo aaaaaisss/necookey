@@ -1,12 +1,20 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- クリップボード履歴: 画像を表示（角丸）。 -->
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
-    android:layout_height="match_parent">
+    android:layout_height="wrap_content"
+    android:paddingStart="@dimen/settings_dialog_padding_h"
+    android:paddingTop="24dp"
+    android:paddingEnd="@dimen/settings_dialog_padding_h">
 
-    <ImageView
+    <com.google.android.material.imageview.ShapeableImageView
         android:id="@+id/image_view_dialog"
         android:layout_width="match_parent"
-        android:layout_height="match_parent"
+        android:layout_height="wrap_content"
         android:adjustViewBounds="true"
-        android:contentDescription="@string/dialog_image_description" />
+        android:contentDescription="@string/dialog_image_description"
+        android:maxHeight="480dp"
+        android:scaleType="fitCenter"
+        app:shapeAppearance="@style/ShapeAppearance.Necookey.Thumb" />
 </FrameLayout>

@@ -1,4 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- ユーザー辞書: 検索欄＋単語の角丸カード一覧＋追加の FAB。操作（読み込み・書き出し・説明・すべて削除）は上部バーのメニュー。 -->
 <androidx.coordinatorlayout.widget.CoordinatorLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
@@ -11,137 +12,21 @@
         android:layout_height="match_parent"
         android:orientation="vertical">
 
-        <androidx.cardview.widget.CardView
-            android:id="@+id/card_view_add_word"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_margin="16dp"
-            android:visibility="gone"
-            app:cardCornerRadius="8dp"
-            app:cardElevation="4dp"
-            tools:visibility="visible">
-
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:padding="16dp">
-
-                <com.google.android.material.textfield.TextInputLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:hint="@string/word_edit_text_title">
-
-                    <com.google.android.material.textfield.TextInputEditText
-                        android:id="@+id/edit_text_word"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content" />
-                </com.google.android.material.textfield.TextInputLayout>
-
-                <com.google.android.material.textfield.TextInputLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="8dp"
-                    android:hint="@string/yomi_edit_text_title">
-
-                    <com.google.android.material.textfield.TextInputEditText
-                        android:id="@+id/edit_text_reading"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content" />
-                </com.google.android.material.textfield.TextInputLayout>
-
-                <RelativeLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="16dp">
-
-                    <Button
-                        android:id="@+id/button_add"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_alignParentEnd="true"
-                        android:text="@string/register_string" />
-                </RelativeLayout>
-            </LinearLayout>
-        </androidx.cardview.widget.CardView>
-
-        <LinearLayout
-            android:id="@+id/layout_explanation"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="vertical"
-            android:visibility="gone"
-            tools:visibility="visible">
-
-            <TextView
-                android:id="@+id/text_view_explanation_header"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginStart="16dp"
-                android:layout_marginTop="16dp"
-                android:layout_marginEnd="16dp"
-                android:text="@string/about_user_dictionary"
-                android:textAppearance="?attr/textAppearanceTitleMedium" />
-
-            <TextView
-                android:id="@+id/text_view_explanation_body"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginStart="16dp"
-                android:layout_marginTop="4dp"
-                android:layout_marginEnd="16dp"
-                android:layout_marginBottom="8dp"
-                android:text="@string/user_dictionary_explanation"
-                android:textAppearance="?attr/textAppearanceBodyMedium" />
-        </LinearLayout>
-
-        <androidx.constraintlayout.widget.ConstraintLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:paddingBottom="8dp">
-
-            <TextView
-                android:id="@+id/textView_title"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginStart="16dp"
-                android:text="@string/registered_words"
-                android:textAppearance="?attr/textAppearanceTitleMedium"
-                app:layout_constraintBottom_toBottomOf="parent"
-                app:layout_constraintStart_toStartOf="parent"
-                app:layout_constraintTop_toTopOf="parent" />
-
-            <ImageButton
-                android:id="@+id/button_toggle_explanation"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginStart="8dp"
-                android:background="?attr/selectableItemBackgroundBorderless"
-                android:contentDescription="説明の表示/非表示"
-                android:src="@android:drawable/ic_menu_help"
-                app:layout_constraintBottom_toBottomOf="parent"
-                app:layout_constraintStart_toEndOf="@+id/textView_title"
-                app:layout_constraintTop_toTopOf="parent"
-                app:tint="?attr/colorOnSurface" />
-
-        </androidx.constraintlayout.widget.ConstraintLayout>
-
         <com.google.android.material.textfield.TextInputLayout
             android:id="@+id/text_input_layout_search_user_dictionary"
+            style="@style/Widget.Necookey.SearchField"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginStart="16dp"
-            android:layout_marginEnd="16dp"
-            android:layout_marginBottom="8dp"
-            android:hint="@string/search_user_dictionary_hint"
-            app:endIconMode="clear_text">
+            android:layout_marginStart="@dimen/settings_screen_padding_h"
+            android:layout_marginTop="8dp"
+            android:layout_marginEnd="@dimen/settings_screen_padding_h">
 
             <com.google.android.material.textfield.TextInputEditText
                 android:id="@+id/edit_text_search_user_dictionary"
+                style="@style/Widget.Necookey.SearchField.EditText"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:inputType="text"
-                android:singleLine="true" />
+                android:hint="@string/st_search" />
         </com.google.android.material.textfield.TextInputLayout>
 
         <FrameLayout
@@ -153,11 +38,15 @@
                 android:id="@+id/recycler_view_user_words"
                 android:layout_width="match_parent"
                 android:layout_height="match_parent"
-                android:fadeScrollbars="false"
-                android:scrollbarSize="12dp"
-                android:scrollbars="vertical"
+                android:clipToPadding="false"
+                android:paddingBottom="@dimen/settings_list_bottom_fab"
+                android:scrollbars="none"
                 app:layoutManager="androidx.recyclerview.widget.LinearLayoutManager"
                 tools:listitem="@layout/item_user_word" />
+
+            <include
+                android:id="@+id/empty_state"
+                layout="@layout/settings_empty_state" />
 
             <com.kazumaproject.markdownhelperkeyboard.setting_activity.ui.common.RecyclerViewFastScroller
                 android:id="@+id/user_dictionary_fast_scroller"
@@ -165,7 +54,6 @@
                 android:layout_height="match_parent"
                 android:layout_gravity="end" />
         </FrameLayout>
-
     </LinearLayout>
 
     <com.google.android.material.floatingactionbutton.FloatingActionButton
@@ -173,9 +61,8 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_gravity="bottom|end"
-        android:layout_marginEnd="16dp"
-        android:layout_marginBottom="32dp"
-        android:contentDescription="単語を追加"
-        app:srcCompat="@android:drawable/ic_input_add" />
+        android:layout_margin="@dimen/settings_fab_margin"
+        android:contentDescription="@string/st_user_word_add"
+        app:srcCompat="@drawable/ic_ms_add" />
 
 </androidx.coordinatorlayout.widget.CoordinatorLayout>

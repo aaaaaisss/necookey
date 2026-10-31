@@ -1,42 +1,52 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- NG ワード: 追加・編集（読み・単語・照合）。 -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:orientation="vertical"
-    android:padding="16dp">
+    android:paddingStart="@dimen/settings_dialog_padding_h"
+    android:paddingTop="8dp"
+    android:paddingEnd="@dimen/settings_dialog_padding_h">
 
     <com.google.android.material.textfield.TextInputLayout
+        style="@style/Widget.Necookey.DialogField"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:hint="読み (yomi)">
+        android:hint="@string/st_field_reading">
 
         <com.google.android.material.textfield.TextInputEditText
             android:id="@+id/edit_text_yomi_dialog"
             android:layout_width="match_parent"
-            android:layout_height="wrap_content" />
+            android:layout_height="wrap_content"
+            android:imeOptions="actionNext"
+            android:inputType="text" />
     </com.google.android.material.textfield.TextInputLayout>
 
     <com.google.android.material.textfield.TextInputLayout
+        style="@style/Widget.Necookey.DialogField"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="8dp"
-        android:hint="単語 (tango)">
+        android:layout_marginTop="16dp"
+        android:hint="@string/st_field_word">
 
         <com.google.android.material.textfield.TextInputEditText
             android:id="@+id/edit_text_tango_dialog"
             android:layout_width="match_parent"
-            android:layout_height="wrap_content" />
+            android:layout_height="wrap_content"
+            android:inputType="text" />
     </com.google.android.material.textfield.TextInputLayout>
 
-    <TextView
+    <com.google.android.material.textfield.TextInputLayout
+        style="@style/Widget.Necookey.DialogDropdown"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="12dp"
-        android:text="@string/ng_word_match_mode_title"
-        android:textAppearance="?attr/textAppearanceBodyMedium" />
+        android:layout_marginTop="16dp"
+        android:hint="@string/st_ng_match">
 
-    <Spinner
-        android:id="@+id/spinner_ng_word_match_mode"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content" />
+        <com.google.android.material.textfield.MaterialAutoCompleteTextView
+            android:id="@+id/spinner_ng_word_match_mode"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:inputType="none" />
+    </com.google.android.material.textfield.TextInputLayout>
 </LinearLayout>

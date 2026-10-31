@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- SettingsListCards: 一覧の行の背景（角丸の形）と、今の角の状態 -->
+    <item name="settings_card_fill" type="id" />
+    <item name="settings_card_state" type="id" />
+</resources>

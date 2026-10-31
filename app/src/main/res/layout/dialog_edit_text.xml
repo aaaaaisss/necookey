@@ -1,16 +1,27 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- クリップボード履歴: テキストを編集。 -->
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:padding="24dp">
+    android:paddingStart="@dimen/settings_dialog_padding_h"
+    android:paddingTop="8dp"
+    android:paddingEnd="@dimen/settings_dialog_padding_h">
 
-    <EditText
-        android:id="@+id/edit_text_clipboard_content"
+    <com.google.android.material.textfield.TextInputLayout
+        style="@style/Widget.Necookey.DialogField"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:gravity="top"
-        android:hint="テキストを編集"
-        android:inputType="textMultiLine"
-        android:minLines="3" />
+        app:hintEnabled="false">
 
+        <com.google.android.material.textfield.TextInputEditText
+            android:id="@+id/edit_text_clipboard_content"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="top|start"
+            android:inputType="textMultiLine"
+            android:maxLines="10"
+            android:minLines="3"
+            android:scrollbars="vertical" />
+    </com.google.android.material.textfield.TextInputLayout>
 </FrameLayout>

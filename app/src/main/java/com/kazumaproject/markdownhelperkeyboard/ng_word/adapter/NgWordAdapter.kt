@@ -10,6 +10,7 @@ import androidx.recyclerview.widget.RecyclerView
 import com.kazumaproject.markdownhelperkeyboard.R
 import com.kazumaproject.markdownhelperkeyboard.ng_word.database.NgWord
 import com.kazumaproject.markdownhelperkeyboard.ng_word.database.NgWordMatchMode
+import com.kazumaproject.markdownhelperkeyboard.setting_activity.ui.setting.SettingsListCards
 
 class NgWordAdapter(
     private val onClick: (NgWord) -> Unit
@@ -20,6 +21,7 @@ class NgWordAdapter(
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): VH {
         val v = LayoutInflater.from(parent.context)
             .inflate(R.layout.item_ng_word, parent, false)
+        SettingsListCards.prepare(v)
         return VH(v, onClick)
     }
 

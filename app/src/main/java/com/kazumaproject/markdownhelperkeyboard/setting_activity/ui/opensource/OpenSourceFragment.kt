@@ -7,12 +7,14 @@ import android.view.MenuInflater
 import android.view.MenuItem
 import android.view.View
 import android.view.ViewGroup
-import android.widget.ArrayAdapter
+import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.MenuHost
 import androidx.core.view.MenuProvider
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.Lifecycle
+import androidx.recyclerview.widget.RecyclerView
+import com.google.android.material.color.MaterialColors
 import androidx.navigation.fragment.findNavController
 import com.kazumaproject.markdownhelperkeyboard.R
 import com.kazumaproject.markdownhelperkeyboard.databinding.FragmentOpenSourceBinding
@@ -21,6 +23,8 @@ import com.kazumaproject.markdownhelperkeyboard.setting_activity.other.MozcLicen
 import com.kazumaproject.markdownhelperkeyboard.setting_activity.other.NeologdLicense
 import com.kazumaproject.markdownhelperkeyboard.setting_activity.other.WikiLicense
 import com.kazumaproject.markdownhelperkeyboard.setting_activity.other.WikiTextLicense
+import com.kazumaproject.markdownhelperkeyboard.setting_activity.ui.setting.SettingsListCardDecoration
+import com.kazumaproject.markdownhelperkeyboard.setting_activity.ui.setting.SettingsListCards
 import de.psdev.licensesdialog.LicensesDialog
 import de.psdev.licensesdialog.licenses.ApacheSoftwareLicense20
 import de.psdev.licensesdialog.licenses.MITLicense
@@ -64,16 +68,9 @@ class OpenSourceFragment : Fragment() {
         setupToolbarAndMenu()
 
         val licenses = buildLicenseEntries()
-        val arrayAdapter = ArrayAdapter(
-            requireContext(),
-            android.R.layout.simple_list_item_1,
-            licenses.map { it.label }
-        )
         binding.openSourceLicenseList.apply {
-            adapter = arrayAdapter
-            setOnItemClickListener { _, _, position, _ ->
-                licenses[position].onClick()
-            }
+            adapter = LicenseAdapter(licenses)
+            addItemDecoration(SettingsListCardDecoration())
         }
     }
 
@@ -234,13 +231,15 @@ class OpenSourceFragment : Fragment() {
         LicensesDialog.Builder(requireContext())
             .setTitle(title)
             .setNotices(notice)
+            .setNoticesCssStyle(darkNoticesCss())
+            .setCloseText(R.string.st_close)
             .build()
             .show()
     }
 
     private fun setupToolbarAndMenu() {
         (activity as? AppCompatActivity)?.supportActionBar?.apply {
-            title = getString(R.string.open_sorce_title)
+            title = getString(R.string.st_licenses)
             setDisplayHomeAsUpEnabled(true)
         }
 
@@ -259,5 +258,48 @@ class OpenSourceFragment : Fragment() {
                 }
             }
         }, viewLifecycleOwner, Lifecycle.State.RESUMED)
+    }
+
+    /** ライセンス本文（WebView）をダイアログと同じ暗い色にする。 */
+    private fun darkNoticesCss(): String {
+        val root = binding.root
+        fun hex(attr: Int): String =
+            String.format("#%06X", 0xFFFFFF and MaterialColors.getColor(root, attr))
+        val surface = hex(com.google.android.material.R.attr.colorSurfaceContainerHigh)
+        val surfaceHighest = hex(com.google.android.material.R.attr.colorSurfaceContainerHighest)
+        val onSurface = hex(com.google.android.material.R.attr.colorOnSurface)
+        val onSurfaceVariant = hex(com.google.android.material.R.attr.colorOnSurfaceVariant)
+        val primary = hex(androidx.appcompat.R.attr.colorPrimary)
+        return "body { font-family: sans-serif; overflow-wrap: break-word; " +
+            "background-color: $surface; color: $onSurface; } " +
+            "a { color: $primary; } p.license { background: transparent; } " +
+            "pre { background-color: $surfaceHighest; color: $onSurfaceVariant; padding: 1em; " +
+            "border-radius: 12px; white-space: pre-wrap; }"
+    }
+
+    private class LicenseAdapter(
+        private val entries: List<LicenseEntry>,
+    ) : RecyclerView.Adapter<LicenseAdapter.Holder>() {
+
+        class Holder(view: View) : RecyclerView.ViewHolder(view) {
+            val title: TextView = view.findViewById(android.R.id.title)
+        }
+
+        override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): Holder {
+            val view = LayoutInflater.from(parent.context)
+                .inflate(R.layout.settings_pref_row, parent, false)
+            view.findViewById<View>(android.R.id.summary).visibility = View.GONE
+            view.findViewById<View>(android.R.id.widget_frame).visibility = View.GONE
+            SettingsListCards.prepare(view)
+            return Holder(view)
+        }
+
+        override fun getItemCount(): Int = entries.size
+
+        override fun onBindViewHolder(holder: Holder, position: Int) {
+            val entry = entries[position]
+            holder.title.text = entry.label
+            holder.itemView.setOnClickListener { entry.onClick() }
+        }
     }
 }

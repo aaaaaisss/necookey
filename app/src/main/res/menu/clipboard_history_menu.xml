@@ -1,18 +1,17 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- 上部バーの操作はすべて右上のメニュー（⋮）にまとめる（一覧画面で共通）。追加は FAB。 -->
 <menu xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto">
     <item
-        android:id="@+id/action_export_clipboard"
-        android:icon="@drawable/upload_file_24px"
-        android:title="@string/export_title"
-        app:showAsAction="ifRoom" />
-    <item
         android:id="@+id/action_import_clipboard"
-        android:icon="@drawable/download_24px"
-        android:title="@string/import_title"
-        app:showAsAction="ifRoom" />
+        android:title="@string/st_import"
+        app:showAsAction="never" />
+    <item
+        android:id="@+id/action_export_clipboard"
+        android:title="@string/st_export"
+        app:showAsAction="never" />
     <item
         android:id="@+id/action_delete_all_clipboard"
-        android:title="@string/delete_all"
+        android:title="@string/st_delete_all"
         app:showAsAction="never" />
 </menu>

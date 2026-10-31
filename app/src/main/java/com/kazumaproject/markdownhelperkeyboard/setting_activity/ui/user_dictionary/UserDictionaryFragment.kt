@@ -1,8 +1,6 @@
 package com.kazumaproject.markdownhelperkeyboard.setting_activity.ui.user_dictionary
 
 import android.app.Activity
-import android.app.AlertDialog
-import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
@@ -12,25 +10,26 @@ import android.view.MenuInflater
 import android.view.MenuItem
 import android.view.View
 import android.view.ViewGroup
-import android.view.inputmethod.InputMethodManager
-import android.widget.ArrayAdapter
 import android.widget.EditText
-import android.widget.Spinner
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.view.MenuHost
 import androidx.core.view.MenuProvider
-import androidx.core.view.isGone
+import androidx.core.view.isVisible
 import androidx.core.widget.addTextChangedListener
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
+import com.google.android.material.textfield.MaterialAutoCompleteTextView
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import com.kazumaproject.markdownhelperkeyboard.user_dictionary.DictionaryWordInput
 import com.kazumaproject.markdownhelperkeyboard.R
 import com.kazumaproject.markdownhelperkeyboard.databinding.FragmentUserDictionaryBinding
+import com.kazumaproject.markdownhelperkeyboard.setting_activity.ui.setting.SettingsListCardDecoration
+import com.kazumaproject.markdownhelperkeyboard.setting_activity.ui.setting.SettingsListCards
 import com.kazumaproject.markdownhelperkeyboard.user_dictionary.adapter.UserWordAdapter
 import com.kazumaproject.markdownhelperkeyboard.user_dictionary.database.UserWord
 import dagger.hilt.android.AndroidEntryPoint
@@ -84,8 +83,6 @@ class UserDictionaryFragment : Fragment() {
         setupSearch()
         setupListeners()
         observeViewModel()
-        setupSpinner()
-        resetInputFields()
     }
 
     private fun setupMenu() {
@@ -110,6 +107,11 @@ class UserDictionaryFragment : Fragment() {
 
                     R.id.action_other_dict_import ->{
                         showOtherDictImportDialog()
+                        true
+                    }
+
+                    R.id.action_about -> {
+                        showExplanationDialog()
                         true
                     }
 
@@ -142,11 +144,18 @@ class UserDictionaryFragment : Fragment() {
         importLauncher.launch(intent)
     }
 
+    private fun showExplanationDialog() {
+        MaterialAlertDialogBuilder(requireContext())
+            .setTitle(R.string.about_user_dictionary)
+            .setMessage(R.string.user_dictionary_explanation)
+            .setPositiveButton(R.string.st_close, null)
+            .show()
+    }
+
     private fun showDeleteAllConfirmationDialog() {
-        AlertDialog.Builder(requireContext())
-            .setTitle(getString(R.string.confirm_delete_title))
-            .setMessage(getString(R.string.confirm_all_words_delete_message))
-            .setPositiveButton(getString(R.string.delete_all)) { _, _ ->
+        MaterialAlertDialogBuilder(requireContext())
+            .setTitle(R.string.st_user_words_delete_all)
+            .setPositiveButton(R.string.st_delete) { _, _ ->
                 viewModel.deleteAll()
                 Toast.makeText(
                     context,
@@ -154,7 +163,7 @@ class UserDictionaryFragment : Fragment() {
                     Toast.LENGTH_SHORT
                 ).show()
             }
-            .setNegativeButton(getString(R.string.cancel_string), null)
+            .setNegativeButton(R.string.st_cancel, null)
             .show()
     }
 
@@ -233,9 +242,9 @@ class UserDictionaryFragment : Fragment() {
     }
 
     private fun showOtherDictImportDialog() {
-        val items = arrayOf("自動判定", "Google日本語入力", "Microsoft IME")
-        AlertDialog.Builder(requireContext())
-            .setTitle("読み込む辞書形式を選択")
+        val items = arrayOf("自動判定", "Google 日本語入力", "Microsoft IME")
+        MaterialAlertDialogBuilder(requireContext())
+            .setTitle(R.string.st_other_ime_format)
             .setItems(items) { _, which ->
                 pendingOtherDictFormat = when (which) {
                     1 -> OtherDictFormat.GOOGLE_JP_INPUT
@@ -317,17 +326,12 @@ class UserDictionaryFragment : Fragment() {
         }
     }
 
-    private fun setupSpinner() {
-        val adapter =
-            ArrayAdapter(requireContext(), android.R.layout.simple_spinner_item, viewModel.posList)
-        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
-    }
-
     private fun setupRecyclerView() {
         userWordAdapter = UserWordAdapter { userWord ->
             showEditDialog(userWord)
         }
         binding.recyclerViewUserWords.adapter = userWordAdapter
+        binding.recyclerViewUserWords.addItemDecoration(SettingsListCardDecoration())
         binding.userDictionaryFastScroller.attachToRecyclerView(binding.recyclerViewUserWords)
     }
 
@@ -339,45 +343,7 @@ class UserDictionaryFragment : Fragment() {
     }
 
     private fun setupListeners() {
-        // [CHANGE 1 START] FABのリスナーを修正
-        binding.fabAddWord.setOnClickListener {
-            val isCurrentlyGone = binding.cardViewAddWord.isGone
-            binding.cardViewAddWord.isGone = !isCurrentlyGone
-
-            // CardViewが表示される場合
-            if (!binding.cardViewAddWord.isGone) {
-                // 説明文を隠す
-                binding.layoutExplanation.isGone = true
-
-                binding.fabAddWord.setImageResource(com.kazumaproject.core.R.drawable.remove)
-                binding.editTextWord.requestFocus()
-                val imm =
-                    context?.getSystemService(Context.INPUT_METHOD_SERVICE) as? InputMethodManager
-                imm?.showSoftInput(binding.editTextWord, InputMethodManager.SHOW_IMPLICIT)
-            } else { // CardViewが隠される場合
-                binding.fabAddWord.setImageResource(android.R.drawable.ic_input_add)
-                hideKeyboardAndClearFocus()
-            }
-        }
-        // [CHANGE 1 END]
-
-        binding.buttonAdd.setOnClickListener {
-            addWord()
-        }
-
-        // [CHANGE 2 START] ヘルプアイコンボタンのリスナーを新規追加
-        binding.buttonToggleExplanation.setOnClickListener {
-            // 説明文の表示/非表示を切り替える
-            binding.layoutExplanation.isGone = !binding.layoutExplanation.isGone
-
-            // もし説明文が表示されたら、単語追加CardViewを隠す
-            if (!binding.layoutExplanation.isGone) {
-                binding.cardViewAddWord.isGone = true
-                binding.fabAddWord.setImageResource(android.R.drawable.ic_input_add)
-                hideKeyboardAndClearFocus()
-            }
-        }
-        // [CHANGE 2 END]
+        binding.fabAddWord.setOnClickListener { showAddDialog() }
     }
 
     private fun observeViewModel() {
@@ -411,6 +377,14 @@ class UserDictionaryFragment : Fragment() {
                 })
         }
         userWordAdapter.submitList(filteredWords)
+        binding.emptyState.root.isVisible = filteredWords.isEmpty()
+        if (filteredWords.isEmpty()) {
+            if (query.isEmpty()) {
+                SettingsListCards.bindEmpty(binding.emptyState.root, R.drawable.ic_ms_dictionary, R.string.st_user_words_empty)
+            } else {
+                SettingsListCards.bindEmpty(binding.emptyState.root, R.drawable.ic_ms_search_off, R.string.st_no_results)
+            }
+        }
         binding.recyclerViewUserWords.post {
             _binding?.userDictionaryFastScroller?.invalidate()
         }
@@ -434,12 +408,35 @@ class UserDictionaryFragment : Fragment() {
             .minOfOrNull { it.length } ?: Int.MAX_VALUE
     }
 
-    private fun addWord() {
+    private fun showAddDialog() {
+        val dialogView = LayoutInflater.from(requireContext()).inflate(R.layout.dialog_add_word, null)
+        val editWord = dialogView.findViewById<EditText>(R.id.edit_text_word)
+        val editReading = dialogView.findViewById<EditText>(R.id.edit_text_reading)
+        val dialog = MaterialAlertDialogBuilder(requireContext())
+            .setTitle(R.string.st_user_word_add)
+            .setView(dialogView)
+            .setPositiveButton(R.string.st_user_word_register, null)
+            .setNegativeButton(R.string.st_cancel, null)
+            .create()
+        dialog.setOnShowListener {
+            editWord.requestFocus()
+            dialog.getButton(android.content.DialogInterface.BUTTON_POSITIVE).setOnClickListener {
+                if (addWord(editWord.text.toString(), editReading.text.toString())) {
+                    dialog.dismiss()
+                }
+            }
+        }
+        dialog.window?.setSoftInputMode(android.view.WindowManager.LayoutParams.SOFT_INPUT_STATE_VISIBLE)
+        dialog.show()
+    }
+
+    /** 登録できたら true（読み・単語が空なら案内を出してダイアログは閉じない）。 */
+    private fun addWord(wordText: String, readingText: String): Boolean {
         val word = DictionaryWordInput.normalize(
-            binding.editTextWord.text.toString(),
+            wordText,
             preserveWhitespace = false,
         )
-        val reading = binding.editTextReading.text.toString().trim()
+        val reading = readingText.trim()
 
         if (word == null || reading.isEmpty()) {
             Toast.makeText(
@@ -447,7 +444,7 @@ class UserDictionaryFragment : Fragment() {
                 getString(R.string.enter_word_and_yomi_string),
                 Toast.LENGTH_SHORT
             ).show()
-            return
+            return false
         }
 
         val newUserWord =
@@ -464,41 +461,36 @@ class UserDictionaryFragment : Fragment() {
             "「$word${getString(R.string.is_registered_string)}",
             Toast.LENGTH_SHORT
         ).show()
-
-        resetInputFields()
-
-        binding.cardViewAddWord.isGone = true
-        binding.fabAddWord.setImageResource(android.R.drawable.ic_input_add)
-        hideKeyboardAndClearFocus()
+        return true
     }
 
     private fun showEditDialog(userWord: UserWord) {
         val dialogView = LayoutInflater.from(context).inflate(R.layout.dialog_edit_word, null)
         val editWord = dialogView.findViewById<EditText>(R.id.edit_text_word_dialog)
         val editReading = dialogView.findViewById<EditText>(R.id.edit_text_reading_dialog)
-        val spinnerPosDialog = dialogView.findViewById<Spinner>(R.id.spinner_pos_dialog)
+        val posDropdown = dialogView.findViewById<MaterialAutoCompleteTextView>(R.id.spinner_pos_dialog)
         val editPosScore = dialogView.findViewById<EditText>(R.id.edit_text_pos_score_dialog)
 
-        val adapter =
-            ArrayAdapter(requireContext(), android.R.layout.simple_spinner_item, viewModel.posList)
-        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
-        spinnerPosDialog.adapter = adapter
+        val posList = viewModel.posList
+        var selectedPosIndex = userWord.posIndex.takeIf { it in posList.indices } ?: 0
+        posDropdown.setSimpleItems(posList.toTypedArray())
+        posDropdown.setText(posList.getOrNull(selectedPosIndex).orEmpty(), false)
+        posDropdown.setOnItemClickListener { _, _, position, _ -> selectedPosIndex = position }
 
         editWord.setText(userWord.word)
         editReading.setText(userWord.reading)
-        spinnerPosDialog.setSelection(userWord.posIndex)
         editPosScore.setText(userWord.posScore.toString())
 
-        AlertDialog.Builder(requireContext())
-            .setTitle(getString(R.string.edit_word))
+        MaterialAlertDialogBuilder(requireContext())
+            .setTitle(R.string.st_user_word_edit)
             .setView(dialogView)
-            .setPositiveButton(getString(R.string.save_string)) { _, _ ->
+            .setPositiveButton(R.string.st_save) { _, _ ->
                 val updatedWord = DictionaryWordInput.normalize(
                     editWord.text.toString(),
                     preserveWhitespace = false,
                 )
                 val updatedReading = editReading.text.toString().trim()
-                val updatedPosIndex = spinnerPosDialog.selectedItemPosition
+                val updatedPosIndex = selectedPosIndex
                 val updatedPosScore = editPosScore.text.toString().toIntOrNull()
                     ?: UserDictionaryViewModel.DEFAULT_SCORE
 
@@ -538,12 +530,11 @@ class UserDictionaryFragment : Fragment() {
                     }
                 }
             }
-            .setNegativeButton(getString(R.string.cancel_string), null)
-            .setNeutralButton(getString(R.string.delete_string)) { _, _ ->
-                AlertDialog.Builder(requireContext())
-                    .setTitle(getString(R.string.confirm_delete_title))
-                    .setMessage("「${userWord.word}」${getString(R.string.confirm_to_delete_text)}")
-                    .setPositiveButton(getString(R.string.delete_string)) { _, _ ->
+            .setNegativeButton(R.string.st_cancel, null)
+            .setNeutralButton(R.string.st_delete) { _, _ ->
+                MaterialAlertDialogBuilder(requireContext())
+                    .setTitle(getString(R.string.st_delete_confirm, userWord.word))
+                    .setPositiveButton(R.string.st_delete) { _, _ ->
                         viewModel.delete(userWord.id)
                         Toast.makeText(
                             context,
@@ -551,21 +542,10 @@ class UserDictionaryFragment : Fragment() {
                             Toast.LENGTH_SHORT
                         ).show()
                     }
-                    .setNegativeButton(getString(R.string.cancel_string), null)
+                    .setNegativeButton(R.string.st_cancel, null)
                     .show()
             }
             .show()
-    }
-
-    private fun hideKeyboardAndClearFocus() {
-        val imm = context?.getSystemService(Context.INPUT_METHOD_SERVICE) as? InputMethodManager
-        imm?.hideSoftInputFromWindow(view?.windowToken, 0)
-        view?.clearFocus()
-    }
-
-    private fun resetInputFields() {
-        binding.editTextWord.text?.clear()
-        binding.editTextReading.text?.clear()
     }
 
     override fun onDestroyView() {

@@ -15,8 +15,10 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.appcompat.app.AlertDialog
-import androidx.core.content.ContextCompat
+import com.google.android.material.color.MaterialColors
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
+import com.kazumaproject.markdownhelperkeyboard.setting_activity.ui.setting.SettingsListCardDecoration
+import com.kazumaproject.markdownhelperkeyboard.setting_activity.ui.setting.SettingsListCards
 import androidx.core.view.MenuHost
 import androidx.core.view.MenuProvider
 import androidx.core.view.isVisible
@@ -128,6 +130,7 @@ class DictionaryLearnFragment : Fragment() {
         binding.learnDictionaryRecyclerView.apply {
             layoutManager = LinearLayoutManager(context)
             adapter = learnDictionaryAdapter
+            addItemDecoration(SettingsListCardDecoration())
         }
         binding.learnDictionaryFastScroller.attachToRecyclerView(binding.learnDictionaryRecyclerView)
 
@@ -137,13 +140,13 @@ class DictionaryLearnFragment : Fragment() {
 
         learnDictionaryAdapter.setOnItemLongClickListener { input ->
             showConfirmationDialog(
-                message = buildSpannableMessage(getString(R.string.yomi_edit_text_title), input),
+                message = buildSpannableMessage(getString(R.string.st_field_reading), input),
                 positiveAction = { deleteByInput(input) })
         }
 
         learnDictionaryAdapter.setOnItemChildrenLongClickListener { input, output ->
             showConfirmationDialog(
-                message = buildSpannableMessage(getString(R.string.word_edit_text_title), output),
+                message = buildSpannableMessage(getString(R.string.st_field_word), output),
                 positiveAction = { deleteByInputAndOutput(input, output) })
         }
     }
@@ -189,6 +192,15 @@ class DictionaryLearnFragment : Fragment() {
                 }.thenBy {
                     it.first
                 })
+        }
+        val empty = learnDictionaryAdapter.learnDataList.isEmpty()
+        binding.emptyState.root.isVisible = empty
+        if (empty) {
+            if (query.isEmpty()) {
+                SettingsListCards.bindEmpty(binding.emptyState.root, R.drawable.ic_ms_auto_stories, R.string.st_learn_empty)
+            } else {
+                SettingsListCards.bindEmpty(binding.emptyState.root, R.drawable.ic_ms_search_off, R.string.st_no_results)
+            }
         }
         binding.learnDictionaryRecyclerView.post {
             _binding?.learnDictionaryFastScroller?.invalidate()
@@ -240,13 +252,13 @@ class DictionaryLearnFragment : Fragment() {
     }
 
     private fun showDeleteAllConfirmationDialog() {
-        AlertDialog.Builder(requireContext())
-            .setTitle(getString(R.string.reset_learning_dictionary_dialog_title))
-            .setMessage(getString(R.string.reset_learning_dictionary_dialog_message))
-            .setPositiveButton(getString(R.string.delete_all)) { _, _ ->
+        MaterialAlertDialogBuilder(requireContext())
+            .setTitle(R.string.st_learn_delete_all)
+            .setMessage(R.string.st_learn_delete_all_message)
+            .setPositiveButton(R.string.st_delete) { _, _ ->
                 lifecycleScope.launch { deleteAll() }
             }
-            .setNegativeButton(getString(R.string.cancel_string), null)
+            .setNegativeButton(R.string.st_cancel, null)
             .show()
     }
 
@@ -345,10 +357,10 @@ class DictionaryLearnFragment : Fragment() {
             editTextTango.setText(entity.out)
             editTextScore.setText(entity.score.toString())
 
-            val dialog = AlertDialog.Builder(context)
-                .setTitle(getString(R.string.learn_dictionary_edit_dialog_title))
+            MaterialAlertDialogBuilder(context)
+                .setTitle(R.string.st_learn_edit)
                 .setView(dialogView)
-                .setPositiveButton(getString(R.string.save_string)) { _, _ ->
+                .setPositiveButton(R.string.st_save) { _, _ ->
                     val newInput = editTextYomi.text.toString()
                     val newOutput = editTextTango.text.toString()
                     val newScore = editTextScore.text.toString().toIntOrNull() ?: entity.score
@@ -357,39 +369,17 @@ class DictionaryLearnFragment : Fragment() {
                         updateLearnData(entity, newInput, newOutput, newScore)
                     }
                 }
-                .setNegativeButton(getString(R.string.cancel_string), null)
-                .setNeutralButton(getString(R.string.delete_string)) { _, _ ->
+                .setNegativeButton(R.string.st_cancel, null)
+                .setNeutralButton(R.string.st_delete) { _, _ ->
                     showConfirmationDialog(
                         message = buildSpannableMessage(
-                            getString(R.string.word_edit_text_title),
+                            getString(R.string.st_field_word),
                             output
                         ),
                         positiveAction = { deleteByInputAndOutput(input, output) }
                     )
                 }
                 .show()
-
-            dialog.getButton(AlertDialog.BUTTON_POSITIVE)
-                .setTextColor(
-                    ContextCompat.getColor(
-                        context,
-                        com.kazumaproject.core.R.color.enter_key_bg
-                    )
-                )
-            dialog.getButton(AlertDialog.BUTTON_NEGATIVE)
-                .setTextColor(
-                    ContextCompat.getColor(
-                        context,
-                        com.kazumaproject.core.R.color.main_text_color
-                    )
-                )
-            dialog.getButton(AlertDialog.BUTTON_NEUTRAL)
-                .setTextColor(
-                    ContextCompat.getColor(
-                        context,
-                        com.kazumaproject.core.R.color.main_text_color
-                    )
-                )
         }
     }
 
@@ -429,42 +419,25 @@ class DictionaryLearnFragment : Fragment() {
     private fun showConfirmationDialog(
         message: CharSequence, positiveAction: suspend () -> Unit
     ) {
-        val dialog =
-            AlertDialog.Builder(requireContext()).setTitle(getString(R.string.confirm_delete_title))
-                .setMessage(message)
-                .setPositiveButton(getString(R.string.yes_string)) { _, _ ->
-                    viewLifecycleOwner.lifecycleScope.launch {
-                        binding.progressBarLearnDictionaryFragment.isVisible = true
-                        positiveAction()
-                        binding.progressBarLearnDictionaryFragment.isVisible = false
-                    }
-                }.setNegativeButton(getString(R.string.no_string), null).show()
-
-        dialog.getButton(AlertDialog.BUTTON_POSITIVE)
-            .setTextColor(
-                ContextCompat.getColor(
-                    requireContext(),
-                    com.kazumaproject.core.R.color.enter_key_bg
-                )
-            )
-        dialog.getButton(AlertDialog.BUTTON_NEGATIVE)
-            .setTextColor(
-                ContextCompat.getColor(
-                    requireContext(),
-                    com.kazumaproject.core.R.color.main_text_color
-                )
-            )
+        MaterialAlertDialogBuilder(requireContext())
+            .setMessage(message)
+            .setPositiveButton(R.string.st_delete) { _, _ ->
+                viewLifecycleOwner.lifecycleScope.launch {
+                    binding.progressBarLearnDictionaryFragment.isVisible = true
+                    positiveAction()
+                    binding.progressBarLearnDictionaryFragment.isVisible = false
+                }
+            }
+            .setNegativeButton(R.string.st_cancel, null)
+            .show()
     }
 
+    /** 「読み「〇〇」を削除しますか？」（〇〇だけ色を付ける。prefix = 読み／単語）。 */
     private fun buildSpannableMessage(prefix: String, content: String): SpannableStringBuilder {
-        return SpannableStringBuilder().append(prefix).append(
-            content, ForegroundColorSpan(
-                ContextCompat.getColor(
-                    requireContext(),
-                    com.kazumaproject.core.R.color.enter_key_bg
-                )
-            ), Spannable.SPAN_EXCLUSIVE_EXCLUSIVE
-        ).append(getString(R.string.confirm_delete_message))
+        val accent = MaterialColors.getColor(binding.root, androidx.appcompat.R.attr.colorPrimary)
+        return SpannableStringBuilder().append(prefix).append("「").append(
+            content, ForegroundColorSpan(accent), Spannable.SPAN_EXCLUSIVE_EXCLUSIVE
+        ).append("」を削除しますか？")
     }
 
     private suspend fun deleteByInput(input: String) {

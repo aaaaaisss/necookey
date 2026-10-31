@@ -10,6 +10,7 @@ import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.textview.MaterialTextView
 import com.kazumaproject.markdownhelperkeyboard.R
 import com.kazumaproject.markdownhelperkeyboard.learning.database.LearnEntity
+import com.kazumaproject.markdownhelperkeyboard.setting_activity.ui.setting.SettingsListCards
 
 class LearnDictionaryAdapter :
     RecyclerView.Adapter<LearnDictionaryAdapter.LearnDictionaryViewHolder>() {
@@ -62,6 +63,7 @@ class LearnDictionaryAdapter :
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): LearnDictionaryViewHolder {
         val view = LayoutInflater.from(parent.context)
             .inflate(R.layout.learn_dictionary_item, parent, false)
+        SettingsListCards.prepare(view, clickable = false)
         return LearnDictionaryViewHolder(view)
     }
 

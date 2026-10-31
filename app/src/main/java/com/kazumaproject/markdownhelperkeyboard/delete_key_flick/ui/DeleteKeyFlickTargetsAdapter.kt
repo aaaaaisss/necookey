@@ -6,6 +6,7 @@ import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
 import com.kazumaproject.markdownhelperkeyboard.databinding.ItemDeleteKeyFlickTargetBinding
+import com.kazumaproject.markdownhelperkeyboard.setting_activity.ui.setting.SettingsListCards
 import com.kazumaproject.markdownhelperkeyboard.delete_key_flick.database.DeleteKeyFlickDeleteTarget
 
 class DeleteKeyFlickTargetsAdapter(
@@ -19,6 +20,7 @@ class DeleteKeyFlickTargetsAdapter(
             parent,
             false
         )
+        SettingsListCards.prepare(binding.root)
         return ViewHolder(binding)
     }
 

@@ -14,4 +14,13 @@
     <dimen name="settings_section_gap">24dp</dimen>
     <dimen name="settings_group_gap">16dp</dimen>
     <dimen name="settings_section_label_bottom">8dp</dimen>
+    <!-- 一覧画面（辞書・クリップボード・NG ワード・記号など） -->
+    <dimen name="settings_list_bottom_fab">96dp</dimen>
+    <dimen name="settings_fab_margin">16dp</dimen>
+    <dimen name="settings_search_radius">28dp</dimen>
+    <dimen name="settings_field_radius">12dp</dimen>
+    <dimen name="settings_chip_radius">12dp</dimen>
+    <dimen name="settings_dialog_padding_h">24dp</dimen>
+    <dimen name="settings_empty_icon">48dp</dimen>
+    <dimen name="settings_thumb">64dp</dimen>
 </resources>

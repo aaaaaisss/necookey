@@ -86,4 +86,60 @@
         <item name="adjustable">true</item>
         <item name="showSeekBarValue">true</item>
     </style>
+
+    <!-- 一覧画面の部品（辞書・クリップボード・NG ワード・記号） -->
+    <!-- 検索欄: 角丸いっぱいの塗り、枠線なし、虫めがね＋消去ボタン。ヒントは浮かせない（EditText の hint をプレースホルダーに） -->
+    <style name="Widget.Necookey.SearchField" parent="Widget.Material3.TextInputLayout.FilledBox.Dense">
+        <item name="boxBackgroundColor">?attr/colorSurfaceContainerHigh</item>
+        <item name="boxStrokeWidth">0dp</item>
+        <item name="boxStrokeWidthFocused">0dp</item>
+        <item name="boxCornerRadiusTopStart">@dimen/settings_search_radius</item>
+        <item name="boxCornerRadiusTopEnd">@dimen/settings_search_radius</item>
+        <item name="boxCornerRadiusBottomStart">@dimen/settings_search_radius</item>
+        <item name="boxCornerRadiusBottomEnd">@dimen/settings_search_radius</item>
+        <item name="hintEnabled">false</item>
+        <item name="startIconDrawable">@drawable/ic_ms_search</item>
+        <item name="startIconTint">?attr/colorOnSurfaceVariant</item>
+        <item name="endIconMode">clear_text</item>
+        <item name="endIconDrawable">@drawable/ic_ms_close</item>
+        <item name="endIconTint">?attr/colorOnSurfaceVariant</item>
+    </style>
+    <style name="Widget.Necookey.SearchField.EditText" parent="">
+        <item name="android:textAppearance">@style/TextAppearance.Necookey.RowTitle</item>
+        <item name="android:textColorHint">?attr/colorOnSurfaceVariant</item>
+        <item name="android:inputType">text</item>
+        <item name="android:imeOptions">actionSearch</item>
+        <item name="android:maxLines">1</item>
+        <item name="android:paddingTop">16dp</item>
+        <item name="android:paddingBottom">16dp</item>
+    </style>
+
+    <!-- ダイアログの入力欄（枠線・角丸 12dp） -->
+    <style name="Widget.Necookey.DialogField" parent="Widget.Material3.TextInputLayout.OutlinedBox">
+        <item name="boxCornerRadiusTopStart">@dimen/settings_field_radius</item>
+        <item name="boxCornerRadiusTopEnd">@dimen/settings_field_radius</item>
+        <item name="boxCornerRadiusBottomStart">@dimen/settings_field_radius</item>
+        <item name="boxCornerRadiusBottomEnd">@dimen/settings_field_radius</item>
+    </style>
+    <style name="Widget.Necookey.DialogDropdown" parent="Widget.Material3.TextInputLayout.OutlinedBox.ExposedDropdownMenu">
+        <item name="boxCornerRadiusTopStart">@dimen/settings_field_radius</item>
+        <item name="boxCornerRadiusTopEnd">@dimen/settings_field_radius</item>
+        <item name="boxCornerRadiusBottomStart">@dimen/settings_field_radius</item>
+        <item name="boxCornerRadiusBottomEnd">@dimen/settings_field_radius</item>
+    </style>
+
+    <!-- サムネイル（クリップボードの画像）の角丸 -->
+    <style name="ShapeAppearance.Necookey.Thumb" parent="">
+        <item name="cornerFamily">rounded</item>
+        <item name="cornerSize">@dimen/settings_chip_radius</item>
+    </style>
+
+    <!-- 一覧の行: 記号・ペアのように 1 文字を大きく見せる行 -->
+    <style name="TextAppearance.Necookey.Glyph" parent="TextAppearance.Material3.TitleLarge">
+        <item name="android:textColor">?attr/colorOnSurface</item>
+    </style>
+    <!-- 一覧の上の短い説明（1 行程度） -->
+    <style name="TextAppearance.Necookey.Caption" parent="TextAppearance.Material3.BodyMedium">
+        <item name="android:textColor">?attr/colorOnSurfaceVariant</item>
+    </style>
 </resources>

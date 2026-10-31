@@ -1,7 +1,6 @@
 package com.kazumaproject.markdownhelperkeyboard.clipboard_history.ui
 
 import android.app.Activity
-import android.app.AlertDialog
 import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
@@ -20,6 +19,8 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.FileProvider
 import androidx.core.view.MenuHost
 import androidx.core.view.MenuProvider
+import androidx.core.view.isVisible
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
 import androidx.lifecycle.Lifecycle
@@ -30,6 +31,8 @@ import com.kazumaproject.markdownhelperkeyboard.R
 import com.kazumaproject.markdownhelperkeyboard.clipboard_history.database.ClipboardHistoryItem
 import com.kazumaproject.markdownhelperkeyboard.clipboard_history.database.ItemType
 import com.kazumaproject.markdownhelperkeyboard.databinding.FragmentClipboardHistoryBinding
+import com.kazumaproject.markdownhelperkeyboard.setting_activity.ui.setting.SettingsListCardDecoration
+import com.kazumaproject.markdownhelperkeyboard.setting_activity.ui.setting.SettingsListCards
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -117,6 +120,8 @@ class ClipboardHistoryFragment : Fragment() {
             }
         }
         binding.recyclerViewClipboard.adapter = adapter
+        binding.recyclerViewClipboard.addItemDecoration(SettingsListCardDecoration())
+        SettingsListCards.bindEmpty(binding.emptyState.root, R.drawable.ic_ms_content_paste_off, R.string.st_clipboard_empty)
     }
 
     private fun observeViewModel() {
@@ -124,6 +129,7 @@ class ClipboardHistoryFragment : Fragment() {
             repeatOnLifecycle(Lifecycle.State.STARTED) {
                 viewModel.allHistory.collect { history ->
                     adapter.submitList(history)
+                    _binding?.emptyState?.root?.isVisible = history.isEmpty()
                 }
             }
         }
@@ -141,17 +147,17 @@ class ClipboardHistoryFragment : Fragment() {
             val editText = dialogView.findViewById<EditText>(R.id.edit_text_clipboard_content)
             editText.setText(fullText)
 
-            AlertDialog.Builder(requireContext())
-                .setTitle(getString(R.string.edit_word_title))
+            MaterialAlertDialogBuilder(requireContext())
+                .setTitle(R.string.st_clipboard_edit)
                 .setView(dialogView)
-                .setPositiveButton(getString(R.string.save_string)) { _, _ ->
+                .setPositiveButton(R.string.st_save) { _, _ ->
                     val updatedText = editText.text.toString()
                     // ViewModel側でファイル保存とプレビュー更新を行うようにリレーする
                     viewModel.updateTextContent(item, updatedText)
                     Toast.makeText(context, getString(R.string.saved), Toast.LENGTH_SHORT).show()
                 }
-                .setNegativeButton(getString(R.string.cancel_string), null)
-                .setNeutralButton(getString(R.string.delete_string)) { _, _ ->
+                .setNegativeButton(R.string.st_cancel, null)
+                .setNeutralButton(R.string.st_delete) { _, _ ->
                     viewModel.delete(item.id)
                     Toast.makeText(context, getString(R.string.deleted_string), Toast.LENGTH_SHORT)
                         .show()
@@ -169,10 +175,10 @@ class ClipboardHistoryFragment : Fragment() {
         val bitmap = BitmapFactory.decodeFile(item.contentPath)
         imageView.setImageBitmap(bitmap)
 
-        AlertDialog.Builder(requireContext())
+        MaterialAlertDialogBuilder(requireContext())
             .setView(dialogView)
-            .setNegativeButton(getString(R.string.close), null)
-            .setNeutralButton(getString(R.string.delete_string)) { _, _ ->
+            .setNegativeButton(R.string.st_close, null)
+            .setNeutralButton(R.string.st_delete) { _, _ ->
                 viewModel.delete(item.id)
                 Toast.makeText(context, getString(R.string.deleted_string), Toast.LENGTH_SHORT)
                     .show()
@@ -300,15 +306,14 @@ class ClipboardHistoryFragment : Fragment() {
     }
 
     private fun showDeleteAllConfirmationDialog() {
-        AlertDialog.Builder(requireContext())
-            .setTitle(getString(R.string.confirm_all_delete_title))
-            .setMessage(getString(R.string.delete_all_clipboard_history))
-            .setPositiveButton(getString(R.string.delete_all)) { _, _ ->
+        MaterialAlertDialogBuilder(requireContext())
+            .setTitle(R.string.st_clipboard_delete_all)
+            .setPositiveButton(R.string.st_delete) { _, _ ->
                 viewModel.deleteAll()
                 Toast.makeText(context, getString(R.string.deleted_string), Toast.LENGTH_SHORT)
                     .show()
             }
-            .setNegativeButton(getString(R.string.cancel_string), null)
+            .setNegativeButton(R.string.st_cancel, null)
             .show()
     }
 

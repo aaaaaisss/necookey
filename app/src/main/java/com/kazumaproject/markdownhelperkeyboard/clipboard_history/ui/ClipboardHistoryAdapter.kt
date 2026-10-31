@@ -10,6 +10,7 @@ import com.kazumaproject.markdownhelperkeyboard.clipboard_history.database.Clipb
 import com.kazumaproject.markdownhelperkeyboard.clipboard_history.database.ItemType
 import com.kazumaproject.markdownhelperkeyboard.databinding.ItemClipboardImageBinding
 import com.kazumaproject.markdownhelperkeyboard.databinding.ItemClipboardTextBinding
+import com.kazumaproject.markdownhelperkeyboard.setting_activity.ui.setting.SettingsListCards
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -49,7 +50,7 @@ class ClipboardHistoryAdapter(
     }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): RecyclerView.ViewHolder {
-        return when (viewType) {
+        val holder = when (viewType) {
             VIEW_TYPE_TEXT -> TextViewHolder(
                 ItemClipboardTextBinding.inflate(LayoutInflater.from(parent.context), parent, false)
             )
@@ -64,6 +65,8 @@ class ClipboardHistoryAdapter(
 
             else -> throw IllegalArgumentException("Invalid view type")
         }
+        SettingsListCards.prepare(holder.itemView)
+        return holder
     }
 
     override fun onBindViewHolder(holder: RecyclerView.ViewHolder, position: Int) {

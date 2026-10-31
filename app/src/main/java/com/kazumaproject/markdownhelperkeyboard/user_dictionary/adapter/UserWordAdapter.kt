@@ -8,6 +8,7 @@ import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
 import com.kazumaproject.markdownhelperkeyboard.R
+import com.kazumaproject.markdownhelperkeyboard.setting_activity.ui.setting.SettingsListCards
 import com.kazumaproject.markdownhelperkeyboard.user_dictionary.database.UserWord
 
 class UserWordAdapter(
@@ -17,6 +18,7 @@ class UserWordAdapter(
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): UserWordViewHolder {
         val view = LayoutInflater.from(parent.context)
             .inflate(R.layout.item_user_word, parent, false)
+        SettingsListCards.prepare(view)
         return UserWordViewHolder(view)
     }
 
