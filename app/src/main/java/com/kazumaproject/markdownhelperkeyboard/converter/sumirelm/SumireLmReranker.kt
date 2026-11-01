@@ -63,6 +63,9 @@ class SumireLmReranker private constructor(
      * 各候補のスコア（大きいほど良い）。[context] は左文脈（生の文字列）。候補は Sumire の順（rank 0 が先頭）で渡す。
      * 文頭扱いは学習時と同じく左文脈が 20 字未満のとき。
      */
+    private val useSpmi = names.contains("spmi_sum")
+    private val RARE = 1L shl 23
+
     override fun score(context: String, cands: List<Input>): DoubleArray {
         if (cands.isEmpty()) return DoubleArray(0)
         val bos = context.length < 20
@@ -114,6 +117,31 @@ class SumireLmReranker private constructor(
                 psum += max(best, 0.0); pmax = max(pmax, best); pn++
             }
             f["pmi_sum"] = psum; f["pmi_max"] = if (pn > 0) pmax else 0.0; f["pmi_n"] = pn.toDouble(); f["cooc"] = ls
+            if (useSpmi) {
+                // 自己 PMI: 候補内で他候補と異なる内容語 b と、同じ候補内の他の内容語 a との最大 PMI（左文脈が無くても効く）
+                // 頻度表に無い語（vr の仮 id）は数えない（学習側と同じ）
+                val ids = csets[ri].mapNotNull { vocab.id(it)?.toLong() }.filter { it < RARE }.toSortedSet()
+                var ss = 0.0
+                var sm = Double.NEGATIVE_INFINITY
+                var sn = 0
+                for (wd in (csets[ri] - common).sorted()) {
+                    val b = vocab.id(wd)?.toLong() ?: continue
+                    if (b >= RARE) continue
+                    val ub = ucount(b)
+                    var best = -1e9
+                    var any = false
+                    for (av in ids) {
+                        if (av == b) continue
+                        any = true
+                        val id = pt.find(av * P + b)
+                        val cq = if (id >= 0) exp(pCnt[pt.cnt(id)]) - 1 else 0.0
+                        best = max(best, ln((cq + 0.1) * nw / (max(ucount(av), 1.0) * max(ub, 1.0) * 30)))
+                    }
+                    if (!any) continue
+                    ss += max(best, 0.0); sm = max(sm, best); sn++
+                }
+                f["spmi_sum"] = ss; f["spmi_max"] = if (sn > 0) sm else 0.0
+            }
             val st = cd.surface
             f["cost"] = cd.cost / 1000.0; f["rel"] = (cd.cost - c0) / 1000.0; f["rank"] = ln1p(cd.rank.toDouble())
             f["ntok"] = ct0.size.toDouble(); f["nseg"] = cd.nseg.toDouble()
