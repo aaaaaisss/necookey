@@ -292,6 +292,7 @@ import com.kazumaproject.markdownhelperkeyboard.ime_service.state.CandidateTab
 import com.kazumaproject.markdownhelperkeyboard.ime_service.state.InputTypeForIME
 import com.kazumaproject.markdownhelperkeyboard.ime_service.state.KeyboardType
 import com.kazumaproject.markdownhelperkeyboard.learning.LearningFeedbackPlan
+import com.kazumaproject.markdownhelperkeyboard.learning.RetypeCorrection
 import com.kazumaproject.markdownhelperkeyboard.learning.database.LearnEntity
 import com.kazumaproject.markdownhelperkeyboard.learning.database.LearningScorePolicy
 import com.kazumaproject.markdownhelperkeyboard.learning.nextword.NextWordEntity
@@ -367,6 +368,7 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import timber.log.Timber
 import java.io.File
+import com.kazumaproject.markdownhelperkeyboard.converter.graph.LearnedBoundaries
 import java.io.FileOutputStream
 import java.io.IOException
 import java.text.BreakIterator
@@ -1458,6 +1460,10 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         private const val CHIP_STATE_POLL_MS = 16L
         /** チップ確定の学習で使う候補スコア（文節セッションの既定と同じ）。 */
         private const val CHIP_LEARNING_CANDIDATE_SCORE = 3000
+        /** 打ち直しで書く新しい表記の候補スコア（候補順 1 扱い）。 */
+        private const val RETYPE_LEARNING_CANDIDATE_SCORE = 3000
+        /** チップで直した区切りの学習（[LearnedBoundaries]）の保存先（filesDir 内）。 */
+        private const val LEARNED_BOUNDARIES_FILE = "learned_boundaries.tsv"
         private val DEFAULT_DELETE_KEY_FLICK_TARGETS =
             DeleteKeyFlickDeleteTargetRepository.DEFAULT_TARGET_SYMBOLS.toSet()
         private val ALWAYS_DELETE_KEY_FLICK_BOUNDARIES = setOf(' ', '　', '\n')
@@ -1593,6 +1599,8 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
     private class LearningRevert(
         val committedText: String,
         val previousBunsetsuOutput: String?,
+        val committedReading: String = "",
+        val segments: List<Pair<String, String>> = emptyList(),
     ) {
         val jobs: MutableList<Job> = java.util.Collections.synchronizedList(ArrayList())
         @Volatile var learned: List<Pair<LearnEntity, LearnEntity?>> = emptyList()
@@ -1600,6 +1608,10 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
     }
 
     private var pendingLearningRevert: LearningRevert? = null
+
+    /** 確定直後の後退で取り消した確定（打ち直しの検出用、[RetypeCorrection]）と、その取り消しの書き込み。 */
+    private var retypeMemory: RetypeCorrection.Memory? = null
+    private var retypeRevertJob: Job? = null
 
     /** 確定後に最初に報告されたカーソル位置。ここから動いたら取り消しの対象から外す。 */
     private var learningRevertAnchor: Int = -1
@@ -1843,6 +1855,7 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         runtimeInputPreferenceListenerRegistered = true
         syncRuntimeInputPreferences()
         startKanaKanjiEngineLoad()
+        loadLearnedBoundaries()
 
         observeDeleteKeyFlickTargets()
 
@@ -12675,11 +12688,24 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         )
         val committedText = fragments.joinToString(separator = "") { it.output }
         val committedReading = fragments.joinToString(separator = "") { it.reading }
+        val committedSegments = fragments.map { it.reading to it.output }
         val revert = if (committedText.isNotEmpty() && isLearningWriteEnabled()) {
-            LearningRevert(committedText, lastLearnedBunsetsuOutput)
+            LearningRevert(committedText, lastLearnedBunsetsuOutput, committedReading, committedSegments)
         } else {
             null
         }
+        // 確定直後に消して同じ読みを別の表記で打ち直した → 元の表記を弱め、新しい表記を書く（IDEAS_NEXT_ACCURACY 4）。
+        val retype = RetypeCorrection.plan(
+            memory = retypeMemory,
+            committedReading = committedReading,
+            committedText = committedText,
+            committedSegments = committedSegments,
+            now = System.currentTimeMillis(),
+            maxWholeReading = ConversionLearningSession.MAX_PHRASE_READING_LENGTH,
+        )
+        retypeMemory = null
+        val retypeAfter = retypeRevertJob
+        retypeRevertJob = null
         setPendingLearningRevert(revert)
         val feedback = shown?.takeIf { it.input == committedReading && committedText.isNotEmpty() }
             ?.let { LearningFeedbackPlan.of(it.primary, it.topPredictions, it.nextWords, committedText) }
@@ -12694,6 +12720,8 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         val allowMixedSymbolsAndNumbers = learnDictionaryAllowMixedSymbolsNumbersPreference
         val job = ioScope.launch {
             try {
+                // 打ち直しの元になった取り消しが書き終わってから書く（順番が入れ替わると取り消しが新しい学習を消す）。
+                retypeAfter?.join()
                 val now = System.currentTimeMillis()
                 val learned = if (entries.isEmpty()) emptyList() else {
                     learnRepository.upsertLearnedDataBatchReturningPrevious(
@@ -12716,8 +12744,36 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
                     factor = LearningScorePolicy.IGNORED_FACTOR_PREDICTION,
                     now = now,
                 )
+                val writtenKeys = written
+                val retypeWeakened = if (retype == null) emptyList() else {
+                    learnRepository.applyIgnoredReturningPrevious(
+                        keys = retype.weaken,
+                        factor = RetypeCorrection.WEAKEN_FACTOR,
+                        now = now,
+                    )
+                }
+                val retypeLearned = retype?.reinforce
+                    ?.filterNot { it in writtenKeys }
+                    ?.takeIf { it.isNotEmpty() }
+                    ?.let { keys ->
+                        learnRepository.upsertLearnedDataBatchReturningPrevious(
+                            learnDataList = keys.map { (input, output) ->
+                                LearnEntity(
+                                    input = input,
+                                    out = output,
+                                    score = LearningScorePolicy.initial(RETYPE_LEARNING_CANDIDATE_SCORE, 1),
+                                    usageCount = 1,
+                                    lastUsedAt = now,
+                                    isPhrase = input == committedReading && committedSegments.size > 1,
+                                )
+                            },
+                            allowJapaneseWithSymbolsAndNumbers = allowMixedSymbolsAndNumbers,
+                        )
+                    }.orEmpty()
+                if (retype != null) Timber.d("learning retype correction: %s", retype)
                 // 取り消しは書いた順の逆に戻す。
-                revert.learned = weakenedPredictions + weakenedPrimary + touched + learned
+                revert.learned = retypeLearned + retypeWeakened +
+                    weakenedPredictions + weakenedPrimary + touched + learned
                 learnRepository.pruneExpiredOccasionally(now)
             } catch (e: CancellationException) {
                 throw e
@@ -12759,7 +12815,15 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         if (before != revert.committedText) return
         lastLearnedBunsetsuOutput = revert.previousBunsetsuOutput
         Timber.d("learning reverted by immediate backspace: %s", revert.committedText)
-        ioScope.launch {
+        retypeMemory = revert.committedReading.takeIf { it.isNotEmpty() }?.let {
+            RetypeCorrection.Memory(
+                reading = it,
+                surface = revert.committedText,
+                segments = revert.segments,
+                revertedAt = System.currentTimeMillis(),
+            )
+        }
+        retypeRevertJob = ioScope.launch {
             try {
                 revert.jobs.toList().forEach { it.join() }
                 learnRepository.revertLearnedData(revert.learned)
@@ -14192,6 +14256,58 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         ChipBarPresenter.learningSessionFragments(state, CHIP_LEARNING_CANDIDATE_SCORE)
             .forEach(conversionLearningSession::record)
         persistCompletedLearningSession()
+        recordLearnedBoundaries(state)
+    }
+
+    /** チップで動かした区切りを「左 2 文字＋右 2 文字」の境目として覚える（[LearnedBoundaries]、IDEAS_NEXT_ACCURACY 5）。 */
+    private fun recordLearnedBoundaries(state: ChipBarState) {
+        val model = chipBarModel ?: return
+        if (state.expanded >= 0) return
+        val initial = try {
+            model.chipsOf(state.whole, state.whole.primary).map { it.end }
+        } catch (e: Exception) {
+            Timber.w(e, "chip initial boundaries failed")
+            return
+        }
+        val changed = LearnedBoundaries.shared.record(
+            reading = state.reading,
+            initialBoundaries = initial,
+            committedBoundaries = state.chips.map { it.end },
+            now = System.currentTimeMillis(),
+        )
+        if (changed) saveLearnedBoundaries()
+    }
+
+    private fun loadLearnedBoundaries() {
+        ioScope.launch {
+            try {
+                val file = File(filesDir, LEARNED_BOUNDARIES_FILE)
+                if (file.exists()) LearnedBoundaries.shared.loadFrom(file.readText())
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                Timber.w(e, "loading learned boundaries failed")
+            }
+        }
+    }
+
+    private fun saveLearnedBoundaries() {
+        val text = LearnedBoundaries.shared.serialize()
+        ioScope.launch {
+            try {
+                val file = File(filesDir, LEARNED_BOUNDARIES_FILE)
+                val temporary = File(filesDir, "$LEARNED_BOUNDARIES_FILE.tmp")
+                temporary.writeText(text)
+                if (!temporary.renameTo(file)) {
+                    file.writeText(text)
+                    temporary.delete()
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                Timber.w(e, "saving learned boundaries failed")
+            }
+        }
     }
 
     /** Main. 上段のチップ列（候補 RecyclerView の上に重ねる。出している間は下の候補を透明にする）。 */

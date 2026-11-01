@@ -911,6 +911,14 @@ class GraphBuilder {
             graph = graph.deepCopyForGraphBuild(),
         )
         cachedGraph = updatedCache
+        // チップで直した区切りの一般化（LearnedBoundaries）。キャッシュは調整前のまま残し、返すグラフだけに反映する。
+        if (LearnedBoundaries.enabled) {
+            val leftmost = LearnedBoundaries.shared.applyTo(graph, str, learnedCostNow)
+            val incremental = graph as? IncrementalGraph
+            if (leftmost >= 0 && incremental != null && incremental.forwardDpReusableThroughEndIndex > leftmost) {
+                incremental.forwardDpReusableThroughEndIndex = leftmost
+            }
+        }
         return graph
     }
 
