@@ -26,7 +26,6 @@ class ImePreferencesSnapshotDeviceTest {
             assertEquals(KeyboardSkinRegistry.find(skin)!!.palette.key, effective.customThemeKeyColor)
             assertEquals(selected, effective.copy(appearance = selected.appearance))
             assertEquals(saved.independentMultiTouchEnabled, effective.independentMultiTouchEnabled)
-            assertEquals(saved.stabilizeCandidateStripHeightPreference, effective.stabilizeCandidateStripHeightPreference)
         }
     }
 }

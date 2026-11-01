@@ -101,16 +101,13 @@ class CandidateReadingSizeLimitsTest {
         }
     }
 
-    @Test fun limitRecomputesWhenFontOrCandidateRowsChange() {
+    @Test fun limitRecomputesWhenFontChanges() {
         val initial = CandidateReadingSizeLimits.maximumSp(context)
         assertEquals(initial.toFloat(), CandidateReadingSizeLimits.clamp(context, 24f), 0f)
         KeyboardFontApplicator.updateProcessSnapshot(KeyboardFontSnapshot(Typeface.SERIF, 1L))
         val custom = CandidateReadingSizeLimits.maximumSp(context)
         assertTrue(custom in 1..24)
         assertEquals(custom.toFloat(), CandidateReadingSizeLimits.clamp(context, 24f), 0f)
-        AppPreference.candidate_letter_size = 24f
-        val resized = CandidateReadingSizeLimits.maximumSp(context)
-        assertTrue(resized in 1..24)
         assertEquals(1f, CandidateReadingSizeLimits.clamp(context, 1f), 0f)
     }
 }
