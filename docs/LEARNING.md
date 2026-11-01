@@ -61,7 +61,36 @@
   （約 13 日）と句だけ残り、区切りが 1 チップに戻る（表記は残る）。
 - 打ち足しでチップの編集が消える問題（CHIP_BAR.md「未対応」）は別。途中で打ち足すと学習も書かれない（確定ボタンで確定してから続ける）。
 
+## 打ち直しを負の教師に（2026-11-01、IDEAS_NEXT_ACCURACY 4、`learning/RetypeCorrection.kt`）
+- 確定直後の後退で学習を取り消したとき（`revertLearningOnImmediateBackspace`）、その確定の読み・表記・文節を
+  `RetypeCorrection.Memory` として覚える（IMEService の `retypeMemory`、次の確定で必ず消える）。
+- 次の `persistCompletedLearningSession` で、**60 秒以内**に**同じ読み**を**別の表記**で確定したら（`RetypeCorrection.plan`）:
+  - 弱める: 元の表記（読み全体）と、同じ読みの文節で表記が変わったもの。強さ × 0.1（変換の先頭を無視したときと同じ、
+    `applyIgnoredReturningPrevious`。1 回だけの語は予測から外れ、もう一度で消える）。区切りが変わった文節は比べない。
+  - 書く: 新しい表記（読み全体、ただし読み 12 字以下）と、表記が変わった文節を 1 回（候補順 1 扱い）。
+    通常の学習（先頭候補の確定は学習しない）で既に書いた行は二重に書かない。
+- 書き込みは取り消しの書き込み（`retypeRevertJob`）が終わってから行う（順番が入れ替わると取り消しが新しい学習を消すため）。
+  この弱め・書き込みも次の確定直後の後退で取り消せる（`revert.learned` に入れてある）。
+- テスト: `RetypeCorrectionTest`（判定だけ。DB・IMEService の結線は実機で確認）。
+
+## 区切りの学習（2026-11-01、IDEAS_NEXT_ACCURACY 5、`converter/graph/LearnedBoundaries.kt`）
+- チップ確定（`recordChipBarLearning` → `recordLearnedBoundaries`）で、確定したチップの区切りと最初に出したチップの区切り
+  （`ChipBarModel.chipsOf(state.whole, state.whole.primary)`）を比べる。長押し展開中の確定は見ない。
+  - 増えた区切り（切った）→ 境目のキーに +1、消えた区切り（くっつけた）→ −1。キー = 境目の左 2 文字＋"|"＋右 2 文字の読み
+    （文頭・文末は短い）。値は ±3 で頭打ち、半減期 30 日で弱まり 0 に丸まったら使わない、最大 1000 行（古いものから捨てる）。
+- 変換では `GraphBuilder.constructGraph` の最後（キャッシュ保存の後、`return graph` の前）で、読みの各境目のキーを引き、
+  その境目をまたぐノード（開始 < 境目 < 終了）のコストに 値 × 1000 を足す（切った → 切れやすく、くっつけた → つながりやすく、下限 0）。
+  キャッシュは調整前のまま。調整したら `IncrementalGraph.forwardDpReusableThroughEndIndex` を一番左の境目以下に下げる
+  （FindPath は入力長と一致するときだけ前向き DP を再利用するので、実際には再利用しない）。
+- 保存: `filesDir/learned_boundaries.tsv`（キー・値・最終時刻のタブ区切り。IMEService.onCreate で読み込み、変わるたびに書く）。
+  アプリ全体で 1 つ（`LearnedBoundaries.shared`）。`LearnedBoundaries.enabled = false` で反映を止められる（設定 UI は無い）。
+- 既知の制約: 確定直後の後退では取り消さない。学習辞書の「すべて削除」・バックアップの対象外。シークレットでは書かない（`isLearningWriteEnabled`）。
+  JVM 評価（学習なし）では何もしないので評価値は変わらない。効き具合（1000/段が強すぎ・弱すぎ）は実機で見る。
+- テスト: `LearnedBoundariesTest`（キー・頭打ち・減衰・保存形式・ノードへの反映）。
+
 ## 実機で見る点
 - 1 回選んだ語が次の同じ読みで先頭に来るか（変換・予測とも）。チップで直した文が次に同じ区切り・表記で出るか（リランカー ON のまま）。先頭の学習語を使わず別候補を選ぶと次から先頭でなくなるか。
 - 1 文字・2 文字読みの学習が他の変換を乱さないか（コストは弱めにしてある）。
 - 後続語が予測で出すぎ・出なさすぎでないか（定数 PRESENT_BONUS_SLOTS / ABSENT_BASE_SLOT / SLOTS_PER_SCORE）。
+- 確定 → すぐ消して同じ読みを別の表記で確定 → 次にその読みで新しい表記が先頭、元の表記が下がるか。
+- チップで切った／くっつけた境目が、別の文の同じ文字の並びでも同じ区切りになるか（強すぎて関係ない文の区切りを壊していないか）。
