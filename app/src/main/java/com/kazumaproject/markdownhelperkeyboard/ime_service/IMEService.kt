@@ -8493,11 +8493,17 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
             val temporary = File(filesDir, "$SUMIRE_LM_TABLE_DIR.tmp")
             temporary.deleteRecursively()
             temporary.mkdirs()
-            for (name in names) {
-                assets.open("$SUMIRE_LM_TABLE_DIR/$name").use { input ->
-                    FileOutputStream(File(temporary, name)).use { input.copyTo(it) }
+            // 混成表（typed1 の sub ブロック）は下位ディレクトリ（例 v2/）を持つので再帰でコピーする
+            fun copyTree(asset: String, to: File) {
+                val children = assets.list(asset).orEmpty()
+                if (children.isEmpty()) {
+                    assets.open(asset).use { input -> FileOutputStream(to).use { input.copyTo(it) } }
+                } else {
+                    to.mkdirs()
+                    for (c in children) copyTree("$asset/$c", File(to, c))
                 }
             }
+            for (name in names) copyTree("$SUMIRE_LM_TABLE_DIR/$name", File(temporary, name))
             dir.deleteRecursively()
             if (!temporary.renameTo(dir)) temporary.deleteRecursively()
         } catch (e: Exception) {
