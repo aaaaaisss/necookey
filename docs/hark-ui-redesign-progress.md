@@ -200,3 +200,11 @@ kt 行数（`git ls-files '*.kt'` の合計）: 204,548 → 176,083（**-28,465 
 - backup_rules.xml / data_extraction_rules.xml がサンプルのままで全データが Google 自動バックアップ対象だった（再インストールでユーザー辞書が戻るのはこのため）。
 - h56 表（約56MB）が files/sumire_lm に入ると上限 25MB を超えてアプリ全体のバックアップが止まるので、file/external の sumire_lm/ を cloud-backup と device-transfer から除外。ユーザー辞書・設定は従来どおりバックアップされる。
 - CI 未実行（次回ビルドで反映）。
+
+## 2026-11-02 seg-edit ブランチ: チップ列の区切り編集モード（rerank-packed 3a190dd から）
+- 実機の不満（区切りの動かし方・足し方が分からない、長押しで切る位置がかな展開と磁石でずれる）に対し、区切りの操作を 1 つにした:
+  長押し → 読み全体をかな 1 文字ずつ固定幅のマスに並べ、文字の間のタップで区切りを入れる／消す（磁石なし、文字は動かない）→「完了」。
+  タップごとに `ChipBarModel.applySegmentation` で反映（作った塊は RESIZED、自動では割らない）。詳細と実機確認 41〜50 は docs/CHIP_BAR.md「2026-11-02 区切り編集モード」。
+- View から削除: くっつける（隙間タップ）、フリックで 1 字ずらす、区切りドラッグ、長押しの切るカーソル（磁石・バブル）。モデル関数はテスト・評価用に残す。
+- commit: f582270（コード・テスト・CHIP_BAR.md）。
+- 確認: APK ビルド・CI は未実行（指示どおり）。gradle は使わず、変更した純 Kotlin（ChipBar / ChipBarPresenter / ChipStripLayout / ChipStripView を android-all 13 の jar に対して）を kotlinc 2.0.21 で単体コンパイルし、ChipBarTest・ChipBarPresenterTest・ChipStripLayoutTest（46 件）が通ることを確認。IMEService.kt はコンパイル未確認（差分 +16/−12 を目視確認のみ）。
