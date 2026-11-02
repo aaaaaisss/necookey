@@ -185,3 +185,10 @@ kt 行数（`git ls-files '*.kt'` の合計）: 204,548 → 176,083（**-28,465 
 - 未実施: 英語の単語変換・予測（EnglishEngine、英語読み辞書）。かな漢字変換のグラフ構築（english_reading 辞書）・辞書差し替え（dictionary_override の ENGLISH カテゴリ）・英字直接入力と絡み合っていて境界が明確でないため見送り。
 - 残課題: zenz 系の死んだコード（Zenzai の FIX 制約・ZenzDiagnosticsStore・ZenzConfidence・`necookey_zenz_*` 設定名など、リランカー経路と共用の部分）は残っている。CI ワークフロー（.github/workflows）の zenz モデルキャッシュ手順・`submodules: recursive` は未整理。androidTest は ImePopupInstrumentedTest（定型文ポップアップ前提）を削除、他は該当部分のみ修正（androidTest はコンパイル未確認）。
 - 確認: 各コミットで `:app:compileFullStandardReleaseUnitTestKotlin` が通ることを確認（テスト実行・実機確認は未実施）。
+
+## 2026-11-02: rerank-packed ブランチ（SUMIRE-LM リランカー表 h56、origin/prep-cleanup から）
+
+- 表 h56 = v2 p35（packed1、`v2/` 下位ディレクトリ）+ v3 p25（typed1、`feats.tsv` の `sub dir=v2 pre=v2.` で v2 の特徴量を接頭辞つきで混ぜる混成モデル）。実行時ファイル 100 個、展開後 56.17 MB。評価（held）: JWTD .450 / 日常文 .627 / AJIMEE .680 / 日常文 lenient .929 / 境界 170/179（出荷済み v2 p45: .455/.584/.680/.907/168）。同梱前に梱包ディレクトリを appharness4 で検証し Python の選択と 6409/6409 一致。
+- 表はリポジトリに入れず、孤立ブランチ `lm-data` のコミット **56c1823**（`56c1823729aa30c27e8c15364c462e94a0ce440c`）の `sumire_lm_h56.zip`（sha256 `5b040b8f9401adcfefe19daf67e4717468b308fea0b9bc5e8003db68e57e8196`）。`app/build.gradle` の `fetchSumireLmTable` が取得・sha256 照合（不一致でビルド失敗）してアセット `sumire_lm/` に展開。`-PsumireLmTable=false` で同梱しない。CI は zip を sha256 キーで actions/cache し `-PsumireLmTableFile` で渡す。
+- 端末: IMEService は初回に アセット `sumire_lm/` を内部 `files/sumire_lm/` へ再帰コピー（v2/ を含む）。**既に内部または外部ファイル領域に `sumire_lm/meta.tsv` がある端末は古い表を使い続ける**（入れ替えるにはアプリのデータ削除か、そのディレクトリを消す）。
+- commits: adf6c22（packed1 読み込み）、a37e270（自己 PMI 特徴）、87219f5（typed1 + sub ブロック）、f0b2699（アセットの再帰コピー）、d1363ed（ビルド時取得 + CI）。f0b2699 以降は CI で初コンパイル。
