@@ -1,13 +1,7 @@
-<?xml version="1.0" encoding="utf-8"?><!--
-   Sample backup rules file; uncomment and customize as necessary.
-   See https://developer.android.com/guide/topics/data/autobackup
-   for details.
-   Note: This file is ignored for devices older that API 31
-   See https://developer.android.com/about/versions/12/backup-restore
--->
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Android 11 以前の自動バックアップ。リランカー表（sumire_lm、約56MB）はアセットから復元できるので外す。
+     入れると上限 25MB を超えてアプリ全体のバックアップが止まる（ユーザー辞書も保存されなくなる）。 -->
 <full-backup-content>
-    <!--
-   <include domain="sharedpref" path="."/>
-   <exclude domain="sharedpref" path="device.xml"/>
--->
+    <exclude domain="file" path="sumire_lm/"/>
+    <exclude domain="external" path="sumire_lm/"/>
 </full-backup-content>
