@@ -87,6 +87,25 @@ jobs:
           git show 63732f821b7100dc6e3b9a47ea7725818151ea84:lc_np1m.slc > "$RUNNER_TEMP/lc_np1m.slc"
           echo "LATTICE_LM_FLAGS=-PlatticeLmTableFile=$RUNNER_TEMP/lc_np1m.slc" >> "$GITHUB_ENV"
 
+      # SUMIRE-LM リランカー表 h56（約 55 MB の zip）: 同じく lm-data の固定コミットから。sha256 をキーにキャッシュし、あれば取り直さない。
+      # sha256 は app/build.gradle の fetchSumireLmTable が照合し、不一致ならビルド失敗。
+      - name: Cache SUMIRE-LM table
+        id: sumire_lm_cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/necookey-sumire-lm
+          key: sumire-lm-5b040b8f9401adcfefe19daf67e4717468b308fea0b9bc5e8003db68e57e8196
+
+      - name: Fetch SUMIRE-LM table (lm-data, pinned)
+        run: |
+          mkdir -p "$HOME/.cache/necookey-sumire-lm"
+          F="$HOME/.cache/necookey-sumire-lm/sumire_lm_h56.zip"
+          if [ ! -f "$F" ]; then
+            git fetch -q --depth=1 origin 56c1823729aa30c27e8c15364c462e94a0ce440c
+            git show 56c1823729aa30c27e8c15364c462e94a0ce440c:sumire_lm_h56.zip > "$F"
+          fi
+          echo "LATTICE_LM_FLAGS=$LATTICE_LM_FLAGS -PsumireLmTableFile=$F" >> "$GITHUB_ENV"
+
       - name: Build fullStandard release APK (arm64-v8a)
         run: ./gradlew :app:assembleFullStandardRelease $GRADLE_FLAGS $LATTICE_LM_FLAGS
 

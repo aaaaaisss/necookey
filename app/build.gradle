@@ -164,6 +164,7 @@ android {
         main.assets.srcDir(layout.buildDirectory.dir("generated/compactConnectionMatrix/assets"))
         main.assets.srcDir(layout.buildDirectory.dir("generated/compactSystemDictionary/assets"))
         main.assets.srcDir(layout.buildDirectory.dir("generated/latticeLmTable/assets"))
+        main.assets.srcDir(layout.buildDirectory.dir("generated/sumireLmTable/assets"))
     }
 
     applicationVariants.configureEach { variant ->
@@ -743,6 +744,89 @@ tasks.register("fetchLatticeLmTable") {
 
 tasks.named("preBuild").configure {
     dependsOn("fetchLatticeLmTable")
+}
+
+// SUMIRE-LM リランカー表 h56（typed1 v3 表 + v2/ の packed1 表、変換エンジン sumire_lm）も同じ形で lm-data の固定コミットの
+// sumire_lm_h56.zip を取得し、sha256 を照合してアセット sumire_lm/ に展開する（IMEService が初回に内部 files/sumire_lm/ へ再帰コピー）。
+// -PsumireLmTable=false で取得しない（表なし = リランカーなし）。非公開リポジトリの CI では -PsumireLmTableFile=PATH で渡す。
+def sumireLmCommit = "56c1823729aa30c27e8c15364c462e94a0ce440c"
+def sumireLmFileName = "sumire_lm_h56.zip"
+def sumireLmSha256 = "5b040b8f9401adcfefe19daf67e4717468b308fea0b9bc5e8003db68e57e8196"
+def sumireLmUrl = "https://raw.githubusercontent.com/aaaaaisss/necookey/${sumireLmCommit}/${sumireLmFileName}"
+def sumireLmEnabled = (findProperty("sumireLmTable") ?: "true").toString() != "false"
+def sumireLmAssetDir = layout.buildDirectory.dir("generated/sumireLmTable/assets/sumire_lm")
+def sumireLmCacheDir = new File(gradle.gradleUserHomeDir, "caches/necookey-sumire-lm")
+def sumireLmLocalFile = findProperty("sumireLmTableFile")?.toString()
+
+tasks.register("fetchSumireLmTable") {
+    inputs.property("sumireLmSha256", sumireLmSha256)
+    inputs.property("sumireLmEnabled", sumireLmEnabled)
+    outputs.dir(layout.buildDirectory.dir("generated/sumireLmTable/assets"))
+    doLast {
+        def outDir = sumireLmAssetDir.get().asFile
+        outDir.deleteDir()
+        if (!sumireLmEnabled) {
+            outDir.parentFile.mkdirs()
+            return
+        }
+        def sha = { File f ->
+            def md = java.security.MessageDigest.getInstance("SHA-256")
+            f.withInputStream { ins ->
+                byte[] buf = new byte[1 << 16]
+                int n
+                while ((n = ins.read(buf)) > 0) md.update(buf, 0, n)
+            }
+            md.digest().collect { String.format("%02x", it) }.join("")
+        }
+        def cached = new File(sumireLmCacheDir, "${sumireLmSha256}.zip")
+        if (sumireLmLocalFile) {
+            def local = new File(sumireLmLocalFile)
+            def got = local.isFile() ? sha(local) : "missing"
+            if (got != sumireLmSha256) {
+                throw new GradleException("SUMIRE-LM table sha256 mismatch: expected ${sumireLmSha256}, got ${got} (${local})")
+            }
+            cached = local
+        } else if (!cached.isFile() || sha(cached) != sumireLmSha256) {
+            sumireLmCacheDir.mkdirs()
+            def tmp = new File(sumireLmCacheDir, "${sumireLmSha256}.zip.tmp")
+            def conn = new URL(sumireLmUrl).openConnection()
+            conn.connectTimeout = 30000
+            conn.readTimeout = 300000
+            conn.inputStream.withCloseable { ins -> tmp.withOutputStream { it << ins } }
+            def got = sha(tmp)
+            if (got != sumireLmSha256) {
+                tmp.delete()
+                throw new GradleException("SUMIRE-LM table sha256 mismatch: expected ${sumireLmSha256}, got ${got} (${sumireLmUrl})")
+            }
+            cached.delete()
+            if (!tmp.renameTo(cached)) throw new GradleException("could not store ${cached}")
+        }
+        outDir.mkdirs()
+        def root = outDir.canonicalPath + File.separator
+        int count = 0
+        new java.util.zip.ZipInputStream(new FileInputStream(cached)).withCloseable { zin ->
+            def e
+            while ((e = zin.nextEntry) != null) {
+                def target = new File(outDir, e.name)
+                if (!target.canonicalPath.startsWith(root)) throw new GradleException("bad entry in SUMIRE-LM table: ${e.name}")
+                if (e.directory) {
+                    target.mkdirs()
+                } else {
+                    target.parentFile.mkdirs()
+                    target.withOutputStream { os -> os << zin }
+                    count++
+                }
+            }
+        }
+        if (!new File(outDir, "meta.tsv").isFile() || !new File(outDir, "v2/meta.tsv").isFile()) {
+            throw new GradleException("SUMIRE-LM table incomplete after extract (${outDir})")
+        }
+        logger.lifecycle("SUMIRE-LM table: ${outDir} (${count} files, sha256 ok)")
+    }
+}
+
+tasks.named("preBuild").configure {
+    dependsOn("fetchSumireLmTable")
 }
 
 tasks.register("generateMozcSegmenterData") {
