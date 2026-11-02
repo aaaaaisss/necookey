@@ -195,3 +195,8 @@ kt 行数（`git ls-files '*.kt'` の合計）: 204,548 → 176,083（**-28,465 
 - 6a1380e: SumireLmTyped の KDoc `x[from..]` が Kotlin 1.9.10 でコンパイルエラー（closing bracket expected）になっていたのを文言だけ修正。
 - CI（necookey debug APK, workflow_dispatch）: run 41406421357（4e60a4c）は上記 KDoc で ksp 失敗。run 41407292443（6a1380e）は `:app:assembleFullStandardRelease` 成功（Kotlin コンパイル・R8 通過、表 100 ファイル sha256 ok）、ただし後段の JVM ユニットテストで `:custom_keyboard:testDebugUnitTest` が 139 件中 1 件失敗（このブランチは custom_keyboard を変更していない。workflow_dispatch では paths-filter が全モジュールを「変更あり」とする）ため APK アップロードはスキップされた。
 - af623fd: CI ワークフローを変更（Kotlin コードは不変）。APK の確認・アップロードはアセンブル成功なら単体テスト失敗時も実行、失敗テスト名を出力し `unit-test-reports` を保存。run 41408746068（af623fd）: assemble 成功、APK アーティファクト `necookey-fullStandard-release-arm64` あり。失敗テストは `custom_keyboard` の `FlickKeyboardRuntimeSettingsTest.sensitivityAndLongPressUpdatesPreserveExistingViewAndController`（`NoSuchFieldException: standardFlickControllers`。テストがリフレクションで読む `FlickKeyboardView` のフィールドが既にない＝テスト側が古い）。
+
+## 2026-11-02 バックアップから sumire_lm を除外（c29d7bf）
+- backup_rules.xml / data_extraction_rules.xml がサンプルのままで全データが Google 自動バックアップ対象だった（再インストールでユーザー辞書が戻るのはこのため）。
+- h56 表（約56MB）が files/sumire_lm に入ると上限 25MB を超えてアプリ全体のバックアップが止まるので、file/external の sumire_lm/ を cloud-backup と device-transfer から除外。ユーザー辞書・設定は従来どおりバックアップされる。
+- CI 未実行（次回ビルドで反映）。
