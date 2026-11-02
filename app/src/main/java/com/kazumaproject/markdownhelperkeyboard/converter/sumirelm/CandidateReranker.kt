@@ -28,6 +28,7 @@ object CandidateRerankers {
     )
 
     val formats: List<Format> = listOf(
+        Format("sumire-lm-typed", SumireLmTyped.REQUIRED_FILES) { SumireLmTyped.load(it) },
         Format("sumire-lm-packed", SumireLmReranker.REQUIRED_FILES_PACKED) { SumireLmReranker.load(it) },
         Format("sumire-lm-od", SumireLmReranker.REQUIRED_FILES) { SumireLmReranker.load(it) },
     )

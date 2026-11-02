@@ -47,6 +47,8 @@ class SumireLmReranker private constructor(
         val nseg: Int,
         val type: Int,
         val tokens: List<String>,
+        /** 各語の読み（[tokens] と同じ長さ、v3 typed1 の rs 特徴量用）。空なら読みを使う特徴量は 0。 */
+        val readings: List<String> = emptyList(),
     )
 
     private val wLp = (1..4).map { cb.getValue("w$it.lp") }
@@ -63,10 +65,22 @@ class SumireLmReranker private constructor(
      * 各候補のスコア（大きいほど良い）。[context] は左文脈（生の文字列）。候補は Sumire の順（rank 0 が先頭）で渡す。
      * 文頭扱いは学習時と同じく左文脈が 20 字未満のとき。
      */
-    private val useSpmi = names.contains("spmi_sum")
+    private var useSpmi = names.contains("spmi_sum")
+
+    /** sub ブロックとして使うとき: 自己 PMI を親モデルが使うなら常に計算する。 */
+    internal fun forceSpmi(on: Boolean) { if (on) useSpmi = true }
     private val RARE = 1L shl 23
 
-    override fun score(context: String, cands: List<Input>): DoubleArray {
+    override fun score(context: String, cands: List<Input>): DoubleArray = run(context, cands, null)
+
+    /** 候補ごとの特徴量（名前 → 値）。typed1 の sub ブロック（v2 表を v3 と一緒に使う混成モデル）が使う。 */
+    fun features(context: String, cands: List<Input>): List<Map<String, Double>> {
+        val res = ArrayList<Map<String, Double>>(cands.size)
+        run(context, cands) { _, f -> res.add(HashMap(f)) }
+        return res
+    }
+
+    private fun run(context: String, cands: List<Input>, sink: ((Int, HashMap<String, Double>) -> Unit)?): DoubleArray {
         if (cands.isEmpty()) return DoubleArray(0)
         val bos = context.length < 20
         val nctx = nfkc(context)
@@ -149,6 +163,7 @@ class SumireLmReranker private constructor(
             f["nkan"] = KAN.findAll(st).count().toDouble(); f["nhira"] = HIRA.findAll(st).count().toDouble()
             f["nkata"] = KATA.findAll(st).count().toDouble(); f["ndig"] = DIG.findAll(st).count().toDouble()
             f["nknum"] = KNUM.findAll(st).count().toDouble(); f["typ1"] = if (cd.type == 1) 1.0 else 0.0
+            if (sink != null) { sink(ri, f); continue }
             var sc = 0.0
             for (k in names.indices) sc += wv[k] * ((f[names[k]] ?: 0.0) - mu[k]) / sd[k]
             out[ri] = sc

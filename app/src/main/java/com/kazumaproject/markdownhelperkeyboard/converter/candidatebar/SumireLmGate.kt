@@ -60,6 +60,7 @@ object SumireLmGate {
                 nseg = segs.size,
                 type = c.type.toInt(),
                 tokens = segs.map { it.output },
+                readings = segs.map { if (it.inputStart in 0..it.inputEnd && it.inputEnd <= input.length) input.substring(it.inputStart, it.inputEnd) else "" },
             )
         }
         val scores = reranker.score(leftContext, inputs)
