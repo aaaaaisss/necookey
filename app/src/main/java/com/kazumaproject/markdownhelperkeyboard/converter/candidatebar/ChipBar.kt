@@ -328,6 +328,38 @@ class ChipBarModel(
         return cutAt(state.copy(expanded = index), at)
     }
 
+    // ---- 区切り編集（長押しで入る区切り編集モード。docs/CHIP_BAR.md「2026-11-02 区切り編集モード」） ----
+
+    /**
+     * 区切りをまとめて [boundaries]（読みの UTF-16 位置。0 と読みの長さ・範囲外・サロゲートペアの途中は無視）にする。
+     * 前と同じ範囲のチップはそのまま残し、新しい範囲は前に同じ範囲のチップがあればその表記に戻し（remembered）、
+     * 無ければ左文脈（左側のチップ。左から順に作るので、作ったばかりの片も含む）付きで 1 チップとして再変換する
+     * （ユーザーが作った区切りなので自動では割らない）。消えたチップは remembered に残す。
+     * 選択は [select]（null なら変わった一番左のチップ）。展開は閉じる。区切りが今と同じなら null。
+     */
+    fun applySegmentation(state: ChipBarState, boundaries: Set<Int>, select: Int? = null): ChipBarState? {
+        val reading = state.reading
+        if (reading.isEmpty()) return null
+        val cuts = boundaries.filter { it in 1 until reading.length && isCodePointBoundary(reading, it) }.sorted()
+        val bounds = listOf(0) + cuts + reading.length
+        if (bounds == state.boundaries) return null
+        val memo = state.remembered + state.chips.map { (it.start to it.end) to it }
+        val existing = state.chips.associateBy { it.start to it.end }
+        val chips = ArrayList<Chip>(bounds.size - 1)
+        var firstChanged = -1
+        for ((s, e) in bounds.zipWithNext()) {
+            val keep = existing[s to e]
+            if (keep != null) {
+                chips += keep
+            } else {
+                if (firstChanged < 0) firstChanged = chips.size
+                chips += reconverted(reading, memo, chips, chips.size, s, e)
+            }
+        }
+        val selected = (select ?: firstChanged).takeIf { it in chips.indices } ?: -1
+        return state.copy(chips = chips, selected = selected, expanded = -1, remembered = memo)
+    }
+
     // ---- くっつける（チップ間タップ / スワイプ） ----
 
     /** チップ [index] と右隣をくっつけて 1 チップにし、左文脈付きで再変換して選択する。末尾チップは null。 */
@@ -454,6 +486,10 @@ class ChipBarModel(
         if (config.advanceAfterPick) (if (index + 1 < size) index + 1 else -1) else index
 
     companion object {
+        /** [at] が文字（コードポイント）の境目か（サロゲートペアの途中でない）。 */
+        internal fun isCodePointBoundary(s: String, at: Int): Boolean =
+            at <= 0 || at >= s.length || !(s[at - 1].isHighSurrogate() && s[at].isLowSurrogate())
+
         /** 自立語の頭（漢字・カタカナ・英数で始まる語）で区切ったグループ。付属語は前に付く。 */
         internal fun contentGroups(words: List<ChipWord>): List<List<ChipWord>> {
             val groups = ArrayList<MutableList<ChipWord>>()

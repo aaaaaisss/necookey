@@ -51,8 +51,7 @@ class ChipBarPresenterTest {
         assertEquals(
             ChipStripData(
                 listOf(
-                    // では = で|は（語の境目 1）、着物 = 1 語
-                    ChipStripItem("では", false, reading = "では", wordBoundaries = listOf(1)),
+                    ChipStripItem("では", false, reading = "では"),
                     ChipStripItem("着物", false, reading = "きもの"),
                 ),
             ),
@@ -64,18 +63,6 @@ class ChipBarPresenterTest {
         assertTrue(strip.items[1].selected)
         assertEquals(1, strip.expandedIndex)
         assertEquals(ChipStripData.EMPTY, ChipBarPresenter.strip(null))
-    }
-
-    @Test
-    fun wordBoundariesComeFromPrimaryWordsInsideChip() {
-        val m = ChipBarModel(table)
-        val s = m.initial("ではきもの")
-        assertEquals(listOf(1), ChipBarPresenter.wordBoundaries(s, s.chips[0]))
-        assertEquals(emptyList<Int>(), ChipBarPresenter.wordBoundaries(s, s.chips[1]))
-        // くっつけたチップ（ではきもの）: 1 位経路の語の頭 1・2 が内側の境目（チップの端 0・5 は入らない）
-        val joined = m.join(s, 0)!!
-        assertEquals(listOf(1, 2), ChipBarPresenter.wordBoundaries(joined, joined.chips[0]))
-        assertEquals(listOf(1, 2), ChipBarPresenter.strip(joined).items[0].wordBoundaries)
     }
 
     @Test

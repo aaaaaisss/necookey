@@ -1634,6 +1634,10 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
     /** 今の読みのチップ状態（Main で読み書き）。読みが変わったら作り直す。 */
     @Volatile
     private var chipBarState: ChipBarState? = null
+
+    /** 区切り編集モードで最後にタップした区切り（読み、区切り、選択）。[ChipStripView.Listener.onSegmentation]。 */
+    @Volatile
+    private var chipBarSegmentTarget: Triple<String, Set<Int>, Int?>? = null
     private var chipBarModel: ChipBarModel? = null
     /** 下段の予測（2段バーの予測と同じもの）。チップ非選択のとき下段に出す。 */
     private var chipBarPredictions: List<Candidate> = emptyList()
@@ -13910,6 +13914,7 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
 
     private fun clearChipBarState() {
         chipBarState = null
+        chipBarSegmentTarget = null
         chipBarModel = null
         chipBarCarryFrom = null
         chipBarLowerRow = null
@@ -14007,20 +14012,16 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
 
     private val chipStripListener = object : ChipStripView.Listener {
         override fun onChipTap(index: Int) = runChipBarOp { m, s -> m.tap(s, index) }
-        // 長押し = 展開 → 指を滑らせて切るカーソル → 離して切る（取り消しなら閉じる）。docs/CHIP_BAR.md「長押しの切るカーソル」
-        override fun onLongPressExpand(index: Int) = runChipBarOp { m, s -> m.expandForCut(s, index) }
-        override fun onLongPressCut(index: Int, offset: Int) = runChipBarOp { m, s ->
-            s.chips.getOrNull(index)?.let { chip -> m.cutChip(s, index, chip.start + offset) }
-        }
-        override fun onCutCancel(index: Int) = runChipBarOp { m, s -> m.collapse(s) }
-        override fun onBoundaryDrag(index: Int, delta: Int) = runChipBarOp { m, s -> m.shiftBoundary(s, index, delta) }
         override fun onConfirm() = confirmChipBar()
-        override fun onJoin(index: Int) = runChipBarOp { m, s -> m.join(s, index) }
-        override fun onCut(gapIndex: Int) = runChipBarOp { m, s ->
-            ChipBarPresenter.cutOffset(s, gapIndex)?.let { m.cutAt(s, it) }
-        }
-        override fun onFlick(index: Int, toRight: Boolean) = runChipBarOp { m, s ->
-            if (toRight) m.flickRight(s, index) else m.flickLeft(s, index)
+        // 区切り編集モード（長押しで入る。docs/CHIP_BAR.md「2026-11-02 区切り編集モード」）: タップごとに区切りをまとめて反映する。
+        // 続けてタップしたときは最後の区切りだけを再変換する（並んだ古い操作は今の目標と同じなので何もしない）。
+        override fun onSegmentation(reading: String, boundaries: Set<Int>, select: Int?) {
+            chipBarSegmentTarget = Triple(reading, boundaries, select)
+            runChipBarOp { m, s ->
+                val (r, b, sel) = chipBarSegmentTarget ?: return@runChipBarOp null
+                if (s.reading != r) return@runChipBarOp null
+                m.applySegmentation(s, b, sel)
+            }
         }
     }
 
@@ -14080,6 +14081,7 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         if (insertString.isEmpty() || !isChipBarMode() || currentInputModeForSession != InputMode.ModeJapanese) {
             return false
         }
+        mainView.necookeyChipStrip.exitSegmentEdit() // 区切り編集モード中なら抜ける（区切りはもう反映済み）
         runChipBarOp(waitForStateMs = CHIP_SPACE_WAIT_MS, onTimeout = {
             val suggestions = suggestionAdapter?.suggestions ?: emptyList()
             if (inputString.value == insertString && suggestions.isNotEmpty()) {

@@ -2,14 +2,15 @@ package com.kazumaproject.markdownhelperkeyboard.ime_service.candidatebar
 
 import com.kazumaproject.markdownhelperkeyboard.converter.candidatebar.ChipStripData
 import com.kazumaproject.markdownhelperkeyboard.converter.candidatebar.ChipStripItem
-import com.kazumaproject.markdownhelperkeyboard.ime_service.candidatebar.ChipStripLayout.Hit
+import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Test
 
-/** チップ列の並べ方と当たり判定（1 文字 = 10px で測る）。 */
+/** チップ列の並べ方と当たり判定（1 文字 = 10px で測る）、区切り編集モードの純粋な部分。 */
 class ChipStripLayoutTest {
 
-    private val spec = ChipStripLayout(chipPadding = 10f, gap = 6f, letterPadding = 5f, joinSlop = 12f)
+    private val spec = ChipStripLayout(chipPadding = 10f, gap = 6f)
     private val measure: (String) -> Float = { it.length * 10f }
 
     @Test
@@ -21,38 +22,15 @@ class ChipStripLayoutTest {
     }
 
     @Test
-    fun hitChipJoinWithWidenedGap() {
+    fun chipAtOnlyInsideChips() {
         val laid = spec.layout(ChipStripData(listOf(ChipStripItem("では", false), ChipStripItem("着物", false))), measure)
-        assertEquals(Hit.Chip(0), spec.hit(laid, 20f))
-        assertEquals(Hit.Chip(1), spec.hit(laid, 80f))
-        // 隙間 [46, 52) の中心 49 から ±(3 + min(12, 40/4)) = [36, 62] はくっつける
-        assertEquals(Hit.Join(0), spec.hit(laid, 49f))
-        assertEquals(Hit.Join(0), spec.hit(laid, 37f))
-        assertEquals(Hit.Join(0), spec.hit(laid, 61f))
-        assertEquals(Hit.Chip(0), spec.hit(laid, 35f))
-        assertEquals(Hit.None, spec.hit(laid, 2f))
-        assertEquals(Hit.None, spec.hit(laid, 200f))
-    }
-
-    @Test
-    fun smallChipKeepsTapAreaAgainstJoinSlop() {
-        val laid = spec.layout(ChipStripData(listOf(ChipStripItem("は", false), ChipStripItem("あ", false))), measure)
-        // チップ幅 30 → くっつける領域は隙間 ±(3 + 7.5)。チップの中央はチップ
-        val a = laid.chips[0]
-        assertEquals(Hit.Chip(0), spec.hit(laid, a.center))
-        assertEquals(Hit.Join(0), spec.hit(laid, a.right + 1f))
-    }
-
-    @Test
-    fun expandedChipHitsNearestLetterGap() {
-        val data = ChipStripData(listOf(ChipStripItem("では", false), ChipStripItem("着物", true, listOf("き", "も", "の"))))
-        val laid = spec.layout(data, measure)
-        // 展開中: 左右 5 + 文字箱 20×3 + 5 = 70 → [52, 122)、文字の箱 [57,77) [77,97) [97,117)
-        assertEquals(ChipStripLayout.Box(52f, 122f), laid.chips[1])
-        assertEquals(listOf(77f, 97f, 117f), laid.letters[1].map { it.right })
-        assertEquals(Hit.Cut(1, 0), spec.hit(laid, 80f))
-        assertEquals(Hit.Cut(1, 1), spec.hit(laid, 95f))
-        assertEquals(Hit.Cut(1, 1), spec.hit(laid, 110f))
+        assertEquals(0, spec.chipAt(laid, 20f))
+        assertEquals(0, spec.chipAt(laid, 45f))
+        assertEquals(1, spec.chipAt(laid, 80f))
+        // 隙間 [46, 52) と左右の余白は何もしない（くっつけるは無くなった）
+        assertEquals(-1, spec.chipAt(laid, 49f))
+        assertEquals(-1, spec.chipAt(laid, 2f))
+        assertEquals(-1, spec.chipAt(laid, 200f))
     }
 
     @Test
@@ -96,103 +74,65 @@ class ChipStripLayoutTest {
         assertEquals(0f, spec.revealScroll(wide, 0, 100f, 150f))
     }
 
+    // ---- 区切り編集モード ----
+
+    private fun item(label: String, reading: String) = ChipStripItem(label, false, reading = reading)
+
     @Test
-    fun chipSwipeBecomesScrollOnlyWhenLongOrSlowAndScrollable() {
-        fun scroll(dx: Float, ms: Long, can: Boolean = true) =
-            ChipStripLayout.chipSwipeIsScroll(dx, ms, can, scrollDistance = 56f, flickMaxMs = 220L)
-        assertEquals(false, scroll(30f, 80L)) // 短く速い = フリック
-        assertEquals(true, scroll(60f, 80L)) // 長い
-        assertEquals(true, scroll(25f, 300L)) // ゆっくり
-        assertEquals(false, scroll(200f, 900L, can = false)) // はみ出していなければ常にフリック
+    fun segSourceJoinsReadingsAndBoundaries() {
+        val data = ChipStripData(listOf(item("では", "では"), item("着物", "きもの"), item("を", "を")))
+        assertEquals("ではきものを" to setOf(2, 5), ChipStripLayout.segSource(data))
+        assertEquals("きもの" to emptySet<Int>(), ChipStripLayout.segSource(ChipStripData(listOf(item("着物", "きもの")))))
+        assertEquals("" to emptySet<Int>(), ChipStripLayout.segSource(ChipStripData.EMPTY))
     }
 
     @Test
-    fun edgeAutoScrollSpeedGrowsTowardEdges() {
-        fun speed(x: Float) = ChipStripLayout.edgeAutoScrollSpeed(x, left = 34f, right = 334f, edge = 30f, maxSpeed = 600f)
-        assertEquals(0f, speed(184f))
-        assertEquals(0f, speed(64f))
-        assertEquals(-300f, speed(49f))
-        assertEquals(-600f, speed(10f))
-        assertEquals(300f, speed(319f))
-        assertEquals(600f, speed(400f))
-        assertEquals(0f, ChipStripLayout.edgeAutoScrollSpeed(50f, 0f, 50f, 30f, 600f)) // 狭すぎる
-    }
-
-    // ---- 長押しの切るカーソル（磁石つき） ----
-
-    /** 1 字 20px、境目 k の x = 20k（とうきょうと = 6 字）。 */
-    private val xs6 = (0..6).map { it * 20f }
-
-    @Test
-    fun snapCutGapPicksNearestCharBoundaryWithoutWordGaps() {
-        fun gap(x: Float) = ChipStripLayout.snapCutGap(xs6, emptySet(), x, snapBonus = 12f)
-        assertEquals(1, gap(22f))
-        assertEquals(3, gap(55f))
-        assertEquals(5, gap(95f))
-        // 両端（とその外）は切らない = null（離すと取り消し）
-        assertEquals(null, gap(3f))
-        assertEquals(null, gap(-40f))
-        assertEquals(null, gap(118f))
-        assertEquals(null, gap(300f))
-    }
-
-    @Test
-    fun snapCutGapPullsTowardWordBoundaryWithinAboutOneChar() {
-        // 語の境目 = 5（とうきょう｜と）。吸い付き 12px（字幅 20 の 0.6）
-        val words = setOf(5)
-        fun gap(x: Float) = ChipStripLayout.snapCutGap(xs6, words, x, snapBonus = 12f)
-        assertEquals(5, gap(100f))
-        assertEquals(5, gap(85f)) // 4 との中間 (90) より 4 寄りでも、吸い付き圏内（境目まで 15 − 12 = 3 < 5）なら 5
-        assertEquals(5, gap(115f)) // 右端寄りでも 5（端より境目が強い）
-        // それでも隣の文字の境目 4 には止まれる（真上なら 0 < 20 − 12）
-        assertEquals(4, gap(80f))
-        assertEquals(4, gap(77f))
-        assertEquals(3, gap(60f))
-    }
-
-    @Test
-    fun snapCutGapKeepsEveryBoundaryReachableEvenWithHugeBonus() {
-        // 語の境目が並んでいても、ボーナスは隣との間隔の 3/4 までなので全部の境目に止まれる
-        val words = setOf(1, 2, 4, 5)
-        for (k in 1..5) {
-            assertEquals(k, ChipStripLayout.snapCutGap(xs6, words, k * 20f, snapBonus = 1000f))
-        }
-        // 1 字のチップ（境目なし）は常に null
-        assertEquals(null, ChipStripLayout.snapCutGap(listOf(0f, 20f), emptySet(), 10f, 12f))
-    }
-
-    @Test
-    fun snapCutGapHandlesUnevenLetterWidths() {
-        // 文字幅がばらばら: 境目 x = 0, 10, 40, 50
-        val xs = listOf(0f, 10f, 40f, 50f)
-        assertEquals(2, ChipStripLayout.snapCutGap(xs, setOf(2), 28f, snapBonus = 12f))
-        assertEquals(1, ChipStripLayout.snapCutGap(xs, setOf(2), 12f, snapBonus = 12f))
-        // 語の境目 2 の隣の間隔は 10 → ボーナスは 7.5 まで。x = 46 なら端 (50) と 2 (40) で 2 が勝つ（6 − 7.5 < 4）
-        assertEquals(2, ChipStripLayout.snapCutGap(xs, setOf(2), 46f, snapBonus = 12f))
-        assertEquals(null, ChipStripLayout.snapCutGap(xs, setOf(2), 49f, snapBonus = 12f))
-    }
-
-    @Test
-    fun wordGapIndicesAndGapOffsetMapBetweenLettersAndReading() {
-        val letters = listOf("と", "う", "き", "ょ", "う", "と")
-        assertEquals(setOf(5), ChipStripLayout.wordGapIndices(letters, listOf(5)))
-        assertEquals(emptySet<Int>(), ChipStripLayout.wordGapIndices(letters, emptyList()))
-        assertEquals(5, ChipStripLayout.gapOffset(letters, 5))
-        // サロゲートペア（𠮷 = 2 UTF-16）: 読みの位置 2 は文字の境目 1
+    fun segOffsetsFollowCodePoints() {
+        assertArrayEquals(intArrayOf(0, 1, 2, 3), ChipStripLayout.segOffsets(ChipStripLayout.codePoints("きもの")))
+        // サロゲートペア（𠮷 = 2 単位）は 1 マス
         val sp = ChipStripLayout.codePoints("𠮷やの")
         assertEquals(listOf("𠮷", "や", "の"), sp)
-        assertEquals(setOf(1, 2), ChipStripLayout.wordGapIndices(sp, listOf(2, 3)))
-        assertEquals(3, ChipStripLayout.gapOffset(sp, 2))
+        assertArrayEquals(intArrayOf(0, 2, 3, 4), ChipStripLayout.segOffsets(sp))
     }
 
     @Test
-    fun cutPreviewShowsReadingWithMark() {
-        val letters = ChipStripLayout.codePoints("とうきょうと")
-        assertEquals("とうきょう｜と", ChipStripLayout.cutPreview(letters, 5))
-        assertEquals("とうきょうと", ChipStripLayout.cutPreview(letters, null))
-        assertEquals("とうきょうと", ChipStripLayout.cutPreview(letters, 0)) // 端 = 切らない
-        val long = ChipStripLayout.codePoints("あいうえおかきくけこさしすせそ")
-        assertEquals("…うえおかきく｜けこさしすせ…", ChipStripLayout.cutPreview(long, 8))
-        assertEquals("あいうえおかきくけこさし…", ChipStripLayout.cutPreview(long, null))
+    fun segGapAtPicksNearestGapWithoutSnap() {
+        // マス幅 30、先頭 8: 境目 k の x = 8 + 30k（k = 1..4 が切れる所、5 文字）
+        fun gap(x: Float) = ChipStripLayout.segGapAt(x, start = 8f, cellWidth = 30f, count = 5)
+        assertEquals(1, gap(38f))
+        assertEquals(1, gap(30f)) // 1 マス目の右寄り → 境目 1
+        assertEquals(1, gap(52f)) // 境目 1 と 2 の中間（53）より左
+        assertEquals(2, gap(54f))
+        assertEquals(4, gap(150f)) // 末尾のマス → 一番近い切れる所（境目 4）
+        assertEquals(1, gap(9f)) // 先頭のマス → 境目 1
+        assertNull(gap(7f)) // マスの外
+        assertNull(gap(159f))
+        assertNull(ChipStripLayout.segGapAt(20f, 8f, 30f, 1)) // 1 文字は区切れない
+        // どの境目にもちょうどその上をタップすれば届く
+        for (k in 1..4) assertEquals(k, gap(8f + 30f * k))
+    }
+
+    @Test
+    fun cellsDoNotMoveWhenBoundariesChange() {
+        // マスの位置は区切りに依存しない（引数に区切りが無い）。幅も文字数だけで決まる
+        assertEquals(8f + 30f * 3, ChipStripLayout.segCellLeft(8f, 30f, 3))
+        assertEquals(16f + 150f, ChipStripLayout.segWidth(8f, 30f, 5))
+    }
+
+    @Test
+    fun toggleBoundaryAddsAndRemoves() {
+        val b = setOf(2, 5)
+        assertEquals(setOf(2, 5, 3), ChipStripLayout.toggleBoundary(b, 3))
+        assertEquals(setOf(5), ChipStripLayout.toggleBoundary(b, 2))
+        assertEquals(b, ChipStripLayout.toggleBoundary(ChipStripLayout.toggleBoundary(b, 4), 4))
+    }
+
+    @Test
+    fun segEntryScrollKeepsPressedChipInPlace() {
+        // 押したチップの先頭の文字のマス（左端 98）を、チップの左端があった画面位置 40 に置く → 58
+        assertEquals(58f, ChipStripLayout.segEntryScroll(cellLeft = 98f, chipScreenLeft = 40f, maxScroll = 300f))
+        assertEquals(0f, ChipStripLayout.segEntryScroll(10f, 40f, 300f)) // 左端より前には行かない
+        assertEquals(30f, ChipStripLayout.segEntryScroll(200f, 0f, 30f)) // 最大で止める
+        assertEquals(0f, ChipStripLayout.segEntryScroll(200f, 0f, -5f)) // はみ出していない
     }
 }

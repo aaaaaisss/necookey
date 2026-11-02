@@ -298,4 +298,82 @@ class ChipBarTest {
         assertEquals(listOf("で吐き", "もと"), re.chips.map { it.output })
         assertEquals(listOf("もと" to ChipContext("で吐き", "ではき")), t.contexts)
     }
+
+    // ---- 区切り編集モード（applySegmentation） ----
+
+    @Test
+    fun applySegmentationAddsBoundaryAndKeepsUnchangedChips() {
+        val m = ChipBarModel(table)
+        val s = m.initial("ではきもの") // では|着物
+        val first = s.chips[0]
+        val out = m.applySegmentation(s, setOf(2, 4))!! // では|きも|の
+        assertEquals(listOf("では", "肝", "の"), out.chips.map { it.output })
+        assertEquals(listOf(0, 2, 4, 5), out.boundaries)
+        assertTrue(out.chips[0] === first) // 同じ範囲のチップはそのまま（再変換しない）
+        assertEquals(Chip.Origin.RESIZED, out.chips[1].origin)
+        assertEquals(1, out.selected) // 変わった一番左のチップ
+        assertEquals(-1, out.expanded)
+    }
+
+    @Test
+    fun applySegmentationRemovesAndMovesBoundaries() {
+        val m = ChipBarModel(table)
+        val s = m.initial("ではきもの")
+        val whole = m.applySegmentation(s, emptySet())!!
+        assertEquals(listOf("では着物"), whole.chips.map { it.output })
+        assertEquals(listOf(0, 5), whole.boundaries)
+        // 作った塊は自動で割らない（読み 7 字以上の文節の割り直しは初期チップだけ）
+        assertEquals(1, whole.chips.size)
+        val moved = m.applySegmentation(s, setOf(3))!! // ではき|もの
+        assertEquals(listOf("で吐き", "物"), moved.chips.map { it.output })
+        assertEquals(0, moved.selected)
+    }
+
+    @Test
+    fun applySegmentationConvertsLeftToRightWithNewLeftContext() {
+        val m = ChipBarModel(table)
+        m.applySegmentation(m.initial("ではきもの"), setOf(3))!!
+        // 右の片（もの）は、作ったばかりの左の片（で吐き）を左文脈にして変換
+        assertEquals(ChipContext("で吐き", "ではき"), table.contexts.last { it.first == "もの" }.second)
+        assertEquals(ChipContext.EMPTY, table.contexts.last { it.first == "ではき" }.second)
+    }
+
+    @Test
+    fun applySegmentationRestoresRememberedChipsWithoutReconverting() {
+        val m = ChipBarModel(table)
+        val s = m.initial("ではきもの")
+        val picked = m.pickCandidate(m.tap(s, 1), "きもの")!! // では|きもの（かなを選んだ）
+        val split = m.applySegmentation(picked, setOf(2, 4))!!
+        val callsBefore = table.calls.size
+        val back = m.applySegmentation(split, setOf(2))!!
+        assertEquals(listOf("では", "きもの"), back.chips.map { it.output })
+        assertEquals(Chip.Origin.PICKED, back.chips[1].origin) // 選んだ表記・origin のまま戻る
+        assertEquals(callsBefore, table.calls.size)
+    }
+
+    @Test
+    fun applySegmentationIgnoresInvalidAndUnchangedBoundaries() {
+        val m = ChipBarModel(table)
+        val s = m.initial("ではきもの")
+        assertNull(m.applySegmentation(s, setOf(2)))
+        assertNull(m.applySegmentation(s, setOf(0, 2, 5, 99, -1))) // 両端・範囲外は無視 → 今と同じ
+        assertNull(m.applySegmentation(m.initial(""), setOf(1)))
+    }
+
+    @Test
+    fun applySegmentationSelectOverride() {
+        val m = ChipBarModel(table)
+        val s = m.initial("ではきもの")
+        assertEquals(-1, m.applySegmentation(s, setOf(2, 4), select = -1)!!.selected)
+        assertEquals(2, m.applySegmentation(s, setOf(2, 4), select = 2)!!.selected)
+        assertEquals(-1, m.applySegmentation(s, setOf(2, 4), select = 9)!!.selected) // 範囲外は選択なし
+    }
+
+    @Test
+    fun applySegmentationDoesNotSplitSurrogatePairs() {
+        val m = ChipBarModel(Table("𠮷や" to listOf(path("𠮷や", "𠮷や", "吉野家"))))
+        val s = m.initial("𠮷や")
+        assertNull(m.applySegmentation(s, setOf(1))) // 𠮷 の途中
+        assertEquals(listOf(0, 2, 3), m.applySegmentation(s, setOf(2))!!.boundaries)
+    }
 }

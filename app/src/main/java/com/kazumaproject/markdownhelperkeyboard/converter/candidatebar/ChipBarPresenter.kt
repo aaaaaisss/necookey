@@ -19,17 +19,15 @@ const val CANDIDATE_TYPE_CHIP_CANDIDATE: Byte = 60
 const val CANDIDATE_TYPE_CHIP_FULL_ALTERNATIVE: Byte = 61
 
 /**
- * 上段の 1 チップの表示。[reading] = チップの読み（長押しの切るカーソル・区切りドラッグのバブル用）。
- * [letters] が空でなければ展開中（読みを 1 文字ずつ。長押しの切るカーソル、間のタップでも切れる）。
- * [wordBoundaries] = チップ内の語の境目（読みの UTF-16 位置、1..読みの長さ−1。1 位経路の語分割 = 自立語｜付属語など）。
- * 切るカーソルはここに吸い付く。
+ * 上段の 1 チップの表示。[reading] = チップの読み（区切り編集モードで読み全体をかな 1 文字ずつ並べる元。
+ * 全チップの [reading] を繋げると読み全体、各チップの終わりが今の区切り）。
+ * [letters] が空でなければ展開中（モデルの [ChipBarModel.longPress] / [ChipBarModel.expandForCut]。View からは使わなくなった）。
  */
 data class ChipStripItem(
     val label: String,
     val selected: Boolean,
     val letters: List<String> = emptyList(),
     val reading: String = "",
-    val wordBoundaries: List<Int> = emptyList(),
 ) {
     val expanded: Boolean get() = letters.isNotEmpty()
 }
@@ -75,17 +73,9 @@ object ChipBarPresenter {
                     selected = i == state.selected,
                     letters = if (i == state.expanded) letters(state.reading, chip) else emptyList(),
                     reading = state.reading.substring(chip.start, chip.end),
-                    wordBoundaries = wordBoundaries(state, chip),
                 )
             },
         )
-    }
-
-    /** チップ内の語の境目（1 位経路の語の頭のうちチップの内側にあるもの。チップの先頭からの位置）。 */
-    fun wordBoundaries(state: ChipBarState, chip: Chip): List<Int> {
-        val words = state.whole.primary?.words ?: return emptyList()
-        return words.asSequence().map { it.start }.filter { it > chip.start && it < chip.end }
-            .map { it - chip.start }.distinct().sorted().toList()
     }
 
     /** チップの読みを 1 文字（コードポイント）ずつ。 */
