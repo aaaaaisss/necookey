@@ -74,7 +74,7 @@ class SumireLmTyped private constructor(
     private fun cnt(t: String, i: Int) = cb.getValue("$t.cnt")[tabs.getValue(t).field("cnt", i)]
     private fun ucount(id: Long, t: String): Double { val i = tabs.getValue(t).find(id); return if (i >= 0) cnt(t, i) else 0.0 }
 
-    /** ARPA 後退（学習側 train3.py の補間値をそのまま lp/bw にしたもの）。x[from..] の各位置の log p を caps ごとに合計。 */
+    /** ARPA 後退（学習側 train3.py の補間値をそのまま lp/bw にしたもの）。x の from 以降の各位置の log p を caps ごとに合計。 */
     private fun lm(b: Map<String, String>, x: LongArray, from: Int, f: HashMap<String, Double>) {
         val tn = b.getValue("tables").split(','); val k0 = tn.size; val caps = b.getValue("caps").split(',').map { it.toInt() }
         val unk = b.getValue("unk").toDouble(); val out = b.getValue("out"); val n = x.size
