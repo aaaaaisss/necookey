@@ -98,4 +98,37 @@ class SumireLmGateTest {
         assertTrue("false hits $other", other <= 1)
     }
 
+    /** 端末報告 2026-11-03: 経路でない候補（半角カナ・絵文字・単漢字辞書・かなそのまま）はコストの尺度が違うので採点しない。 */
+    @Test
+    fun nonLatticeCandidatesAreNotScored() {
+        val reranker = SumireLmReranker.load(syntheticTables())!!
+        for ((input, list) in listOf(
+            "おけ" to listOf(c("桶", 2, 7000), c("おけ", 2, 7800), c("おけ", 2, 6000, 3), c("オケ", 2, 6000, 4), c("ｵｹ", 2, 6000, 31), c("岡", 2, 4500, 7)),
+            "くさ" to listOf(c("草", 2, 6500), c("くさ", 2, 7600), c("ｸｻ", 2, 6000, 31), c("日", 2, 100, 7), c("日", 2, 100, 2)),
+            "むりょう" to listOf(c("無料", 4, 6000), c("むりょう", 4, 9500), c("🈚", 4, 10, 11), c("☆", 4, 10, 13), c("(^^)", 4, 10, 12), c("むりょう", 4, 6000, 3)),
+        )) {
+            val d = SumireLmGate.rerank(reranker, input, "", list, { emptyList() })!!
+            assertEquals(input, list[0].string, d.top.string)
+            assertTrue(d.ranked.all { it.type.toInt() == 1 })
+        }
+        // 半角の数字記号だけの経路（種別 31）は採点する、半角カナは種別 31 でも採点しない
+        assertTrue(SumireLmGate.isRerankable(c("12:00", 5, 1, 31)))
+        assertFalse(SumireLmGate.isRerankable(c("ｵｹ", 2, 1, 31)))
+        assertFalse(SumireLmGate.isRerankable(c("ｵｹ", 2, 1, 1)))
+        assertTrue(SumireLmGate.isRerankable(c("県庁", 4, 1, 34)))
+    }
+
+    @Test
+    fun rareSingleKanjiDoesNotReplaceSumireTopForShortReadings() {
+        // コストが小さいほど良いモデルで、Sumire 1 位（おけ）より安い経路の 1 字漢字（岡）を出させる
+        val reranker = SumireLmReranker.load(syntheticTables())!!
+        val d = SumireLmGate.rerank(reranker, "おけ", "", listOf(c("おけ", 2, 9000), c("桶", 2, 9500), c("岡", 2, 100)), { emptyList() })!!
+        assertEquals("おけ", d.top.string)
+        // Sumire 1 位が 1 字漢字（橋）なら、近くの 1 字漢字（箸）への差し替えは文脈で許す
+        val h = SumireLmGate.rerank(reranker, "はし", "", listOf(c("橋", 2, 9000), c("端", 2, 9500), c("箸", 2, 100)), { emptyList() })!!
+        assertEquals("箸", h.top.string)
+        // 4 字以上の読みや 2 字以上の表記は対象外
+        val k = SumireLmGate.rerank(reranker, "けんちょう", "", listOf(c("県長", 5, 9000), c("県庁", 5, 100)), { emptyList() })!!
+        assertEquals("県庁", k.top.string)
+    }
 }

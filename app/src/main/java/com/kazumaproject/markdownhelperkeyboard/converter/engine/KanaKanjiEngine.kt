@@ -22,6 +22,7 @@ import com.kazumaproject.markdownhelperkeyboard.converter.candidate.BunsetsuCand
 import com.kazumaproject.markdownhelperkeyboard.converter.candidate.CANDIDATE_TYPE_TIME
 import com.kazumaproject.markdownhelperkeyboard.converter.candidate.Candidate
 import com.kazumaproject.markdownhelperkeyboard.converter.candidate.CandidateConversionSegment
+import com.kazumaproject.markdownhelperkeyboard.converter.candidate.KanaCandidateOrder
 import com.kazumaproject.markdownhelperkeyboard.converter.graph.GraphBuilder
 import com.kazumaproject.markdownhelperkeyboard.converter.graph.GraphNodeDedupMode
 import com.kazumaproject.markdownhelperkeyboard.converter.graph.SystemDictionaryErrata
@@ -1131,9 +1132,12 @@ class KanaKanjiEngine {
             )
         }
 
+        // かなそのまま・カタカナは絵文字・記号・単漢字より前、半角カタカナは一覧の最後（KanaCandidateOrder）。
         val hirakanaAndKana = listOf(
             Candidate(input, 3, input.length.toUByte(), 6000),
             Candidate(input.hiraToKata(), 4, input.length.toUByte(), 6000),
+        )
+        val hankakuKana = listOf(
             Candidate(input.toHankakuKatakana(), 31, input.length.toUByte(), 6000)
         )
 
@@ -1269,7 +1273,7 @@ class KanaKanjiEngine {
 
         if (input.length == 1) {
             val finalList =
-                resultNBestFinalDeferred.candidates.sortedBy { it.score } + (englishDeferred + englishZenkaku).sortedBy { it.score } + hirakanaAndKana + emojiListDeferred + emoticonListDeferred + symbolListDeferred + symbolHalfWidthListDeferred + singleKanjiListDeferred
+                resultNBestFinalDeferred.candidates.sortedBy { it.score } + (englishDeferred + englishZenkaku).sortedBy { it.score } + hirakanaAndKana + emojiListDeferred + emoticonListDeferred + symbolListDeferred + symbolHalfWidthListDeferred + singleKanjiListDeferred + hankakuKana
             return BunsetsuCandidateResult(
                 candidates = finalList,
                 splitPatterns = resultNBestFinalDeferred.splitPatterns,
@@ -1387,7 +1391,7 @@ class KanaKanjiEngine {
                 compareByDescending<Candidate> { it.string in systemNgramMatchedCandidates }
                     .thenBy { it.score }
                     .thenBy { it.string },
-            ) + deferredEnglishReadingCandidates(input, resultList) + symbolHalfWidthListDeferred + (englishDeferred + englishZenkaku).sortedBy { it.score } + (emojiListDeferred + emoticonListDeferred).sortedBy { it.score } + symbolListDeferred + hirakanaAndKana + yomiPartListDeferred + singleKanjiListDeferred
+            ).let { KanaCandidateOrder.ensureKanaNearTop(it, input) } + deferredEnglishReadingCandidates(input, resultList) + symbolHalfWidthListDeferred + (englishDeferred + englishZenkaku).sortedBy { it.score } + hirakanaAndKana + yomiPartListDeferred + (emojiListDeferred + emoticonListDeferred).sortedBy { it.score } + symbolListDeferred + singleKanjiListDeferred + hankakuKana
 
         return BunsetsuCandidateResult(
             candidates = resultListFinal,
@@ -1632,9 +1636,12 @@ class KanaKanjiEngine {
             )
         }
 
+        // かなそのまま・カタカナは絵文字・記号・単漢字より前、半角カタカナは一覧の最後（KanaCandidateOrder）。
         val hirakanaAndKana = listOf(
             Candidate(input, 3, input.length.toUByte(), 6000),
             Candidate(input.hiraToKata(), 4, input.length.toUByte(), 6000),
+        )
+        val hankakuKana = listOf(
             Candidate(input.toHankakuKatakana(), 31, input.length.toUByte(), 6000)
         )
 
@@ -1751,7 +1758,7 @@ class KanaKanjiEngine {
 
         if (input.length == 1) {
             val finalListOneLetter =
-                resultNBestFinalDeferred.candidates.sortedBy { it.score } + (englishDeferred + englishZenkaku).sortedBy { it.score } + hirakanaAndKana + (emojiListDeferred + emoticonListDeferred).sortedBy { it.score } + symbolListDeferred + singleKanjiListDeferred
+                resultNBestFinalDeferred.candidates.sortedBy { it.score } + (englishDeferred + englishZenkaku).sortedBy { it.score } + hirakanaAndKana + (emojiListDeferred + emoticonListDeferred).sortedBy { it.score } + symbolListDeferred + singleKanjiListDeferred + hankakuKana
             return BunsetsuCandidateResult(
                 candidates = finalListOneLetter,
                 splitPatterns = resultNBestFinalDeferred.splitPatterns,
@@ -1871,7 +1878,7 @@ class KanaKanjiEngine {
         )
 
         val finalList =
-            resultListFinal + deferredEnglishReadingCandidates(input, resultList) + (englishDeferred + englishZenkaku).sortedBy { it.score } + (emojiListDeferred + emoticonListDeferred).sortedBy { it.score } + hirakanaAndKana + yomiPartListDeferred + symbolListDeferred + singleKanjiListDeferred
+            KanaCandidateOrder.ensureKanaNearTop(resultListFinal, input) + deferredEnglishReadingCandidates(input, resultList) + (englishDeferred + englishZenkaku).sortedBy { it.score } + hirakanaAndKana + yomiPartListDeferred + (emojiListDeferred + emoticonListDeferred).sortedBy { it.score } + symbolListDeferred + singleKanjiListDeferred + hankakuKana
 
         return BunsetsuCandidateResult(
             candidates = finalList,
@@ -2085,9 +2092,12 @@ class KanaKanjiEngine {
             )
         }
 
+        // かなそのまま・カタカナは絵文字・記号・単漢字より前、半角カタカナは一覧の最後（KanaCandidateOrder）。
         val hirakanaAndKana = listOf(
             Candidate(input, 3, input.length.toUByte(), 6000),
             Candidate(input.hiraToKata(), 4, input.length.toUByte(), 6000),
+        )
+        val hankakuKana = listOf(
             Candidate(input.toHankakuKatakana(), 31, input.length.toUByte(), 6000)
         )
 
@@ -2221,7 +2231,7 @@ class KanaKanjiEngine {
 
         if (input.length == 1) {
             val finalList =
-                resultNBestFinalDeferred.candidates.sortedBy { it.score } + (englishDeferred + englishZenkaku).sortedBy { it.score } + hirakanaAndKana + emojiListDeferred + emoticonListDeferred + symbolListDeferred + symbolHalfWidthListDeferred + singleKanjiListDeferred
+                resultNBestFinalDeferred.candidates.sortedBy { it.score } + (englishDeferred + englishZenkaku).sortedBy { it.score } + hirakanaAndKana + emojiListDeferred + emoticonListDeferred + symbolListDeferred + symbolHalfWidthListDeferred + singleKanjiListDeferred + hankakuKana
             return BunsetsuCandidateResult(
                 candidates = finalList,
                 splitPatterns = resultNBestFinalDeferred.splitPatterns,
@@ -2336,7 +2346,7 @@ class KanaKanjiEngine {
                 compareByDescending<Candidate> { it.string in systemNgramMatchedCandidates }
                     .thenBy { it.score }
                     .thenBy { it.string },
-            ) + deferredEnglishReadingCandidates(input, resultList) + (englishDeferred + englishZenkaku).sortedBy { it.score } + symbolHalfWidthListDeferred + (emojiListDeferred + emoticonListDeferred).sortedBy { it.score } + symbolListDeferred + hirakanaAndKana + yomiPartListDeferred + singleKanjiListDeferred
+            ).let { KanaCandidateOrder.ensureKanaNearTop(it, input) } + deferredEnglishReadingCandidates(input, resultList) + (englishDeferred + englishZenkaku).sortedBy { it.score } + symbolHalfWidthListDeferred + hirakanaAndKana + yomiPartListDeferred + (emojiListDeferred + emoticonListDeferred).sortedBy { it.score } + symbolListDeferred + singleKanjiListDeferred + hankakuKana
 
         return BunsetsuCandidateResult(
             candidates = resultListFinal,

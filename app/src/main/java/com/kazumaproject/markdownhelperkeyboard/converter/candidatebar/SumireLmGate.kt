@@ -45,7 +45,7 @@ object SumireLmGate {
     ): Decision? {
         val seen = HashSet<String>()
         val pool = candidates.asSequence()
-            .filter { it.length.toInt() == input.length && !isExcluded(it) && seen.add(it.string) }
+            .filter { it.length.toInt() == input.length && isRerankable(it) && !isExcluded(it) && seen.add(it.string) }
             .take(POOL_SIZE)
             .toList()
         // ユーザー辞書・学習辞書の語を含む経路が先頭なら守る（学習はラティスの中で効くので、学習した文は Sumire 自身の
@@ -65,9 +65,36 @@ object SumireLmGate {
         }
         val scores = reranker.score(leftContext, inputs)
         // 同点は Sumire の順を保つ。
-        val order = pool.indices.sortedWith(compareByDescending<Int> { scores[it] }.thenBy { it })
+        var order = pool.indices.sortedWith(compareByDescending<Int> { scores[it] }.thenBy { it })
+        if (blocksRareSingleKanji(input, pool, order[0])) {
+            // 短い読み（2〜3 字）を、Sumire が 1 位にしていない 1 字漢字（おけ→岡、くさ→日 のような稀な読み）に替えない。
+            order = listOf(0) + order.filter { it != 0 }
+        }
         val margin = if (order.size > 1) scores[order[0]] - scores[order[1]] else null
         return Decision(top = pool[order[0]], margin = margin, ranked = order.map { pool[it] }, scores = order.map { scores[it] })
+    }
+
+    /**
+     * リランカーで採点してよい候補か。表は Sumire のラティス経路（N-best）だけで学習していて、コストは経路コスト。
+     * かなそのまま・カタカナ（種別 3/4、コスト 6000 固定）・半角カタカナ（31）・絵文字/顔文字/記号（11/12/13/21）・
+     * 単漢字辞書（7）・読み一致の単語（2）・読み誤り補正（15）・UT 辞書などは経路コストと尺度が違う（ずっと小さい）ので、
+     * dcost の重みで大きく持ち上がって 1 位になっていた（端末報告: 半角カナ・🈚・岡 が先頭）。これらは採点せず Sumire の並びのまま。
+     * 経路由来の種別: 1（通常）、28/34（ユーザー辞書・学習を含む経路）、30/31（全角/半角の数字記号だけの経路）。
+     */
+    fun isRerankable(c: Candidate): Boolean {
+        val t = c.type.toInt()
+        if (t != 1 && t != 28 && t != 34 && t != 30 && t != 31) return false
+        return c.string.none { it in '\uFF61'..'\uFF9F' }
+    }
+
+    private fun isSingleKanji(s: String): Boolean =
+        s.length == 1 && (s[0] in '\u4E00'..'\u9FFF' || s[0] == '々')
+
+    /** 稀な 1 字漢字への差し替えを止めるか（[pool] は Sumire の順、[top] はリランカー 1 位の位置）。 */
+    internal fun blocksRareSingleKanji(input: String, pool: List<Candidate>, top: Int): Boolean {
+        if (top == 0 || input.length !in 2..3 || !isSingleKanji(pool[top].string)) return false
+        // Sumire の 1 位も 1 字漢字（はし→橋/箸）で、その近く（上位 4 件）の 1 字漢字どうしなら文脈で選び直してよい。
+        return !(isSingleKanji(pool[0].string) && top <= 3)
     }
 
 }

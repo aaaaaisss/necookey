@@ -212,6 +212,7 @@ import com.kazumaproject.markdownhelperkeyboard.learning.session.LearningReading
 import com.kazumaproject.markdownhelperkeyboard.converter.candidate.CANDIDATE_TYPE_LEARNED_DICTIONARY
 import com.kazumaproject.markdownhelperkeyboard.converter.candidate.CANDIDATE_TYPE_TIME
 import com.kazumaproject.markdownhelperkeyboard.converter.candidate.CANDIDATE_TYPE_USER_DICTIONARY
+import com.kazumaproject.markdownhelperkeyboard.converter.candidate.KanaCandidateOrder
 import com.kazumaproject.markdownhelperkeyboard.converter.candidate.Candidate
 import com.kazumaproject.markdownhelperkeyboard.converter.candidate.CandidateConversionSegment
 import com.kazumaproject.markdownhelperkeyboard.converter.candidate.ExactInputCandidatePromotionPolicy
@@ -8598,7 +8599,7 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
     private fun userDictionaryExactFirst(input: String): Comparator<Candidate> =
         compareBy<Candidate>({ it.length.toInt() != input.length }, { it.score })
 
-    private fun promoteRerankedCandidate(candidates: List<Candidate>, top: Candidate?): List<Candidate> {
+    private fun promoteRerankedCandidate(candidates: List<Candidate>, top: Candidate?, input: String? = null): List<Candidate> {
         if (top == null) return candidates
         val index = candidates.indexOfFirst { it.string == top.string }
         if (index == 0) {
@@ -8608,7 +8609,8 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         val result = candidates.toMutableList()
         if (index > 0) result.removeAt(index)
         result.add(0, top)
-        return result
+        // 先頭を差し替えても、短い読みのかなそのままは上位 3 件に残す（KanaCandidateOrder）。
+        return if (input == null) result else KanaCandidateOrder.ensureKanaNearTop(result, input)
     }
 
     /** 1 段バー（従来の候補欄）用。結果で先頭を差し替えて再表示する。 */
@@ -8632,7 +8634,7 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
                 if (requestToken != rerankRequestToken ||
                     !shouldApplyCandidateResult(insertString, candidateToken)
                 ) return
-                val reranked = promoteRerankedCandidate(baseCandidates, top)
+                val reranked = promoteRerankedCandidate(baseCandidates, top, insertString)
                 if (reranked == baseCandidates) return
                 withContext(Dispatchers.Main.immediate) { adoptRerankBunsetsuPath(insertString, top) }
                 updateDisplayedCandidates(
@@ -13992,7 +13994,7 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
                         segmentsOf = { c ->
                             c.conversionSegments.ifEmpty { pool.candidateSegmentsByString[c.string].orEmpty() }
                         },
-                    )?.let { candidates = promoteRerankedCandidate(candidates, it.top) }
+                    )?.let { candidates = promoteRerankedCandidate(candidates, it.top, reading) }
                 }
                 ChipConversion.fromEngine(
                     reading = reading,
