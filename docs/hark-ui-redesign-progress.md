@@ -208,3 +208,36 @@ kt 行数（`git ls-files '*.kt'` の合計）: 204,548 → 176,083（**-28,465 
 - View から削除: くっつける（隙間タップ）、フリックで 1 字ずらす、区切りドラッグ、長押しの切るカーソル（磁石・バブル）。モデル関数はテスト・評価用に残す。
 - commit: f582270（コード・テスト・CHIP_BAR.md）。
 - 確認: APK ビルド・CI は未実行（指示どおり）。gradle は使わず、変更した純 Kotlin（ChipBar / ChipBarPresenter / ChipStripLayout / ChipStripView を android-all 13 の jar に対して）を kotlinc 2.0.21 で単体コンパイルし、ChipBarTest・ChipBarPresenterTest・ChipStripLayoutTest（46 件）が通ることを確認。IMEService.kt はコンパイル未確認（差分 +16/−12 を目視確認のみ）。
+
+## 2026-11-03 ctx-clean ブランチ: 変な上位候補の根本修正と画面文脈（seg-edit 04d09d4 から）
+
+### A. 半角カナ・稀な 1 字漢字・絵文字が 1 位になる（端末報告: おけ→岡、くさ→日、むりょう→🈚、半角カナが上位）
+- 原因: リランカーの候補プール（`SumireLmGate.rerank`、`queryRerankPool` = `getCandidatesWithoutPredictionWithBunsetsu` の全候補から読み全体を覆うもの）に、
+  ラティス経路でない候補が混ざっていた: かなそのまま/カタカナ（種別 3/4）・半角カナ（31）はコスト 6000 固定、絵文字/顔文字/記号（11/12/13/21）・
+  単漢字辞書（7）・読み一致の単語（2）・読み誤り補正（15）は語コストそのまま。表は経路コスト（N-best、種別 1 だけ: h56 の学習・評価 32 万候補はすべて種別 1、
+  プールは常に 50 件で埋まる）で学習していて、`dcost`（1 位とのコスト差、重み -0.87/sd 1.84）が尺度違いの小さいコストに大きな加点をしていた。
+  短い読みは N-best が 50 件に満たないのでこれらがプールに入る。半角カナが勝つのは、全角カナ・かなは経路側の同じ文字列（本来のコスト）が先に残るのに、
+  半角カナだけは文字列が違うのでコスト 6000 のまま残るため（NFKC で特徴量はカタカナと同じ）。
+- 再現（`/workspace/work/nk-ctx/Repro.kt`、h56 表、経路コストは仮の値）: 旧プールの 1 位 おけ→ｵｹ、くさ→日、むりょう→🈚。修正後 おけ／草／無料。
+- 修正（72cf830）:
+  - `SumireLmGate.isRerankable`: 経路由来の種別（1・28・34・30・31）だけ採点、半角カナを含む表記は採点しない。採点しない候補は Sumire の並びのまま。
+  - 稀な 1 字漢字: 2〜3 字の読みで、Sumire 1 位でない 1 字漢字には差し替えない（Sumire 1 位も 1 字漢字で上位 4 件以内なら可: はし→橋/箸）。
+  - 一覧の順（KanaKanjiEngine の 3 経路）: かな・カタカナを絵文字/記号/単漢字より前、半角カナは最後。
+  - `KanaCandidateOrder`: 2〜4 字のひらがな読みは、かなそのままを上位 3 件に（無ければ差し込む）。リランカーで先頭を替えた後も同じ。1 字の読み（め・て・き）は対象外。
+  - 回帰用の短語セット `tools/sumire_lm/regress_short.tsv`（おけ・くさ・むりょう・はし・め・て・き・ひと・けんちょう 等、border 形式）。
+- 評価: ユーザー指示（17:06）で held/AJIMEE/境界の再評価は省略（端末で確認）。h56 の評価データは全候補が種別 1・プール 50 件なので、プールの絞り込みでは
+  評価値は変わらない見込み（未計測）。
+
+### B. 画面文脈（すべてメモリだけ、保存・送信なし）
+- 6313041: `ScreenContextStore`（共有シングルトン）と `ScreenContextBonus`。
+  - 層 1: 入力欄のカーソル前後 200 字（変換中の文字列を除く）。リランカーの左文脈も同じ行の最大 40 字に（従来は `getLeftContext` の 8＋入力長から入力分を除いた約 8 字。学習の左文脈は従来のまま）。
+  - 層 2: 確定した表記（`persistCompletedLearningSession` で記録、アプリ＝パッケージごと 30 分、最大 200 件）。学習が書ける時だけ記録。
+  - 加点: リランカー上位 5 件かつ 1 位との差 1.5 以内の候補で、Sumire の語分割の語（2 字以上、漢字かカタカナを含む、全候補共通の語は除く）が文脈の文字列に
+    含まれれば、確定 0.6・入力欄 0.4・画面 0.3（語ごとに最大、候補あたり上限 0.8）。読みは候補自身の変換なので一致は常に満たす（逆引き辞書は不要）。
+    1 字の語は数えない（今日 の 日 で くさ→日 を押さないため）。重みはオフライン調整なしの控えめな既定。
+  - パスワード欄・`IME_FLAG_NO_PERSONALIZED_LEARNING`・シークレットモードでは記録も使用もしない。IME 終了で消去。
+- d5d7e80: 層 3 `ScreenContextAccessibilityService`（任意・既定オフ）。設定「辞書 › 画面の文脈 › 画面に見えている語を変換に使う」をオンにするとユーザー補助の設定画面を開く
+  （両方オンで動く）。画面変化を 0.5 秒まとめで前面アプリの見えるノードの text を最大 600 ノード/6000 字読み、3 分だけ置く。パスワード・入力欄・自アプリは読まない。
+  `res/xml/screen_context_accessibility.xml`、マニフェストに BIND_ACCESSIBILITY_SERVICE 保護のサービス。ネットワーク権限は追加なし。
+- 確認: kotlinc 2.0.21 で純 Kotlin（SumireLmGate・ScreenContext・KanaCandidateOrder・リランカー）とテスト SumireLmGateTest・KanaCandidateOrderTest・ScreenContextTest（16 件）が通る。
+  ScreenContextAccessibilityService は android-36 の android.jar＋androidx.preference でコンパイル可。**IMEService.kt・KanaKanjiEngine.kt・MainPreferenceFragment.kt は未コンパイル**（CI で確認）。
