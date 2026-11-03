@@ -34,6 +34,9 @@ class SumireLmGateTest {
         return dir
     }
 
+    /** 他のテスト用: コストだけ（-1/1000 nat）の合成リランカー。 */
+    fun syntheticReranker() = SumireLmReranker.load(syntheticTables())!!
+
     @Test
     fun missingTablesLoadAsNull() {
         assertNull(SumireLmReranker.load(File("/nonexistent/sumire_lm")))

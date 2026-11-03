@@ -183,6 +183,8 @@ import com.kazumaproject.markdownhelperkeyboard.clipboard_history.database.Clipb
 import com.kazumaproject.markdownhelperkeyboard.clipboard_history.database.ItemType
 import com.kazumaproject.markdownhelperkeyboard.converter.candidate.BunsetsuCandidateResult
 import com.kazumaproject.markdownhelperkeyboard.converter.candidatebar.SumireLmGate
+import com.kazumaproject.markdownhelperkeyboard.converter.candidatebar.ScreenContextBonus
+import com.kazumaproject.markdownhelperkeyboard.converter.candidatebar.ScreenContextStore
 import com.kazumaproject.markdownhelperkeyboard.converter.sumirelm.CandidateReranker
 import com.kazumaproject.markdownhelperkeyboard.converter.sumirelm.CandidateRerankers
 import com.kazumaproject.markdownhelperkeyboard.converter.candidatebar.BunsetsuAnalysis
@@ -432,6 +434,8 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
 
     private data class ConversionContext(
         val leftContext: String,
+        /** リランカー用の左文脈（同じ行の最大 maxLeftContextChars 字。従来の leftContext は最大 8 字前後で学習と同じまま）。 */
+        val rerankLeftContext: String = leftContext,
     )
 
     private data class SuggestionLayoutKey(
@@ -2856,6 +2860,7 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
 
     override fun onDestroy() {
         FreezeWatchdog.onImeDestroyed()
+        ScreenContextStore.clear()
         dismissKeyboardSelectionPopups()
         unregisterCrossWindowBlurListener()
         flickInputPreviewCoordinator.cancel(restore = false)
@@ -8346,7 +8351,12 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
                 inputConnection = inputConnection,
                 inputLength = lastCandidateLength,
             ).dropLast(lastCandidateLength)
-            ConversionContext(leftContext = leftContext)
+            // 画面文脈の層 1: カーソル前後 200 字（変換中の文字列を除く）を ScreenContextStore に置き、同じ行の左側をリランカーに渡す。
+            val before = captureScreenContext(inputConnection, lastCandidateLength)
+            ConversionContext(
+                leftContext = leftContext,
+                rerankLeftContext = leftContextOverride ?: before.substringAfterLast('\n'),
+            )
         } catch (e: Exception) {
             Timber.e(e, "Error getConversionContext")
             ConversionContext("")
@@ -8529,7 +8539,7 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
     ): RerankOutcome? {
         val session = kanaKanjiConversionSession ?: return null
         val request = lastKanaKanjiQueryRequest?.copy(input = insertString) ?: return null
-        val leftContext = context.leftContext.takeLast(necookeyCandidateBarConfig.maxLeftContextChars)
+        val leftContext = context.rerankLeftContext.takeLast(necookeyCandidateBarConfig.maxLeftContextChars)
         val topKey = "${leftContext.length}:$leftContext\u0001$insertString"
         val recheck = sumireCandidates.isEmpty()
         val reranker = sumireLmRerankerOrNull()
@@ -8562,6 +8572,7 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
                             segments[c.string] ?: necookeyLearningSegmentsByString[c.string].orEmpty()
                         }
                     },
+                    contextBonus = screenContextBonus(),
                 )
             }
             if (decision != null) {
@@ -12700,6 +12711,10 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         )
         val committedText = fragments.joinToString(separator = "") { it.output }
         val committedReading = fragments.joinToString(separator = "") { it.reading }
+        // 画面文脈の層 2: 最近確定した表記（アプリごと 30 分、メモリだけ）。
+        if (screenContextAllowed()) {
+            ScreenContextStore.recordCommit(screenContextPackage(), committedText, System.currentTimeMillis())
+        }
         val committedSegments = fragments.map { it.reading to it.output }
         val revert = if (committedText.isNotEmpty() && isLearningWriteEnabled()) {
             LearningRevert(committedText, lastLearnedBunsetsuOutput, committedReading, committedSegments)
@@ -13994,6 +14009,7 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
                         segmentsOf = { c ->
                             c.conversionSegments.ifEmpty { pool.candidateSegmentsByString[c.string].orEmpty() }
                         },
+                        contextBonus = screenContextBonus(),
                     )?.let { candidates = promoteRerankedCandidate(candidates, it.top, reading) }
                 }
                 ChipConversion.fromEngine(
@@ -14623,6 +14639,32 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
 
         orderedCandidates
     } }
+
+    /** 画面文脈を使ってよい入力欄か（パスワード・シークレット（学習しない）欄は使わない、記録もしない）。 */
+    private fun screenContextAllowed(): Boolean {
+        val info = currentInputEditorInfo ?: return false
+        if (currentInputType in passwordTypes || isPrivateMode) return false
+        return (info.imeOptions and EditorInfo.IME_FLAG_NO_PERSONALIZED_LEARNING) == 0
+    }
+
+    private fun screenContextPackage(): String = currentInputEditorInfo?.packageName.orEmpty()
+
+    /** リランカーへの画面文脈の加点（[ScreenContextStore]）。使えない欄・文脈なしなら null。 */
+    private fun screenContextBonus(): ScreenContextBonus? =
+        if (screenContextAllowed()) ScreenContextStore.snapshot(screenContextPackage(), System.currentTimeMillis()) else null
+
+    /** カーソル前（変換中の [composingLength] 字を除く）と後を最大 200 字ずつ読み、使える欄なら記録する。カーソル前を返す。 */
+    private suspend fun captureScreenContext(inputConnection: InputConnection?, composingLength: Int): String =
+        withContext(Dispatchers.IO) {
+            val ic = inputConnection ?: return@withContext ""
+            val n = ScreenContextStore.EDITOR_CHARS
+            val before = ic.getTextBeforeCursor(n + composingLength, 0)?.toString().orEmpty().dropLast(composingLength)
+            if (screenContextAllowed()) {
+                val after = ic.getTextAfterCursor(n, 0)?.toString().orEmpty()
+                ScreenContextStore.recordEditor(screenContextPackage(), before, after, System.currentTimeMillis())
+            }
+            before
+        }
 
     private suspend fun getLeftContext(
         inputConnection: InputConnection?,

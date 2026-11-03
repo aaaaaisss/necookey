@@ -42,6 +42,7 @@ object SumireLmGate {
         candidates: List<Candidate>,
         segmentsOf: (Candidate) -> List<CandidateConversionSegment>,
         isExcluded: (Candidate) -> Boolean = { false },
+        contextBonus: ScreenContextBonus? = null,
     ): Decision? {
         val seen = HashSet<String>()
         val pool = candidates.asSequence()
@@ -64,6 +65,11 @@ object SumireLmGate {
             )
         }
         val scores = reranker.score(leftContext, inputs)
+        // 画面文脈（入力欄の前後・最近の確定・任意のユーザー補助）にある語への小さな加点。上位・僅差の候補だけ（ScreenContextBonus）。
+        contextBonus?.let { bonus ->
+            val add = bonus.bonuses(inputs.map { it.tokens }, scores)
+            for (k in scores.indices) scores[k] += add[k]
+        }
         // 同点は Sumire の順を保つ。
         var order = pool.indices.sortedWith(compareByDescending<Int> { scores[it] }.thenBy { it })
         if (blocksRareSingleKanji(input, pool, order[0])) {
