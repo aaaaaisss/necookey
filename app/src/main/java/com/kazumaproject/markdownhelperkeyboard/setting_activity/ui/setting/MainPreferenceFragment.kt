@@ -2,11 +2,13 @@ package com.kazumaproject.markdownhelperkeyboard.setting_activity.ui.setting
 
 import android.content.ClipData
 import android.content.ClipboardManager
+import android.content.ComponentName
 import android.content.Intent
 import android.graphics.Typeface
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.provider.Settings
 import android.util.TypedValue
 import android.widget.ScrollView
 import android.widget.TextView
@@ -16,6 +18,8 @@ import androidx.appcompat.app.AlertDialog
 import androidx.lifecycle.lifecycleScope
 import androidx.preference.Preference
 import com.kazumaproject.markdownhelperkeyboard.R
+import com.kazumaproject.markdownhelperkeyboard.converter.candidatebar.ScreenContextStore
+import com.kazumaproject.markdownhelperkeyboard.ime_service.screen_context.ScreenContextAccessibilityService
 import com.kazumaproject.markdownhelperkeyboard.diagnostics.FreezeLogFile
 import com.kazumaproject.markdownhelperkeyboard.diagnostics.FreezeWatchdog
 import com.kazumaproject.markdownhelperkeyboard.learning.nextword.NextWordEntity
@@ -131,9 +135,34 @@ class MainPreferenceFragment : AsyncPreferenceFragment() {
         super.onDestroyView()
     }
 
+    // ---- 画面の文脈（ユーザー補助、既定オフ） ----
+
+    private fun bindScreenContextSection() {
+        findPreference<Preference>(ScreenContextAccessibilityService.PREF_KEY)?.setOnPreferenceChangeListener { _, newValue ->
+            if (newValue == true && !isScreenContextServiceEnabled()) {
+                // ユーザー補助はアプリからオンにできないので設定画面を開く（そこで necookey の項目をオンにする）。
+                try {
+                    startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
+                } catch (e: Exception) {
+                    Timber.w(e, "accessibility settings not available")
+                }
+            }
+            if (newValue == false) ScreenContextStore.clearScreen()
+            true
+        }
+    }
+
+    private fun isScreenContextServiceEnabled(): Boolean {
+        val ctx = context ?: return false
+        val enabled = Settings.Secure.getString(ctx.contentResolver, Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES).orEmpty()
+        val name = ComponentName(ctx, ScreenContextAccessibilityService::class.java)
+        return enabled.split(':').any { ComponentName.unflattenFromString(it) == name }
+    }
+
     // ---- 入力・キー操作 ----
 
     private fun bindInputSection() {
+        bindScreenContextSection()
 
         findPreference<Preference>("delete_key_flick_left_targets_preference")?.setOnPreferenceClickListener {
             navigateSafely(R.id.deleteKeyFlickTargetsFragment)

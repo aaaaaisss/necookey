@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 画面の文脈（ScreenContextAccessibilityService）。前面アプリの見えている文字を読むだけ。操作・ジェスチャー・キー入力の取得はしない。 -->
+<accessibility-service xmlns:android="http://schemas.android.com/apk/res/android"
+    android:accessibilityEventTypes="typeWindowContentChanged|typeWindowStateChanged|typeViewScrolled"
+    android:accessibilityFeedbackType="feedbackGeneric"
+    android:accessibilityFlags="flagDefault"
+    android:canRetrieveWindowContent="true"
+    android:description="@string/screen_context_accessibility_description"
+    android:notificationTimeout="500" />

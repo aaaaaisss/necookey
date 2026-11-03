@@ -118,6 +118,15 @@
                 android:title="@string/st_wikipedia" />
         </PreferenceCategory>
         <PreferenceCategory
+            android:key="group_screen_context"
+            android:title="@string/st_section_screen_context">
+            <SwitchPreferenceCompat
+                android:defaultValue="false"
+                android:key="screen_context_accessibility_preference"
+                android:summary="@string/st_screen_context_accessibility_summary"
+                android:title="@string/st_screen_context_accessibility" />
+        </PreferenceCategory>
+        <PreferenceCategory
             android:key="group_dictionary_next_word"
             android:title="@string/st_section_next_word">
             <Preference

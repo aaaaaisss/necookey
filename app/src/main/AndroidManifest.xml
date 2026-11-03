@@ -88,6 +88,20 @@
             </intent-filter>
         </service>
 
+        <!-- 画面の文脈（任意・既定オフ）: 見えている文字をメモリだけに数分置き、変換の順位付けに使う。 -->
+        <service
+            android:name=".ime_service.screen_context.ScreenContextAccessibilityService"
+            android:exported="true"
+            android:label="@string/st_screen_context_accessibility"
+            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
+            <intent-filter>
+                <action android:name="android.accessibilityservice.AccessibilityService" />
+            </intent-filter>
+            <meta-data
+                android:name="android.accessibilityservice"
+                android:resource="@xml/screen_context_accessibility" />
+        </service>
+
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.fileprovider"

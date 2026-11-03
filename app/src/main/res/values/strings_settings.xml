@@ -40,6 +40,10 @@
     <string name="st_person_names">人名</string>
     <string name="st_places">地名</string>
     <string name="st_wikipedia">Wikipedia</string>
+    <string name="st_section_screen_context">画面の文脈</string>
+    <string name="st_screen_context_accessibility">画面に見えている語を変換に使う</string>
+    <string name="st_screen_context_accessibility_summary">ユーザー補助で前面アプリの文字を読み、出てくる語を変換候補の順位付けに少しだけ使います。数分で消え、保存・送信はしません（パスワード欄は読みません）。オンにするとユーザー補助の設定画面を開きます。</string>
+    <string name="screen_context_accessibility_description">necookey キーボードの変換で、画面に見えている語（漢字・カタカナ）を候補の順位付けに少しだけ使います。読んだ文字はメモリだけに数分置いて消し、保存も送信もしません。パスワード欄は読みません。設定の「画面の文脈」でも切り替えられます。</string>
     <string name="st_section_next_word">次の言葉の学習</string>
     <string name="st_next_word_list">学習した組み合わせ</string>
     <string name="st_next_word_count">%1$d 件</string>
