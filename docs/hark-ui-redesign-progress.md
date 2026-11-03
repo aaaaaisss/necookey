@@ -241,3 +241,7 @@ kt 行数（`git ls-files '*.kt'` の合計）: 204,548 → 176,083（**-28,465 
   `res/xml/screen_context_accessibility.xml`、マニフェストに BIND_ACCESSIBILITY_SERVICE 保護のサービス。ネットワーク権限は追加なし。
 - 確認: kotlinc 2.0.21 で純 Kotlin（SumireLmGate・ScreenContext・KanaCandidateOrder・リランカー）とテスト SumireLmGateTest・KanaCandidateOrderTest・ScreenContextTest（16 件）が通る。
   ScreenContextAccessibilityService は android-36 の android.jar＋androidx.preference でコンパイル可。**IMEService.kt・KanaKanjiEngine.kt・MainPreferenceFragment.kt は未コンパイル**（CI で確認）。
+
+## 2026-11-03 クラッシュ記録（ctx-clean）
+- 実機のフリーズ記録にメインスレッドが `handleApplicationCrash` 中（＝クラッシュ処理中）のものが出たが、例外本体が残っていなかった。
+- `FreezeWatchdog.start` で既定の UncaughtExceptionHandler を包み、例外（スレッド名・cause 連鎖・スタック、12,000 字まで）を `files/freeze_log.txt` に同期で書いてから元のハンドラへ渡すようにした。設定「その他 → フリーズ記録」で見られる。

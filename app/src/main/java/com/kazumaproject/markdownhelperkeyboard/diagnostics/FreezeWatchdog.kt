@@ -42,6 +42,7 @@ object FreezeWatchdog {
     private const val MAIN_STACK_MAX_FRAMES = 60
     private const val OTHER_THREAD_MAX = 60
     private const val OTHER_THREAD_MAX_FRAMES = 6
+    private const val CRASH_TRACE_MAX_CHARS = 12_000
 
     private val lock = Object()
     private val mainHandler by lazy { Handler(Looper.getMainLooper()) }
@@ -68,6 +69,7 @@ object FreezeWatchdog {
             started = true
             logFile = File(application.filesDir, LOG_FILE_NAME)
             application.registerActivityLifecycleCallbacks(ActivityTracker)
+            installCrashRecorder()
             Thread(::watchLoop, "FreezeWatchdog").apply {
                 isDaemon = true
                 priority = Thread.MIN_PRIORITY
@@ -198,6 +200,32 @@ object FreezeWatchdog {
         if (imeAlive) parts += if (imeInputViewShown) "IME（キーボード表示中）" else "IME（常駐・非表示）"
         resumedActivity?.let { parts += "アクティビティ $it（前面）" }
         return if (parts.isEmpty()) "なし" else parts.joinToString(", ")
+    }
+
+    /**
+     * 落ちたときの例外（スレッド名・例外・cause の連鎖・スタック）を同じ記録ファイルへ同期で書いてから、
+     * 元のハンドラ（システムのクラッシュ処理）へ渡す。落ちる直前なので別スレッドには頼らない。
+     */
+    private fun installCrashRecorder() {
+        val previous = Thread.getDefaultUncaughtExceptionHandler()
+        Thread.setDefaultUncaughtExceptionHandler { thread, error ->
+            runCatching {
+                val file = logFile
+                if (file != null) {
+                    val text = buildString {
+                        append(ENTRY_MARKER).append(timestamp()).append(" クラッシュ（スレッド: ")
+                            .append(thread.name).append("）\n")
+                        append("アプリ: ").append(BuildConfig.VERSION_NAME).append(" (")
+                            .append(BuildConfig.VERSION_CODE).append(")\n")
+                        append("生きていた画面: ").append(componentsSummary()).append('\n')
+                        append(android.util.Log.getStackTraceString(error).take(CRASH_TRACE_MAX_CHARS))
+                        append('\n')
+                    }
+                    FreezeLogFile.append(file, text)
+                }
+            }
+            previous?.uncaughtException(thread, error)
+        }
     }
 
     private fun timestamp(): String =
