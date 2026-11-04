@@ -27,10 +27,34 @@ class ChipStripLayoutTest {
         assertEquals(0, spec.chipAt(laid, 20f))
         assertEquals(0, spec.chipAt(laid, 45f))
         assertEquals(1, spec.chipAt(laid, 80f))
-        // 隙間 [46, 52) と左右の余白は何もしない（くっつけるは無くなった）
+        // 隙間 [46, 52) と左右の余白はチップではない（隙間は joinAt で くっつける）
         assertEquals(-1, spec.chipAt(laid, 49f))
         assertEquals(-1, spec.chipAt(laid, 2f))
         assertEquals(-1, spec.chipAt(laid, 200f))
+    }
+
+    @Test
+    fun joinAtCoversGapAndThinChipEdgesOnly() {
+        // [6, 46) [52, 92) [98, 128)
+        val laid = spec.layout(
+            ChipStripData(listOf(ChipStripItem("では", false), ChipStripItem("着物", false), ChipStripItem("だ", false))),
+            measure,
+        )
+        // 帯 0|1 = [46 - min(6, 8), 52 + min(6, 8)) = [40, 58)
+        assertEquals(0, spec.joinAt(laid, 49f, edgeSlop = 6f))
+        assertEquals(0, spec.joinAt(laid, 41f, edgeSlop = 6f))
+        assertEquals(0, spec.joinAt(laid, 57f, edgeSlop = 6f))
+        assertNull(spec.joinAt(laid, 39f, edgeSlop = 6f)) // チップ 0 の中 = 選択
+        assertNull(spec.joinAt(laid, 70f, edgeSlop = 6f))
+        // 端の幅が大きくても各チップの幅の 1/5 まで: 帯 1|2 = [92 - 8, 98 + 6) = [84, 104)
+        assertEquals(1, spec.joinAt(laid, 103f, edgeSlop = 12f))
+        assertNull(spec.joinAt(laid, 104f, edgeSlop = 12f))
+        assertNull(spec.joinAt(laid, 83f, edgeSlop = 12f))
+        assertEquals(2, spec.chipAt(laid, 104f))
+        // 左右の余白・1 チップだけ は くっつけない
+        assertNull(spec.joinAt(laid, 2f, edgeSlop = 6f))
+        val one = spec.layout(ChipStripData(listOf(ChipStripItem("では", false))), measure)
+        assertNull(spec.joinAt(one, 47f, edgeSlop = 6f))
     }
 
     @Test

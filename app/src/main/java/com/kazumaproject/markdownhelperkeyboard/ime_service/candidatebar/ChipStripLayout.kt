@@ -5,7 +5,8 @@ import com.kazumaproject.markdownhelperkeyboard.converter.candidatebar.ChipStrip
 /**
  * 文節チップ列の並べ方と当たり判定（Android なし。文字幅は [measure] で注入）。
  *
- * - 普段: チップ = 左右に [chipPadding] を付けた表記。チップの間は [gap]。タップはチップの上だけ（隙間・余白は何もしない）。
+ * - 普段: チップ = 左右に [chipPadding] を付けた表記。チップの間は [gap]。チップの上のタップ = 選択、
+ *   2 つのチップの間（[joinAt]: 隙間＋両側のチップ端の細い帯）のタップ = くっつける（2026-11-04 復活）。
  * - 区切り編集モード（長押しで入る。docs/CHIP_BAR.md「2026-11-02 区切り編集モード」）: 読み全体をかな 1 文字ずつ、
  *   同じ幅のマス（[segCellLeft]）に並べる。区切りの縦線は幅を取らない（マスの境目に描く）ので、区切りを足しても消しても
  *   文字は動かない。タップは一番近い文字の境目（[segGapAt]、磁石なし）の区切りを入れる／消す（[toggleBoundary]）。
@@ -46,6 +47,23 @@ class ChipStripLayout(
     fun chipAt(laid: Laid, x: Float): Int = laid.chips.indexOfFirst { x in it }
 
     /**
+     * くっつける当たり判定: [x] がチップ i と i+1 の間なら i、それ以外は null。帯 = 隙間全体＋両側のチップの端
+     * （それぞれ min([edgeSlop], チップ幅 × [EDGE_FRACTION])。チップの中央側の大部分は選択のまま残る）。
+     * 普段のタップはこれを先に見て、外れたら [chipAt]。
+     */
+    fun joinAt(laid: Laid, x: Float, edgeSlop: Float): Int? {
+        val c = laid.chips
+        for (i in 0 until c.size - 1) {
+            val a = c[i]
+            val b = c[i + 1]
+            val left = a.right - minOf(edgeSlop, a.width * EDGE_FRACTION)
+            val right = b.left + minOf(edgeSlop, b.width * EDGE_FRACTION)
+            if (x >= left && x < right) return i
+        }
+        return null
+    }
+
+    /**
      * はみ出したときの横スクロール量（0..[maxScroll]）。
      * - [reveal] = true で選択中のチップがあれば、[current] から最小限動かしてそのチップを見せる。
      * - 見せるチップが無いとき: [followEnd] = true なら右端（打っている所）、false なら [current] のまま（手でスクロールした位置を保つ）。
@@ -83,6 +101,9 @@ class ChipStripLayout(
     }
 
     companion object {
+        /** くっつける帯がチップに食い込む最大の割合（チップ幅の 1/5。小さいチップでも 3/5 は選択に残る）。 */
+        const val EDGE_FRACTION = 0.2f
+
         /** 読みを 1 文字（コードポイント）ずつ（presenter の letters と同じ分け方）。 */
         fun codePoints(reading: String): List<String> {
             val out = ArrayList<String>()

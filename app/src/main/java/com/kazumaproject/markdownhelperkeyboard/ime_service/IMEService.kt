@@ -14030,6 +14030,8 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
 
     private val chipStripListener = object : ChipStripView.Listener {
         override fun onChipTap(index: Int) = runChipBarOp { m, s -> m.tap(s, index) }
+        // チップの間のタップ = くっつけて再変換・選択（docs/CHIP_BAR.md「2026-11-04 くっつけるの復活」）
+        override fun onJoin(index: Int) = runChipBarOp { m, s -> m.join(s, index) }
         override fun onConfirm() = confirmChipBar()
         // 区切り編集モード（長押しで入る。docs/CHIP_BAR.md「2026-11-02 区切り編集モード」）: タップごとに区切りをまとめて反映する。
         // 続けてタップしたときは最後の区切りだけを再変換する（並んだ古い操作は今の目標と同じなので何もしない）。

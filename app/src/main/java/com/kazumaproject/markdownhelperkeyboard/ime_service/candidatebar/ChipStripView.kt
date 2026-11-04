@@ -24,6 +24,8 @@ import kotlin.math.roundToInt
  *
  * 普段:
  * - タップ = チップの選択 / 選択解除（下段にそのチップの候補）。
+ * - 2 つのチップの間をタップ = くっつけて再変換（[Listener.onJoin]、軽い振動）。当たりは隙間＋両側のチップ端の細い帯
+ *   （[ChipStripLayout.joinAt]、端は最大 [JOIN_EDGE_SLOP_DP]dp かつチップ幅の 1/5 まで）。2026-11-04 に普段のモードへ復活。
  * - 右端の確定ボタン = いま見えている表記で確定。
  * - 長押し（チップ列のどこでも）= 区切り編集モードに入る。
  * - はみ出したとき（文字は最小 [MIN_TEXT_SCALE] 倍まで縮めてから）は横に動かすとスクロール（離すと慣性）。
@@ -43,6 +45,8 @@ class ChipStripView @JvmOverloads constructor(
 
     interface Listener {
         fun onChipTap(index: Int)
+        /** チップ [index] と右隣をくっつける（チップの間のタップ）。 */
+        fun onJoin(index: Int)
         /** 確定ボタン。 */
         fun onConfirm()
         /**
@@ -57,8 +61,10 @@ class ChipStripView @JvmOverloads constructor(
     private val density = resources.displayMetrics.density
     private val layoutSpec = ChipStripLayout(
         chipPadding = 10f * density,
-        gap = 6f * density,
+        gap = 10f * density,
     )
+    /** くっつける帯がチップ端に食い込む幅（[ChipStripLayout.joinAt]）。 */
+    private val joinEdgeSlop = JOIN_EDGE_SLOP_DP * density
     /** 右端の確定ボタンの幅（チップ列はこの左に並べる。スクロールしない）。編集モードは「完了」を出すので広げる。 */
     private val confirmWidth = 34f * density
     private val doneWidth = 52f * density
@@ -442,8 +448,15 @@ class ChipStripView @JvmOverloads constructor(
                 if (segEditing) {
                     ChipStripLayout.segGapAt(event.x + scroll, segStart, segCellWidth, segLetters.size)?.let(::toggleGap)
                 } else {
-                    val index = layoutSpec.chipAt(laid, event.x + scroll)
-                    if (index >= 0) listener?.onChipTap(index)
+                    val x = event.x + scroll
+                    val join = layoutSpec.joinAt(laid, x, joinEdgeSlop)
+                    if (join != null) {
+                        performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)
+                        listener?.onJoin(join)
+                    } else {
+                        val index = layoutSpec.chipAt(laid, x)
+                        if (index >= 0) listener?.onChipTap(index)
+                    }
                 }
                 performClick()
                 return true
@@ -500,5 +513,6 @@ class ChipStripView @JvmOverloads constructor(
     companion object {
         const val MIN_TEXT_SCALE = 0.7f
         const val DONE_LABEL = "完了"
+        const val JOIN_EDGE_SLOP_DP = 6f
     }
 }
