@@ -21,6 +21,9 @@ object MozcNodeAttributes {
 
     /** 方言の活用語尾を動詞語幹に付けた合成ノード（DialectInflectionNodes）。ラティス LM は語幹の表記で引く。 */
     const val DIALECT_INFLECTION = 1 shl 8
+
+    /** 五段ワ行のウ音便過去の合成ノード（思うた・思た、UOnbinPastNodes）。ラティス LM は標準の連用タ接続（思っ）で引く。 */
+    const val U_ONBIN_PAST = 1 shl 9
 }
 
 data class Node(

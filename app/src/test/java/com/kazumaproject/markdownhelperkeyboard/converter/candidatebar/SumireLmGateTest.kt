@@ -134,4 +134,28 @@ class SumireLmGateTest {
         val k = SumireLmGate.rerank(reranker, "けんちょう", "", listOf(c("県長", 5, 9000), c("県庁", 5, 100)), { emptyList() })!!
         assertEquals("県庁", k.top.string)
     }
+
+    @Test
+    fun trailingElongationStaysKana() {
+        val input = "よくないのおお"
+        val pool = listOf(c("良くないのおお", 7, 100), c("よくないの大", 7, 110), c("よくないのおお", 7, 120))
+        // リランカーが の大 を 1 位にしても、伸ばしを残す候補のうち一番上（よくないのおお）を 1 位に
+        assertEquals(listOf(2, 1, 0), SumireLmGate.keepTrailingElongation(input, pool, listOf(1, 2, 0)))
+        // 1 位が既に残している・伸ばしが無い入力・残す候補が無い なら何もしない
+        assertEquals(null, SumireLmGate.keepTrailingElongation(input, pool, listOf(0, 1, 2)))
+        assertEquals(null, SumireLmGate.keepTrailingElongation("よくないのお", pool, listOf(1, 0, 2)))
+        assertEquals(null, SumireLmGate.keepTrailingElongation(input, listOf(c("よくないの大", 7, 1)), listOf(0)))
+    }
+
+    @Test
+    fun katakanaOnlySwapOfSumireTopNeedsClearMargin() {
+        val pool = listOf(c("かわいそすぎやろ", 8, 100), c("カワイソスぎやろ", 8, 101), c("かわいそ過ぎやろ", 8, 102))
+        val scores = doubleArrayOf(16.4, 17.0, 13.1)
+        assertEquals("かわいそすぎやろ", SumireLmGate.foldKatakana("カワイソスぎやろ"))
+        assertEquals(listOf(0, 1, 2), SumireLmGate.keepHiraganaOverKatakanaSwap(pool, listOf(1, 0, 2), scores))
+        // 差が大きい・カタカナにするだけでない（漢字が変わる）・1 位が Sumire の 1 位 なら何もしない
+        assertNull(SumireLmGate.keepHiraganaOverKatakanaSwap(pool, listOf(1, 0, 2), doubleArrayOf(14.0, 17.0, 13.1)))
+        assertNull(SumireLmGate.keepHiraganaOverKatakanaSwap(pool, listOf(2, 0, 1), doubleArrayOf(16.4, 13.0, 17.0)))
+        assertNull(SumireLmGate.keepHiraganaOverKatakanaSwap(pool, listOf(0, 1, 2), scores))
+    }
 }

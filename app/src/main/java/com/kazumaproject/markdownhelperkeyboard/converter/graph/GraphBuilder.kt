@@ -288,6 +288,9 @@ class GraphBuilder {
         // 方言の活用語尾が始まる位置（語幹はその手前の辞書の動詞活用形、DialectInflectionNodes.kt）
         val dialectSuffixStarts = if (DialectInflectionNodes.mayApply(str)) DialectInflectionNodes.suffixStarts(str) else IntArray(0)
         val dialectSuffixCost = DialectInflectionNodes.suffixCost
+        // 五段ワ行のウ音便過去（思うた・こうた・思た、UOnbinPastNodes.kt）の語尾が始まる位置
+        val uOnbinStarts = if (UOnbinPastNodes.mayApply(str)) UOnbinPastNodes.endingStarts(str) else IntArray(0)
+        val uOnbinCost = UOnbinPastNodes.cost
         for (i in str.indices) {
             currentCoroutineContext().ensureActive()
             var subStrCache: String? = null
@@ -531,6 +534,92 @@ class GraphBuilder {
                             )
                         }
                     }
+                }
+            }
+
+            // 3.055 五段ワ行のウ音便過去・て形（UOnbinPastNodes.kt）: 語幹 = str[i, e)、辞書の基本形（読み替え・縮約あり）を引く
+            for (e in uOnbinStarts) {
+                if (e <= i + 1) continue
+                if (e - i > UOnbinPastNodes.MAX_STEM_LEN) break
+                val stemYomi = str.substring(i, e)
+                for (lk in UOnbinPastNodes.lookups(stemYomi)) {
+                    val endings = UOnbinPastNodes.endingsAt(str, e, lk.contracted)
+                    if (endings.isEmpty()) continue
+                    val idx = yomiTrie.getNodeIndex(lk.dictYomi, succinctBitVectorLBSYomi)
+                    if (idx <= 0) continue
+                    val termId = yomiTrie.getTermId(idx, succinctBitVectorIsLeafYomi)
+                    if (termId < 0) continue
+                    tokenArray.forEachDictionaryByYomiTermId(termId, succinctBitVectorTokenArray) { posTableIndex, wordCost, tokenNodeId ->
+                        val baseLeft = tokenArray.leftIds[posTableIndex.toInt()]
+                        val taLeft = UOnbinPastNodes.taId(baseLeft)
+                        if (taLeft != null) {
+                            val baseTango = when (tokenNodeId) {
+                                -2 -> lk.dictYomi
+                                -1 -> lk.dictYomi.hiraToKata()
+                                else -> tangoTrie.getLetter(tokenNodeId, succinctBitVector = succinctBitVectorTangoLBS)
+                            }
+                            for (en in endings) {
+                                val end = e + en.reading.length
+                                if (end <= reusablePrefixLength) continue
+                                val tango = UOnbinPastNodes.surface(baseTango, stemYomi, lk, en) ?: continue
+                                val yomi = stemYomi + en.reading
+                                val c = wordCost.toInt() + uOnbinCost + UOnbinPastNodes.extraCost(lk)
+                                addOrUpdateNode(
+                                    graph, end,
+                                    Node(
+                                        l = taLeft, r = en.r, score = c, f = c, g = c, tango = tango,
+                                        yomiUsed = yomi, len = yomi.length.toShort(), sPos = i,
+                                        mozcAttributes = mozcAttributesFor(taLeft) or MozcNodeAttributes.U_ONBIN_PAST,
+                                    ),
+                                    graphNodeDedupMode, graphNodeTrace, str, "U_ONBIN_PAST",
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+
+            // 3.056 う を落とした形容動詞語幹（かわいそすぎ、DroppedUStemNodes.kt）: 読み str[i, e) ＋ う が 形容動詞語幹なら、ひらがなのノード
+            if (DroppedUStemNodes.enabled) {
+                for (e in i + DroppedUStemNodes.MIN_LEN..minOf(i + DroppedUStemNodes.MAX_LEN, str.length - 1)) {
+                    if (e <= reusablePrefixLength) continue
+                    val yomi = str.substring(i, e)
+                    if (!DroppedUStemNodes.mayBe(yomi)) continue
+                    val idx = yomiTrie.getNodeIndex(yomi + "う", succinctBitVectorLBSYomi)
+                    if (idx <= 0) continue
+                    val termId = yomiTrie.getTermId(idx, succinctBitVectorIsLeafYomi)
+                    if (termId < 0) continue
+                    var best = Int.MAX_VALUE
+                    tokenArray.forEachDictionaryByYomiTermId(termId, succinctBitVectorTokenArray) { posTableIndex, wordCost, _ ->
+                        if (tokenArray.leftIds[posTableIndex.toInt()] == DroppedUStemNodes.KEIDOU && wordCost < best) best = wordCost.toInt()
+                    }
+                    if (best == Int.MAX_VALUE) continue
+                    val c = best + DroppedUStemNodes.cost
+                    val id = DroppedUStemNodes.KEIDOU
+                    addOrUpdateNode(
+                        graph, e,
+                        Node(
+                            l = id, r = id, score = c, f = c, g = c, tango = yomi, yomiUsed = yomi,
+                            len = yomi.length.toShort(), sPos = i, mozcAttributes = mozcAttributesFor(id),
+                        ),
+                        graphNodeDedupMode, graphNodeTrace, str, "DROPPED_U_STEM",
+                    )
+                }
+            }
+
+            // 3.057 語末の母音の伸ばし（よくないのおお → の＋おお、ElongationNodes.kt）: かなのまま終助詞のノード
+            ElongationNodes.spanAt(str, i)?.let { sp ->
+                if (sp.end > reusablePrefixLength) {
+                    val yomi = str.substring(i, sp.end)
+                    val c = ElongationNodes.cost
+                    addOrUpdateNode(
+                        graph, sp.end,
+                        Node(
+                            l = sp.posId, r = sp.posId, score = c, f = c, g = c, tango = yomi, yomiUsed = yomi,
+                            len = yomi.length.toShort(), sPos = i, mozcAttributes = mozcAttributesFor(sp.posId),
+                        ),
+                        graphNodeDedupMode, graphNodeTrace, str, "ELONGATION",
+                    )
                 }
             }
 

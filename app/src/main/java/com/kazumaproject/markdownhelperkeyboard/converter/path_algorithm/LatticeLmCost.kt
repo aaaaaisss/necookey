@@ -4,6 +4,7 @@ import com.kazumaproject.graph.MozcNodeAttributes
 import com.kazumaproject.graph.MozcNodeType
 import com.kazumaproject.graph.Node
 import com.kazumaproject.markdownhelperkeyboard.converter.graph.DialectInflectionNodes
+import com.kazumaproject.markdownhelperkeyboard.converter.graph.UOnbinPastNodes
 import java.io.DataInputStream
 import java.io.InputStream
 
@@ -36,8 +37,11 @@ object LatticeLmCost {
     }
 
     /** 方言の活用語尾の合成ノード（言えんかった・撮っとる）は語幹（言え・撮っ）で引く（合成語は表に無く、文脈が効かなくなるため）。 */
-    private fun lmWord(node: Node): String =
-        if ((node.mozcAttributes and MozcNodeAttributes.DIALECT_INFLECTION) != 0) DialectInflectionNodes.lmStem(node.tango) else node.tango
+    private fun lmWord(node: Node): String = when {
+        (node.mozcAttributes and MozcNodeAttributes.DIALECT_INFLECTION) != 0 -> DialectInflectionNodes.lmStem(node.tango)
+        (node.mozcAttributes and MozcNodeAttributes.U_ONBIN_PAST) != 0 -> UOnbinPastNodes.lmWord(node.tango)
+        else -> node.tango
+    }
 
     @JvmStatic
     fun wordHash(s: String): Int {

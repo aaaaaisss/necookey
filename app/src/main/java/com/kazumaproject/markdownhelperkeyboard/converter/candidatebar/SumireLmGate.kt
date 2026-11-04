@@ -5,6 +5,7 @@ import com.kazumaproject.markdownhelperkeyboard.converter.candidate.CANDIDATE_TY
 
 import com.kazumaproject.markdownhelperkeyboard.converter.candidate.Candidate
 import com.kazumaproject.markdownhelperkeyboard.converter.candidate.CandidateConversionSegment
+import com.kazumaproject.markdownhelperkeyboard.converter.graph.ElongationNodes
 import com.kazumaproject.markdownhelperkeyboard.converter.sumirelm.CandidateReranker
 import com.kazumaproject.markdownhelperkeyboard.converter.sumirelm.SumireLmReranker
 
@@ -76,6 +77,8 @@ object SumireLmGate {
             // 短い読み（2〜3 字）を、Sumire が 1 位にしていない 1 字漢字（おけ→岡、くさ→日 のような稀な読み）に替えない。
             order = listOf(0) + order.filter { it != 0 }
         }
+        keepHiraganaOverKatakanaSwap(pool, order, scores)?.let { order = it }
+        keepTrailingElongation(input, pool, order)?.let { order = it }
         val margin = if (order.size > 1) scores[order[0]] - scores[order[1]] else null
         return Decision(top = pool[order[0]], margin = margin, ranked = order.map { pool[it] }, scores = order.map { scores[it] })
     }
@@ -91,6 +94,43 @@ object SumireLmGate {
         val t = c.type.toInt()
         if (t != 1 && t != 28 && t != 34 && t != 30 && t != 31) return false
         return c.string.none { it in '\uFF61'..'\uFF9F' }
+    }
+
+    /**
+     * 語末の母音の伸ばし（よくないのおお・そうなのおお）をかなのまま残す。表は伸ばしの母音を語として学習しておらず
+     * （語彙外）、の＋大・の＋王 のような漢字 1 字の名詞を選んでいた（端末報告）。リランカー 1 位が伸ばしを崩していて、
+     * プールに伸ばしをかなで残す候補があれば、その中でスコアが一番高いものを 1 位にする（残りの順はそのまま）。
+     * 変えないなら null。
+     */
+    internal fun keepTrailingElongation(input: String, pool: List<Candidate>, order: List<Int>): List<Int>? {
+        if (order.isEmpty()) return null
+        val run = ElongationNodes.trailingRun(input) ?: return null
+        if (pool[order[0]].string.endsWith(run)) return null
+        val keep = order.firstOrNull { pool[it].string.endsWith(run) } ?: return null
+        return listOf(keep) + order.filter { it != keep }
+    }
+
+    /** カタカナをひらがなに畳んだ文字列（ー はそのまま）。 */
+    internal fun foldKatakana(s: String): String = buildString(s.length) {
+        for (ch in s) append(if (ch in '\u30A1'..'\u30F6') ch - 0x60 else ch)
+    }
+
+    /** ひらがな→カタカナの書き換えだけの差し替えを止めるリランカーの差（これ未満なら Sumire の 1 位のまま）。 */
+    const val KATAKANA_SWAP_MARGIN = 1.5
+
+    /**
+     * リランカー 1 位が、Sumire の 1 位のひらがなの部分をカタカナにしただけ（カタカナを畳むと Sumire の 1 位と同じ）で、
+     * スコアの差が [KATAKANA_SWAP_MARGIN] 未満なら Sumire の 1 位に戻す（端末報告: かわいそすぎやろ → カワイソスぎやろ。
+     * 表はネット語のカタカナ語を語彙に持ち、Sumire の口語のかなの語は語彙外で低く出る。ひらがなの出力は良い、強制は悪い）。
+     * 変えないなら null。
+     */
+    internal fun keepHiraganaOverKatakanaSwap(pool: List<Candidate>, order: List<Int>, scores: DoubleArray): List<Int>? {
+        if (order.isEmpty() || order[0] == 0) return null
+        val top = pool[order[0]].string
+        val sumire = pool[0].string
+        if (top == sumire || top.none { it in '\u30A1'..'\u30F6' } || foldKatakana(top) != sumire) return null
+        if (scores[order[0]] - scores[0] >= KATAKANA_SWAP_MARGIN) return null
+        return listOf(0) + order.filter { it != 0 }
     }
 
     private fun isSingleKanji(s: String): Boolean =

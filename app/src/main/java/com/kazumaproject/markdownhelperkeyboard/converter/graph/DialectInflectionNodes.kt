@@ -2,7 +2,7 @@ package com.kazumaproject.markdownhelperkeyboard.converter.graph
 
 /**
  * 方言の活用語尾を、システム辞書の動詞語幹ノードに付けた 1 ノードにする（言え＋んかった＝言えんかった、待ち＋んさい、
- * し＋てもうた、待っ＋とる …）。語尾だけのノードは作らない（取る/撮る や 歌 などの標準語が語尾に化けないように、
+ * し＋てもうた、待っ＋とる、き＋たげる …）。語尾だけのノードは作らない（取る/撮る や 歌 などの標準語が語尾に化けないように、
  * 直前が辞書の動詞活用形で、その活用形が語尾に合うときだけ）。
  *
  * 以前は 言えん＋買った（胃炎買った）・し＋て＋も＋歌（しても歌）・地位トマチン祭 のように、語尾の読みが漢字片に崩れていた。
@@ -34,6 +34,7 @@ internal object DialectInflectionNodes {
     private const val IRU: Short = 1084      // いる 動詞 非自立 一段 基本形
     private const val TE: Short = 348        // て 接続助詞
     private const val NASAI: Short = 1718    // なさい 動詞 非自立 五段・ラ行特殊 命令ｉ なさる
+    private const val TAGERU: Short = 1093   // たげる 動詞 非自立 一段 基本形
 
     /** 語幹の活用形（ビット）。 */
     const val MIZEN = 1   // 未然形: 行か・言え・食べ・せ・こ
@@ -62,8 +63,15 @@ internal object DialectInflectionNodes {
         for (id in TE_IDS) a[id - VERB_FIRST] = (a[id - VERB_FIRST].toInt() or TE_STEM).toByte()
     }
 
+    /**
+     * 動詞,非自立 の て/で が付く形（買ってき・見てみ・置いとい・行っ: 〜てきたげる・〜てきとる）。id.def の
+     * くる/来る 連用形、みる・いる 連用形、おく 連用タ接続、いく/行く 連用タ接続。
+     */
+    private val AUX_TE_IDS = intArrayOf(866, 876, 1206, 1225, 1331, 1385, 1389)
+
     fun stemClass(leftId: Short): Int {
         val l = leftId.toInt()
+        if (l in AUX_TE_IDS) return TE_STEM
         return if (l < VERB_FIRST || l > VERB_LAST) 0 else stemClassById[l - VERB_FIRST].toInt()
     }
 
@@ -92,6 +100,12 @@ internal object DialectInflectionNodes {
             add(Suffix(s + "かった", TE_STEM, TA))
         }
         for (s in listOf("とって", "どって")) add(Suffix(s, TE_STEM, TE))
+        // 〜てあげる の縮約（関西・中国）: 買うてきたげる・見たげる・読んだげる・したげた
+        for (t in listOf("た", "だ")) {
+            add(Suffix(t + "げる", TE_STEM, TAGERU))
+            add(Suffix(t + "げた", TE_STEM, TA))
+            add(Suffix(t + "げて", TE_STEM, TE))
+        }
     }
 
     private val byFirst: Map<Char, List<Suffix>> = SUFFIXES.groupBy { it.reading[0] }
