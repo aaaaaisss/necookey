@@ -32,4 +32,12 @@ class SystemDictionaryErrataTest {
         val c = convert("すもももももももものうち")
         assertTrue(c.toString(), c.none { it.contains("季も桃") } && c.first() == "李も桃も桃のうち")
     }
+
+    @Test
+    fun misreadEntryIsDroppedFromLattice() {
+        assertTrue(SystemDictionaryErrata.isDropped("ついた", "一"))
+        assertTrue(!SystemDictionaryErrata.isDropped("いち", "一"))
+        val c = convert("もうついた")
+        assertTrue(c.toString(), c.none { it.contains("一") })
+    }
 }

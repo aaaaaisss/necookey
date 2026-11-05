@@ -462,6 +462,7 @@ class GraphBuilder {
                                 )
                             )
                         }
+                        if (SystemDictionaryErrata.isDropped(yomiStr, tango)) return@forEachDictionaryByYomiTermId
                         val leftId = tokenArray.leftIds[posTableIndex.toInt()]
                         val cost = wordCost.toInt() + VerbInflectionCost.delta(leftId, yomiStr, tango)
                         val node = Node(
