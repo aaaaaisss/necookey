@@ -289,3 +289,44 @@ kt 行数（`git ls-files '*.kt'` の合計）: 204,548 → 176,083（**-28,465 
   fullStandard フレーバーは CI で確認（変更ファイルはフレーバー共通）。
 - リスク: 縮約 おもた 型（読み 2 字以上＋た/たら）は あらた・おおた 等の語と競う（コスト +2500 で辞書語が勝つ想定、確認文 新たな世界 は不変）。
   カタカナ差し替えの抑止で だめやろ → ダメやろ のようなカタカナ表記がひらがなに戻る（差 1.5 未満のとき）。伸ばしの並べ替えは入力末尾が同じ母音 2 字以上のときだけ。
+
+## 2026-11-05 ctx-clean: 端末の誤変換 3 件、長押しの区切りポップアップ、変換ミスの記録、画面の文脈の絞り込み、表を APK の外へ
+
+### 誤変換（アプリの変換経路 SumireNbestDumpTest lite ＋ h56 リランカー、ラティス表 lc_np1m）
+| 読み | 修正前 | 修正後 | |
+|---|---|---|---|
+| もうついた？ | もう一？ | もう着いた？ | 直した |
+| もうついた / もうついたよ | もう一 / もう一世 | もう着いた / もう着いたよ | 同じ原因 |
+| いわかんでないように | 違和感でないように（Sumire 1 位は 違和感で内容に） | 変えず | 未修正 |
+| きれいとはいえんけど | 綺麗とは言えんけど（ハーネスでは正しい） | 変えず | 端末だけの再現（学習・入力途中の状態の可能性） |
+| そうはいえん | 総肺炎 | 変えず | 未修正（確認文として記録） |
+- 原因と修正: システム辞書に 読み ついた・表記 一 の語（一＝ついたち の読み欠け）があり、文末の 着いた/付いた より安かった。
+  `SystemDictionaryErrata.isDropped`（読み→表記の誤り語の表、今は ついた→一 の 1 件）をラティスの辞書引き（GraphBuilder）で外す。辞書の誤りなので副作用なし。
+- 違和感出ないように: 1 位の差は でない（ひらがな）／出ない／内容に の語の選び方で、一般的な直し方（副作用なし）が見つからず見送り（ユーザー方針: 無理に 1 文ごとの例外は入れない）。
+- そうはいえん → 総肺炎: 文末の はいえん が 肺炎 に取られる。は＋言え＋ん のノードはあり（何も言えんかった・きれいとは言えんけど は正しい）。一般的な直し方が無く見送り。
+- 回帰（regress_short 16、regress_device_1104 9、鍵語 c001–c011・r046–r051）は全件不変。確認文 tools/sumire_lm/regress_device_1105.tsv（15 文）。
+- commit 901f6aa
+
+### 長押しの区切りポップアップ（docs/CHIP_BAR.md「2026-11-05」）
+- チップを長押し → チップ列の上（PopupWindow）に読みのかなを大きく、今の区切りは棒、押した所に一番近い境目にカーソル。押したまま横に動かすと相対移動（26dp ≒ 1 境目、文字は動かない・磁石なし・振動）、
+  離すと区切りを入れる／消す（つなぐ）→ 再変換。上へ外す・下へ 48dp 外すと やめる。区切り編集モード（完了ボタン）は削除。タップ = 選択・間のタップ = くっつける は従来どおり。
+- commit e49ea96
+
+### 変換ミスの記録・画面の文脈・変換の表（commit 817e526）
+- 設定 → 辞書 →「変換ミスの記録」: 既定オン。記録は files/correction_log.tsv（最新 200 件、時刻・読み・最初の変換・確定・直し方 候補/区切り/かな・ctx）。
+  一覧・全部コピー（`読み<TAB>最初<TAB>確定<TAB>直し方<TAB>ctx=0/1`、新しい順）・消去。アプリ名は残さない。パスワード・学習しない・シークレット欄では残さない。チップ方式の確定だけが対象。
+- 同じ所に「画面の文脈の状態」: ユーザー補助の接続、保持している語の数（画面・入力欄の前後・最近の確定）、直近 100 回の変換で文脈の加点が 1 位を変えた回数（メモリだけ）。
+- 画面の文脈（ユーザー補助）を絞った: キーボードが出ている間だけ（IMEService onStartInputView/onFinishInputView → ScreenContextStore）、入力中のアプリ（EditorInfo.packageName）のウィンドウだけ、
+  漢字・カタカナ 2 字以上の語だけ残す（元の文字列は捨てる）、隠れたら消去、パスワード管理・銀行・決済・認証アプリ（パッケージ名の語で判定）は読まない。XML は従来どおり 3 種のイベント＋ウィンドウ内容のみ。
+- 設定 → 辞書 →「変換の表（リランカー）を読み込む」: SAF で sumire_lm_h56.zip を選ぶ → sha256 照合（違えば警告、meta.tsv があれば読む）→ zip-slip を防いで files/sumire_lm/ に展開（進み具合）→
+  `SumireLmTableStore.generation` で IMEService が次の変換で読み直す（再起動不要）。削除ボタン。既に files/sumire_lm/ にある表はそのまま使う。
+  zip の URL（公開リポジトリ）: https://raw.githubusercontent.com/aaaaaisss/necookey/56c1823729aa30c27e8c15364c462e94a0ce440c/sumire_lm_h56.zip （54,919,872 バイト）
+
+### CI（commit c4ccd77）
+- necookey-debug-apk.yml: `-PsumireLmTable=false`（表の取得・キャッシュの手順を削除）。単体テストは release バリアント（assemble 済みのクラスを再利用）、新しいテストを対象に追加。
+  FlickKeyboardRuntimeSettingsTest（削除済みの standardFlickControllers を参照していた）を修正。ほかのワークフローは手動・タグ起動なので変更なし。
+- APK の大きさの見込み: 前回 84.6 MB（artifact）→ 表 55 MB が抜けて 約 30 MB。
+
+### 確認
+- ローカル: `:app:testLiteStandardDebugUnitTest`（lite の本体・テストを全部コンパイル）で ChipStripLayoutTest 12・CorrectionLogTest 2・SumireLmTableStoreTest 2・ScreenContextTest 6・
+  SystemDictionaryErrataTest 2・SumireLmGateTest 9・ChipBarTest 26 通過。`:custom_keyboard:compileReleaseUnitTestKotlin` 通過。fullStandard・release 単体テストは CI で確認。
