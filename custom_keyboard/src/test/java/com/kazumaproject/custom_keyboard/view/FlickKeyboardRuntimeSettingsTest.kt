@@ -17,14 +17,14 @@ import org.robolectric.annotation.Config
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [35])
+/** 感度・長押し時間を変えてもキーの View を作り直さない（standardFlickControllers は削除済みなので View の同一性だけを見る）。 */
 class FlickKeyboardRuntimeSettingsTest {
 
     @Test
-    fun sensitivityAndLongPressUpdatesPreserveExistingViewAndController() {
+    fun sensitivityAndLongPressUpdatesPreserveExistingView() {
         val keyboardView = FlickKeyboardView(context())
         keyboardView.setKeyboard(standardLayout())
         val childBefore = keyboardView.getChildAt(0)
-        val controllerBefore = keyboardView.standardController()
 
         keyboardView.setFlickSensitivityValue(1)
         keyboardView.setFlickThresholdShape(FlickThresholdShape.Rectangular)
@@ -34,7 +34,6 @@ class FlickKeyboardRuntimeSettingsTest {
         keyboardView.setLongPressTimeout(2_000L)
 
         assertSame(childBefore, keyboardView.getChildAt(0))
-        assertSame(controllerBefore, keyboardView.standardController())
     }
 
     private fun standardLayout(): KeyboardLayout {
@@ -59,13 +58,6 @@ class FlickKeyboardRuntimeSettingsTest {
             columnCount = 1,
             rowCount = 1
         )
-    }
-
-    @Suppress("UNCHECKED_CAST")
-    private fun FlickKeyboardView.standardController(): Any {
-        val field = FlickKeyboardView::class.java.getDeclaredField("standardFlickControllers")
-        field.isAccessible = true
-        return (field.get(this) as List<Any>).single()
     }
 
     private fun context(): Context {

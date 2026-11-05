@@ -2,6 +2,8 @@ name: necookey debug APK
 
 # One variant only: fullStandard release (R8 + shrinkResources, signed with keystore/necookey-ci.jks),
 # arm64-v8a. No lint, no other flavors. (Workflow name kept for tooling.)
+# The reranker table (h56, ~55 MB) is not bundled (-PsumireLmTable=false): users import sumire_lm_h56.zip in settings.
+# Unit tests run on the release variant so the already-compiled release classes are reused.
 on:
   push:
     branches: [sumire-fork, main, sumire-lm-app, slim]
@@ -87,41 +89,26 @@ jobs:
           git show 63732f821b7100dc6e3b9a47ea7725818151ea84:lc_np1m.slc > "$RUNNER_TEMP/lc_np1m.slc"
           echo "LATTICE_LM_FLAGS=-PlatticeLmTableFile=$RUNNER_TEMP/lc_np1m.slc" >> "$GITHUB_ENV"
 
-      # SUMIRE-LM リランカー表 h56（約 55 MB の zip）: 同じく lm-data の固定コミットから。sha256 をキーにキャッシュし、あれば取り直さない。
-      # sha256 は app/build.gradle の fetchSumireLmTable が照合し、不一致ならビルド失敗。
-      - name: Cache SUMIRE-LM table
-        id: sumire_lm_cache
-        uses: actions/cache@v4
-        with:
-          path: ~/.cache/necookey-sumire-lm
-          key: sumire-lm-5b040b8f9401adcfefe19daf67e4717468b308fea0b9bc5e8003db68e57e8196
-
-      - name: Fetch SUMIRE-LM table (lm-data, pinned)
-        run: |
-          mkdir -p "$HOME/.cache/necookey-sumire-lm"
-          F="$HOME/.cache/necookey-sumire-lm/sumire_lm_h56.zip"
-          if [ ! -f "$F" ]; then
-            git fetch -q --depth=1 origin 56c1823729aa30c27e8c15364c462e94a0ce440c
-            git show 56c1823729aa30c27e8c15364c462e94a0ce440c:sumire_lm_h56.zip > "$F"
-          fi
-          echo "LATTICE_LM_FLAGS=$LATTICE_LM_FLAGS -PsumireLmTableFile=$F" >> "$GITHUB_ENV"
-
+      # SUMIRE-LM リランカー表 h56（約 55 MB）は APK に入れない（-PsumireLmTable=false）。端末で設定
+      # 「変換の表（リランカー）を読み込む」から sumire_lm_h56.zip を読み込む（既に files/sumire_lm/ にある端末はそのまま使える）。
       - name: Build fullStandard release APK (arm64-v8a)
         id: assemble
-        run: ./gradlew :app:assembleFullStandardRelease $GRADLE_FLAGS $LATTICE_LM_FLAGS
+        run: ./gradlew :app:assembleFullStandardRelease $GRADLE_FLAGS $LATTICE_LM_FLAGS -PsumireLmTable=false
 
       - name: JVM unit tests (touched modules only)
         id: tests
         if: steps.changes.outputs.app == 'true' || steps.changes.outputs.core == 'true' || steps.changes.outputs.custom_keyboard == 'true'
         run: |
           TASKS=""
+          # release の単体テスト = assemble でコンパイル済みの release クラスを使う（debug をもう一度コンパイルしない）。
           if [ "${{ steps.changes.outputs.app }}" = "true" ]; then
             # necookey's own tests; the full Sumire app suite (Robolectric) is not run on every push.
-            TASKS="$TASKS :app:testFullStandardDebugUnitTest --tests com.kazumaproject.markdownhelperkeyboard.converter.candidatebar.* --tests com.kazumaproject.markdownhelperkeyboard.converter.quality.* --tests com.kazumaproject.markdownhelperkeyboard.converter.path_algorithm.LatticeLmCostTest"
+            P=com.kazumaproject.markdownhelperkeyboard
+            TASKS="$TASKS :app:testFullStandardReleaseUnitTest --tests $P.converter.candidatebar.* --tests $P.converter.quality.* --tests $P.converter.path_algorithm.LatticeLmCostTest --tests $P.ime_service.candidatebar.* --tests $P.converter.sumirelm.SumireLmTableStoreTest --tests $P.converter.graph.SystemDictionaryErrataTest"
           fi
-          if [ "${{ steps.changes.outputs.core }}" = "true" ]; then TASKS="$TASKS :core:testDebugUnitTest"; fi
-          if [ "${{ steps.changes.outputs.custom_keyboard }}" = "true" ]; then TASKS="$TASKS :custom_keyboard:testDebugUnitTest"; fi
-          ./gradlew $TASKS $GRADLE_FLAGS $LATTICE_LM_FLAGS --quiet
+          if [ "${{ steps.changes.outputs.core }}" = "true" ]; then TASKS="$TASKS :core:testReleaseUnitTest"; fi
+          if [ "${{ steps.changes.outputs.custom_keyboard }}" = "true" ]; then TASKS="$TASKS :custom_keyboard:testReleaseUnitTest"; fi
+          ./gradlew $TASKS $GRADLE_FLAGS $LATTICE_LM_FLAGS -PsumireLmTable=false --quiet
 
       # Print each failing test (class.method + first line of the message) and keep the reports.
       - name: Report failing unit tests
