@@ -12,31 +12,28 @@ import android.view.MotionEvent
 import android.view.VelocityTracker
 import android.view.View
 import android.view.ViewConfiguration
+import android.graphics.drawable.ColorDrawable
+import android.view.Gravity
 import android.widget.OverScroller
+import android.widget.PopupWindow
 import androidx.core.graphics.ColorUtils
 import com.kazumaproject.markdownhelperkeyboard.converter.candidatebar.ChipStripData
 import kotlin.math.abs
 import kotlin.math.roundToInt
+import timber.log.Timber
 
 /**
  * 文節チップ候補欄の上段（チップ列）。描画とジェスチャだけで、状態は持たない（[setData] で受け取り、操作は [Listener] へ）。
- * docs/CHIP_BAR.md「2026-11-02 区切り編集モード」。
+ * docs/CHIP_BAR.md「2026-11-05 長押しの区切りポップアップ」。
  *
- * 普段:
  * - タップ = チップの選択 / 選択解除（下段にそのチップの候補）。
- * - 2 つのチップの間をタップ = くっつけて再変換（[Listener.onJoin]、軽い振動）。当たりは隙間＋両側のチップ端の細い帯
- *   （[ChipStripLayout.joinAt]、端は最大 [JOIN_EDGE_SLOP_DP]dp かつチップ幅の 1/5 まで）。2026-11-04 に普段のモードへ復活。
+ * - 2 つのチップの間をタップ = くっつけて再変換（[Listener.onJoin]、軽い振動。[ChipStripLayout.joinAt]）。
  * - 右端の確定ボタン = いま見えている表記で確定。
- * - 長押し（チップ列のどこでも）= 区切り編集モードに入る。
+ * - チップを長押し = チップ列の上にポップアップ（読みのかなを大きく、今の区切りは縦の棒）。押した所に一番近い文字の境目に
+ *   カーソル。**指を置いたまま**横に動かすとカーソルが 1 境目ずつ相対的に動く（指の移動 [HOLD_STEP_DP]dp ≒ 1 字、文字は動かない、
+ *   磁石なし、1 つ動くごとに軽い振動）。離す = カーソルの所の区切りを入れる（区切りの上なら消す）→ 再変換（[Listener.onSegmentation]）。
+ *   指を上へポップアップの外まで、または下へ大きく外すと「やめる」（離しても何も変えない）。
  * - はみ出したとき（文字は最小 [MIN_TEXT_SCALE] 倍まで縮めてから）は横に動かすとスクロール（離すと慣性）。
- *
- * 区切り編集モード:
- * - 読み全体をかな 1 文字ずつ、同じ幅のマスに並べ、今の区切りをはっきりした縦線で出す（線は幅を取らないので文字は動かない）。
- * - 文字の間をタップ（一番近い境目。磁石なし）= そこの区切りを入れる／消す（軽い振動）。その都度 [Listener.onSegmentation] で
- *   モデルに反映する（再変換は裏で。入力欄の表記もその都度変わる）。
- * - 右端の「完了」ボタン = 編集モードを抜ける（区切りはもう反映済み）。打鍵で読みが変わる・確定でチップ列が消えるときも抜ける。
- * - もう一度長押し = 入ったときの区切りに戻して抜ける（取り消し）。
- * - 横に動かすとスクロール。
  */
 class ChipStripView @JvmOverloads constructor(
     context: Context,
@@ -50,7 +47,7 @@ class ChipStripView @JvmOverloads constructor(
         /** 確定ボタン。 */
         fun onConfirm()
         /**
-         * 区切り編集: 読み [reading] の区切りを [boundaries]（読みの UTF-16 位置、0 と末尾を除く）にする。
+         * 長押しの区切り: 読み [reading] の区切りを [boundaries]（読みの UTF-16 位置、0 と末尾を除く）にする。
          * [select] = 選択するチップ（null = 変わった一番左のチップ、-1 = 選択なし）。
          */
         fun onSegmentation(reading: String, boundaries: Set<Int>, select: Int?)
@@ -65,23 +62,14 @@ class ChipStripView @JvmOverloads constructor(
     )
     /** くっつける帯がチップ端に食い込む幅（[ChipStripLayout.joinAt]）。 */
     private val joinEdgeSlop = JOIN_EDGE_SLOP_DP * density
-    /** 右端の確定ボタンの幅（チップ列はこの左に並べる。スクロールしない）。編集モードは「完了」を出すので広げる。 */
+    /** 右端の確定ボタンの幅（チップ列はこの左に並べる。スクロールしない）。 */
     private val confirmWidth = 34f * density
-    private val doneWidth = 52f * density
 
-    private fun buttonWidth(): Float = if (segEditing) doneWidth else confirmWidth
-
-    /** チップ列の表示域の右端（この右が確定 / 完了ボタン）。 */
-    private fun contentRight(): Float = (width.toFloat() - buttonWidth()).coerceAtLeast(0f)
+    /** チップ列の表示域の右端（この右が確定ボタン）。 */
+    private fun contentRight(): Float = (width.toFloat() - confirmWidth).coerceAtLeast(0f)
     private val baseTextSize = 17f * density
     private val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { textSize = baseTextSize }
-    private val segTextPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { textSize = baseTextSize }
-    private val buttonTextPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        textSize = 13f * density
-        isFakeBoldText = true
-    }
     private val fillPaint = Paint(Paint.ANTI_ALIAS_FLAG)
-    private val linePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { strokeCap = Paint.Cap.ROUND }
     private val checkPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.STROKE
         strokeWidth = 2.2f * density
@@ -104,19 +92,21 @@ class ChipStripView @JvmOverloads constructor(
     private var selectedFill = Color.BLUE
     private var selectedText = Color.WHITE
 
-    // 区切り編集モード（View だけが持つ。区切りはタップごとに Listener でモデルへ）
-    private var segEditing = false
-    private var segReading = ""
-    private var segLetters: List<String> = emptyList()
-    private var segOffsets = IntArray(1)
-    /** いまの区切り（読みの UTF-16 位置）。モデルの結果を待たずに、ユーザーのタップをそのまま出す。 */
-    private var segBounds: Set<Int> = emptySet()
-    /** 入ったときの区切りと選択（長押しでの取り消し用）。 */
-    private var segEntryBounds: Set<Int> = emptySet()
-    private var segEntrySelected = -1
-    /** マスの幅（全マス同じ。タップしやすい大きさ）と左右の余白。 */
-    private val segCellWidth = 34f * density
-    private val segStart = 8f * density
+    // 長押しの区切りポップアップ（View だけが持つ。離したときだけ Listener でモデルへ）
+    private var holding = false
+    private var holdReading = ""
+    private var holdLetters: List<String> = emptyList()
+    private var holdOffsets = IntArray(1)
+    private var holdBounds: Set<Int> = emptySet()
+    private var holdCursor: ChipStripLayout.HoldCursor? = null
+    private var holdFirst = 0
+    private var holdVisible = 0
+    /** 指がポップアップの上の外・下の大きく外にある（離すとやめる）。 */
+    private var holdCancelZone = false
+    private var holdPopup: PopupWindow? = null
+    private var holdPopupView: HoldPopupView? = null
+    private var holdPopupShown = false
+    private val holdRenderer = HoldPopupRenderer(density)
 
     // ジェスチャ
     private val touchSlop = ViewConfiguration.get(context).scaledTouchSlop.toFloat()
@@ -137,7 +127,7 @@ class ChipStripView @JvmOverloads constructor(
         if (moved || downOnButton || downStoppedFling) return@Runnable
         longPressed = true
         performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
-        if (segEditing) cancelSegmentEdit() else enterSegmentEdit(downX)
+        startHold(downX)
     }
 
     /** 既存の候補欄の色（[background] = 候補欄の背景、[chip] = 候補の背景、透明なら文字色を薄く混ぜて作る）。 */
@@ -155,15 +145,8 @@ class ChipStripView @JvmOverloads constructor(
         val old = data
         data = newData
         val readingChanged = old.items.joinToString("") { it.reading } != newData.items.joinToString("") { it.reading }
-        if (segEditing) {
-            // 同じ読みのまま（モデルの反映・リランカーの再公開など）なら編集を続ける。区切りの表示はユーザーのタップのまま。
-            // 読みが変わった（打鍵・後退）・チップ列が空になった（確定など）なら抜ける（区切りはもう反映済み）。
-            if (!readingChanged && newData.items.isNotEmpty()) {
-                invalidate()
-                return
-            }
-            exitSegmentEdit()
-        }
+        // 長押し中: 同じ読みの再公開（リランカー・予測）なら続ける。読みが変わった・チップ列が空になったらやめる。
+        if (holding && (readingChanged || newData.items.isEmpty())) cancelHold()
         if (readingChanged) userScrolled = false
         // 選択中のチップ（とその表記）が変わったときだけ寄せる。手でスクロールした位置は、それ以外の更新では保つ。
         val reveal = readingChanged || focusKey(old) != focusKey(newData)
@@ -172,90 +155,139 @@ class ChipStripView @JvmOverloads constructor(
         invalidate()
     }
 
-    /** 区切り編集モードを（区切りはそのまま）抜ける。編集中でなければ何もしない。 */
-    fun exitSegmentEdit() {
-        if (!segEditing) return
-        segEditing = false
-        segLetters = emptyList()
-        segOffsets = IntArray(1)
-        segReading = ""
-        scroller.forceFinished(true)
-        relayout(reveal = true, followEnd = !userScrolled)
+    /** 長押しのポップアップを（何も変えずに）閉じる。長押し中でなければ何もしない。 */
+    fun cancelHold() {
+        if (!holding) return
+        holding = false
+        holdCursor = null
+        hideHoldPopup()
         invalidate()
     }
 
-    /** 長押しの位置 [x]（画面上）で区切り編集モードに入る。押したチップの先頭の文字が、そのチップの左端があった所に来る。 */
-    private fun enterSegmentEdit(x: Float) {
+    /** 長押しの位置 [x]（画面上）でポップアップを出す。カーソルは押した所に一番近い文字の境目。 */
+    private fun startHold(x: Float) {
         val (reading, bounds) = ChipStripLayout.segSource(data)
         val letters = ChipStripLayout.codePoints(reading)
-        if (letters.size < 2) return // 1 文字だけなら区切れる所が無い
-        val pressed = layoutSpec.chipAt(laid, x + scroll).takeIf { it >= 0 } ?: nearestChip(x + scroll)
-        val chipScreenLeft = laid.chips.getOrNull(pressed)?.left?.minus(scroll) ?: 0f
-        val chipStart = data.items.take(pressed.coerceAtLeast(0)).sumOf { it.reading.length }
-        segEditing = true
-        segReading = reading
-        segLetters = letters
-        segOffsets = ChipStripLayout.segOffsets(letters)
-        segBounds = bounds
-        segEntryBounds = bounds
-        segEntrySelected = data.selectedIndex
+        val start = ChipStripLayout.holdStartGap(laid, data, x + scroll) ?: return // 1 文字だけなら区切れる所が無い
+        holding = true
+        holdReading = reading
+        holdLetters = letters
+        holdOffsets = ChipStripLayout.segOffsets(letters)
+        holdBounds = bounds
+        holdCancelZone = false
+        val cell = HOLD_CELL_DP * density
+        holdCursor = ChipStripLayout.HoldCursor(letters.size, start, x, HOLD_STEP_DP * density)
+        val screenW = resources.displayMetrics.widthPixels.toFloat()
+        holdVisible = ((screenW - 2f * HOLD_MARGIN_DP * density - 2f * holdRenderer.pad) / cell).toInt().coerceAtLeast(2)
+        // 窓が要るときは、カーソルが押した指の所になるべく来るように
+        val preferredSlot = ((x - holdRenderer.pad) / cell).roundToInt()
+        holdFirst = ChipStripLayout.holdInitialFirst(letters.size, holdVisible, start, preferredSlot)
         scroller.forceFinished(true)
         parent?.requestDisallowInterceptTouchEvent(true)
-        val k = segOffsets.indexOfFirst { it >= chipStart }.coerceAtLeast(0)
-        scroll = ChipStripLayout.segEntryScroll(
-            cellLeft = ChipStripLayout.segCellLeft(segStart, segCellWidth, k),
-            chipScreenLeft = chipScreenLeft,
-            maxScroll = maxScroll(),
-        )
-        invalidate()
+        showHoldPopup(fingerX = x)
     }
 
-    /** もう一度長押し: 入ったときの区切り（と選択）に戻して抜ける。 */
-    private fun cancelSegmentEdit() {
-        val reading = segReading
-        val changed = segBounds != segEntryBounds
-        val entry = segEntryBounds
-        val selected = segEntrySelected
-        exitSegmentEdit()
-        if (changed) listener?.onSegmentation(reading, entry, selected)
-    }
-
-    /** 文字の境目 [gap] の区切りを入れる／消す（軽い振動）。 */
-    private fun toggleGap(gap: Int) {
-        val at = segOffsets.getOrNull(gap) ?: return
-        if (at <= 0 || at >= segReading.length) return
-        segBounds = ChipStripLayout.toggleBoundary(segBounds, at)
-        performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)
-        invalidate()
-        listener?.onSegmentation(segReading, segBounds, null)
-    }
-
-    private fun nearestChip(x: Float): Int {
-        var best = 0
-        var bestDistance = Float.MAX_VALUE
-        laid.chips.forEachIndexed { i, box ->
-            val d = abs(x - box.center)
-            if (d < bestDistance) {
-                bestDistance = d
-                best = i
-            }
+    /** 指が動いた（長押し中）。 */
+    private fun updateHold(x: Float, y: Float) {
+        val cursor = holdCursor ?: return
+        val popupH = holdRenderer.height(baseTextSize)
+        val cancel = y < -(popupH + HOLD_POPUP_GAP_DP * density) || y > height + HOLD_CANCEL_BELOW_DP * density
+        var changed = cancel != holdCancelZone
+        holdCancelZone = cancel
+        if (!cancel && cursor.move(x)) {
+            changed = true
+            holdFirst = ChipStripLayout.holdWindowFirst(holdLetters.size, holdVisible, cursor.gap, holdFirst)
+            performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
         }
-        return best
+        if (changed) refreshHoldPopup()
+    }
+
+    /** 離した: やめる所でなければカーソルの区切りを入れる／消す。 */
+    private fun finishHold() {
+        val cursor = holdCursor
+        val reading = holdReading
+        val cancel = holdCancelZone
+        val bounds = holdBounds
+        val at = cursor?.let { holdOffsets.getOrNull(it.gap) }
+        cancelHold()
+        if (cancel || at == null || at <= 0 || at >= reading.length) return
+        performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)
+        listener?.onSegmentation(reading, ChipStripLayout.toggleBoundary(bounds, at), null)
+    }
+
+    private fun holdState(): HoldPopupRenderer.State = HoldPopupRenderer.State(
+        letters = holdLetters,
+        offsets = holdOffsets,
+        bounds = holdBounds,
+        first = holdFirst,
+        visible = holdVisible.coerceAtMost(holdLetters.size),
+        gap = holdCursor?.gap ?: -1,
+        cancel = holdCancelZone,
+        background = selectedFill,
+        text = selectedText,
+        textSize = baseTextSize * HOLD_TEXT_SCALE,
+    )
+
+    /** チップ列の上（候補欄の外、PopupWindow）にポップアップを出す。出せなければチップ列の中に描く（[onDraw]）。 */
+    private fun showHoldPopup(fingerX: Float) {
+        val state = holdState()
+        val view = holdPopupView ?: HoldPopupView(context, holdRenderer).also { holdPopupView = it }
+        view.state = state
+        val w = holdRenderer.width(state).roundToInt().coerceAtLeast(1)
+        val h = holdRenderer.height(baseTextSize).roundToInt().coerceAtLeast(1)
+        holdPopupShown = runCatching {
+            if (windowToken == null || !isAttachedToWindow) return@runCatching false
+            val loc = IntArray(2)
+            getLocationInWindow(loc)
+            val screenW = resources.displayMetrics.widthPixels
+            val margin = (HOLD_MARGIN_DP * density).roundToInt()
+            // カーソルの境目が指の真上に来る位置（画面からはみ出さないように丸める）
+            val cursorInPopup = holdRenderer.gapX(state, state.gap)
+            val x = (loc[0] + fingerX - cursorInPopup).roundToInt().coerceIn(margin, (screenW - w - margin).coerceAtLeast(margin))
+            val y = loc[1] - h - (HOLD_POPUP_GAP_DP * density).roundToInt()
+            val popup = holdPopup ?: PopupWindow(view, w, h, false).apply {
+                isTouchable = false
+                isFocusable = false
+                isClippingEnabled = false
+                setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
+                animationStyle = 0
+                inputMethodMode = PopupWindow.INPUT_METHOD_NOT_NEEDED
+            }.also { holdPopup = it }
+            popup.width = w
+            popup.height = h
+            if (popup.isShowing) popup.update(x, y, w, h) else popup.showAtLocation(this, Gravity.NO_GRAVITY, x, y)
+            view.invalidate()
+            popup.isShowing
+        }.getOrElse { e ->
+            Timber.w(e, "chip hold popup failed")
+            false
+        }
+        invalidate()
+    }
+
+    private fun refreshHoldPopup() {
+        val state = holdState()
+        holdPopupView?.let {
+            it.state = state
+            it.invalidate()
+        }
+        if (!holdPopupShown) invalidate()
+    }
+
+    private fun hideHoldPopup() {
+        runCatching { holdPopup?.dismiss() }
+        holdPopupShown = false
     }
 
     private fun focusKey(d: ChipStripData) = d.selectedIndex to d.items.getOrNull(d.selectedIndex)
 
     private fun availableWidth(): Float = contentRight()
 
-    private fun contentWidth(): Float =
-        if (segEditing) ChipStripLayout.segWidth(segStart, segCellWidth, segLetters.size) else laid.width
-
-    private fun maxScroll(): Float = (contentWidth() - availableWidth()).coerceAtLeast(0f)
+    private fun maxScroll(): Float = (laid.width - availableWidth()).coerceAtLeast(0f)
 
     override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
         super.onSizeChanged(w, h, oldw, oldh)
         relayout()
-        if (segEditing) scroll = scroll.coerceIn(0f, maxScroll())
     }
 
     private fun relayout(reveal: Boolean = true, followEnd: Boolean = !userScrolled) {
@@ -268,9 +300,7 @@ class ChipStripView @JvmOverloads constructor(
             result = layoutSpec.layout(data) { textPaint.measureText(it) }
         }
         laid = result
-        if (!segEditing) {
-            scroll = layoutSpec.scrollFor(result, data, available, scroll, reveal = reveal, followEnd = followEnd)
-        }
+        scroll = layoutSpec.scrollFor(result, data, available, scroll, reveal = reveal, followEnd = followEnd)
     }
 
     override fun computeScroll() {
@@ -287,11 +317,6 @@ class ChipStripView @JvmOverloads constructor(
         if (data.items.isEmpty()) return
         val h = height.toFloat()
         val vPad = (h * 0.14f).coerceAtMost(8f * density)
-        if (segEditing) {
-            drawDone(canvas, h, vPad)
-            drawSegmentEdit(canvas, h, vPad)
-            return
-        }
         val radius = (h - vPad * 2f) / 2f
         val baseline = h / 2f - (textPaint.descent() + textPaint.ascent()) / 2f
         drawConfirm(canvas, h, vPad)
@@ -307,60 +332,15 @@ class ChipStripView @JvmOverloads constructor(
             canvas.drawText(item.label, box.left + layoutSpec.chipPadding, baseline, textPaint)
         }
         canvas.restore()
-    }
-
-    /**
-     * 区切り編集モード: 区切りで分けた塊ごとに角丸の背景、かなは同じ幅のマスの中央、区切りは太い縦線（選択色）、
-     * 区切りでない文字の間は薄い短い線（タップできる所の目印）。線はマスの境目に描くので幅を取らない。
-     */
-    private fun drawSegmentEdit(canvas: Canvas, h: Float, vPad: Float) {
-        val n = segLetters.size
-        if (n == 0) return
-        canvas.save()
-        canvas.clipRect(0f, 0f, contentRight(), h)
-        canvas.translate(-scroll, 0f)
-        val inset = 2.5f * density
-        val radius = 8f * density
-        // 塊の背景
-        fillPaint.color = chipFill
-        var segFrom = 0
-        for (k in 1..n) {
-            if (k == n || segOffsets[k] in segBounds) {
-                rect.set(
-                    ChipStripLayout.segCellLeft(segStart, segCellWidth, segFrom) + inset,
-                    vPad,
-                    ChipStripLayout.segCellLeft(segStart, segCellWidth, k) - inset,
-                    h - vPad,
-                )
-                canvas.drawRoundRect(rect, radius, radius, fillPaint)
-                segFrom = k
-            }
+        if (holding && !holdPopupShown) {
+            // ポップアップが出せないとき: チップ列の上に重ねて描く（高さは上段に合わせて縮める）
+            val state = holdState().copy(textSize = (h * 0.5f).coerceAtMost(baseTextSize * HOLD_TEXT_SCALE))
+            val w = holdRenderer.width(state).coerceAtMost(contentRight())
+            canvas.save()
+            canvas.translate(((contentRight() - w) / 2f).coerceAtLeast(0f), 0f)
+            holdRenderer.draw(canvas, state, w, h)
+            canvas.restore()
         }
-        // かな
-        val maxLetter = segLetters.maxOf { segTextPaint.apply { textSize = baseTextSize }.measureText(it) }
-        segTextPaint.textSize = if (maxLetter > segCellWidth - 2f * inset) {
-            baseTextSize * ((segCellWidth - 2f * inset) / maxLetter).coerceAtLeast(0.5f)
-        } else baseTextSize
-        segTextPaint.color = chipText
-        val baseline = h / 2f - (segTextPaint.descent() + segTextPaint.ascent()) / 2f
-        segLetters.forEachIndexed { k, letter ->
-            val left = ChipStripLayout.segCellLeft(segStart, segCellWidth, k)
-            canvas.drawText(letter, left + (segCellWidth - segTextPaint.measureText(letter)) / 2f, baseline, segTextPaint)
-        }
-        // 境目の線
-        for (k in 1 until n) {
-            val x = ChipStripLayout.segCellLeft(segStart, segCellWidth, k)
-            if (segOffsets[k] in segBounds) {
-                linePaint.color = selectedFill
-                linePaint.strokeWidth = 3f * density
-                canvas.drawLine(x, 2f * density, x, h - 2f * density, linePaint)
-            } else {
-                linePaint.color = ColorUtils.setAlphaComponent(chipText, 0x40)
-                linePaint.strokeWidth = 1f * density
-                canvas.drawLine(x, h - vPad - 8f * density, x, h - vPad - 2f * density, linePaint)
-            }
-        }
-        canvas.restore()
     }
 
     /** 右端の確定ボタン（丸の中にチェック）。 */
@@ -376,20 +356,6 @@ class ChipStripView @JvmOverloads constructor(
         canvas.drawLine(cx - s * 0.25f, cy + s * 0.7f, cx + s, cy - s * 0.6f, checkPaint)
     }
 
-    /** 区切り編集モードの「完了」ボタン（確定ボタンの場所、角丸に文字）。 */
-    private fun drawDone(canvas: Canvas, h: Float, vPad: Float) {
-        val right = width - 2f * density
-        val left = right - doneWidth + 4f * density
-        rect.set(left, vPad, right, h - vPad)
-        fillPaint.color = selectedFill
-        val r = (h - vPad * 2f) / 2f
-        canvas.drawRoundRect(rect, r, r, fillPaint)
-        buttonTextPaint.color = selectedText
-        val label = DONE_LABEL
-        val baseline = h / 2f - (buttonTextPaint.descent() + buttonTextPaint.ascent()) / 2f
-        canvas.drawText(label, rect.centerX() - buttonTextPaint.measureText(label) / 2f, baseline, buttonTextPaint)
-    }
-
     @SuppressLint("ClickableViewAccessibility")
     override fun onTouchEvent(event: MotionEvent): Boolean {
         if (event.actionMasked == MotionEvent.ACTION_DOWN) {
@@ -399,6 +365,7 @@ class ChipStripView @JvmOverloads constructor(
         velocityTracker?.addMovement(event)
         when (event.actionMasked) {
             MotionEvent.ACTION_DOWN -> {
+                cancelHold()
                 downX = event.x
                 downY = event.y
                 moved = false
@@ -415,6 +382,10 @@ class ChipStripView @JvmOverloads constructor(
             }
 
             MotionEvent.ACTION_MOVE -> {
+                if (holding) {
+                    updateHold(event.x, event.y)
+                    return true
+                }
                 val dx = event.x - downX
                 val dy = event.y - downY
                 if (!moved && (abs(dx) > touchSlop || abs(dy) > touchSlop)) {
@@ -431,10 +402,15 @@ class ChipStripView @JvmOverloads constructor(
 
             MotionEvent.ACTION_UP -> {
                 removeCallbacks(longPressRunnable)
+                if (holding) {
+                    updateHold(event.x, event.y)
+                    finishHold()
+                    return true
+                }
                 if (downOnButton) {
                     if (!moved && event.x >= contentRight()) {
                         performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)
-                        if (segEditing) exitSegmentEdit() else listener?.onConfirm()
+                        listener?.onConfirm()
                     }
                     return true
                 }
@@ -445,18 +421,14 @@ class ChipStripView @JvmOverloads constructor(
                     return true
                 }
                 if (moved) return true
-                if (segEditing) {
-                    ChipStripLayout.segGapAt(event.x + scroll, segStart, segCellWidth, segLetters.size)?.let(::toggleGap)
+                val x = event.x + scroll
+                val join = layoutSpec.joinAt(laid, x, joinEdgeSlop)
+                if (join != null) {
+                    performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)
+                    listener?.onJoin(join)
                 } else {
-                    val x = event.x + scroll
-                    val join = layoutSpec.joinAt(laid, x, joinEdgeSlop)
-                    if (join != null) {
-                        performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)
-                        listener?.onJoin(join)
-                    } else {
-                        val index = layoutSpec.chipAt(laid, x)
-                        if (index >= 0) listener?.onChipTap(index)
-                    }
+                    val index = layoutSpec.chipAt(laid, x)
+                    if (index >= 0) listener?.onChipTap(index)
                 }
                 performClick()
                 return true
@@ -465,6 +437,7 @@ class ChipStripView @JvmOverloads constructor(
             MotionEvent.ACTION_CANCEL -> {
                 removeCallbacks(longPressRunnable)
                 scrolling = false
+                cancelHold()
                 return true
             }
         }
@@ -498,12 +471,13 @@ class ChipStripView @JvmOverloads constructor(
 
     override fun onVisibilityAggregated(isVisible: Boolean) {
         super.onVisibilityAggregated(isVisible)
-        if (!isVisible) exitSegmentEdit()
+        if (!isVisible) cancelHold()
     }
 
     override fun onDetachedFromWindow() {
         removeCallbacks(longPressRunnable)
-        segEditing = false
+        cancelHold()
+        holdPopup = null
         scroller.forceFinished(true)
         velocityTracker?.recycle()
         velocityTracker = null
@@ -512,7 +486,142 @@ class ChipStripView @JvmOverloads constructor(
 
     companion object {
         const val MIN_TEXT_SCALE = 0.7f
-        const val DONE_LABEL = "完了"
         const val JOIN_EDGE_SLOP_DP = 6f
+        /** ポップアップの 1 字のマスの幅。 */
+        const val HOLD_CELL_DP = 30f
+        /** カーソルを 1 境目動かす指の横の移動量（≒ 1 字のマス）。 */
+        const val HOLD_STEP_DP = 26f
+        /** ポップアップの文字の大きさ（チップの文字に対する倍率）。 */
+        const val HOLD_TEXT_SCALE = 1.35f
+        /** ポップアップとチップ列の間・画面の端との余白。 */
+        const val HOLD_POPUP_GAP_DP = 6f
+        const val HOLD_MARGIN_DP = 6f
+        /** 指をチップ列の下へこれ以上外すと「やめる」。 */
+        const val HOLD_CANCEL_BELOW_DP = 48f
+    }
+}
+
+/**
+ * 長押しの区切りポップアップの描画（PopupWindow の中と、出せないときのチップ列の中で共通）。
+ * かなは同じ幅のマス、今の区切りは選択文字色の太い棒、区切りでない境目は薄い短い線、カーソルは太い棒＋上下の三角、
+ * 右上に離したときの動作（切る / つなぐ / やめる）。
+ */
+internal class HoldPopupRenderer(private val density: Float) {
+    data class State(
+        val letters: List<String>,
+        val offsets: IntArray,
+        val bounds: Set<Int>,
+        val first: Int,
+        val visible: Int,
+        val gap: Int,
+        val cancel: Boolean,
+        val background: Int,
+        val text: Int,
+        val textSize: Float,
+    )
+
+    val pad: Float = 10f * density
+    private val cell: Float = ChipStripView.HOLD_CELL_DP * density
+    private val paint = Paint(Paint.ANTI_ALIAS_FLAG)
+    private val hintPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { isFakeBoldText = true }
+    private val fill = Paint(Paint.ANTI_ALIAS_FLAG)
+    private val line = Paint(Paint.ANTI_ALIAS_FLAG).apply { strokeCap = Paint.Cap.ROUND }
+    private val rect = RectF()
+    private val path = android.graphics.Path()
+
+    fun width(state: State): Float = pad * 2f + cell * state.visible
+    fun height(baseTextSize: Float): Float = baseTextSize * ChipStripView.HOLD_TEXT_SCALE * 1.9f + 14f * density
+
+    /** 境目 [gap] のポップアップ内の x。 */
+    fun gapX(state: State, gap: Int): Float = pad + cell * (gap - state.first)
+
+    fun draw(canvas: Canvas, state: State, w: Float, h: Float) {
+        rect.set(0f, 0f, w, h)
+        fill.color = state.background
+        val r = 12f * density
+        canvas.drawRoundRect(rect, r, r, fill)
+        val hintSize = 11f * density
+        hintPaint.textSize = hintSize
+        val top = hintSize + 4f * density
+        val last = (state.first + state.visible).coerceAtMost(state.letters.size)
+        // かな
+        paint.textSize = state.textSize
+        val maxLetter = state.letters.subList(state.first, last).maxOfOrNull { paint.measureText(it) } ?: 0f
+        if (maxLetter > cell - 2f * density) paint.textSize = state.textSize * ((cell - 2f * density) / maxLetter).coerceAtLeast(0.5f)
+        val alpha = if (state.cancel) 0x80 else 0xFF
+        paint.color = ColorUtils.setAlphaComponent(state.text, alpha)
+        val mid = top + (h - top) / 2f
+        val baseline = mid - (paint.descent() + paint.ascent()) / 2f
+        for (k in state.first until last) {
+            val left = pad + cell * (k - state.first)
+            val letter = state.letters[k]
+            canvas.drawText(letter, left + (cell - paint.measureText(letter)) / 2f, baseline, paint)
+        }
+        // 窓の外に続きがあれば端に「…」
+        hintPaint.color = ColorUtils.setAlphaComponent(state.text, 0xAA)
+        if (state.first > 0) canvas.drawText("…", 2f * density, baseline, hintPaint)
+        if (last < state.letters.size) canvas.drawText("…", w - pad + 1f * density, baseline, hintPaint)
+        // 境目
+        val y0 = top + 3f * density
+        val y1 = h - 4f * density
+        for (k in (state.first + 1) until last) {
+            val x = pad + cell * (k - state.first)
+            if (state.offsets[k] in state.bounds) {
+                line.color = ColorUtils.setAlphaComponent(state.text, alpha)
+                line.strokeWidth = 2.5f * density
+                canvas.drawLine(x, y0 + 4f * density, x, y1 - 4f * density, line)
+            } else {
+                line.color = ColorUtils.setAlphaComponent(state.text, 0x50)
+                line.strokeWidth = 1f * density
+                canvas.drawLine(x, y1 - 8f * density, x, y1 - 3f * density, line)
+            }
+        }
+        // カーソル
+        val onBoundary = state.gap in 1 until state.letters.size && state.offsets[state.gap] in state.bounds
+        if (!state.cancel && state.gap in (state.first + 1) until last) {
+            val x = gapX(state, state.gap)
+            line.color = state.text
+            line.strokeWidth = 4f * density
+            if (onBoundary) {
+                // 区切りの上: 離すと消す → 棒に × を重ねる
+                canvas.drawLine(x, y0, x, y1, line)
+                val s = 5f * density
+                line.strokeWidth = 2.2f * density
+                canvas.drawLine(x - s, mid - s, x + s, mid + s, line)
+                canvas.drawLine(x - s, mid + s, x + s, mid - s, line)
+            } else {
+                canvas.drawLine(x, y0, x, y1, line)
+            }
+            val t = 5f * density
+            fill.color = state.text
+            path.reset()
+            path.moveTo(x - t, y0 - t * 0.2f); path.lineTo(x + t, y0 - t * 0.2f); path.lineTo(x, y0 + t); path.close()
+            canvas.drawPath(path, fill)
+        }
+        // 右上: 離したときの動作
+        val hint = when {
+            state.cancel -> HINT_CANCEL
+            onBoundary -> HINT_JOIN
+            else -> HINT_CUT
+        }
+        hintPaint.color = state.text
+        canvas.drawText(hint, w - pad - hintPaint.measureText(hint), hintSize + 1f * density, hintPaint)
+    }
+
+    companion object {
+        const val HINT_CUT = "離すと区切る"
+        const val HINT_JOIN = "離すとつなぐ"
+        const val HINT_CANCEL = "やめる"
+    }
+}
+
+/** ポップアップの中身（PopupWindow に載せる。タッチは取らない）。 */
+private class HoldPopupView(context: Context, private val renderer: HoldPopupRenderer) : View(context) {
+    var state: HoldPopupRenderer.State? = null
+
+    override fun onDraw(canvas: Canvas) {
+        super.onDraw(canvas)
+        val s = state ?: return
+        renderer.draw(canvas, s, width.toFloat(), height.toFloat())
     }
 }

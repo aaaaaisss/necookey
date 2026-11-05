@@ -1,15 +1,16 @@
 package com.kazumaproject.markdownhelperkeyboard.ime_service.candidatebar
 
 import com.kazumaproject.markdownhelperkeyboard.converter.candidatebar.ChipStripData
+import kotlin.math.abs
 
 /**
  * 文節チップ列の並べ方と当たり判定（Android なし。文字幅は [measure] で注入）。
  *
  * - 普段: チップ = 左右に [chipPadding] を付けた表記。チップの間は [gap]。チップの上のタップ = 選択、
  *   2 つのチップの間（[joinAt]: 隙間＋両側のチップ端の細い帯）のタップ = くっつける（2026-11-04 復活）。
- * - 区切り編集モード（長押しで入る。docs/CHIP_BAR.md「2026-11-02 区切り編集モード」）: 読み全体をかな 1 文字ずつ、
- *   同じ幅のマス（[segCellLeft]）に並べる。区切りの縦線は幅を取らない（マスの境目に描く）ので、区切りを足しても消しても
- *   文字は動かない。タップは一番近い文字の境目（[segGapAt]、磁石なし）の区切りを入れる／消す（[toggleBoundary]）。
+ * - 長押し（docs/CHIP_BAR.md「2026-11-05 長押しの区切りポップアップ」）: チップ列の上に読みのかなを大きく出し、押した所に一番近い
+ *   文字の境目（[holdStartGap]）にカーソル。指を置いたまま横に動かすとカーソルが相対的に動き（[HoldCursor]）、離すとそこの区切りを
+ *   入れる／消す（[toggleBoundary]）。長い読みは窓（[holdWindowFirst]）で見せる。
  */
 class ChipStripLayout(
     val chipPadding: Float,
@@ -136,32 +137,84 @@ class ChipStripLayout(
             return out
         }
 
-        /** マス k の左端（全マス同じ幅 [cellWidth]、先頭は [start]）。k = 文字数 で右端。 */
-        fun segCellLeft(start: Float, cellWidth: Float, k: Int): Float = start + cellWidth * k
-
-        /** マス全体の幅（左右の余白 [start] 込み）。 */
-        fun segWidth(start: Float, cellWidth: Float, count: Int): Float = start * 2f + cellWidth * count
-
-        /**
-         * 指の [x]（チップ列の座標）に一番近い文字の境目（1..[count]−1）。マスの外（左右の余白より外）や 1 文字以下は null。
-         * 吸い付き・磁石は無い（押した所の一番近い境目）。
-         */
-        fun segGapAt(x: Float, start: Float, cellWidth: Float, count: Int): Int? {
-            if (count < 2 || cellWidth <= 0f) return null
-            if (x < start || x > start + cellWidth * count) return null
-            val k = Math.round((x - start) / cellWidth)
-            return k.coerceIn(1, count - 1)
-        }
-
         /** 区切り（読みの位置）[at] を入れる／消す。 */
         fun toggleBoundary(bounds: Set<Int>, at: Int): Set<Int> =
             if (at in bounds) bounds - at else bounds + at
 
+        // ---- 長押しの区切りポップアップ（2026-11-05） ----
+
         /**
-         * 区切り編集モードに入ったとき、指の下の文字が大きく跳ばないスクロール量: 押したチップの先頭の文字のマスを、
-         * 押したチップの左端があった画面位置 [chipScreenLeft] に置く（0..[maxScroll] に収める）。
+         * 長押しした所に一番近い文字の境目（1..文字数−1、文字単位）。チップの上なら、そのチップの表記の幅のうち押した割合を
+         * チップの読みの文字数に当てて丸める（チップの両端 = その区切り）。チップの外（隙間・余白）なら一番近いチップの端。
+         * 読みが 1 文字以下なら null。
          */
-        fun segEntryScroll(cellLeft: Float, chipScreenLeft: Float, maxScroll: Float): Float =
-            (cellLeft - chipScreenLeft).coerceIn(0f, maxScroll.coerceAtLeast(0f))
+        fun holdStartGap(laid: Laid, data: ChipStripData, x: Float): Int? {
+            val counts = data.items.map { codePoints(it.reading).size }
+            val total = counts.sum()
+            if (total < 2 || laid.chips.isEmpty()) return null
+            var i = laid.chips.indexOfFirst { x in it }
+            val frac: Float
+            if (i < 0) {
+                // 一番近いチップの近い方の端
+                var best = 0
+                var bestD = Float.MAX_VALUE
+                laid.chips.forEachIndexed { k, box ->
+                    val d = minOf(abs(x - box.left), abs(x - box.right))
+                    if (d < bestD) { bestD = d; best = k }
+                }
+                i = best
+                frac = if (abs(x - laid.chips[i].left) <= abs(x - laid.chips[i].right)) 0f else 1f
+            } else {
+                val box = laid.chips[i]
+                frac = if (box.width > 0f) ((x - box.left) / box.width).coerceIn(0f, 1f) else 0.5f
+            }
+            val before = counts.take(i.coerceAtMost(counts.size)).sum()
+            val inChip = Math.round(frac * counts.getOrElse(i) { 0 })
+            return (before + inChip).coerceIn(1, total - 1)
+        }
+
+        /**
+         * ポップアップに出す文字の範囲の先頭: 全部入れば 0。入らなければ今の [first] を保ち、カーソル [gap] が
+         * 窓の端（両端の境目の 1 つ内側）を越えたときだけ 1 字ずつずらす（文字はふだん動かない）。
+         */
+        fun holdWindowFirst(count: Int, visible: Int, gap: Int, first: Int): Int {
+            if (visible <= 0 || count <= visible) return 0
+            var f = first.coerceIn(0, count - visible)
+            if (gap < f + 1) f = gap - 1
+            if (gap > f + visible - 1) f = gap - visible + 1
+            return f.coerceIn(0, count - visible)
+        }
+
+        /** 窓の先頭の初期値: カーソル [gap] が窓の中のなるべく [preferredSlot] 番目の境目に来るように。 */
+        fun holdInitialFirst(count: Int, visible: Int, gap: Int, preferredSlot: Int): Int {
+            if (visible <= 0 || count <= visible) return 0
+            return holdWindowFirst(count, visible, gap, gap - preferredSlot.coerceIn(1, visible - 1))
+        }
+    }
+
+    /**
+     * 長押し中のカーソル（相対移動）: 指の横の移動量 [step] ごとに境目を 1 つ動かす（スペースキーのカーソル移動と同じ。
+     * 指の絶対位置には合わせないので、ポップアップの文字が動かず、ずれも溜まらない。磁石なし）。端（1 / 文字数−1）で止まったら
+     * そこで基準を取り直すので、戻すとすぐ動く。
+     */
+    class HoldCursor(private val count: Int, startGap: Int, startX: Float, private val step: Float) {
+        var gap: Int = startGap.coerceIn(1, (count - 1).coerceAtLeast(1))
+            private set
+        private var anchorGap = gap
+        private var anchorX = startX
+
+        /** 指が [x] に来た。境目が変わったら true。 */
+        fun move(x: Float): Boolean {
+            if (count < 2 || step <= 0f) return false
+            val raw = anchorGap + ((x - anchorX) / step).let { if (it >= 0f) (it + 0.5f).toInt() else -((-it + 0.5f).toInt()) }
+            val g = raw.coerceIn(1, count - 1)
+            if (g != raw) {
+                anchorGap = g
+                anchorX = x
+            }
+            if (g == gap) return false
+            gap = g
+            return true
+        }
     }
 }

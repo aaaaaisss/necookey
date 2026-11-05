@@ -4,10 +4,12 @@ import com.kazumaproject.markdownhelperkeyboard.converter.candidatebar.ChipStrip
 import com.kazumaproject.markdownhelperkeyboard.converter.candidatebar.ChipStripItem
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Assert.assertNull
 import org.junit.Test
 
-/** チップ列の並べ方と当たり判定（1 文字 = 10px で測る）、区切り編集モードの純粋な部分。 */
+/** チップ列の並べ方と当たり判定（1 文字 = 10px で測る）、長押しの区切りポップアップの純粋な部分。 */
 class ChipStripLayoutTest {
 
     private val spec = ChipStripLayout(chipPadding = 10f, gap = 6f)
@@ -98,7 +100,7 @@ class ChipStripLayoutTest {
         assertEquals(0f, spec.revealScroll(wide, 0, 100f, 150f))
     }
 
-    // ---- 区切り編集モード ----
+    // ---- 長押しの区切りポップアップ ----
 
     private fun item(label: String, reading: String) = ChipStripItem(label, false, reading = reading)
 
@@ -120,30 +122,6 @@ class ChipStripLayoutTest {
     }
 
     @Test
-    fun segGapAtPicksNearestGapWithoutSnap() {
-        // マス幅 30、先頭 8: 境目 k の x = 8 + 30k（k = 1..4 が切れる所、5 文字）
-        fun gap(x: Float) = ChipStripLayout.segGapAt(x, start = 8f, cellWidth = 30f, count = 5)
-        assertEquals(1, gap(38f))
-        assertEquals(1, gap(30f)) // 1 マス目の右寄り → 境目 1
-        assertEquals(1, gap(52f)) // 境目 1 と 2 の中間（53）より左
-        assertEquals(2, gap(54f))
-        assertEquals(4, gap(150f)) // 末尾のマス → 一番近い切れる所（境目 4）
-        assertEquals(1, gap(9f)) // 先頭のマス → 境目 1
-        assertNull(gap(7f)) // マスの外
-        assertNull(gap(159f))
-        assertNull(ChipStripLayout.segGapAt(20f, 8f, 30f, 1)) // 1 文字は区切れない
-        // どの境目にもちょうどその上をタップすれば届く
-        for (k in 1..4) assertEquals(k, gap(8f + 30f * k))
-    }
-
-    @Test
-    fun cellsDoNotMoveWhenBoundariesChange() {
-        // マスの位置は区切りに依存しない（引数に区切りが無い）。幅も文字数だけで決まる
-        assertEquals(8f + 30f * 3, ChipStripLayout.segCellLeft(8f, 30f, 3))
-        assertEquals(16f + 150f, ChipStripLayout.segWidth(8f, 30f, 5))
-    }
-
-    @Test
     fun toggleBoundaryAddsAndRemoves() {
         val b = setOf(2, 5)
         assertEquals(setOf(2, 5, 3), ChipStripLayout.toggleBoundary(b, 3))
@@ -152,11 +130,43 @@ class ChipStripLayoutTest {
     }
 
     @Test
-    fun segEntryScrollKeepsPressedChipInPlace() {
-        // 押したチップの先頭の文字のマス（左端 98）を、チップの左端があった画面位置 40 に置く → 58
-        assertEquals(58f, ChipStripLayout.segEntryScroll(cellLeft = 98f, chipScreenLeft = 40f, maxScroll = 300f))
-        assertEquals(0f, ChipStripLayout.segEntryScroll(10f, 40f, 300f)) // 左端より前には行かない
-        assertEquals(30f, ChipStripLayout.segEntryScroll(200f, 0f, 30f)) // 最大で止める
-        assertEquals(0f, ChipStripLayout.segEntryScroll(200f, 0f, -5f)) // はみ出していない
+    fun holdStartGapMapsPressFractionToReadingLetters() {
+        // では[6,46) 着物[52,92)、読み では|きもの（5 字、境目 1..4）
+        val data = ChipStripData(listOf(item("では", "では"), item("着物", "きもの")))
+        val laid = spec.layout(data, measure)
+        assertEquals(1, ChipStripLayout.holdStartGap(laid, data, 26f)) // では の真ん中 → で|は
+        assertEquals(1, ChipStripLayout.holdStartGap(laid, data, 7f)) // 左端は境目 0 → 1 に丸める
+        assertEquals(2, ChipStripLayout.holdStartGap(laid, data, 45f)) // では の右端 = 区切り
+        assertEquals(2, ChipStripLayout.holdStartGap(laid, data, 49f)) // 隙間 = 区切り
+        assertEquals(3, ChipStripLayout.holdStartGap(laid, data, 65f)) // 着物 の 1/3 → き|もの
+        assertEquals(4, ChipStripLayout.holdStartGap(laid, data, 91f)) // 末尾 → 4 に丸める
+        assertNull(ChipStripLayout.holdStartGap(spec.layout(ChipStripData(listOf(item("木", "き"))), measure), ChipStripData(listOf(item("木", "き"))), 10f))
+    }
+
+    @Test
+    fun holdCursorMovesRelativelyAndReanchorsAtEnds() {
+        val c = ChipStripLayout.HoldCursor(count = 6, startGap = 2, startX = 100f, step = 20f)
+        assertEquals(2, c.gap)
+        assertFalse(c.move(109f)) // 半歩未満は動かない
+        assertTrue(c.move(111f)); assertEquals(3, c.gap)
+        assertTrue(c.move(160f)); assertEquals(5, c.gap) // 端で止まる（3 歩分 = 5）
+        c.move(300f); assertEquals(5, c.gap)
+        // 端で基準を取り直したので、戻すとすぐ動く
+        assertTrue(c.move(280f)); assertEquals(4, c.gap)
+        c.move(-500f); assertEquals(1, c.gap)
+        assertTrue(c.move(-480f)); assertEquals(2, c.gap)
+    }
+
+    @Test
+    fun holdWindowShiftsOnlyAtEdges() {
+        assertEquals(0, ChipStripLayout.holdWindowFirst(count = 5, visible = 8, gap = 3, first = 2)) // 全部入る
+        // 20 字を 8 マスで: 窓 [4,12) の境目 5..11 の間は動かない
+        assertEquals(4, ChipStripLayout.holdWindowFirst(20, 8, 7, 4))
+        assertEquals(4, ChipStripLayout.holdWindowFirst(20, 8, 11, 4))
+        assertEquals(5, ChipStripLayout.holdWindowFirst(20, 8, 12, 4))
+        assertEquals(3, ChipStripLayout.holdWindowFirst(20, 8, 4, 4))
+        assertEquals(12, ChipStripLayout.holdWindowFirst(20, 8, 19, 15)) // 最後まで
+        assertEquals(6, ChipStripLayout.holdInitialFirst(20, 8, gap = 9, preferredSlot = 3))
+        assertEquals(0, ChipStripLayout.holdInitialFirst(20, 8, gap = 2, preferredSlot = 5))
     }
 }

@@ -1640,7 +1640,7 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
     @Volatile
     private var chipBarState: ChipBarState? = null
 
-    /** 区切り編集モードで最後にタップした区切り（読み、区切り、選択）。[ChipStripView.Listener.onSegmentation]。 */
+    /** 長押しの区切りポップアップで最後に指定した区切り（読み、区切り、選択）。[ChipStripView.Listener.onSegmentation]。 */
     @Volatile
     private var chipBarSegmentTarget: Triple<String, Set<Int>, Int?>? = null
     private var chipBarModel: ChipBarModel? = null
@@ -14101,7 +14101,7 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         if (insertString.isEmpty() || !isChipBarMode() || currentInputModeForSession != InputMode.ModeJapanese) {
             return false
         }
-        mainView.necookeyChipStrip.exitSegmentEdit() // 区切り編集モード中なら抜ける（区切りはもう反映済み）
+        mainView.necookeyChipStrip.cancelHold() // 長押しの区切りポップアップ中なら閉じる（何も変えない）
         runChipBarOp(waitForStateMs = CHIP_SPACE_WAIT_MS, onTimeout = {
             val suggestions = suggestionAdapter?.suggestions ?: emptyList()
             if (inputString.value == insertString && suggestions.isNotEmpty()) {
