@@ -42,8 +42,8 @@
     <string name="st_wikipedia">Wikipedia</string>
     <string name="st_section_screen_context">画面の文脈</string>
     <string name="st_screen_context_accessibility">画面に見えている語を変換に使う</string>
-    <string name="st_screen_context_accessibility_summary">ユーザー補助で前面アプリの文字を読み、出てくる語を変換候補の順位付けに少しだけ使います。数分で消え、保存・送信はしません（パスワード欄は読みません）。オンにするとユーザー補助の設定画面を開きます。</string>
-    <string name="screen_context_accessibility_description">necookey キーボードの変換で、画面に見えている語（漢字・カタカナ）を候補の順位付けに少しだけ使います。読んだ文字はメモリだけに数分置いて消し、保存も送信もしません。パスワード欄は読みません。設定の「画面の文脈」でも切り替えられます。</string>
+    <string name="st_screen_context_accessibility_summary">キーボードが出ている間だけ、いま入力しているアプリの画面から漢字・カタカナ 2 字以上の語を取り出し、変換候補の順位付けに少しだけ使います。元の文章は残さず、語もメモリだけに 3 分（キーボードを閉じると消去）。保存・送信はしません。パスワード欄・入力欄、通知やほかのアプリの画面、パスワード管理・銀行・決済・認証アプリは読みません。オンにするとユーザー補助の設定画面を開きます。</string>
+    <string name="screen_context_accessibility_description">necookey キーボードが出ている間だけ、いま入力しているアプリの画面から漢字・カタカナ 2 字以上の語を取り出し、変換候補の順位付けに少しだけ使います。元の文章は残しません。語はメモリだけに 3 分置き、キーボードを閉じると消します。保存・送信はしません（アプリにネットワーク権限はありません）。パスワード欄・入力欄、通知・システム画面・ほかのアプリの画面、パスワード管理・銀行・決済・認証アプリは読みません。設定の「画面の文脈」でも切り替えられます。</string>
     <string name="st_section_next_word">次の言葉の学習</string>
     <string name="st_next_word_list">学習した組み合わせ</string>
     <string name="st_next_word_count">%1$d 件</string>
@@ -129,4 +129,31 @@
 
     <!-- 配列 -->
     <string name="st_layouts_empty">配列はまだありません</string>
+    <string name="st_section_correction_log">変換ミスの記録</string>
+    <string name="st_correction_log">変換ミスの記録</string>
+    <string name="st_correction_log_summary">別の候補を選んだ・区切りを直した・かなに戻したときに、読み・最初の変換・確定した表記をこの端末だけに最新 200 件残します（アプリ名は残さず、送信しません。パスワード欄・シークレットでは残しません）。</string>
+    <string name="st_correction_log_view">記録を見る（%1$d 件）</string>
+    <string name="st_correction_log_view_title">変換ミスの記録</string>
+    <string name="st_correction_log_empty">まだ記録はありません。</string>
+    <string name="st_correction_log_copy">全部コピー</string>
+    <string name="st_correction_log_copied">コピーしました（読み・最初の変換・確定・直し方・ctx をタブ区切りで 1 件 1 行）</string>
+    <string name="st_correction_log_clear">消去</string>
+    <string name="st_correction_log_close">閉じる</string>
+    <string name="st_correction_log_cleared">記録を消去しました</string>
+    <string name="st_screen_context_status">画面の文脈の状態（タップで更新）</string>
+    <string name="st_screen_context_status_summary">ユーザー補助: %1$s ／ 今ある語: 画面 %2$d・入力欄の前後 %3$d・最近の確定 %4$d ／ 直近 %5$d 回の変換のうち文脈で 1 位が変わった %6$d 回（メモリだけ、アプリを閉じると消えます）</string>
+    <string name="st_screen_context_connected">接続中</string>
+    <string name="st_screen_context_not_connected">未接続</string>
+    <string name="st_section_sumire_lm_table">変換の表（リランカー）</string>
+    <string name="st_sumire_lm_table_import">変換の表（リランカー）を読み込む</string>
+    <string name="st_sumire_lm_table_loaded">読み込み済み（%1$s）。タップで別の zip から読み込み直します</string>
+    <string name="st_sumire_lm_table_not_loaded">未読み込み。sumire_lm_h56.zip を選ぶと読み込みます（無くても変換は使えます）</string>
+    <string name="st_sumire_lm_table_importing">読み込み中… %1$d%%</string>
+    <string name="st_sumire_lm_table_done">変換の表を読み込みました（%1$s）。すぐに使われます</string>
+    <string name="st_sumire_lm_table_hash_warning">sha256 が既定の表（h56）と違います。中身に meta.tsv があるので読み込みました</string>
+    <string name="st_sumire_lm_table_invalid">この zip は変換の表ではありません（meta.tsv がありません）</string>
+    <string name="st_sumire_lm_table_failed">読み込めませんでした: %1$s</string>
+    <string name="st_sumire_lm_table_delete">変換の表を削除</string>
+    <string name="st_sumire_lm_table_delete_confirm">変換の表（リランカー）を削除しますか？ 変換は表なしで続けて使えます。</string>
+    <string name="st_sumire_lm_table_deleted">変換の表を削除しました</string>
 </resources>

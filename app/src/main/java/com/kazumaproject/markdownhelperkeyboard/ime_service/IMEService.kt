@@ -183,10 +183,12 @@ import com.kazumaproject.markdownhelperkeyboard.clipboard_history.database.Clipb
 import com.kazumaproject.markdownhelperkeyboard.clipboard_history.database.ItemType
 import com.kazumaproject.markdownhelperkeyboard.converter.candidate.BunsetsuCandidateResult
 import com.kazumaproject.markdownhelperkeyboard.converter.candidatebar.SumireLmGate
+import com.kazumaproject.markdownhelperkeyboard.converter.candidatebar.CorrectionLog
 import com.kazumaproject.markdownhelperkeyboard.converter.candidatebar.ScreenContextBonus
 import com.kazumaproject.markdownhelperkeyboard.converter.candidatebar.ScreenContextStore
 import com.kazumaproject.markdownhelperkeyboard.converter.sumirelm.CandidateReranker
 import com.kazumaproject.markdownhelperkeyboard.converter.sumirelm.CandidateRerankers
+import com.kazumaproject.markdownhelperkeyboard.converter.sumirelm.SumireLmTableStore
 import com.kazumaproject.markdownhelperkeyboard.converter.candidatebar.BunsetsuAnalysis
 import com.kazumaproject.markdownhelperkeyboard.converter.candidatebar.BunsetsuAnalyzer
 import com.kazumaproject.markdownhelperkeyboard.converter.candidatebar.BunsetsuRangeEditor
@@ -2706,6 +2708,10 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
     override fun onStartInputView(editorInfo: EditorInfo?, restarting: Boolean) {
         super.onStartInputView(editorInfo, restarting)
         FreezeWatchdog.onImeInputViewShown(true)
+        // 画面の文脈（ユーザー補助）はキーボードが出ている間、いま入力しているアプリだけ読む。パスワード・学習しない欄では読まない。
+        ScreenContextStore.onKeyboardShown(
+            if (screenContextAllowed()) (editorInfo ?: currentInputEditorInfo)?.packageName?.toString().orEmpty() else ""
+        )
         flickInputPreviewCoordinator.cancel(restore = true)
         // The input view can restart without onStartInput() after returning from settings.
         // Re-read preferences that may change while the existing input session is retained.
@@ -2816,6 +2822,7 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
 
     override fun onFinishInputView(finishingInput: Boolean) {
         FreezeWatchdog.onImeInputViewShown(false)
+        ScreenContextStore.onKeyboardHidden()
         dismissKeyboardSelectionPopups()
         modeSwitchAwaitingCursorPosition = false
         dismissJob?.cancel()
@@ -8468,6 +8475,7 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
     private val sumireLmLoadMutex = Mutex()
     @Volatile private var sumireLmReranker: CandidateReranker? = null
     @Volatile private var sumireLmLastMissAt: Long = Long.MIN_VALUE
+    @Volatile private var sumireLmGeneration: Int = 0
     /** 直前のリランカー 1 位（入力が止まった後の追加判定で、ドラフトの基準に使う）: 文脈・読み → 候補。 */
     @Volatile private var sumireLmLastTop: Pair<String, Candidate>? = null
 
@@ -8477,6 +8485,14 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
      * 無ければ null（リランカーなし）、[SUMIRE_LM_RETRY_MS] 後にまた探す。
      */
     private suspend fun sumireLmRerankerOrNull(): CandidateReranker? {
+        // 設定で表を読み込んだ・削除した（SumireLmTableStore.generation が進んだ）ら読み直す（再起動不要）
+        val generation = SumireLmTableStore.generation
+        if (generation != sumireLmGeneration) {
+            sumireLmGeneration = generation
+            sumireLmReranker = null
+            sumireLmLastMissAt = Long.MIN_VALUE
+            sumireLmLastTop = null
+        }
         sumireLmReranker?.let { return it }
         val now = SystemClock.uptimeMillis()
         if (sumireLmLastMissAt != Long.MIN_VALUE && now - sumireLmLastMissAt < SUMIRE_LM_RETRY_MS) return null
@@ -14234,6 +14250,7 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         if (requireTouched && !ChipBarPresenter.isTouched(state)) return false
         val text = model.commit(state)
         if (text.isEmpty()) return false
+        recordCorrection(state, text)
         recordChipBarLearning(state)
         if (stringInTail.get().isEmpty()) {
             rememberCommittedTextForReconversion(reading = insertString, committedText = text)
@@ -14285,6 +14302,44 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
             .forEach(conversionLearningSession::record)
         persistCompletedLearningSession()
         recordLearnedBoundaries(state)
+    }
+
+    /**
+     * 変換ミスの記録（[CorrectionLog]、端末だけ）: 確定する表記が最初に出したチップ（1 位経路）と違えば 1 行残す。
+     * 設定でオフ・パスワード欄・学習しない欄・シークレットでは残さない。アプリ名は残さない。
+     */
+    private fun recordCorrection(state: ChipBarState, text: String) {
+        val model = chipBarModel ?: return
+        if (!screenContextAllowed()) return
+        if (!PreferenceManager.getDefaultSharedPreferences(this).getBoolean(CorrectionLog.PREF_KEY, true)) return
+        val initial = try {
+            model.chipsOf(state.whole, state.whole.primary)
+        } catch (e: Exception) {
+            return
+        }
+        val kind = CorrectionLog.kindOf(
+            initialBounds = initial.map { it.end },
+            initialText = initial.joinToString("") { it.output },
+            bounds = state.chips.map { it.end },
+            text = text,
+        ) ?: return
+        val entry = CorrectionLog.Entry(
+            time = System.currentTimeMillis(),
+            reading = state.reading,
+            shown = initial.joinToString("") { it.output },
+            chosen = text,
+            kind = kind,
+            ctx = ScreenContextStore.contextAppliedFor(state.reading),
+        )
+        ioScope.launch {
+            try {
+                CorrectionLog.append(File(filesDir, CorrectionLog.FILE_NAME), entry)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                Timber.w(e, "correction log write failed")
+            }
+        }
     }
 
     /** チップで動かした区切りを「左 2 文字＋右 2 文字」の境目として覚える（[LearnedBoundaries]、IDEAS_NEXT_ACCURACY 5）。 */

@@ -18,7 +18,9 @@ import androidx.appcompat.app.AlertDialog
 import androidx.lifecycle.lifecycleScope
 import androidx.preference.Preference
 import com.kazumaproject.markdownhelperkeyboard.R
+import com.kazumaproject.markdownhelperkeyboard.converter.candidatebar.CorrectionLog
 import com.kazumaproject.markdownhelperkeyboard.converter.candidatebar.ScreenContextStore
+import com.kazumaproject.markdownhelperkeyboard.converter.sumirelm.SumireLmTableStore
 import com.kazumaproject.markdownhelperkeyboard.ime_service.screen_context.ScreenContextAccessibilityService
 import com.kazumaproject.markdownhelperkeyboard.diagnostics.FreezeLogFile
 import com.kazumaproject.markdownhelperkeyboard.diagnostics.FreezeWatchdog
@@ -90,6 +92,13 @@ class MainPreferenceFragment : AsyncPreferenceFragment() {
             }
         }
 
+    /** 変換の表（リランカー）の zip を選ぶ（SAF）。展開は IO で、進み具合は行の説明に出す。 */
+    private val sumireLmTableLauncher =
+        registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+            if (uri == null) return@registerForActivityResult
+            importSumireLmTable(uri)
+        }
+
     override fun onViewCreated(view: android.view.View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
         setDivider(null)
@@ -128,6 +137,9 @@ class MainPreferenceFragment : AsyncPreferenceFragment() {
     override fun onPreferencesResumed() {
         updateCursorMoveTargetPairsSummary()
         refreshNextWordSummary()
+        refreshCorrectionLogSummary()
+        refreshScreenContextStatus()
+        refreshSumireLmTableSummary()
     }
 
     override fun onDestroyView() {
@@ -238,8 +250,170 @@ class MainPreferenceFragment : AsyncPreferenceFragment() {
             true
         }
         refreshNextWordSummary()
+        bindCorrectionLogSection()
+        bindSumireLmTableSection()
+    }
 
+    // ---- 変換ミスの記録・画面の文脈の状態 ----
 
+    private fun correctionLogFile() = java.io.File(requireContext().filesDir, CorrectionLog.FILE_NAME)
+
+    private fun bindCorrectionLogSection() {
+        findPreference<Preference>("correction_log_view_preference")?.setOnPreferenceClickListener {
+            showCorrectionLog()
+            true
+        }
+        findPreference<Preference>("screen_context_status_preference")?.setOnPreferenceClickListener {
+            refreshScreenContextStatus()
+            true
+        }
+        refreshCorrectionLogSummary()
+        refreshScreenContextStatus()
+    }
+
+    private fun refreshCorrectionLogSummary() {
+        val pref = findPreference<Preference>("correction_log_view_preference") ?: return
+        if (view == null) return
+        val file = correctionLogFile()
+        viewLifecycleOwner.lifecycleScope.launch {
+            val n = withContext(Dispatchers.IO) { runCatching { CorrectionLog.read(file).size }.getOrDefault(0) }
+            pref.title = getString(R.string.st_correction_log_view, n)
+        }
+    }
+
+    private fun refreshScreenContextStatus() {
+        val pref = findPreference<Preference>("screen_context_status_preference") ?: return
+        val st = ScreenContextStore.stats(System.currentTimeMillis())
+        pref.summary = getString(
+            R.string.st_screen_context_status_summary,
+            getString(if (st.serviceConnected) R.string.st_screen_context_connected else R.string.st_screen_context_not_connected),
+            st.screenWords, st.editorWords, st.commitEntries, st.conversions, st.changedByContext,
+        )
+    }
+
+    /** 記録の一覧（新しい順）。全部コピー（読み・最初の変換・確定・直し方・ctx のタブ区切り、1 件 1 行）・消去。 */
+    private fun showCorrectionLog() {
+        val context = requireContext()
+        val file = correctionLogFile()
+        viewLifecycleOwner.lifecycleScope.launch {
+            val entries = withContext(Dispatchers.IO) { runCatching { CorrectionLog.read(file) }.getOrDefault(emptyList()) }
+            if (!isAdded) return@launch
+            val padding = (16 * resources.displayMetrics.density).toInt()
+            val fmt = java.text.SimpleDateFormat("MM/dd HH:mm", java.util.Locale.JAPAN)
+            val textView = TextView(context).apply {
+                text = if (entries.isEmpty()) getString(R.string.st_correction_log_empty) else entries.joinToString("\n") {
+                    "${fmt.format(java.util.Date(it.time))} [${it.kind}${if (it.ctx) "・文脈" else ""}] ${it.reading}\n  ${it.shown} → ${it.chosen}"
+                }
+                setTextIsSelectable(true)
+                setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f)
+                setPadding(padding, padding, padding, padding)
+            }
+            val scroll = ScrollView(context).apply { addView(textView) }
+            AlertDialog.Builder(context)
+                .setTitle(R.string.st_correction_log_view_title)
+                .setView(scroll)
+                .setPositiveButton(R.string.st_correction_log_copy) { _, _ ->
+                    val clipboard = context.getSystemService(ClipboardManager::class.java)
+                    clipboard?.setPrimaryClip(ClipData.newPlainText("necookey corrections", CorrectionLog.copyText(entries)))
+                    Toast.makeText(context, R.string.st_correction_log_copied, Toast.LENGTH_SHORT).show()
+                }
+                .setNeutralButton(R.string.st_correction_log_clear) { _, _ ->
+                    viewLifecycleOwner.lifecycleScope.launch {
+                        withContext(Dispatchers.IO) { runCatching { CorrectionLog.clear(file) } }
+                        if (isAdded) {
+                            Toast.makeText(context, R.string.st_correction_log_cleared, Toast.LENGTH_SHORT).show()
+                            refreshCorrectionLogSummary()
+                        }
+                    }
+                }
+                .setNegativeButton(R.string.st_correction_log_close, null)
+                .show()
+                .also { dialog ->
+                    dialog.getButton(AlertDialog.BUTTON_POSITIVE)?.isEnabled = entries.isNotEmpty()
+                    dialog.getButton(AlertDialog.BUTTON_NEUTRAL)?.isEnabled = entries.isNotEmpty()
+                }
+        }
+    }
+
+    // ---- 変換の表（リランカー） ----
+
+    private var sumireLmImporting = false
+
+    private fun bindSumireLmTableSection() {
+        findPreference<Preference>("sumire_lm_table_import_preference")?.setOnPreferenceClickListener {
+            if (!sumireLmImporting) sumireLmTableLauncher.launch(arrayOf("application/zip", "application/x-zip-compressed", "application/octet-stream"))
+            true
+        }
+        findPreference<Preference>("sumire_lm_table_delete_preference")?.setOnPreferenceClickListener {
+            AlertDialog.Builder(requireContext())
+                .setMessage(R.string.st_sumire_lm_table_delete_confirm)
+                .setPositiveButton(android.R.string.ok) { _, _ ->
+                    val filesDir = requireContext().filesDir
+                    viewLifecycleOwner.lifecycleScope.launch {
+                        withContext(Dispatchers.IO) { SumireLmTableStore.delete(filesDir) }
+                        if (isAdded) {
+                            toast(getString(R.string.st_sumire_lm_table_deleted))
+                            refreshSumireLmTableSummary()
+                        }
+                    }
+                }
+                .setNegativeButton(android.R.string.cancel, null)
+                .show()
+            true
+        }
+        refreshSumireLmTableSummary()
+    }
+
+    private fun formatBytes(b: Long): String = String.format(java.util.Locale.US, "%.1f MB", b / 1048576.0)
+
+    private fun refreshSumireLmTableSummary() {
+        val pref = findPreference<Preference>("sumire_lm_table_import_preference") ?: return
+        if (view == null || sumireLmImporting) return
+        val filesDir = requireContext().filesDir
+        viewLifecycleOwner.lifecycleScope.launch {
+            val bytes = withContext(Dispatchers.IO) { runCatching { SumireLmTableStore.installedBytes(filesDir) }.getOrNull() }
+            pref.summary = if (bytes != null) getString(R.string.st_sumire_lm_table_loaded, formatBytes(bytes))
+            else getString(R.string.st_sumire_lm_table_not_loaded)
+            findPreference<Preference>("sumire_lm_table_delete_preference")?.isEnabled = bytes != null
+        }
+    }
+
+    private fun importSumireLmTable(uri: Uri) {
+        val context = requireContext().applicationContext
+        val pref = findPreference<Preference>("sumire_lm_table_import_preference")
+        sumireLmImporting = true
+        pref?.summary = getString(R.string.st_sumire_lm_table_importing, 0)
+        val main = android.os.Handler(android.os.Looper.getMainLooper())
+        viewLifecycleOwner.lifecycleScope.launch {
+            val result = withContext(Dispatchers.IO) {
+                runCatching {
+                    val size = runCatching {
+                        context.contentResolver.query(uri, arrayOf(android.provider.OpenableColumns.SIZE), null, null, null)?.use { c ->
+                            if (c.moveToFirst() && !c.isNull(0)) c.getLong(0) else -1L
+                        } ?: -1L
+                    }.getOrDefault(-1L)
+                    val input = context.contentResolver.openInputStream(uri) ?: error("cannot open")
+                    input.use { ins ->
+                        SumireLmTableStore.importZip(context.filesDir, ins.buffered(1 shl 16), size) { pct ->
+                            main.post { if (isAdded) pref?.summary = getString(R.string.st_sumire_lm_table_importing, pct) }
+                        }
+                    }
+                }
+            }
+            sumireLmImporting = false
+            if (!isAdded) return@launch
+            result.onSuccess { r ->
+                toast(getString(R.string.st_sumire_lm_table_done, formatBytes(r.bytes)))
+                if (!r.hashMatches) toast(getString(R.string.st_sumire_lm_table_hash_warning))
+            }.onFailure { e ->
+                Timber.w(e, "sumire-lm table import failed")
+                toast(
+                    if (e is SumireLmTableStore.InvalidTableException) getString(R.string.st_sumire_lm_table_invalid)
+                    else getString(R.string.st_sumire_lm_table_failed, e.message ?: e.javaClass.simpleName)
+                )
+            }
+            refreshSumireLmTableSummary()
+        }
     }
 
     private fun refreshNextWordSummary() {

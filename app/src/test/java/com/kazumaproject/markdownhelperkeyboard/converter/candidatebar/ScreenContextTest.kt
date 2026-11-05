@@ -32,6 +32,7 @@ class ScreenContextTest {
 
     @Test
     fun screenLayerExpiresQuickly() {
+        ScreenContextStore.onKeyboardShown("a")
         ScreenContextStore.recordScreen("a", listOf("県庁前のバス停", "ok"), 0L)
         assertEquals(ScreenContextBonus.W_SCREEN, ScreenContextStore.snapshot("a", 0L)!!.tokenBonus("県庁"), 1e-9)
         assertNull(ScreenContextStore.snapshot("a", ScreenContextStore.SCREEN_TTL_MS + 1))
@@ -69,5 +70,22 @@ class ScreenContextTest {
         val far = listOf(c("県長に", 1000), c("県庁に", 4000))
         assertEquals("県長に", SumireLmGate.rerank(reranker, input, "", far, { segs.getValue(it.string) }, contextBonus = bonus)!!.top.string)
         assertTrue(true)
+    }
+
+    @Test
+    fun screenKeepsOnlyWordsAndOnlyWhileKeyboardVisible() {
+        ScreenContextStore.clear()
+        ScreenContextStore.onKeyboardHidden()
+        ScreenContextStore.recordScreen("a", listOf("県庁前のバス停"), 0L)
+        assertNull(ScreenContextStore.snapshot("a", 0L)) // キーボードが出ていない
+        ScreenContextStore.onKeyboardShown("a")
+        ScreenContextStore.recordScreen("a", listOf("今日は県庁前のバス停で、パスワード1234を見た"), 0L)
+        assertEquals(listOf("県庁前", "バス停", "パスワード"), ScreenContextStore.extractWords("今日は県庁前のバス停で、パスワード1234を見た").drop(1))
+        assertEquals(4, ScreenContextStore.stats(0L).screenWords) // 今日・県庁前・バス停・パスワード
+        val snap = ScreenContextStore.snapshot("a", 0L)!!
+        assertEquals(0.0, snap.tokenBonus("見た"), 1e-9)
+        assertEquals(ScreenContextBonus.W_SCREEN, snap.tokenBonus("県庁"), 1e-9)
+        ScreenContextStore.onKeyboardHidden()
+        assertNull(ScreenContextStore.snapshot("a", 0L)) // 隠れたら捨てる
     }
 }

@@ -67,9 +67,13 @@ object SumireLmGate {
         }
         val scores = reranker.score(leftContext, inputs)
         // 画面文脈（入力欄の前後・最近の確定・任意のユーザー補助）にある語への小さな加点。上位・僅差の候補だけ（ScreenContextBonus）。
+        var bonusApplied = false
+        var topWithoutBonus = -1
         contextBonus?.let { bonus ->
             val add = bonus.bonuses(inputs.map { it.tokens }, scores)
+            topWithoutBonus = pool.indices.maxWithOrNull(compareBy<Int> { scores[it] }.thenByDescending { it }) ?: -1
             for (k in scores.indices) scores[k] += add[k]
+            bonusApplied = add.any { it > 0.0 }
         }
         // 同点は Sumire の順を保つ。
         var order = pool.indices.sortedWith(compareByDescending<Int> { scores[it] }.thenBy { it })
@@ -79,6 +83,9 @@ object SumireLmGate {
         }
         keepHiraganaOverKatakanaSwap(pool, order, scores)?.let { order = it }
         keepTrailingElongation(input, pool, order)?.let { order = it }
+        // 確認用の数（メモリだけ）: 加点が付いたか・加点で 1 位が変わったか（設定「画面の文脈」の状態表示）
+        val withBonusTop = if (bonusApplied) pool.indices.sortedWith(compareByDescending<Int> { scores[it] }.thenBy { it }).first() else -1
+        ScreenContextStore.noteConversion(input, bonusApplied, bonusApplied && topWithoutBonus >= 0 && withBonusTop != topWithoutBonus)
         val margin = if (order.size > 1) scores[order[0]] - scores[order[1]] else null
         return Decision(top = pool[order[0]], margin = margin, ranked = order.map { pool[it] }, scores = order.map { scores[it] })
     }

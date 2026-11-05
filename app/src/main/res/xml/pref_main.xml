@@ -127,6 +127,31 @@
                 android:title="@string/st_screen_context_accessibility" />
         </PreferenceCategory>
         <PreferenceCategory
+            android:key="group_correction_log"
+            android:title="@string/st_section_correction_log">
+            <SwitchPreferenceCompat
+                android:defaultValue="true"
+                android:key="correction_log_preference"
+                android:summary="@string/st_correction_log_summary"
+                android:title="@string/st_correction_log" />
+            <Preference
+                android:key="correction_log_view_preference"
+                android:title="@string/st_correction_log_view" />
+            <Preference
+                android:key="screen_context_status_preference"
+                android:title="@string/st_screen_context_status" />
+        </PreferenceCategory>
+        <PreferenceCategory
+            android:key="group_sumire_lm_table"
+            android:title="@string/st_section_sumire_lm_table">
+            <Preference
+                android:key="sumire_lm_table_import_preference"
+                android:title="@string/st_sumire_lm_table_import" />
+            <Preference
+                android:key="sumire_lm_table_delete_preference"
+                android:title="@string/st_sumire_lm_table_delete" />
+        </PreferenceCategory>
+        <PreferenceCategory
             android:key="group_dictionary_next_word"
             android:title="@string/st_section_next_word">
             <Preference

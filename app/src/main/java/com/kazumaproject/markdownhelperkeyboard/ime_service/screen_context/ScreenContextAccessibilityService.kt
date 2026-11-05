@@ -10,9 +10,11 @@ import androidx.preference.PreferenceManager
 import com.kazumaproject.markdownhelperkeyboard.converter.candidatebar.ScreenContextStore
 
 /**
- * 画面の文脈（任意・既定オフ、設定「画面の文脈」とユーザー補助の両方でオン）。
- * 前面アプリの見えている文字列を読み、[ScreenContextStore] にメモリだけで数分置く（IME と同じプロセスの共有オブジェクト）。
- * 保存・送信はしない。パスワード欄・入力欄（変換中の文字が入る）・このアプリ自身の画面は読まない。
+ * 画面の文脈（任意・既定オフ、設定「画面の文脈」とユーザー補助の両方でオン）。読む範囲は最小限（2026-11-05 絞り込み）:
+ *  - necookey のキーボードが出ている間だけ（[ScreenContextStore.keyboardVisible]）。それ以外のイベントは無視し、隠れたら語を捨てる。
+ *  - いま入力しているアプリ（EditorInfo.packageName）のウィンドウだけ。通知・システム UI・ランチャー・ほかのアプリのウィンドウは読まない。
+ *  - パスワード管理・銀行・決済・認証アプリ（[isExcludedPackage]）は読まない。パスワード欄・入力欄・このアプリ自身の画面も読まない。
+ *  - 残すのは漢字・カタカナ 2 字以上の語だけ（[ScreenContextStore.extractWords]）。元の文字列はすぐ捨てる。メモリだけ（3 分）、保存・送信しない。
  * 読み取りは画面の変化から [THROTTLE_MS] 待ってまとめて 1 回。
  */
 class ScreenContextAccessibilityService : AccessibilityService() {
@@ -22,6 +24,17 @@ class ScreenContextAccessibilityService : AccessibilityService() {
         private const val MAX_NODES = 600
         private const val MAX_DEPTH = 40
         private const val MAX_CHARS = ScreenContextStore.MAX_SCREEN_CHARS
+
+        /** 読まないアプリ（パッケージ名に含まれる語）: パスワード管理・銀行・決済・認証。 */
+        private val EXCLUDED_KEYWORDS = listOf(
+            "bank", "pay", "wallet", "1password", "bitwarden", "keepass", "lastpass", "dashlane", "enpass",
+            "authenticator", "password", "credit", "securities", "finance", "crypto",
+        )
+
+        fun isExcludedPackage(pkg: String): Boolean {
+            val p = pkg.lowercase()
+            return EXCLUDED_KEYWORDS.any { p.contains(it) }
+        }
     }
 
     private val handler = Handler(Looper.getMainLooper())
@@ -36,9 +49,22 @@ class ScreenContextAccessibilityService : AccessibilityService() {
     private fun enabled(): Boolean =
         PreferenceManager.getDefaultSharedPreferences(this).getBoolean(PREF_KEY, false)
 
+    override fun onServiceConnected() {
+        super.onServiceConnected()
+        ScreenContextStore.serviceConnected = true
+    }
+
+    override fun onUnbind(intent: android.content.Intent?): Boolean {
+        ScreenContextStore.serviceConnected = false
+        ScreenContextStore.clearScreen()
+        return super.onUnbind(intent)
+    }
+
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
         if (event == null || scheduled) return
-        if (event.packageName?.toString() == packageName) return
+        if (!ScreenContextStore.keyboardVisible) return
+        val target = ScreenContextStore.inputPackage
+        if (target.isEmpty() || event.packageName?.toString() != target) return
         val wait = (lastRun + THROTTLE_MS - SystemClock.uptimeMillis()).coerceIn(0L, THROTTLE_MS)
         scheduled = true
         handler.postDelayed(runnable, wait)
@@ -57,9 +83,13 @@ class ScreenContextAccessibilityService : AccessibilityService() {
             ScreenContextStore.clearScreen()
             return
         }
+        if (!ScreenContextStore.keyboardVisible) return
+        val target = ScreenContextStore.inputPackage
+        if (target.isEmpty() || target == packageName || isExcludedPackage(target)) return
         val root = rootInActiveWindow ?: return
         val pkg = root.packageName?.toString().orEmpty()
-        if (pkg.isEmpty() || pkg == packageName) return
+        // いま入力しているアプリのウィンドウだけ（通知を下ろしている・別のウィンドウが前面のときは読まない）
+        if (pkg != target) return
         val texts = ArrayList<String>()
         var chars = 0
         var nodes = 0
@@ -79,13 +109,16 @@ class ScreenContextAccessibilityService : AccessibilityService() {
                 for (i in node.childCount - 1 downTo 0) node.getChild(i)?.let { stack.addLast(it to depth + 1) }
             }
         }
+        // 語だけを残し、元の文字列はここで捨てる（recordScreen が語を取り出す）
         ScreenContextStore.recordScreen(pkg, texts, System.currentTimeMillis())
+        texts.clear()
     }
 
     override fun onInterrupt() = Unit
 
     override fun onDestroy() {
         handler.removeCallbacks(runnable)
+        ScreenContextStore.serviceConnected = false
         ScreenContextStore.clearScreen()
         super.onDestroy()
     }

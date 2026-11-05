@@ -6,7 +6,8 @@ package com.kazumaproject.markdownhelperkeyboard.converter.candidatebar
  * 3 つの層:
  *  - [Source.EDITOR] 入力欄のカーソル前後（各 [EDITOR_CHARS] 字、変換中の文字列は除く）。最新 1 件だけ。
  *  - [Source.COMMIT] 最近確定した表記（アプリ = パッケージごと、[COMMIT_TTL_MS] = 30 分）。会話の中で一度 県庁 に直したら県庁のまま。
- *  - [Source.SCREEN] ユーザー補助サービス（任意・既定オフ）が拾った前面アプリの見えている文字列（[SCREEN_TTL_MS] = 3 分）。
+ *  - [Source.SCREEN] ユーザー補助サービス（任意・既定オフ）が拾った、いま入力しているアプリの画面の語（漢字・カタカナ 2 字以上だけ、
+ *    元の文字列は残さない。キーボードが出ている間だけ。隠れたら捨てる。[SCREEN_TTL_MS] = 3 分）。
  *
  * 使い方は [ScreenContextBonus]: 候補の語（Sumire の語分割の出力）が画面文脈の文字列に含まれていれば、リランカーの
  * スコアに小さく加点する。読みは候補自身が入力の読みの変換なので「読み一致」は常に満たす（逆引き辞書は不要）。
@@ -50,23 +51,108 @@ object ScreenContextStore {
         }
     }
 
-    /** ユーザー補助サービスから: 前面アプリの見えている文字列（呼ぶたびに置き換え）。 */
+    /**
+     * ユーザー補助サービスから: 前面アプリの見えている文字列（呼ぶたびに置き換え）。**語だけを残す**: 漢字・カタカナの 2 字以上の
+     * 並び（[extractWords]）を取り出し、元の文字列（ひらがな・数字・記号を含む全文）はここで捨てる。キーボードが出ていないときは何もしない。
+     */
     fun recordScreen(pkg: String, texts: List<String>, now: Long) {
-        val sb = StringBuilder()
+        if (!keyboardVisible) return
+        val words = LinkedHashSet<String>()
+        var chars = 0
         for (t in texts) {
-            if (sb.length >= MAX_SCREEN_CHARS) break
-            if (t.any(::isKanjiOrKatakana)) sb.append(t.take(MAX_SCREEN_CHARS - sb.length)).append('\n')
+            if (chars >= MAX_SCREEN_CHARS) break
+            for (w in extractWords(t)) if (words.add(w)) chars += w.length + 1
         }
         synchronized(lock) {
             screens.remove(pkg)
-            if (sb.isNotEmpty()) screens[pkg] = Entry(sb.toString(), now)
+            if (words.isNotEmpty()) screens[pkg] = Entry(words.joinToString("\n"), now)
             while (screens.size > MAX_APPS) screens.remove(screens.keys.first())
         }
+    }
+
+    // ---- キーボードの表示とユーザー補助の接続（ユーザー補助はキーボードが出ている間だけ読む） ----
+
+    /** necookey のキーボードが出ている間 true（IMEService の onStartInputView / onFinishInputView）。 */
+    @Volatile var keyboardVisible: Boolean = false
+        private set
+    /** いま入力しているアプリ（EditorInfo.packageName）。ユーザー補助はこのアプリのウィンドウだけ読む。 */
+    @Volatile var inputPackage: String = ""
+        private set
+    /** ユーザー補助サービスが接続中か（設定の状態表示用）。 */
+    @Volatile var serviceConnected: Boolean = false
+
+    fun onKeyboardShown(pkg: String) {
+        inputPackage = pkg
+        keyboardVisible = true
+    }
+
+    /** キーボードが隠れた: 画面の語を捨てる（入力欄の前後・確定の記録は残す）。 */
+    fun onKeyboardHidden() {
+        keyboardVisible = false
+        clearScreen()
+    }
+
+    // ---- 確認用の数（メモリだけ。設定の状態表示） ----
+
+    private val recent = ArrayDeque<Boolean>()
+    private var recentApplied = 0
+    @Volatile private var lastInput: String = ""
+    @Volatile private var lastApplied: Boolean = false
+
+    /** リランカー 1 回分: 画面文脈の加点が付いたか [applied]・それで 1 位が変わったか [changedTop]（読み [input]）。 */
+    fun noteConversion(input: String, applied: Boolean, changedTop: Boolean) {
+        lastInput = input
+        lastApplied = applied
+        synchronized(lock) {
+            recent.addLast(changedTop)
+            if (changedTop) recentApplied++
+            while (recent.size > RECENT_CONVERSIONS) if (recent.removeFirst()) recentApplied--
+        }
+    }
+
+    /** 読み [input] の直前の変換で画面文脈の加点が付いたか（変換ミスの記録の ctx 列）。 */
+    fun contextAppliedFor(input: String): Boolean = lastInput == input && lastApplied
+
+    data class Stats(
+        val serviceConnected: Boolean,
+        val keyboardVisible: Boolean,
+        val screenWords: Int,
+        val editorWords: Int,
+        val commitEntries: Int,
+        val conversions: Int,
+        val changedByContext: Int,
+    )
+
+    fun stats(now: Long): Stats = synchronized(lock) {
+        val sc = screens.values.filter { now - it.time <= SCREEN_TTL_MS }.sumOf { e -> e.text.split('\n').count { it.isNotEmpty() } }
+        val ed = editor?.takeIf { now - it.time <= EDITOR_TTL_MS }?.let { extractWords(it.text).size } ?: 0
+        val cm = commits.values.sumOf { q -> q.count { now - it.time <= COMMIT_TTL_MS } }
+        Stats(serviceConnected, keyboardVisible, sc, ed, cm, recent.size, recentApplied)
+    }
+
+    const val RECENT_CONVERSIONS = 100
+
+    /** 漢字（々 含む）・カタカナ（ー 含む）が 2 字以上続く並び。ひらがな・数字・記号・英字は捨てる。 */
+    fun extractWords(text: String): List<String> {
+        val out = ArrayList<String>()
+        var i = 0
+        while (i < text.length) {
+            if (!isKanjiOrKatakana(text[i])) {
+                i++
+                continue
+            }
+            var j = i + 1
+            while (j < text.length && (isKanjiOrKatakana(text[j]) || text[j] == 'ー')) j++
+            if (j - i >= 2) out.add(text.substring(i, j))
+            i = j
+        }
+        return out
     }
 
     /** 端末を閉じた・設定を切ったときなど。 */
     fun clear() = synchronized(lock) {
         editor = null; editorPkg = ""; commits.clear(); screens.clear()
+        recent.clear(); recentApplied = 0
     }
 
     fun clearScreen() = synchronized(lock) { screens.clear() }
