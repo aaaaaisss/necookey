@@ -330,3 +330,45 @@ kt 行数（`git ls-files '*.kt'` の合計）: 204,548 → 176,083（**-28,465 
 ### 確認
 - ローカル: `:app:testLiteStandardDebugUnitTest`（lite の本体・テストを全部コンパイル）で ChipStripLayoutTest 12・CorrectionLogTest 2・SumireLmTableStoreTest 2・ScreenContextTest 6・
   SystemDictionaryErrataTest 2・SumireLmGateTest 9・ChipBarTest 26 通過。`:custom_keyboard:compileReleaseUnitTestKotlin` 通過。fullStandard・release 単体テストは CI で確認。
+
+## 2026-11-06 ctx-clean: LOUDS の境界クラッシュ（本家 #1216）、CI は APK だけ、端末の誤変換 6 文、キーボードサイズのプレビューを実寸に（本家 #1175）
+
+### LOUDS（commit 99a2fe5）
+- 本家 Sumire PR #1216（9162aad・9564b43「Fix dictionary boundary crashes」）の移植。圧縮辞書では最後の葉の区切りの `select0` が -1 を返し、
+  `select0(...) + 1 = 0` で根に戻ってループ（ちゅう/ちゅ で OutOfMemoryError）。`loudsChildPosition()`（converter/louds/LoudsNavigation.kt）で
+  失敗を +1 の前に弾き、子は親より後ろの 1 ビットに限る。日本語・英語の LOUDS / LOUDSWithTermId（IntArray・ShortArray・succinct、完全一致の search）。
+  本家の LoudsTermIterator・packed 辞書はこちらに無いので対象外。TokenArray の select0 は区切りの組で別物（本家も触っていない）。
+- 正しい辞書では同じ位置を返す: 57 文の上段・プール（50）・リランカー結果が修正前（nk1105）と完全一致。テスト LOUDSBoundaryTest（3 件）。
+
+### CI（commit a7d0210）
+- necookey-debug-apk.yml から単体テストの手順（変更モジュール検出・JVM 単体テスト・失敗の報告・レポート）を削除。arm64 fullStandard release APK のビルドとアップロードだけ（-PsumireLmTable=false）。
+  単体テストはローカル（lite）で回す。
+
+### 誤変換（SumireNbestDumpTest lite ＋ h56 リランカー、ラティス表 lc_np1m）（commit 11f2e85）
+| 読み | 修正前（ハーネス） | 修正後 | |
+|---|---|---|---|
+| おもってそーだけど | 思ってソーだけど（端末 思ってソーダけど） | 思ってそーだけど | 直した（LongVowelNodes） |
+| よーがんばったね | ヨー頑張ったね | よー頑張ったね | 直した（LongVowelNodes） |
+| うおお | ウオオ | うおお | 直した（母音だけの感動詞） |
+| もんくいえれん | 文句言え連 | 文句言えれん | 直した（方言語尾 れん＋ツギハギ修正） |
+| なんかかいいく | なんか回行く（端末 会行く） | なんか買い行く | 直した（RenyouMotionNodes） |
+| やつはるね | 奴はルネ（Sumire やつはルネ、端末 やつハルネ） | 変えず | 未修正 |
+- LongVowelNodes: ー を前の字の母音（お段 う/お、え段 い/え）に置き換えて辞書を引き、表記がひらがなの語だけを 表記 = 元の読み（そー）・同じ品詞・語コスト＋800 のノードに。
+  カタカナ語（コーヒー・ソーダを飲む・ヨーグルト）は不変。母音だけの感動詞: 文頭から母音（と ー）3 字以上・同じ母音の繰り返しか ー で終わる → かなのまま感動詞。
+- DialectInflectionNodes に 可能の否定 れん／れんかった（未然形＋）: 言えれん・何も言えれんかった。
+- RenyouMotionNodes: 動詞連用形（読み 2 字以上）＋行く/来る の活用形（読み 2 字以上）を 1 ノード（＋2000）。買い行く・ご飯食べ行く。し＋行く（飼育）は語幹 1 字なので作らない。
+- TsugihagiKanaRepair: 合成ノード（方言語尾・ウ音便過去・連用形＋行く）を漢字片に数えない（文句|言えれん がかなに戻っていた）。
+- やつはるね は見送り: やつ貼るね は Sumire のプールで 12 位（1 位 やつはルネ と約 2,700 差）、ルネ/ハルネ/晴音 は人名・Wiki 辞書の語で、カタカナ固有名詞を一律に下げる直し方は副作用が読めない（1 文ごとの例外は入れない方針）。
+- 回帰: regress_short 16・device_1104 9・device_1105 15・鍵語 c001–c011・r046–r051 の 1 位（リランカー・Sumire とも）全件不変、DeviceConfigRegressionGuardTest（買って/県庁/困難/広島県/三年）通過。
+  tools/eval_border の in+reg+dia 308 文で新ノードあり/なしの 1 位・上位 3 件が全件不変。確認文 tools/sumire_lm/regress_device_1106.tsv（15 文、14 OK）。
+- 評価用の切り替え ConversionKnobs: lv（ー の伸ばし・感動詞）lvp rm（連用形＋行く）rmp ren（れん）。
+
+### キーボードサイズのプレビューを実寸に（commit e2b84b4）
+- 本家 #1175 の移植（本家の横向き画面・QWERTY 別設定はこちらに無いので、縦の 1 画面だけ）。縮小キャンバス KeyboardPreviewViewport を削除し、IMEService.updateKeyboardLayout と同じ計算で描く:
+  高さ dp×density、幅 = 画面幅×%（100% は左右の余白を引いた残り）、左右の余白 dp×density（両方）、下の余白は保存値を px のまま（IME も dp 変換しない）。
+  ドラッグで保存する下の余白も px に（以前は px/density で保存して IME と食い違っていた）。開いている間は縦に固定、閉じたら元に戻す。
+- 注意: 数値入力の画面・キーボード上の編集は下の余白を「dp」と表示しているが、IME は px として使う（以前からの食い違い、本家 #1228 で統一。今回は触っていない）。
+
+### 確認
+- ローカル lite: LOUDSBoundaryTest 3・ColloquialForms1106Test 4・TsugihagiKanaRepairTest 5・SumireLmGateTest 9・LatticeLmCostTest 5・DeviceConfigRegressionGuardTest 1 通過、
+  lite の本体・テストは全部コンパイル（設定画面の変更を含む）。fullStandard release は CI で（単体テストは CI で回さない）。KeyboardSizeEditorRegressionTest（Robolectric）は未実行。
