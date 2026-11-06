@@ -80,12 +80,13 @@ class KeyboardSizeEditorRegressionTest {
     }
 
     @Test
-    fun returningFromNumericInputRestoresTheLogicalCanvasForBothEditors() {
+    fun returningFromNumericInputRestoresDimensionsForBothEditors() {
         listOf(R.id.keyboardSettingFragment).forEach { destination ->
+            val previousOrientation = activity.requestedOrientation
             val root = openEditor(destination)
-            val viewport = root.findViewById<KeyboardPreviewViewport>(R.id.keyboard_preview_viewport)
-            val width = viewport.logicalCanvasWidth
-            val height = viewport.logicalCanvasHeight
+            val keyboard = root.findViewById<View>(R.id.keyboard_container)
+            val width = keyboard.width
+            val height = keyboard.height
             assertTrue(width > 1 && height > 1)
             val originalOrientation = activity.requestedOrientation
             host.navController.navigate(R.id.keyboardSizeDirectInputFragment)
@@ -94,10 +95,14 @@ class KeyboardSizeEditorRegressionTest {
             drainNavigation()
             val restoredRoot = editorRoot()
             layoutEditor(restoredRoot)
-            val restored = restoredRoot.findViewById<KeyboardPreviewViewport>(R.id.keyboard_preview_viewport)
-            assertEquals(width, restored.logicalCanvasWidth)
-            assertEquals(height, restored.logicalCanvasHeight)
+            val restored = restoredRoot.findViewById<View>(R.id.keyboard_container)
+            assertEquals(width, restored.width)
+            assertEquals(height, restored.height)
             assertEquals(originalOrientation, activity.requestedOrientation)
+            // 実寸表示のため編集画面の間は縦に固定し、閉じたら元に戻す（upstream #1175）
+            assertTrue(host.navController.popBackStack())
+            drainNavigation()
+            assertEquals(previousOrientation, activity.requestedOrientation)
         }
     }
 
@@ -121,6 +126,8 @@ class KeyboardSizeEditorRegressionTest {
                     }
                 assertEquals(before, sizePreferences())
             }
+            assertTrue(host.navController.popBackStack())
+            drainNavigation()
         }
         assertEquals(originalOrientation, activity.requestedOrientation)
     }
