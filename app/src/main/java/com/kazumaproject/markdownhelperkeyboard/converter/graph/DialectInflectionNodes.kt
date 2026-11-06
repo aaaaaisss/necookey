@@ -23,6 +23,11 @@ internal object DialectInflectionNodes {
     @JvmStatic
     var lmStemEnabled: Boolean = true
 
+    /** 可能の否定 れん/れんかった（言えれん）を作るか（評価用に切り替え可能）。 */
+    @Volatile
+    @JvmStatic
+    var potentialNegativeEnabled: Boolean = true
+
     /** 語尾 1 つあたりの追加コスト（語幹の語コストに足す）。 */
     @Volatile
     @JvmStatic
@@ -85,6 +90,9 @@ internal object DialectInflectionNodes {
             add(Suffix(s, MIZEN, N))
             add(Suffix(s + "かった", MIZEN, TA))
         }
+        // 可能の否定（広島・西日本、ら抜き＋ん）: 言えれん・食べれん・来れんかった（語幹 = 可能動詞/一段の未然形 言え・食べ）
+        add(Suffix("れん", MIZEN, N))
+        add(Suffix("れんかった", MIZEN, TA))
         // 命令（広島）: 待ちんさい・食べんさい・しんさい
         add(Suffix("んさい", RENYOU, NASAI))
         // 〜てしまった（関西・中国）: 寝落ちしてもうた・食べてしもうた・忘れてもた
@@ -124,6 +132,7 @@ internal object DialectInflectionNodes {
         val cands = byFirst[str[end]] ?: return emptyList()
         var out: MutableList<Suffix>? = null
         for (s in cands) {
+            if (!potentialNegativeEnabled && s.reading[0] == 'れ') continue
             if (s.stem and stemClass != 0 && str.startsWith(s.reading, end)) {
                 (out ?: ArrayList<Suffix>(2).also { out = it }).add(s)
             }

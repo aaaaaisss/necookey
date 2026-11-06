@@ -291,6 +291,7 @@ class GraphBuilder {
         // 五段ワ行のウ音便過去（思うた・こうた・思た、UOnbinPastNodes.kt）の語尾が始まる位置
         val uOnbinStarts = if (UOnbinPastNodes.mayApply(str)) UOnbinPastNodes.endingStarts(str) else IntArray(0)
         val uOnbinCost = UOnbinPastNodes.cost
+        val longVowelActive = LongVowelNodes.mayApply(str)
         for (i in str.indices) {
             currentCoroutineContext().ensureActive()
             var subStrCache: String? = null
@@ -499,6 +500,64 @@ class GraphBuilder {
                 }
             }
 
+            // 3.052 口語の 動詞連用形＋行く/来る（買い行く、RenyouMotionNodes.kt）。語幹 = str[i, e) の辞書の動詞連用形。
+            if (RenyouMotionNodes.enabled) {
+                for (e in i + RenyouMotionNodes.MIN_STEM_LEN..minOf(i + RenyouMotionNodes.MAX_STEM_LEN, str.length - RenyouMotionNodes.MIN_MOTION_LEN)) {
+                    if (!RenyouMotionNodes.mayStartAt(str, e)) continue
+                    // 続き（行く/来る の活用形）: 読み str[e, m)
+                    var motions: MutableList<Node>? = null
+                    for (m in e + RenyouMotionNodes.MIN_MOTION_LEN..minOf(e + RenyouMotionNodes.MAX_MOTION_LEN, str.length)) {
+                        if (m <= reusablePrefixLength) continue
+                        val my = str.substring(e, m)
+                        val midx = yomiTrie.getNodeIndex(my, succinctBitVectorLBSYomi)
+                        if (midx <= 0) continue
+                        val mTerm = yomiTrie.getTermId(midx, succinctBitVectorIsLeafYomi)
+                        if (mTerm < 0) continue
+                        tokenArray.forEachDictionaryByYomiTermId(mTerm, succinctBitVectorTokenArray) { posTableIndex, wordCost, tokenNodeId ->
+                            if (tokenNodeId >= 0) {
+                                val leftId = tokenArray.leftIds[posTableIndex.toInt()]
+                                if (leftId.toInt() in 577..856) {
+                                    val t = tangoTrie.getLetter(tokenNodeId, succinctBitVector = succinctBitVectorTangoLBS)
+                                    if (RenyouMotionNodes.isMotionVerb(leftId, t)) {
+                                        val rightId = tokenArray.rightIds[posTableIndex.toInt()]
+                                        (motions ?: ArrayList<Node>(4).also { motions = it }).add(
+                                            Node(l = leftId, r = rightId, score = wordCost.toInt(), f = 0, tango = t, yomiUsed = my, len = my.length.toShort(), sPos = e)
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    val ms = motions ?: continue
+                    val stemYomi = str.substring(i, e)
+                    val idx = yomiTrie.getNodeIndex(stemYomi, succinctBitVectorLBSYomi)
+                    if (idx <= 0) continue
+                    val termId = yomiTrie.getTermId(idx, succinctBitVectorIsLeafYomi)
+                    if (termId < 0) continue
+                    tokenArray.forEachDictionaryByYomiTermId(termId, succinctBitVectorTokenArray) { posTableIndex, wordCost, tokenNodeId ->
+                        val leftId = tokenArray.leftIds[posTableIndex.toInt()]
+                        if (tokenNodeId >= 0 && RenyouMotionNodes.isRenyouStem(leftId)) {
+                            val stemTango = tangoTrie.getLetter(tokenNodeId, succinctBitVector = succinctBitVectorTangoLBS)
+                            val stemCost = wordCost.toInt() + VerbInflectionCost.delta(leftId, stemYomi, stemTango)
+                            for (mv in ms) {
+                                val end = e + mv.len
+                                val yomi = stemYomi + mv.yomiUsed
+                                val c = stemCost + mv.score + RenyouMotionNodes.penalty
+                                addOrUpdateNode(
+                                    graph, end,
+                                    Node(
+                                        l = leftId, r = mv.r, score = c, f = c, g = c, tango = stemTango + mv.tango,
+                                        yomiUsed = yomi, len = yomi.length.toShort(), sPos = i,
+                                        mozcAttributes = mozcAttributesFor(leftId) or MozcNodeAttributes.RENYOU_MOTION,
+                                    ),
+                                    graphNodeDedupMode, graphNodeTrace, str, "RENYOU_MOTION",
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+
             // 3.05 方言の活用語尾を動詞語幹に付けた 1 ノード（DialectInflectionNodes.kt）。語幹 = str[i, e) の辞書の動詞活用形。
             // 差分入力で語幹が再利用範囲にあっても、語尾の終わりが新しい範囲なら作る（共通接頭辞検索の結果には頼らない）。
             for (e in dialectSuffixStarts) {
@@ -622,6 +681,52 @@ class GraphBuilder {
                         graphNodeDedupMode, graphNodeTrace, str, "ELONGATION",
                     )
                 }
+            }
+
+            // 3.058 ー を母音の伸ばしとして読むひらがなの語（そー・よー）と、母音だけの感動詞（うおお）。LongVowelNodes.kt
+            if (longVowelActive) {
+                for (e in i + 2..minOf(i + LongVowelNodes.MAX_LEN, str.length)) {
+                    if (e <= reusablePrefixLength) continue
+                    val yomi = str.substring(i, e)
+                    if (yomi[0] == 'ー' || yomi.indexOf('ー') < 0) continue
+                    for (alt in LongVowelNodes.variants(yomi)) {
+                        val idx = yomiTrie.getNodeIndex(alt, succinctBitVectorLBSYomi)
+                        if (idx <= 0) continue
+                        val termId = yomiTrie.getTermId(idx, succinctBitVectorIsLeafYomi)
+                        if (termId < 0) continue
+                        tokenArray.forEachDictionaryByYomiTermId(termId, succinctBitVectorTokenArray) { posTableIndex, wordCost, tokenNodeId ->
+                            val hira = tokenNodeId == -2 || (tokenNodeId >= 0 &&
+                                tangoTrie.getLetter(tokenNodeId, succinctBitVector = succinctBitVectorTangoLBS) == alt)
+                            if (hira) {
+                                val l = tokenArray.leftIds[posTableIndex.toInt()]
+                                val r = tokenArray.rightIds[posTableIndex.toInt()]
+                                val c = wordCost.toInt() + LongVowelNodes.penalty
+                                addOrUpdateNode(
+                                    graph, e,
+                                    Node(
+                                        l = l, r = r, score = c, f = c, g = c, tango = yomi, yomiUsed = yomi,
+                                        len = yomi.length.toShort(), sPos = i,
+                                        mozcAttributes = mozcAttributesFor(l) or MozcNodeAttributes.LONG_VOWEL,
+                                    ),
+                                    graphNodeDedupMode, graphNodeTrace, str, "LONG_VOWEL",
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+            LongVowelNodes.interjectionEnd(str, i).takeIf { it > reusablePrefixLength }?.let { end ->
+                val yomi = str.substring(i, end)
+                val c = LongVowelNodes.INTERJECTION_COST
+                val id = LongVowelNodes.INTJ
+                addOrUpdateNode(
+                    graph, end,
+                    Node(
+                        l = id, r = id, score = c, f = c, g = c, tango = yomi, yomiUsed = yomi,
+                        len = yomi.length.toShort(), sPos = i, mozcAttributes = mozcAttributesFor(id),
+                    ),
+                    graphNodeDedupMode, graphNodeTrace, str, "VOWEL_INTERJECTION",
+                )
             }
 
             // 3.06 方言・口語のかな語（KanaDialectNodes.kt）: 標準形の構成語の品詞 ID・語コストの和＋共通ペナルティ

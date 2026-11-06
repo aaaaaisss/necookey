@@ -24,6 +24,12 @@ object MozcNodeAttributes {
 
     /** 五段ワ行のウ音便過去の合成ノード（思うた・思た、UOnbinPastNodes）。ラティス LM は標準の連用タ接続（思っ）で引く。 */
     const val U_ONBIN_PAST = 1 shl 9
+
+    /** ー を母音の伸ばしとして読んだひらがなの語（そー・よー、LongVowelNodes）。ラティス LM は置き換えた読み（そう）で引く。 */
+    const val LONG_VOWEL = 1 shl 10
+
+    /** 動詞の連用形＋行く/来る の合成ノード（買い行く・食べ来る、RenyouMotionNodes）。ラティス LM は前の動詞の表記で引く。 */
+    const val RENYOU_MOTION = 1 shl 11
 }
 
 data class Node(

@@ -2,6 +2,7 @@ package com.kazumaproject.markdownhelperkeyboard.converter.path_algorithm
 
 import com.kazumaproject.markdownhelperkeyboard.converter.candidate.CANDIDATE_TYPE_LEARNED_DICTIONARY
 import com.kazumaproject.graph.CandidateSource
+import com.kazumaproject.graph.MozcNodeAttributes
 import com.kazumaproject.graph.Node
 import com.kazumaproject.markdownhelperkeyboard.converter.candidate.Candidate
 import com.kazumaproject.markdownhelperkeyboard.converter.candidate.CandidateConversionSegment
@@ -43,6 +44,8 @@ internal object TsugihagiKanaRepair {
 
     private const val NUMBER_FIRST = 2043
     private const val NUMBER_LAST = 2055
+    private const val COMPOSED_ATTRIBUTES =
+        MozcNodeAttributes.DIALECT_INFLECTION or MozcNodeAttributes.U_ONBIN_PAST or MozcNodeAttributes.RENYOU_MOTION
 
     private fun isKanjiOrKatakana(c: Char) = c in '\u4E00'..'\u9FFF' || c == '々' || c in '\u30A1'..'\u30FA'
     private fun isHiragana(c: Char) = c in '\u3041'..'\u3096' || c == 'ー'
@@ -53,6 +56,9 @@ internal object TsugihagiKanaRepair {
         if (node.score < minWordCost) return false
         if (node.l.toInt() in NUMBER_FIRST..NUMBER_LAST) return false
         if (node.candidateSource != CandidateSource.SYSTEM && node.candidateSource != CandidateSource.UNKNOWN) return false
+        // 口語の合成ノード（言え＋れん・買い＋行く・思うた）は辞書の動詞から作った語で、コストに合成の上乗せが入っている。
+        // 低頻度の漢字片ではないので片に数えない（文句|言えれん がかなに戻されていた、2026-11-06）。
+        if (node.mozcAttributes and COMPOSED_ATTRIBUTES != 0) return false
         if (!y.all { isHiragana(it) }) return false
         return node.tango.any { isKanjiOrKatakana(it) }
     }

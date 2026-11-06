@@ -2,6 +2,8 @@ package com.kazumaproject.markdownhelperkeyboard.converter.quality
 
 import com.kazumaproject.markdownhelperkeyboard.converter.graph.DialectInflectionNodes
 import com.kazumaproject.markdownhelperkeyboard.converter.graph.KanaDialectNodes
+import com.kazumaproject.markdownhelperkeyboard.converter.graph.LongVowelNodes
+import com.kazumaproject.markdownhelperkeyboard.converter.graph.RenyouMotionNodes
 import com.kazumaproject.markdownhelperkeyboard.converter.graph.SystemDictionaryErrata
 import com.kazumaproject.markdownhelperkeyboard.converter.path_algorithm.PosPairPenalty
 import com.kazumaproject.markdownhelperkeyboard.converter.path_algorithm.TsugihagiKanaRepair
@@ -21,6 +23,11 @@ internal object ConversionKnobs {
         TsugihagiKanaRepair.minWordCost = TsugihagiKanaRepair.DEFAULT_MIN_WORD_COST
         TsugihagiKanaRepair.maxPieceYomi = TsugihagiKanaRepair.DEFAULT_MAX_PIECE_YOMI
         TsugihagiKanaRepair.minRun = 2
+        LongVowelNodes.enabled = true
+        LongVowelNodes.penalty = LongVowelNodes.DEFAULT_PENALTY
+        RenyouMotionNodes.enabled = true
+        RenyouMotionNodes.penalty = RenyouMotionNodes.DEFAULT_PENALTY
+        DialectInflectionNodes.potentialNegativeEnabled = true
     }
 
     fun set(key: String, value: String) {
@@ -37,6 +44,11 @@ internal object ConversionKnobs {
             "tc" -> TsugihagiKanaRepair.minWordCost = value.toInt()
             "ty" -> TsugihagiKanaRepair.maxPieceYomi = value.toInt()
             "tr" -> TsugihagiKanaRepair.minRun = value.toInt()
+            "lv" -> LongVowelNodes.enabled = value == "1"
+            "lvp" -> LongVowelNodes.penalty = value.toInt()
+            "rm" -> RenyouMotionNodes.enabled = value == "1"
+            "rmp" -> RenyouMotionNodes.penalty = value.toInt()
+            "ren" -> DialectInflectionNodes.potentialNegativeEnabled = value == "1"
             else -> error("unknown knob $key")
         }
     }
@@ -45,5 +57,6 @@ internal object ConversionKnobs {
         "dinf=${DialectInflectionNodes.enabled} dcost=${DialectInflectionNodes.suffixCost} kdia=${KanaDialectNodes.enabled} " +
             "kpen=${KanaDialectNodes.penalty} ha=${PosPairPenalty.haMergePenalty} hat=${PosPairPenalty.haMergeTimeOnly} err=${SystemDictionaryErrata.enabled} " +
             "lms=${DialectInflectionNodes.lmStemEnabled} tp=${TsugihagiKanaRepair.position} tc=${TsugihagiKanaRepair.minWordCost} " +
-            "ty=${TsugihagiKanaRepair.maxPieceYomi} tr=${TsugihagiKanaRepair.minRun}"
+            "ty=${TsugihagiKanaRepair.maxPieceYomi} tr=${TsugihagiKanaRepair.minRun} lv=${LongVowelNodes.enabled}/${LongVowelNodes.penalty} " +
+            "rm=${RenyouMotionNodes.enabled}/${RenyouMotionNodes.penalty}"
 }

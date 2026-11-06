@@ -41,6 +41,17 @@ class TsugihagiKanaRepairTest {
         assertEquals("ちいとまちんさい", s)
     }
 
+    @Test
+    fun composedColloquialNodesAreNotPieces() {
+        // 文句|言えれん: 言えれん は 言え＋れん の合成ノード（方言の活用語尾）で、片に数えない（2026-11-06）
+        val composed = Node(
+            l = 701, r = 45, score = 5000, f = 5000, tango = "言えん", len = 3, yomiUsed = "いえん", sPos = 0,
+            mozcAttributes = com.kazumaproject.graph.MozcNodeAttributes.DIALECT_INFLECTION,
+        )
+        assertEquals(false, TsugihagiKanaRepair.isPiece(composed))
+        assertNull(TsugihagiKanaRepair.repair(listOf(n("文句", "もんく", 5000), composed)))
+    }
+
     private fun n(tango: String, yomi: String, cost: Int, id: Short = 1851) =
         Node(l = id, r = id, score = cost, f = cost, tango = tango, len = yomi.length.toShort(), yomiUsed = yomi, sPos = 0)
 

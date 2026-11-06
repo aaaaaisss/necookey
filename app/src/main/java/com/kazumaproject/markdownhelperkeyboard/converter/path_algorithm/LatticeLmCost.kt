@@ -4,6 +4,8 @@ import com.kazumaproject.graph.MozcNodeAttributes
 import com.kazumaproject.graph.MozcNodeType
 import com.kazumaproject.graph.Node
 import com.kazumaproject.markdownhelperkeyboard.converter.graph.DialectInflectionNodes
+import com.kazumaproject.markdownhelperkeyboard.converter.graph.LongVowelNodes
+import com.kazumaproject.markdownhelperkeyboard.converter.graph.RenyouMotionNodes
 import com.kazumaproject.markdownhelperkeyboard.converter.graph.UOnbinPastNodes
 import java.io.DataInputStream
 import java.io.InputStream
@@ -40,6 +42,8 @@ object LatticeLmCost {
     private fun lmWord(node: Node): String = when {
         (node.mozcAttributes and MozcNodeAttributes.DIALECT_INFLECTION) != 0 -> DialectInflectionNodes.lmStem(node.tango)
         (node.mozcAttributes and MozcNodeAttributes.U_ONBIN_PAST) != 0 -> UOnbinPastNodes.lmWord(node.tango)
+        (node.mozcAttributes and MozcNodeAttributes.LONG_VOWEL) != 0 -> LongVowelNodes.lmWord(node.tango)
+        (node.mozcAttributes and MozcNodeAttributes.RENYOU_MOTION) != 0 -> RenyouMotionNodes.lmStem(node.tango)
         else -> node.tango
     }
 
