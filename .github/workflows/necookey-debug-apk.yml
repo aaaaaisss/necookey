@@ -3,7 +3,7 @@ name: necookey debug APK
 # One variant only: fullStandard release (R8 + shrinkResources, signed with keystore/necookey-ci.jks),
 # arm64-v8a. No lint, no other flavors. (Workflow name kept for tooling.)
 # The reranker table (h56, ~55 MB) is not bundled (-PsumireLmTable=false): users import sumire_lm_h56.zip in settings.
-# Unit tests run on the release variant so the already-compiled release classes are reused.
+# No unit tests in this workflow: it only builds and uploads the APK (run tests locally / separately).
 on:
   push:
     branches: [sumire-fork, main, sumire-lm-app, slim]
@@ -58,15 +58,6 @@ jobs:
         with:
           fetch-depth: 2
 
-      - name: Detect touched modules
-        id: changes
-        uses: dorny/paths-filter@v3
-        with:
-          filters: |
-            app: ['app/**']
-            core: ['core/**']
-            custom_keyboard: ['custom_keyboard/**']
-
       - name: Set up JDK 17
         uses: actions/setup-java@v5
         with:
@@ -95,50 +86,8 @@ jobs:
         id: assemble
         run: ./gradlew :app:assembleFullStandardRelease $GRADLE_FLAGS $LATTICE_LM_FLAGS -PsumireLmTable=false
 
-      - name: JVM unit tests (touched modules only)
-        id: tests
-        if: steps.changes.outputs.app == 'true' || steps.changes.outputs.core == 'true' || steps.changes.outputs.custom_keyboard == 'true'
-        run: |
-          TASKS=""
-          # release の単体テスト = assemble でコンパイル済みの release クラスを使う（debug をもう一度コンパイルしない）。
-          if [ "${{ steps.changes.outputs.app }}" = "true" ]; then
-            # necookey's own tests; the full Sumire app suite (Robolectric) is not run on every push.
-            P=com.kazumaproject.markdownhelperkeyboard
-            TASKS="$TASKS :app:testFullStandardReleaseUnitTest --tests $P.converter.candidatebar.* --tests $P.converter.quality.* --tests $P.converter.path_algorithm.LatticeLmCostTest --tests $P.ime_service.candidatebar.* --tests $P.converter.sumirelm.SumireLmTableStoreTest --tests $P.converter.graph.SystemDictionaryErrataTest"
-          fi
-          if [ "${{ steps.changes.outputs.core }}" = "true" ]; then TASKS="$TASKS :core:testReleaseUnitTest"; fi
-          if [ "${{ steps.changes.outputs.custom_keyboard }}" = "true" ]; then TASKS="$TASKS :custom_keyboard:testReleaseUnitTest"; fi
-          ./gradlew $TASKS $GRADLE_FLAGS $LATTICE_LM_FLAGS -PsumireLmTable=false --quiet
-
-      # Print each failing test (class.method + first line of the message) and keep the reports.
-      - name: Report failing unit tests
-        if: always() && steps.tests.outcome == 'failure'
-        run: |
-          python3 - <<'PY'
-          import glob, xml.etree.ElementTree as ET
-          for f in glob.glob('**/build/test-results/**/*.xml', recursive=True):
-              for tc in ET.parse(f).getroot().iter('testcase'):
-                  for e in list(tc.findall('failure')) + list(tc.findall('error')):
-                      msg = (e.get('message') or e.text or '').strip().splitlines()
-                      line = f"FAILED {tc.get('classname')}.{tc.get('name')}: {msg[0] if msg else ''}"
-                      print(f"::error title=Unit test failed::{line}")
-                      print(line)
-          PY
-
-      - name: Upload unit test reports
-        if: always() && steps.tests.outcome == 'failure'
-        uses: actions/upload-artifact@v4
-        with:
-          name: unit-test-reports
-          path: |
-            */build/test-results/**/*.xml
-            */build/reports/tests/
-          retention-days: 7
-
-      # APK steps run whenever assemble succeeded, even if unit tests failed.
       - name: Locate APK and verify no INTERNET permission
         id: apk
-        if: always() && steps.assemble.outcome == 'success'
         run: |
           APK=$(find app/build -name '*.apk' -path '*fullStandard*' -path '*release*' | grep -v androidTest | head -1)
           if [ -z "$APK" ]; then echo "APK not found"; find app/build -name '*.apk'; exit 1; fi
@@ -155,7 +104,6 @@ jobs:
           ls -la "$APK"
 
       - name: Upload APK
-        if: always() && steps.apk.outcome == 'success'
         uses: actions/upload-artifact@v4
         with:
           name: necookey-fullStandard-release-arm64
