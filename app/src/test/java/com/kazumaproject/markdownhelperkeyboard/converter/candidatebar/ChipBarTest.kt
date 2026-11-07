@@ -376,4 +376,107 @@ class ChipBarTest {
         assertNull(m.applySegmentation(s, setOf(1))) // 𠮷 の途中
         assertEquals(listOf(0, 2, 3), m.applySegmentation(s, setOf(2))!!.boundaries)
     }
+
+    // ---- 区切りを変える候補（2026-11-07） ----
+
+    @Test
+    fun segmentAlternativesComeFromWholeNBestPaths() {
+        val t = Table(*table.map.toList().toTypedArray())
+        val m = ChipBarModel(t)
+        val s = m.tap(m.initial("ではきもの"), 1) // では|[着物]
+        val row = m.lowerRow(s) as LowerRow.ChipCandidates
+        // 2 位の経路 で|履物 → 左隣を取り込んで区切りが動く
+        assertEquals(1, row.segments.size)
+        val alt = row.segments[0]
+        assertEquals(listOf("で", "履物"), alt.pieces.map { it.output })
+        assertEquals(0 to 5, alt.start to alt.end)
+        assertEquals(SegmentAlternative.Direction.LEFT, alt.direction)
+        // 適用: 変換し直さず（表記は候補のまま）、元の選択チップの頭を含むチップを選択
+        val calls = t.calls.size
+        val out = m.applyAlternative(s, alt)!!
+        assertEquals(calls, t.calls.size)
+        assertEquals(listOf("で", "履物"), out.chips.map { it.output })
+        assertEquals(listOf(0, 1, 5), out.boundaries)
+        assertEquals(1, out.selected)
+        assertTrue(out.chips.all { it.origin == Chip.Origin.RESIZED })
+        // 戻すと remembered で元の表記
+        val back = m.applySegmentation(out, setOf(2))!!
+        assertEquals(listOf("では", "着物"), back.chips.map { it.output })
+        // 状態が変わって範囲が合わなければ null
+        assertNull(m.applyAlternative(m.applySegmentation(s, setOf(2, 4))!!, alt.copy(start = 1)))
+    }
+
+    @Test
+    fun refineAddsMergedConversionsAndContextSurfaces() {
+        val t = Table(
+            "いいほうほうないか" to listOf(path("いいほうほうないか", "いい|ほうほう|ないか", "いい|方法|内科", listOf(2, 6))),
+            "ないか" to listOf(path("ないか", "ないか", "内科")),
+            "ほうほうないか" to listOf(path("ほうほうないか", "ほうほう|ない|か", "方法|ない|か")),
+        )
+        val m = ChipBarModel(t)
+        val s = m.tap(m.initial("いいほうほうないか"), 2) // いい|方法|[内科]
+        val row = m.lowerRow(s) as LowerRow.ChipCandidates
+        assertTrue(row.segments.isEmpty())
+        val refined = m.refineLowerRow(s, row)!!
+        assertEquals(listOf("方法ないか"), refined.segments.map { it.surface })
+        assertEquals(SegmentAlternative.Direction.LEFT, refined.segments[0].direction)
+        assertEquals(2 to 9, refined.segments[0].start to refined.segments[0].end)
+        assertEquals(listOf("ないか"), refined.context) // くっつけた読みの経路で、このチップの範囲 = ない|か
+        // 左隣を左文脈にして変換
+        assertEquals(ChipContext("いい", "いい"), t.contexts.last { it.first == "ほうほうないか" }.second)
+        val out = m.applyAlternative(s, refined.segments[0])!!
+        assertEquals(listOf("いい", "方法ないか"), out.chips.map { it.output })
+        assertEquals(1, out.selected)
+        // もう一杯・選択が違うときは何もしない
+        assertNull(m.refineLowerRow(s.copy(selected = 1), refined))
+    }
+
+    @Test
+    fun refineOffersMergedChipWhenPathKeepsSameBoundary() {
+        // は|磨いて の「磨いて」を選ぶ → くっつけた読みの 2 位「歯磨いて」を 1 チップで
+        val t = Table(
+            "はみがいて" to listOf(
+                path("はみがいて", "は|みがい|て", "は|磨い|て", listOf(1)),
+                path("はみがいて", "は|みがい|て", "歯|磨い|て"),
+            ),
+            "みがいて" to listOf(path("みがいて", "みがい|て", "磨い|て")),
+        )
+        val m = ChipBarModel(t)
+        val s = m.tap(m.initial("はみがいて"), 1)
+        assertEquals(listOf("は", "磨いて"), s.chips.map { it.output })
+        val row = m.lowerRow(s) as LowerRow.ChipCandidates
+        assertTrue(row.segments.isEmpty()) // 2 位の文節は区切りが同じ（歯|磨いて）なので区切りの候補ではない
+        val refined = m.refineLowerRow(s, row)!!
+        assertEquals(listOf("歯磨いて"), refined.segments.map { it.surface })
+        assertEquals(1, refined.segments[0].pieces.size) // 1 チップ
+    }
+
+    @Test
+    fun alternativeFromRejectsFarReachingAndUnchanged() {
+        val m = ChipBarModel(table)
+        val s = m.applySegmentation(m.initial("ではきもの"), setOf(1, 2, 4))!! // で|は|きも|の
+        // 4 チップをまたぐ塊（左右の隣より先）は出さない
+        assertNull(m.alternativeFrom(s, 0, listOf(Chip(0, 5, "では着物"))))
+        // 同じ区切り・同じ表記は出さない
+        assertNull(m.alternativeFrom(s, 1, s.chips))
+        // 右隣とくっつける
+        val alt = m.alternativeFrom(s, 1, listOf(Chip(0, 1, "で"), Chip(1, 4, "はきも")))!!
+        assertEquals(SegmentAlternative.Direction.RIGHT, alt.direction)
+        assertEquals(1 to 4, alt.start to alt.end)
+    }
+
+    @Test
+    fun applySegmentationWithSurfacesSkipsReconversion() {
+        val t = Table(*table.map.toList().toTypedArray())
+        val m = ChipBarModel(t)
+        val s = m.initial("ではきもの")
+        val calls = t.calls.size
+        val out = m.applySegmentation(s, setOf(1), select = 1, surfaces = mapOf((0 to 1) to "出", (1 to 5) to "履物"))!!
+        assertEquals(listOf("出", "履物"), out.chips.map { it.output })
+        assertEquals(1, out.selected)
+        assertEquals(calls, t.calls.size)
+        // 区切りが同じでも表記が違えば反映、同じなら null
+        assertEquals("肝の", m.applySegmentation(s, setOf(2), surfaces = mapOf((2 to 5) to "肝の"))!!.chips[1].output)
+        assertNull(m.applySegmentation(s, setOf(2), surfaces = mapOf((2 to 5) to "着物")))
+    }
 }

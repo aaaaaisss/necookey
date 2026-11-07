@@ -193,6 +193,7 @@ import com.kazumaproject.markdownhelperkeyboard.converter.candidatebar.BunsetsuA
 import com.kazumaproject.markdownhelperkeyboard.converter.candidatebar.BunsetsuAnalyzer
 import com.kazumaproject.markdownhelperkeyboard.converter.candidatebar.BunsetsuRangeEditor
 import com.kazumaproject.markdownhelperkeyboard.converter.candidatebar.CANDIDATE_TYPE_CHIP_CANDIDATE
+import com.kazumaproject.markdownhelperkeyboard.converter.candidatebar.CANDIDATE_TYPE_CHIP_UNDO
 import com.kazumaproject.markdownhelperkeyboard.converter.candidatebar.CANDIDATE_TYPE_CHIP_FULL_ALTERNATIVE
 import com.kazumaproject.markdownhelperkeyboard.converter.candidatebar.ChipBarModel
 import com.kazumaproject.markdownhelperkeyboard.converter.candidatebar.ChipBarPresenter
@@ -1646,6 +1647,11 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
     @Volatile
     private var chipBarSegmentTarget: Triple<String, Set<Int>, Int?>? = null
     private var chipBarModel: ChipBarModel? = null
+    /**
+     * 直前の区切りの変更（変えた後の状態, 変える前の状態）。今の状態が「変えた後」のままの間だけ下段に「戻す」を出す
+     * （docs/CHIP_BAR.md「2026-11-07 区切りを変える候補・端のハンドル」）。Main。
+     */
+    private var chipBarUndo: Pair<ChipBarState, ChipBarState>? = null
     /** 下段の予測（2段バーの予測と同じもの）。チップ非選択のとき下段に出す。 */
     private var chipBarPredictions: List<Candidate> = emptyList()
     private var chipBarLowerRow: LowerRow? = null
@@ -13948,6 +13954,7 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
     private fun clearChipBarState() {
         chipBarState = null
         chipBarSegmentTarget = null
+        chipBarUndo = null
         chipBarModel = null
         chipBarCarryFrom = null
         chipBarLowerRow = null
@@ -13993,7 +14000,7 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         }
         val state = chipBarState ?: return bar.predictions
         val row = chipBarLowerRow ?: return bar.predictions
-        return ChipBarPresenter.lowerRow(state, row, bar.predictions)
+        return ChipBarPresenter.lowerRow(state, row, bar.predictions, undo = chipBarUndoAvailable(state))
     }
 
     /**
@@ -14134,6 +14141,7 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
     private fun runChipBarOp(
         waitForStateMs: Long = 0L,
         onTimeout: () -> Unit = {},
+        recordUndo: Boolean = true,
         op: (ChipBarModel, ChipBarState) -> ChipBarState?,
     ) {
         val input = inputString.value
@@ -14165,9 +14173,39 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
                     }
                 } ?: return@withLock
                 if (chipBarState !== state || chipBarModel !== model || inputString.value != input) return@withLock
-                applyChipBarState(input, result.first, result.second)
+                val next = result.first
+                // 区切りが変わったら「戻す」（戻した操作自体は記録しない）
+                if (!recordUndo) {
+                    chipBarUndo = null
+                } else if (next.boundaries != state.boundaries) {
+                    chipBarUndo = next to state
+                }
+                applyChipBarState(input, next, result.second)
+                refineChipBarLowerRow(input, model, next, result.second)
             }
         }
+    }
+
+    private fun chipBarUndoAvailable(state: ChipBarState): Boolean = chipBarUndo?.first === state
+
+    /**
+     * 下段を出した後に、選択チップを左右の隣とくっつけた読みを変換して「区切りを変える候補」を足す
+     * （[ChipBarModel.refineLowerRow]。選択の反応を待たせないため 2 段目で）。チップ操作の Mutex の中で呼ぶ。
+     */
+    private suspend fun refineChipBarLowerRow(input: String, model: ChipBarModel, state: ChipBarState, row: LowerRow) {
+        if (row !is LowerRow.ChipCandidates) return
+        val refined = withContext(Dispatchers.Default) {
+            try {
+                model.refineLowerRow(state, row)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                Timber.w(e, "chip segment alternatives failed")
+                null
+            }
+        } ?: return
+        if (chipBarState !== state || chipBarModel !== model || inputString.value != input) return
+        applyChipBarState(input, state, refined)
     }
 
     /** Main. */
@@ -14175,7 +14213,8 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         chipBarState = state
         chipBarLowerRow = row
         necookeyPredictionRowInput = input
-        necookeyPredictionRowCandidates = ChipBarPresenter.lowerRow(state, row, chipBarPredictions)
+        necookeyPredictionRowCandidates =
+            ChipBarPresenter.lowerRow(state, row, chipBarPredictions, undo = chipBarUndoAvailable(state))
         applyChipComposingText(state)
         syncNecookeyPredictionRow(candidatesShown = true)
     }
@@ -14185,7 +14224,15 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         when (candidate.type) {
             CANDIDATE_TYPE_CHIP_CANDIDATE -> runChipBarOp { m, s -> m.pickCandidate(s, candidate.string) }
             CANDIDATE_TYPE_CHIP_FULL_ALTERNATIVE -> runChipBarOp { m, s -> m.pickFullAlternative(s, candidate.string) }
-            else -> return false
+            // 区切りを変える候補（docs/CHIP_BAR.md「2026-11-07 区切りを変える候補・端のハンドル」）
+            CANDIDATE_TYPE_CHIP_UNDO -> runChipBarOp(recordUndo = false) { _, s ->
+                chipBarUndo?.takeIf { it.first === s }?.second
+            }
+            else -> {
+                if (!ChipBarPresenter.isSegmentAlternative(candidate)) return false
+                val alt = ChipBarPresenter.segmentFor(chipBarLowerRow, candidate) ?: return true
+                runChipBarOp { m, s -> m.applyAlternative(s, alt) }
+            }
         }
         return true
     }
