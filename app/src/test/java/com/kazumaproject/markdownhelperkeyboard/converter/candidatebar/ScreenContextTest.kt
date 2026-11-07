@@ -16,7 +16,8 @@ class ScreenContextTest {
         val b = ScreenContextStore.snapshot("chat", 1000L)!!
         assertEquals(ScreenContextBonus.W_COMMIT, b.tokenBonus("県庁"), 1e-9)
         assertEquals(0.0, b.tokenBonus("県長"), 1e-9)
-        assertNull(ScreenContextStore.snapshot("mail", 1000L))
+        // 別アプリでは他アプリの確定語として弱く効く（2026-11-07）
+        assertEquals(ScreenContextBonus.W_OTHER_COMMIT, ScreenContextStore.snapshot("mail", 1000L)!!.tokenBonus("県庁"), 1e-9)
         assertNull(ScreenContextStore.snapshot("chat", ScreenContextStore.COMMIT_TTL_MS + 1))
     }
 

@@ -57,7 +57,8 @@ class DialectInflectionNodesTest {
     @Test
     fun suffixStartsAndLmStem() {
         assertTrue(DialectInflectionNodes.suffixStarts("いえんかった").contains(2))
-        assertEquals(0, DialectInflectionNodes.suffixStarts("きょうはいいてんき").size)
+        // 否定の「ん」（2026-11-07）だけは どの ん の位置でも始まり候補になる（未然形の語幹にしか付かない）
+        assertEquals(listOf(7), DialectInflectionNodes.suffixStarts("きょうはいいてんき").toList())
         assertEquals("言え", DialectInflectionNodes.lmStem("言えんかった"))
         assertEquals("撮っ", DialectInflectionNodes.lmStem("撮っとる"))
         assertEquals("寝落ちし", DialectInflectionNodes.lmStem("寝落ちしてもうた"))
