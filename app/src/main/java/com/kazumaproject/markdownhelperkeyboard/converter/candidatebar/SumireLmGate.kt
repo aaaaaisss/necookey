@@ -18,6 +18,11 @@ import com.kazumaproject.markdownhelperkeyboard.converter.sumirelm.SumireLmReran
  */
 object SumireLmGate {
     const val POOL_SIZE = 50
+
+    /** 2026-11-07 の並べ替えの歯止め（1 字漢字への差し替え・文頭の助詞・長い読みの 1 字漢字）。評価用に切り替え可能。 */
+    @Volatile
+    @JvmStatic
+    var guards1107: Boolean = true
     /** 設定値（百分の一単位）の既定 = マージン 0.50。 */
     const val DEFAULT_MARGIN_THRESHOLD_CENTS = 50
 
@@ -82,6 +87,12 @@ object SumireLmGate {
             order = listOf(0) + order.filter { it != 0 }
         }
         keepHiraganaOverKatakanaSwap(pool, order, scores)?.let { order = it }
+        if (guards1107) {
+            val toks = inputs.map { it.tokens }
+            keepHiraganaOverSingleKanjiSwap(toks, order, scores)?.let { order = it }
+            avoidSentenceInitialParticle(leftContext, toks, inputs.map { it.readings }, order, scores)?.let { order = it }
+            avoidLoneLongReadingKanji(input, pool, order, scores)?.let { order = it }
+        }
         keepTrailingElongation(input, pool, order)?.let { order = it }
         // 確認用の数（メモリだけ）: 加点が付いたか・加点で 1 位が変わったか（設定「画面の文脈」の状態表示）
         val withBonusTop = if (bonusApplied) pool.indices.sortedWith(compareByDescending<Int> { scores[it] }.thenBy { it }).first() else -1
@@ -138,6 +149,79 @@ object SumireLmGate {
         if (top == sumire || top.none { it in '\u30A1'..'\u30F6' } || foldKatakana(top) != sumire) return null
         if (scores[order[0]] - scores[0] >= KATAKANA_SWAP_MARGIN) return null
         return listOf(0) + order.filter { it != 0 }
+    }
+
+    /** 1 字漢字への差し替え・文頭の助詞・長い読みの 1 字漢字を止めるリランカーの差（これ未満なら止める）。 */
+    const val SINGLE_KANJI_SWAP_MARGIN = 1.5
+    const val INITIAL_PARTICLE_MARGIN = 3.0
+    const val LONE_KANJI_MARGIN = 1.0
+
+    private fun isAllHiragana(s: String): Boolean = s.isNotEmpty() && s.all { it in '\u3041'..'\u3096' || it == 'ー' }
+
+    /**
+     * リランカー 1 位が、Sumire の 1 位と同じ語分割で、Sumire のひらがなの語を 1 字漢字に替えただけ（しとく→し得）で、
+     * 差が [SINGLE_KANJI_SWAP_MARGIN] 未満なら Sumire の 1 位に戻す（2026-11-07 端末: めちゃたのしみしとく → し得）。
+     * 補助動詞・縮約（とく・とる・ちゃう）はひらがなで書くのが普通で、表は稀な 1 字漢字の語に引っ張られる。変えないなら null。
+     */
+    internal fun keepHiraganaOverSingleKanjiSwap(tokens: List<List<String>>, order: List<Int>, scores: DoubleArray): List<Int>? {
+        if (order.isEmpty() || order[0] == 0) return null
+        val top = tokens[order[0]]
+        val sumire = tokens[0]
+        if (top.size != sumire.size || top.isEmpty()) return null
+        var swapped = false
+        for (k in top.indices) {
+            if (top[k] == sumire[k]) continue
+            if (!(isSingleKanji(top[k]) && isAllHiragana(sumire[k]) && sumire[k].length >= 2)) return null
+            swapped = true
+        }
+        if (!swapped || scores[order[0]] - scores[0] >= SINGLE_KANJI_SWAP_MARGIN) return null
+        return listOf(0) + order.filter { it != 0 }
+    }
+
+    private val INITIAL_PARTICLES = setOf("は", "が", "を", "に", "へ")
+
+    /**
+     * 文頭（左文脈なし・文末記号や改行の直後）の 1 字の助詞（は|磨いて）は日本語として来ない。1 位がそうなら、先頭の語が
+     * 違う候補のうち一番スコアの高いもの（歯磨いて）を、差が [INITIAL_PARTICLE_MARGIN] 未満なら 1 位にする（2026-11-07 端末）。
+     * 変えないなら null。
+     */
+    internal fun avoidSentenceInitialParticle(
+        leftContext: String,
+        tokens: List<List<String>>,
+        readings: List<List<String>>,
+        order: List<Int>,
+        scores: DoubleArray,
+    ): List<Int>? {
+        if (order.isEmpty()) return null
+        val left = leftContext.trimEnd(' ', '\u3000')
+        if (left.isNotEmpty() && left.last() !in "。！？!?\n") return null
+        val t0 = tokens[order[0]].firstOrNull() ?: return null
+        if (t0 !in INITIAL_PARTICLES || readings[order[0]].firstOrNull() != t0) return null
+        // 助詞の字だけを替えた候補（は|磨いて→歯|磨いて）に限る。残りまで変わる候補（はよしてや→羽吉手や）は採らない。
+        val rest = tokens[order[0]].joinToString("").substring(t0.length)
+        val alt = order.drop(1).firstOrNull {
+            val f = tokens[it].firstOrNull()
+            f != null && f !in INITIAL_PARTICLES && tokens[it].joinToString("").endsWith(rest) &&
+                tokens[it].joinToString("").length - rest.length == 1
+        } ?: return null
+        if (scores[order[0]] - scores[alt] >= INITIAL_PARTICLE_MARGIN) return null
+        return listOf(alt) + order.filter { it != alt }
+    }
+
+    /**
+     * 入力全体（4 字以下）が読み 3 字以上の 1 字漢字（うれし→嬉）になったら、その漢字を含む送り仮名つきの表記（嬉し）のうち
+     * 一番スコアの高いものを、差が [LONE_KANJI_MARGIN] 未満なら 1 位にする（2026-11-07 端末）。
+     * 変えないなら null。
+     */
+    internal fun avoidLoneLongReadingKanji(input: String, pool: List<Candidate>, order: List<Int>, scores: DoubleArray): List<Int>? {
+        if (order.isEmpty() || input.length !in 3..4) return null
+        val top = pool[order[0]].string
+        if (!isSingleKanji(top)) return null
+        // 送り仮名つきの表記（嬉し）があるときだけ替える。名詞として 1 字で立つ漢字（さかな→魚）にはそれが無いので変わらない。
+        val alt = order.drop(1).firstOrNull { val s = pool[it].string; s.length >= 2 && s.startsWith(top) && isAllHiragana(s.substring(1)) }
+            ?: return null
+        if (scores[order[0]] - scores[alt] >= LONE_KANJI_MARGIN) return null
+        return listOf(alt) + order.filter { it != alt }
     }
 
     private fun isSingleKanji(s: String): Boolean =

@@ -31,6 +31,14 @@ class ScreenContextAccessibilityService : AccessibilityService() {
             "authenticator", "password", "credit", "securities", "finance", "crypto",
         )
 
+        /** 接続中のサービス（キーボードが出た瞬間に読み取りを頼むため）。 */
+        @Volatile private var instance: java.lang.ref.WeakReference<ScreenContextAccessibilityService>? = null
+
+        /** すぐ 1 回読む（キーボードが出た・画面の語が古い）。サービスが無ければ何もしない。 */
+        fun requestCapture() {
+            instance?.get()?.scheduleNow()
+        }
+
         fun isExcludedPackage(pkg: String): Boolean {
             val p = pkg.lowercase()
             return EXCLUDED_KEYWORDS.any { p.contains(it) }
@@ -51,13 +59,27 @@ class ScreenContextAccessibilityService : AccessibilityService() {
 
     override fun onServiceConnected() {
         super.onServiceConnected()
+        instance = java.lang.ref.WeakReference(this)
         ScreenContextStore.serviceConnected = true
+        ScreenContextStore.captureRequester = { requestCapture() }
     }
 
     override fun onUnbind(intent: android.content.Intent?): Boolean {
         ScreenContextStore.serviceConnected = false
+        ScreenContextStore.captureRequester = null
+        instance = null
         ScreenContextStore.clearScreen()
         return super.onUnbind(intent)
+    }
+
+    /** イベントを待たずに読む（キーボードが出ても対象アプリのイベントが来ないと語が空のままだった）。 */
+    private fun scheduleNow() {
+        handler.post {
+            handler.removeCallbacks(runnable)
+            scheduled = false
+            lastRun = SystemClock.uptimeMillis()
+            captureSafely()
+        }
     }
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
@@ -86,9 +108,10 @@ class ScreenContextAccessibilityService : AccessibilityService() {
         if (!ScreenContextStore.keyboardVisible) return
         val target = ScreenContextStore.inputPackage
         if (target.isEmpty() || target == packageName || isExcludedPackage(target)) return
-        val root = rootInActiveWindow ?: return
+        // いま入力しているアプリのウィンドウだけ。キーボードが出ていると前面（active）がずれることがあるので、
+        // まず対話ウィンドウ一覧からそのアプリの通常ウィンドウを探し、無ければ前面のウィンドウ。
+        val root = targetRoot(target) ?: return
         val pkg = root.packageName?.toString().orEmpty()
-        // いま入力しているアプリのウィンドウだけ（通知を下ろしている・別のウィンドウが前面のときは読まない）
         if (pkg != target) return
         val texts = ArrayList<String>()
         var chars = 0
@@ -114,10 +137,24 @@ class ScreenContextAccessibilityService : AccessibilityService() {
         texts.clear()
     }
 
+    private fun targetRoot(target: String): AccessibilityNodeInfo? {
+        try {
+            for (w in windows) {
+                if (w.type != android.view.accessibility.AccessibilityWindowInfo.TYPE_APPLICATION) continue
+                val r = w.root ?: continue
+                if (r.packageName?.toString() == target) return r
+            }
+        } catch (_: Exception) {
+        }
+        return rootInActiveWindow
+    }
+
     override fun onInterrupt() = Unit
 
     override fun onDestroy() {
         handler.removeCallbacks(runnable)
+        instance = null
+        ScreenContextStore.captureRequester = null
         ScreenContextStore.serviceConnected = false
         ScreenContextStore.clearScreen()
         super.onDestroy()

@@ -28,6 +28,11 @@ internal object DialectInflectionNodes {
     @JvmStatic
     var potentialNegativeEnabled: Boolean = true
 
+    /** 否定 ん（話さん・言えん）を作るか（評価用に切り替え可能）。SUFFIXES は初期化時に決まるので、切り替えは suffixesAt で見る。 */
+    @Volatile
+    @JvmStatic
+    var plainNegativeEnabled: Boolean = true
+
     /** 語尾 1 つあたりの追加コスト（語幹の語コストに足す）。 */
     @Volatile
     @JvmStatic
@@ -90,6 +95,9 @@ internal object DialectInflectionNodes {
             add(Suffix(s, MIZEN, N))
             add(Suffix(s + "かった", MIZEN, TA))
         }
+        // 否定 ん（広島・西日本）: 話さん・言えん・行かん・せん。辞書の 未然＋ん は 花さん・肺炎 のような名詞に負けていた
+        // （2026-11-07 端末: あんまはなさんとこ・そうはいえん）。1 ノードにして経路に残す。
+        add(Suffix("ん", MIZEN, N))
         // 可能の否定（広島・西日本、ら抜き＋ん）: 言えれん・食べれん・来れんかった（語幹 = 可能動詞/一段の未然形 言え・食べ）
         add(Suffix("れん", MIZEN, N))
         add(Suffix("れんかった", MIZEN, TA))
@@ -133,6 +141,7 @@ internal object DialectInflectionNodes {
         var out: MutableList<Suffix>? = null
         for (s in cands) {
             if (!potentialNegativeEnabled && s.reading[0] == 'れ') continue
+            if (!plainNegativeEnabled && s.reading == "ん") continue
             if (s.stem and stemClass != 0 && str.startsWith(s.reading, end)) {
                 (out ?: ArrayList<Suffix>(2).also { out = it }).add(s)
             }

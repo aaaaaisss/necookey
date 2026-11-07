@@ -28,6 +28,8 @@ internal object ConversionKnobs {
         RenyouMotionNodes.enabled = true
         RenyouMotionNodes.penalty = RenyouMotionNodes.DEFAULT_PENALTY
         DialectInflectionNodes.potentialNegativeEnabled = true
+        DialectInflectionNodes.plainNegativeEnabled = true
+        com.kazumaproject.markdownhelperkeyboard.converter.candidatebar.SumireLmGate.guards1107 = true
     }
 
     fun set(key: String, value: String) {
@@ -49,6 +51,8 @@ internal object ConversionKnobs {
             "rm" -> RenyouMotionNodes.enabled = value == "1"
             "rmp" -> RenyouMotionNodes.penalty = value.toInt()
             "ren" -> DialectInflectionNodes.potentialNegativeEnabled = value == "1"
+            "neg" -> DialectInflectionNodes.plainNegativeEnabled = value == "1"
+            "gg" -> com.kazumaproject.markdownhelperkeyboard.converter.candidatebar.SumireLmGate.guards1107 = value == "1"
             else -> error("unknown knob $key")
         }
     }

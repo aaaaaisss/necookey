@@ -81,9 +81,17 @@ object ScreenContextStore {
     /** ユーザー補助サービスが接続中か（設定の状態表示用）。 */
     @Volatile var serviceConnected: Boolean = false
 
+    /** ユーザー補助サービスへの「今すぐ読んで」（接続中だけ入る）。 */
+    @Volatile var captureRequester: (() -> Unit)? = null
+
+    /** 画面の語がこれより古ければ変換のときに読み直しを頼む。 */
+    const val SCREEN_REFRESH_MS = 4000L
+
     fun onKeyboardShown(pkg: String) {
         inputPackage = pkg
         keyboardVisible = true
+        // 出た瞬間に 1 回読む（対象アプリのイベントを待つと、変化のない画面では語が空のままだった）
+        captureRequester?.invoke()
     }
 
     /** キーボードが隠れた: 画面の語を捨てる（入力欄の前後・確定の記録は残す）。 */
@@ -165,8 +173,14 @@ object ScreenContextStore {
         val cm = q?.joinToString("\n") { it.text }.orEmpty()
         val iter = screens.entries.iterator()
         while (iter.hasNext()) if (now - iter.next().value.time > SCREEN_TTL_MS) iter.remove()
-        val sc = screens[pkg]?.text.orEmpty()
-        if (ed.isEmpty() && cm.isEmpty() && sc.isEmpty()) null else ScreenContextBonus(editor = ed, commits = cm, screen = sc)
+        val scEntry = screens[pkg]
+        if (keyboardVisible && (scEntry == null || now - scEntry.time > SCREEN_REFRESH_MS)) captureRequester?.invoke()
+        val sc = scEntry?.text.orEmpty()
+        // ほかのアプリで最近確定した語（同じ話題をアプリをまたいで打つことが多い）。重みは画面と同じ控えめ。
+        val other = commits.entries.filter { it.key != pkg }.flatMap { e -> e.value.filter { now - it.time <= COMMIT_TTL_MS }.map { it.text } }
+            .joinToString("\n")
+        if (ed.isEmpty() && cm.isEmpty() && sc.isEmpty() && other.isEmpty()) null
+        else ScreenContextBonus(editor = ed, commits = cm, screen = sc, otherCommits = other)
     }
 
     internal fun isKanjiOrKatakana(c: Char): Boolean =
@@ -178,6 +192,7 @@ class ScreenContextBonus(
     private val editor: String,
     private val commits: String,
     private val screen: String,
+    private val otherCommits: String = "",
     private val wEditor: Double = W_EDITOR,
     private val wCommit: Double = W_COMMIT,
     private val wScreen: Double = W_SCREEN,
@@ -187,9 +202,11 @@ class ScreenContextBonus(
         const val W_EDITOR = 0.4
         const val W_COMMIT = 0.6
         const val W_SCREEN = 0.3
+        const val W_OTHER_COMMIT = 0.3
         const val CAP = 0.8
-        const val TOP_N = 5
-        const val MAX_GAP = 1.5
+        // 2026-11-07: 上位 5・差 1.5 では正解が届かず、端末で 1 位を変えたのは 100 回に 1 回未満だった。少し広げる。
+        const val TOP_N = 10
+        const val MAX_GAP = 2.5
     }
 
     private fun eligible(token: String): Boolean =
@@ -202,6 +219,7 @@ class ScreenContextBonus(
         if (commits.contains(token)) b = maxOf(b, wCommit)
         if (editor.contains(token)) b = maxOf(b, wEditor)
         if (screen.contains(token)) b = maxOf(b, wScreen)
+        if (b == 0.0 && otherCommits.contains(token)) b = W_OTHER_COMMIT
         return b
     }
 
