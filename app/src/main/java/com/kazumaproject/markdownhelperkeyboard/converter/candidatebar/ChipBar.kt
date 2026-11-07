@@ -108,13 +108,59 @@ sealed interface LowerRow {
     /** 普段の下段（予測）。モデルは予測を持たず、読み全体の別候補だけ渡す（UI が予測と並べる）。 */
     data class Predictions(val fullAlternatives: List<String>) : LowerRow
 
+    /**
+     * [segments] = 区切りを変える候補（選択チップの周りを割り直した変換済みの塊。最大 [ChipBarConfig.maxSegmentAlternatives]）。
+     * [context] = 文全体の経路で選択チップと同じ範囲になった表記（例: 「ないか」。前の方に寄せる普通の候補）。
+     * docs/CHIP_BAR.md「2026-11-07 区切りを変える候補・端のハンドル」。
+     */
     data class ChipCandidates(
         val chipIndex: Int,
         val candidates: List<String>,
         val kana: List<String>,
+        val segments: List<SegmentAlternative> = emptyList(),
+        val context: List<String> = emptyList(),
     ) : LowerRow {
         val all: List<String> get() = (candidates + kana).distinct()
     }
+}
+
+/**
+ * 区切りを変える候補: 選択チップ（読みの [chipStart]..[chipEnd]）の周りの読み [start]..[end]（今のチップの区切りに揃う。
+ * 選択チップと左右の隣まで）を [pieces]（変換済み）に置き換える。
+ */
+data class SegmentAlternative(
+    val chipStart: Int,
+    val chipEnd: Int,
+    val start: Int,
+    val end: Int,
+    val pieces: List<Chip>,
+) {
+    enum class Direction {
+        /** 左隣を取り込む（左の区切りが動く・消える）。 */
+        LEFT,
+        /** 右隣を取り込む。 */
+        RIGHT,
+        BOTH,
+        /** 選択チップの中だけ（割る）。 */
+        SPLIT,
+    }
+
+    val surface: String get() = pieces.joinToString("") { it.output }
+
+    val direction: Direction
+        get() {
+            val left = start < chipStart
+            val right = end > chipEnd
+            return when {
+                left && right -> Direction.BOTH
+                left -> Direction.LEFT
+                right -> Direction.RIGHT
+                else -> Direction.SPLIT
+            }
+        }
+
+    /** 同じ置き換えかどうか（重複を除くため）。 */
+    val key: List<Triple<Int, Int, String>> get() = pieces.map { Triple(it.start, it.end, it.output) }
 }
 
 data class ChipBarConfig(
@@ -122,6 +168,10 @@ data class ChipBarConfig(
     val maxChipReading: Int = 6,
     val maxCandidates: Int = 8,
     val maxFullAlternatives: Int = 8,
+    /** 下段に出す「区切りを変える候補」の最大数。 */
+    val maxSegmentAlternatives: Int = 3,
+    /** 文全体の経路から取った同じ範囲の表記（[LowerRow.ChipCandidates.context]）の最大数。 */
+    val maxContextSurfaces: Int = 2,
     /** 候補を選んだら次のチップへ選択を進める（既定は仕様どおり、選んだチップのまま）。 */
     val advanceAfterPick: Boolean = false,
 ) {
@@ -195,7 +245,126 @@ class ChipBarModel(
         val conv = converter.convert(chipReading, leftContext(state.reading, state.chips, i))
         val candidates = (listOf(chip.output) + conv.paths.map { it.output }).distinct().take(config.maxCandidates + 1)
         val kana = listOf(chipReading, toKatakana(chipReading)).distinct().filter { it !in candidates }
-        return LowerRow.ChipCandidates(i, candidates, kana)
+        // 区切りを変える候補（追加の変換なし）: 文全体の N-best 経路 → このチップだけの変換の経路（割る）
+        val segments = ArrayList<SegmentAlternative>()
+        val context = ArrayList<String>()
+        for (path in state.whole.paths) {
+            addSegment(segments, alternativeFrom(state, i, pathPieces(state.whole, path, 0)))
+            addContext(context, chip, contextSurface(path, 0, chip))
+        }
+        for (path in conv.paths) addSegment(segments, alternativeFrom(state, i, pathPieces(conv, path, chip.start)))
+        return LowerRow.ChipCandidates(i, candidates, kana, segments, context)
+    }
+
+    /**
+     * 下段の 2 段目の計算（選択チップを左右の隣とくっつけた読みを変換する。1 回 1〜2 変換）。[row] に区切りを変える候補・
+     * 同じ範囲の表記を足したもの。足すものが無い・もう一杯なら null。IMEService が下段を出した後に裏で呼ぶ
+     * （選択の反応を待たせないため）。
+     */
+    fun refineLowerRow(state: ChipBarState, row: LowerRow.ChipCandidates): LowerRow.ChipCandidates? {
+        val i = row.chipIndex
+        val chip = state.chips.getOrNull(i) ?: return null
+        if (i != state.selected || row.segments.size >= config.maxSegmentAlternatives) return null
+        val segments = row.segments.toMutableList()
+        val context = row.context.toMutableList()
+        for ((a, b) in listOf(i - 1 to i, i to i + 1)) {
+            if (segments.size >= config.maxSegmentAlternatives) break
+            if (a < 0 || b > state.chips.lastIndex) continue
+            val lo = state.chips[a].start
+            val hi = state.chips[b].end
+            val conv = converter.convert(state.reading.substring(lo, hi), leftContext(state.reading, state.chips, a))
+            for (path in conv.paths.take(MERGE_PATHS)) {
+                // 経路の文節どおり（区切りが動くことがある）→ 1 つにくっつけた塊
+                val before = segments.size
+                addSegment(segments, alternativeFrom(state, i, pathPieces(conv, path, lo)))
+                if (segments.size == before) addSegment(segments, alternativeFrom(state, i, listOf(Chip(lo, hi, path.output, Chip.Origin.RESIZED))))
+                if (segments.size > before) break
+            }
+            conv.primary?.let { addContext(context, chip, contextSurface(it, lo, chip)) }
+        }
+        if (segments.size == row.segments.size && context.size == row.context.size) return null
+        return row.copy(segments = segments, context = context)
+    }
+
+    private fun addSegment(out: MutableList<SegmentAlternative>, alt: SegmentAlternative?) {
+        if (alt == null || out.size >= config.maxSegmentAlternatives) return
+        if (out.any { it.key == alt.key }) return
+        out += alt
+    }
+
+    private fun addContext(out: MutableList<String>, chip: Chip, surface: String?) {
+        if (surface == null || surface.isEmpty() || surface == chip.output || surface in out) return
+        if (out.size < config.maxContextSurfaces) out += surface
+    }
+
+    /**
+     * 経路 [path]（[conv] の読み = 入力全体の読みの [offset] から）を文節の塊にする（文節区切りが無い経路は自立語の頭で）。
+     * オフセットは入力全体の読みの位置。
+     */
+    internal fun pathPieces(conv: ChipConversion, path: ChipPath, offset: Int): List<Chip> {
+        val base = if (path.bunsetsuSplits.isNotEmpty()) {
+            chipsOf(conv, path)
+        } else {
+            contentGroups(path.words).map { g -> Chip(g.first().start, g.last().end, g.joinToString("") { it.output }) }
+        }
+        return base.map { it.copy(start = it.start + offset, end = it.end + offset, origin = Chip.Origin.RESIZED) }
+    }
+
+    /**
+     * 塊 [pieces]（入力全体の読みの位置、連続）から選択チップ [index] の区切りを変える候補を作る: チップの範囲から始めて、
+     * 塊の境目と今のチップの境目が両方そろう所まで広げた範囲を [pieces] で置き換える。範囲が左右の隣より先へ広がる・
+     * 塊が範囲を覆わない・区切りが今と同じ・表記が今と同じなら null。
+     */
+    internal fun alternativeFrom(state: ChipBarState, index: Int, pieces: List<Chip>): SegmentAlternative? {
+        val chips = state.chips
+        val chip = chips.getOrNull(index) ?: return null
+        if (pieces.isEmpty() || pieces.zipWithNext().any { (a, b) -> a.end != b.start }) return null
+        var lo = chip.start
+        var hi = chip.end
+        while (true) {
+            val pl = pieces.firstOrNull { lo >= it.start && lo < it.end } ?: return null
+            val ph = pieces.firstOrNull { hi > it.start && hi <= it.end } ?: return null
+            val cl = chips.firstOrNull { lo >= it.start && lo < it.end } ?: return null
+            val ch = chips.firstOrNull { hi > it.start && hi <= it.end } ?: return null
+            val nlo = minOf(pl.start, cl.start)
+            val nhi = maxOf(ph.end, ch.end)
+            if (nlo == lo && nhi == hi) break
+            lo = nlo
+            hi = nhi
+        }
+        val first = chips.indexOfFirst { it.start == lo }
+        val last = chips.indexOfFirst { it.end == hi }
+        if (first < 0 || last < 0 || first < index - 1 || last > index + 1) return null
+        val inside = pieces.filter { it.start >= lo && it.end <= hi }
+        if (inside.isEmpty() || inside.any { it.output.isEmpty() }) return null
+        val current = chips.subList(first, last + 1)
+        if (inside.map { it.start to it.end } == current.map { it.start to it.end }) return null
+        if (inside.joinToString("") { it.output } == current.joinToString("") { it.output }) return null
+        if (!isCodePointBoundary(state.reading, lo) || inside.any { !isCodePointBoundary(state.reading, it.end) }) return null
+        return SegmentAlternative(chip.start, chip.end, lo, hi, inside.map { it.copy(origin = Chip.Origin.RESIZED) })
+    }
+
+    /** 経路 [path]（読みの [offset] から）の語の境目がチップ [chip] の両端にそろえば、その範囲の表記。 */
+    internal fun contextSurface(path: ChipPath, offset: Int, chip: Chip): String? {
+        val inside = path.words.filter { it.start + offset >= chip.start && it.end + offset <= chip.end }
+        if (inside.isEmpty() || inside.first().start + offset != chip.start || inside.last().end + offset != chip.end) return null
+        if (inside.zipWithNext().any { (a, b) -> a.end != b.start }) return null
+        return inside.joinToString("") { it.output }
+    }
+
+    /**
+     * 区切りを変える候補を適用する（[applySegmentation] に区切りと表記を渡す。作ったチップは RESIZED = 明示選択として学習）。
+     * 選択は元の選択チップの頭を含むチップ。今のチップの区切りと合わない（状態が変わった）なら null。
+     */
+    fun applyAlternative(state: ChipBarState, alt: SegmentAlternative): ChipBarState? {
+        val bounds = state.boundaries
+        if (alt.start !in bounds || alt.end !in bounds || alt.pieces.isEmpty()) return null
+        if (alt.pieces.first().start != alt.start || alt.pieces.last().end != alt.end) return null
+        if (alt.pieces.zipWithNext().any { (a, b) -> a.end != b.start }) return null
+        val next = (bounds.filter { it <= alt.start || it >= alt.end } + alt.pieces.map { it.end }).toSortedSet()
+        val select = next.filter { it < state.reading.length }.indexOfLast { it <= alt.chipStart }
+        val surfaces = alt.pieces.associate { (it.start to it.end) to it.output }
+        return applySegmentation(state, next, select, surfaces)
     }
 
     /** チップのタップ = 選択 / 選択解除（展開は閉じる）。 */
@@ -337,19 +506,31 @@ class ChipBarModel(
      * （ユーザーが作った区切りなので自動では割らない）。消えたチップは remembered に残す。
      * 選択は [select]（null なら変わった一番左のチップ）。展開は閉じる。区切りが今と同じなら null。
      */
-    fun applySegmentation(state: ChipBarState, boundaries: Set<Int>, select: Int? = null): ChipBarState? {
+    fun applySegmentation(
+        state: ChipBarState,
+        boundaries: Set<Int>,
+        select: Int? = null,
+        surfaces: Map<Pair<Int, Int>, String> = emptyMap(),
+    ): ChipBarState? {
         val reading = state.reading
         if (reading.isEmpty()) return null
         val cuts = boundaries.filter { it in 1 until reading.length && isCodePointBoundary(reading, it) }.sorted()
         val bounds = listOf(0) + cuts + reading.length
-        if (bounds == state.boundaries) return null
+        if (bounds == state.boundaries && surfaces.none { (k, v) -> state.chips.none { it.start to it.end == k && it.output == v } }) {
+            return null
+        }
         val memo = state.remembered + state.chips.map { (it.start to it.end) to it }
         val existing = state.chips.associateBy { it.start to it.end }
         val chips = ArrayList<Chip>(bounds.size - 1)
         var firstChanged = -1
         for ((s, e) in bounds.zipWithNext()) {
             val keep = existing[s to e]
-            if (keep != null) {
+            val forced = surfaces[s to e]?.takeIf { it.isNotEmpty() }
+            if (forced != null && keep?.output != forced) {
+                // 区切りを変える候補で選んだ表記（変換済み）
+                if (firstChanged < 0) firstChanged = chips.size
+                chips += Chip(s, e, forced, Chip.Origin.RESIZED)
+            } else if (keep != null) {
                 chips += keep
             } else {
                 if (firstChanged < 0) firstChanged = chips.size
@@ -486,6 +667,9 @@ class ChipBarModel(
         if (config.advanceAfterPick) (if (index + 1 < size) index + 1 else -1) else index
 
     companion object {
+        /** くっつけた読みの変換で見る経路の数（[refineLowerRow]）。 */
+        private const val MERGE_PATHS = 2
+
         /** [at] が文字（コードポイント）の境目か（サロゲートペアの途中でない）。 */
         internal fun isCodePointBoundary(s: String, at: Int): Boolean =
             at <= 0 || at >= s.length || !(s[at - 1].isHighSurrogate() && s[at].isLowSurrogate())

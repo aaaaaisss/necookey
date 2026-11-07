@@ -109,8 +109,14 @@ class ChipBarPresenterTest {
         val m = ChipBarModel(table)
         val s = m.tap(m.initial("ではきもの"), 1)
         val row = ChipBarPresenter.lowerRow(s, m.lowerRow(s), listOf(pred("a")))
-        assertEquals(listOf("着物", "きもの", "キモノ"), row.map { it.string })
-        assertTrue(row.all { it.type == CANDIDATE_TYPE_CHIP_CANDIDATE && it.yomi == "きもの" && it.length.toInt() == 3 })
+        // 今の表記・1 番目の別候補の後ろに区切りを変える候補（2 位の経路 で|履物、左隣を取り込む）
+        assertEquals(listOf("着物", "きもの", "で｜履物", "キモノ"), row.map { it.string })
+        val plain = row.filter { it.type == CANDIDATE_TYPE_CHIP_CANDIDATE }
+        assertEquals(3, plain.size)
+        assertTrue(plain.all { it.yomi == "きもの" && it.length.toInt() == 3 })
+        assertEquals(CANDIDATE_TYPE_CHIP_SEGMENT_LEFT, row[2].type)
+        assertEquals("ではきもの", row[2].yomi)
+        assertEquals(0, row[2].score)
         // もう一度タップで予測に戻る
         val back = m.tap(s, 1)
         assertEquals("a", ChipBarPresenter.lowerRow(back, m.lowerRow(back), listOf(pred("a"))).first().string)
@@ -186,5 +192,25 @@ class ChipBarPresenterTest {
         val w2 = ChipBarPresenter.wholeConversion(reading, override, listOf(engine, other), segs, emptyMap())
         assertEquals("で履物", w2.primary?.output)
         assertEquals(listOf("で", "履物"), ChipBarModel(table).chipsOf(w2, w2.primary).map { it.output })
+    }
+
+    @Test
+    fun lowerRowOrdersSegmentsUndoAndContext() {
+        val m = ChipBarModel(table)
+        val s = m.tap(m.initial("ではきもの"), 1)
+        val base = m.lowerRow(s) as LowerRow.ChipCandidates
+        val row = base.copy(context = listOf("キモノ", "着物"))
+        val out = ChipBarPresenter.lowerRow(s, row, emptyList(), undo = true)
+        // 今の表記・別候補 → 区切りを変える候補 → 戻す → 文の経路の表記（前の 2 つと重なるものは除く）→ 残り
+        assertEquals(listOf("着物", "きもの", "で｜履物", "戻す", "キモノ"), out.map { it.string })
+        assertEquals(CANDIDATE_TYPE_CHIP_UNDO, out[3].type)
+        assertTrue(out.all { ChipBarPresenter.isChipCandidate(it) })
+        // タップの対応: 番号と表示が合えばその候補、番号がずれていたら表示で探す
+        assertEquals(base.segments[0], ChipBarPresenter.segmentFor(row, out[2]))
+        assertEquals(base.segments[0], ChipBarPresenter.segmentFor(row, out[2].copy(score = 5)))
+        assertNull(ChipBarPresenter.segmentFor(LowerRow.Predictions(emptyList()), out[2]))
+        assertTrue(ChipBarPresenter.isSegmentAlternative(out[2]))
+        assertEquals("←" to "", ChipBarPresenter.markerAffixes(out[2].type))
+        assertNull(ChipBarPresenter.markerAffixes(out[0].type))
     }
 }

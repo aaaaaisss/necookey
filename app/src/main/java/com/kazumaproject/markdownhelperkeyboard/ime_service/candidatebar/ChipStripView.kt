@@ -33,6 +33,10 @@ import timber.log.Timber
  *   カーソル。**指を置いたまま**横に動かすとカーソルが 1 境目ずつ相対的に動く（指の移動 [HOLD_STEP_DP]dp ≒ 1 字、文字は動かない、
  *   磁石なし、1 つ動くごとに軽い振動）。離す = カーソルの所の区切りを入れる（区切りの上なら消す）→ 再変換（[Listener.onSegmentation]）。
  *   指を上へポップアップの外まで、または下へ大きく外すと「やめる」（離しても何も変えない）。
+ * - 選択チップの端のハンドル（左隣・右隣があるとき、文字選択のハンドルのような小さなつまみ）を横に動かす = その区切りを
+ *   1 字ずつずらす（長押しと同じ相対移動・振動・上のポップアップで見せる）。隣のチップの端まで動かすとくっつく。
+ *   離すと再変換（[Listener.onSegmentation]、選択はそのチップのまま）。ハンドルの所を押しただけ（動かさない）なら
+ *   普段のタップ（くっつける / 選択）。docs/CHIP_BAR.md「2026-11-07 区切りを変える候補・端のハンドル」。
  * - はみ出したとき（文字は最小 [MIN_TEXT_SCALE] 倍まで縮めてから）は横に動かすとスクロール（離すと慣性）。
  */
 class ChipStripView @JvmOverloads constructor(
@@ -77,6 +81,8 @@ class ChipStripView @JvmOverloads constructor(
         strokeJoin = Paint.Join.ROUND
     }
     private val rect = RectF()
+    private val handlePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { strokeCap = Paint.Cap.ROUND }
+    private val handleRing = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE }
 
     private var data: ChipStripData = ChipStripData.EMPTY
     private var laid: ChipStripLayout.Laid = ChipStripLayout.Laid.EMPTY
@@ -107,6 +113,11 @@ class ChipStripView @JvmOverloads constructor(
     private var holdPopupView: HoldPopupView? = null
     private var holdPopupShown = false
     private val holdRenderer = HoldPopupRenderer(density)
+    /** 端のハンドルを動かしている（null = 長押しの区切りポップアップ）。 */
+    private var holdMove: HandleDrag? = null
+    /** 押したのがハンドルの当たり判定の中（横に動かしたらハンドルを動かす）。 */
+    private var pendingHandle: ChipStripLayout.Handle? = null
+    private val handleHalfWidth = HANDLE_TOUCH_DP / 2f * density
 
     // ジェスチャ
     private val touchSlop = ViewConfiguration.get(context).scaledTouchSlop.toFloat()
@@ -160,6 +171,7 @@ class ChipStripView @JvmOverloads constructor(
         if (!holding) return
         holding = false
         holdCursor = null
+        holdMove = null
         hideHoldPopup()
         invalidate()
     }
@@ -170,18 +182,40 @@ class ChipStripView @JvmOverloads constructor(
         val letters = ChipStripLayout.codePoints(reading)
         val start = ChipStripLayout.holdStartGap(laid, data, x + scroll) ?: return // 1 文字だけなら区切れる所が無い
         holding = true
+        holdMove = null
         holdReading = reading
         holdLetters = letters
         holdOffsets = ChipStripLayout.segOffsets(letters)
         holdBounds = bounds
         holdCancelZone = false
-        val cell = HOLD_CELL_DP * density
         holdCursor = ChipStripLayout.HoldCursor(letters.size, start, x, HOLD_STEP_DP * density)
+        openHoldPopup(x, start)
+    }
+
+    /** 端のハンドルを動かし始める（指は [x]、押したのは [downAt]）。 */
+    private fun startHandleDrag(handle: ChipStripLayout.Handle, downAt: Float) {
+        val plan = ChipStripLayout.handleDrag(data, handle.left) ?: return
+        holding = true
+        holdMove = plan
+        holdReading = plan.reading
+        holdLetters = plan.letters
+        holdOffsets = plan.offsets
+        holdBounds = plan.otherBounds
+        holdCancelZone = false
+        holdCursor = ChipStripLayout.HoldCursor(
+            plan.letters.size, plan.startGap, downAt, HOLD_STEP_DP * density, plan.minGap, plan.maxGap,
+        )
+        performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
+        openHoldPopup(downAt, plan.startGap)
+    }
+
+    private fun openHoldPopup(x: Float, start: Int) {
+        val cell = HOLD_CELL_DP * density
         val screenW = resources.displayMetrics.widthPixels.toFloat()
         holdVisible = ((screenW - 2f * HOLD_MARGIN_DP * density - 2f * holdRenderer.pad) / cell).toInt().coerceAtLeast(2)
         // 窓が要るときは、カーソルが押した指の所になるべく来るように
         val preferredSlot = ((x - holdRenderer.pad) / cell).roundToInt()
-        holdFirst = ChipStripLayout.holdInitialFirst(letters.size, holdVisible, start, preferredSlot)
+        holdFirst = ChipStripLayout.holdInitialFirst(holdLetters.size, holdVisible, start, preferredSlot)
         scroller.forceFinished(true)
         parent?.requestDisallowInterceptTouchEvent(true)
         showHoldPopup(fingerX = x)
@@ -202,14 +236,22 @@ class ChipStripView @JvmOverloads constructor(
         if (changed) refreshHoldPopup()
     }
 
-    /** 離した: やめる所でなければカーソルの区切りを入れる／消す。 */
+    /** 離した: やめる所でなければカーソルの区切りを入れる／消す（ハンドルなら区切りをそこへ動かす）。 */
     private fun finishHold() {
         val cursor = holdCursor
         val reading = holdReading
         val cancel = holdCancelZone
         val bounds = holdBounds
+        val move = holdMove
         val at = cursor?.let { holdOffsets.getOrNull(it.gap) }
         cancelHold()
+        if (move != null) {
+            if (cancel || cursor == null) return
+            val (next, select) = move.finish(cursor.gap) ?: return
+            performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)
+            listener?.onSegmentation(reading, next, select)
+            return
+        }
         if (cancel || at == null || at <= 0 || at >= reading.length) return
         performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)
         listener?.onSegmentation(reading, ChipStripLayout.toggleBoundary(bounds, at), null)
@@ -226,6 +268,8 @@ class ChipStripView @JvmOverloads constructor(
         background = selectedFill,
         text = selectedText,
         textSize = baseTextSize * HOLD_TEXT_SCALE,
+        moving = holdMove != null,
+        merge = holdMove?.let { m -> holdCursor?.let { m.merges(it.gap) } } == true,
     )
 
     /** チップ列の上（候補欄の外、PopupWindow）にポップアップを出す。出せなければチップ列の中に描く（[onDraw]）。 */
@@ -331,6 +375,7 @@ class ChipStripView @JvmOverloads constructor(
             textPaint.color = if (item.selected) selectedText else chipText
             canvas.drawText(item.label, box.left + layoutSpec.chipPadding, baseline, textPaint)
         }
+        drawHandles(canvas, h, vPad)
         canvas.restore()
         if (holding && !holdPopupShown) {
             // ポップアップが出せないとき: チップ列の上に重ねて描く（高さは上段に合わせて縮める）
@@ -340,6 +385,31 @@ class ChipStripView @JvmOverloads constructor(
             canvas.translate(((contentRight() - w) / 2f).coerceAtLeast(0f), 0f)
             holdRenderer.draw(canvas, state, w, h)
             canvas.restore()
+        }
+    }
+
+    /**
+     * 選択チップの端のハンドル（文字選択のハンドルのように、チップの端から下へ短い軸と丸いつまみ）。
+     * 動かしている方は大きく。長押しのポップアップ中は出さない。
+     */
+    private fun drawHandles(canvas: Canvas, h: Float, vPad: Float) {
+        val sel = data.selectedIndex
+        val box = laid.chips.getOrNull(sel) ?: return
+        if (holding && holdMove == null) return
+        val r = HANDLE_KNOB_DP * density
+        val cy = h - vPad - r * 0.2f
+        for (handle in layoutSpec.handles(laid, sel)) {
+            val active = holdMove?.left == handle.left
+            if (holding && !active) continue
+            val x = if (handle.left) box.left + r * 0.35f else box.right - r * 0.35f
+            val knob = if (active) r * 1.35f else r
+            handlePaint.color = selectedFill
+            handlePaint.strokeWidth = 2f * density
+            canvas.drawLine(x, h / 2f, x, cy, handlePaint)
+            canvas.drawCircle(x, cy, knob, handlePaint)
+            handleRing.color = ColorUtils.setAlphaComponent(selectedText, 0xCC)
+            handleRing.strokeWidth = 1.2f * density
+            canvas.drawCircle(x, cy, knob, handleRing)
         }
     }
 
@@ -374,6 +444,8 @@ class ChipStripView @JvmOverloads constructor(
                 downStoppedFling = !scroller.isFinished
                 scroller.forceFinished(true)
                 downOnButton = event.x >= contentRight() && data.items.isNotEmpty()
+                pendingHandle = if (downOnButton || downStoppedFling) null
+                else layoutSpec.handleAt(laid, data.selectedIndex, event.x + scroll, handleHalfWidth)
                 removeCallbacks(longPressRunnable)
                 if (data.items.isNotEmpty() && !downOnButton && !downStoppedFling) {
                     postDelayed(longPressRunnable, ViewConfiguration.getLongPressTimeout().toLong())
@@ -391,7 +463,18 @@ class ChipStripView @JvmOverloads constructor(
                 if (!moved && (abs(dx) > touchSlop || abs(dy) > touchSlop)) {
                     moved = true
                     removeCallbacks(longPressRunnable)
-                    if (!downOnButton && !longPressed && abs(dx) >= abs(dy)) startScroll(event.x)
+                    val handle = pendingHandle
+                    if (!downOnButton && !longPressed && abs(dx) >= abs(dy)) {
+                        if (handle != null) {
+                            // ハンドルを横に動かした: 区切りを 1 字ずつずらす（スクロールにしない）
+                            startHandleDrag(handle, downX)
+                            if (holding) {
+                                updateHold(event.x, event.y)
+                                return true
+                            }
+                        }
+                        startScroll(event.x)
+                    }
                 }
                 if (scrolling) {
                     scroll = (scrollAnchor - (event.x - scrollAnchorX)).coerceIn(0f, maxScroll())
@@ -498,6 +581,10 @@ class ChipStripView @JvmOverloads constructor(
         const val HOLD_MARGIN_DP = 6f
         /** 指をチップ列の下へこれ以上外すと「やめる」。 */
         const val HOLD_CANCEL_BELOW_DP = 48f
+        /** 端のハンドルの当たり判定の幅（区切りを中心に）。 */
+        const val HANDLE_TOUCH_DP = 44f
+        /** 端のハンドルのつまみの半径。 */
+        const val HANDLE_KNOB_DP = 4.5f
     }
 }
 
@@ -518,6 +605,10 @@ internal class HoldPopupRenderer(private val density: Float) {
         val background: Int,
         val text: Int,
         val textSize: Float,
+        /** 端のハンドルで区切りを動かしている（[bounds] は動かしている区切りを除く）。 */
+        val moving: Boolean = false,
+        /** ハンドルが隣の端まで来た（離すとくっつく）。 */
+        val merge: Boolean = false,
     )
 
     val pad: Float = 10f * density
@@ -577,8 +668,9 @@ internal class HoldPopupRenderer(private val density: Float) {
             }
         }
         // カーソル
-        val onBoundary = state.gap in 1 until state.letters.size && state.offsets[state.gap] in state.bounds
-        if (!state.cancel && state.gap in (state.first + 1) until last) {
+        val onBoundary = state.merge ||
+            state.gap in 1 until state.letters.size && state.offsets[state.gap] in state.bounds
+        if (!state.cancel && state.gap in state.first..last) {
             val x = gapX(state, state.gap)
             line.color = state.text
             line.strokeWidth = 4f * density
@@ -602,6 +694,7 @@ internal class HoldPopupRenderer(private val density: Float) {
         val hint = when {
             state.cancel -> HINT_CANCEL
             onBoundary -> HINT_JOIN
+            state.moving -> HINT_MOVE
             else -> HINT_CUT
         }
         hintPaint.color = state.text
@@ -612,6 +705,7 @@ internal class HoldPopupRenderer(private val density: Float) {
         const val HINT_CUT = "離すと区切る"
         const val HINT_JOIN = "離すとつなぐ"
         const val HINT_CANCEL = "やめる"
+        const val HINT_MOVE = "離すとずらす"
     }
 }
 

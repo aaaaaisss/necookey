@@ -42,6 +42,7 @@ import com.kazumaproject.markdownhelperkeyboard.converter.candidate.CANDIDATE_TY
 import com.kazumaproject.markdownhelperkeyboard.converter.candidate.CANDIDATE_TYPE_USER_DICTIONARY
 import com.kazumaproject.markdownhelperkeyboard.converter.candidate.Candidate
 import com.kazumaproject.markdownhelperkeyboard.converter.candidate.QWERTY_GLIDE_CANDIDATE_TYPE
+import com.kazumaproject.markdownhelperkeyboard.converter.candidatebar.ChipBarPresenter
 import com.kazumaproject.markdownhelperkeyboard.custom_keyboard.data.CustomKeyboardLayout
 import com.kazumaproject.markdownhelperkeyboard.ime_service.CandidateStripLayoutPolicy
 import com.kazumaproject.markdownhelperkeyboard.ime_service.candidate.CandidateStripContent
@@ -1608,6 +1609,28 @@ class SuggestionAdapter internal constructor(
         notifyItemRangeChanged(0, itemCount)
     }
 
+    /**
+     * 文節チップの「区切りを変える候補」・「戻す」の表示: 前後の向きの印（←/→/↶）と塊の間の区切り（｜）を小さく描く
+     * （docs/CHIP_BAR.md「2026-11-07 区切りを変える候補・端のハンドル」）。
+     */
+    private fun chipMarkedText(text: String, prefix: String, suffix: String, padding: Int): CharSequence {
+        val sb = SpannableStringBuilder(" ".repeat(padding))
+        fun small(s: String) {
+            if (s.isEmpty()) return
+            val start = sb.length
+            sb.append(s)
+            sb.setSpan(RelativeSizeSpan(0.6f), start, sb.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+        }
+        small(prefix)
+        text.split(ChipBarPresenter.SEGMENT_SEPARATOR).forEachIndexed { i, piece ->
+            if (i > 0) small(ChipBarPresenter.SEGMENT_SEPARATOR)
+            sb.append(piece)
+        }
+        small(suffix)
+        sb.append(" ".repeat(padding))
+        return sb
+    }
+
     private fun onBindSuggestionViewHolder(
         holder: SuggestionViewHolder,
         item: SuggestionDisplayItem.CandidateItem,
@@ -1631,6 +1654,9 @@ class SuggestionAdapter internal constructor(
         } else {
             suggestion.string.padStart(suggestion.string.length + paddingLength)
                 .plus(" ".repeat(paddingLength))
+        }
+        ChipBarPresenter.markerAffixes(suggestion.type)?.let { (prefix, suffix) ->
+            holder.text.text = chipMarkedText(suggestion.string, prefix, suffix, paddingLength)
         }
         holder.text.isVisible = true
 

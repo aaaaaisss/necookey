@@ -169,4 +169,76 @@ class ChipStripLayoutTest {
         assertEquals(6, ChipStripLayout.holdInitialFirst(20, 8, gap = 9, preferredSlot = 3))
         assertEquals(0, ChipStripLayout.holdInitialFirst(20, 8, gap = 2, preferredSlot = 5))
     }
+
+    // ---- 選択チップの端のハンドル（2026-11-07） ----
+
+    private val three = ChipStripData(
+        listOf(
+            ChipStripItem("では", false, reading = "では"),
+            ChipStripItem("着物", true, reading = "きもの"),
+            ChipStripItem("だ", false, reading = "だ"),
+        ),
+    )
+
+    @Test
+    fun handlesSitOnSelectedChipBoundariesWithGenerousTargets() {
+        // [6, 46) [52, 92) [98, 128)
+        val laid = spec.layout(three, measure)
+        assertEquals(
+            listOf(ChipStripLayout.Handle(true, 49f), ChipStripLayout.Handle(false, 95f)),
+            spec.handles(laid, 1),
+        )
+        assertEquals(true, spec.handleAt(laid, 1, 60f, 22f)?.left)
+        assertEquals(false, spec.handleAt(laid, 1, 80f, 22f)?.left)
+        assertNull(spec.handleAt(laid, 1, 72f, 22f)) // 両方から 23 離れている
+        // 端のチップは片側だけ、選択なしは無し
+        assertEquals(listOf(false), spec.handles(laid, 0).map { it.left })
+        assertEquals(listOf(true), spec.handles(laid, 2).map { it.left })
+        assertTrue(spec.handles(laid, -1).isEmpty())
+    }
+
+    @Test
+    fun handleDragMovesBoundaryAndMergesAtNeighborEnd() {
+        // ではきものだ、区切り {2, 5}、選択 = きもの
+        val left = ChipStripLayout.handleDrag(three, left = true)!!
+        assertEquals(2, left.from)
+        assertEquals(Triple(0, 2, 5), Triple(left.minGap, left.startGap, left.maxGap))
+        assertEquals(setOf(5), left.otherBounds)
+        assertNull(left.finish(2)) // 動いていない
+        assertEquals(setOf(3, 5) to 1, left.finish(3)) // 1 字右へ（き を左隣へ渡す）
+        assertEquals(setOf(1, 5) to 1, left.finish(1)) // 1 字左へ（は をもらう）
+        assertEquals(setOf(5) to 0, left.finish(0)) // 左隣の頭まで → くっつく（選択はくっついたチップ）
+        assertEquals(setOf(5) to 0, left.finish(5)) // 右の端まで → くっつく
+        assertTrue(left.merges(0) && left.merges(5) && !left.merges(3))
+
+        val right = ChipStripLayout.handleDrag(three, left = false)!!
+        assertEquals(Triple(2, 5, 6), Triple(right.minGap, right.startGap, right.maxGap))
+        assertEquals(setOf(2, 4) to 1, right.finish(4))
+        assertEquals(setOf(2) to 1, right.finish(6)) // 右隣（だ）を取り込む
+        assertEquals(setOf(2) to 1, right.finish(99)) // 範囲外は端に丸める
+
+        // 選択なし・その側に隣が無い
+        val first = three.copy(items = three.items.mapIndexed { i, it -> it.copy(selected = i == 0) })
+        assertNull(ChipStripLayout.handleDrag(first, left = true))
+        assertEquals(Triple(0, 2, 5), ChipStripLayout.handleDrag(first, left = false)!!.let { Triple(it.minGap, it.startGap, it.maxGap) })
+        assertNull(ChipStripLayout.handleDrag(three.copy(items = three.items.map { it.copy(selected = false) }), left = true))
+    }
+
+    @Test
+    fun holdCursorRespectsHandleRange() {
+        // 境目 0..5 の範囲で、2 から 10px ごとに 1 つ
+        val c = ChipStripLayout.HoldCursor(6, 2, 0f, 10f, minGap = 0, maxGap = 5)
+        assertTrue(c.move(-20f))
+        assertEquals(0, c.gap) // 両端まで行ける（くっつく）
+        assertFalse(c.move(-60f))
+        assertEquals(0, c.gap)
+        assertTrue(c.move(-50f)) // 端で基準を取り直すので戻すとすぐ動く
+        assertEquals(1, c.gap)
+        assertTrue(c.move(100f))
+        assertEquals(5, c.gap)
+        // 既定の範囲は 1..count-1（長押し）
+        val d = ChipStripLayout.HoldCursor(6, 2, 0f, 10f)
+        d.move(-100f)
+        assertEquals(1, d.gap)
+    }
 }

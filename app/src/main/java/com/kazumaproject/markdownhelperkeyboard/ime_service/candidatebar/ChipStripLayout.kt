@@ -101,7 +101,46 @@ class ChipStripLayout(
         return scroll.coerceIn(0f, overflow)
     }
 
+    /** 選択チップの端のハンドル: [left] = 左端（左隣との区切り）、そうでなければ右端。[x] = 区切りの位置（隙間の真ん中）。 */
+    data class Handle(val left: Boolean, val x: Float)
+
+    /** 選択チップ [selected] のハンドル（左隣があれば左端、右隣があれば右端）。 */
+    fun handles(laid: Laid, selected: Int): List<Handle> {
+        val c = laid.chips
+        if (selected !in c.indices) return emptyList()
+        val out = ArrayList<Handle>(2)
+        if (selected > 0) out += Handle(true, (c[selected - 1].right + c[selected].left) / 2f)
+        if (selected < c.lastIndex) out += Handle(false, (c[selected].right + c[selected + 1].left) / 2f)
+        return out
+    }
+
+    /**
+     * ハンドルの当たり判定: [x]（チップ列の座標）から区切りまで [halfWidth] 以内の一番近いハンドル。無ければ null。
+     * ここで押しただけ（横に動かさない）なら普段のタップ（くっつける / 選択）のまま。横に動かしたときだけハンドルを動かす。
+     */
+    fun handleAt(laid: Laid, selected: Int, x: Float, halfWidth: Float): Handle? =
+        handles(laid, selected).filter { abs(x - it.x) <= halfWidth }.minByOrNull { abs(x - it.x) }
+
     companion object {
+        /**
+         * 端のハンドルを動かす準備: チップ列 [data] の選択チップの左端（[left]）か右端の区切りを、両隣のチップの中で動かす。
+         * 選択なし・その側に隣が無いときは null。
+         */
+        fun handleDrag(data: ChipStripData, left: Boolean): HandleDrag? {
+            val sel = data.selectedIndex
+            if (sel < 0) return null
+            val l = if (left) sel - 1 else sel // 動かす区切りの左のチップ
+            if (l < 0 || l + 1 > data.items.lastIndex) return null
+            val (reading, bounds) = segSource(data)
+            val letters = codePoints(reading)
+            val counts = data.items.map { codePoints(it.reading).size }
+            val lo = counts.take(l).sum()
+            val gap = lo + counts[l]
+            val hi = gap + counts[l + 1]
+            val offsets = segOffsets(letters)
+            return HandleDrag(reading, letters, offsets, bounds, sel, left, offsets[gap], gap, lo, hi)
+        }
+
         /** くっつける帯がチップに食い込む最大の割合（チップ幅の 1/5。小さいチップでも 3/5 は選択に残る）。 */
         const val EDGE_FRACTION = 0.2f
 
@@ -197,17 +236,25 @@ class ChipStripLayout(
      * 指の絶対位置には合わせないので、ポップアップの文字が動かず、ずれも溜まらない。磁石なし）。端（1 / 文字数−1）で止まったら
      * そこで基準を取り直すので、戻すとすぐ動く。
      */
-    class HoldCursor(private val count: Int, startGap: Int, startX: Float, private val step: Float) {
-        var gap: Int = startGap.coerceIn(1, (count - 1).coerceAtLeast(1))
+    class HoldCursor(
+        private val count: Int,
+        startGap: Int,
+        startX: Float,
+        private val step: Float,
+        /** 動ける範囲（境目の番号）。既定は両端を除く全部。端のハンドル（[HandleDrag]）は隣のチップの端まで。 */
+        private val minGap: Int = 1,
+        private val maxGap: Int = count - 1,
+    ) {
+        var gap: Int = startGap.coerceIn(minGap, maxGap.coerceAtLeast(minGap))
             private set
         private var anchorGap = gap
         private var anchorX = startX
 
         /** 指が [x] に来た。境目が変わったら true。 */
         fun move(x: Float): Boolean {
-            if (count < 2 || step <= 0f) return false
+            if (count < 2 || step <= 0f || maxGap <= minGap) return false
             val raw = anchorGap + ((x - anchorX) / step).let { if (it >= 0f) (it + 0.5f).toInt() else -((-it + 0.5f).toInt()) }
-            val g = raw.coerceIn(1, count - 1)
+            val g = raw.coerceIn(minGap, maxGap)
             if (g != raw) {
                 anchorGap = g
                 anchorX = x
@@ -217,4 +264,47 @@ class ChipStripLayout(
             return true
         }
     }
+}
+
+/**
+ * 端のハンドルのドラッグ（純粋な部分）。区切り [from]（読みの UTF-16 位置、文字の境目では [startGap] 番目）を、
+ * 左のチップの頭 [minGap] から右のチップの終わり [maxGap] まで 1 字ずつ動かす（両端まで行くと隣とくっつく）。
+ * 指の動きは [ChipStripLayout.HoldCursor]（[minGap]..[maxGap]）で数える。
+ */
+data class HandleDrag(
+    val reading: String,
+    val letters: List<String>,
+    val offsets: IntArray,
+    /** 今の区切り（動かす区切りを含む）。 */
+    val bounds: Set<Int>,
+    val selected: Int,
+    val left: Boolean,
+    val from: Int,
+    val startGap: Int,
+    val minGap: Int,
+    val maxGap: Int,
+) {
+    /** ポップアップに出す区切り（動かしている区切りを除く。カーソルが動かしている区切り）。 */
+    val otherBounds: Set<Int> get() = bounds - from
+
+    /** 境目 [gap] まで動かすと隣とくっつくか。 */
+    fun merges(gap: Int): Boolean = gap <= minGap || gap >= maxGap
+
+    /**
+     * 境目 [gap] で離したときの区切りと選択するチップ。動いていなければ null。くっついたら（左のハンドルなら左隣と 1 つになり、
+     * そのチップの番号が 1 つ減る）選択はくっついたチップ。
+     */
+    fun finish(gap: Int): Pair<Set<Int>, Int>? {
+        val g = gap.coerceIn(minGap, maxGap)
+        if (g == startGap) return null
+        val to = offsets[g]
+        val next = (otherBounds + to).filterTo(LinkedHashSet()) { it in 1 until reading.length }
+        val select = if (merges(g) && left) selected - 1 else selected
+        return next to select
+    }
+
+    override fun equals(other: Any?): Boolean = other is HandleDrag && reading == other.reading && from == other.from &&
+        bounds == other.bounds && selected == other.selected && left == other.left && minGap == other.minGap && maxGap == other.maxGap
+
+    override fun hashCode(): Int = (reading.hashCode() * 31 + from) * 31 + selected
 }

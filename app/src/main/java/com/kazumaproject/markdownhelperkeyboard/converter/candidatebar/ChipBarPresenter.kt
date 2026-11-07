@@ -19,6 +19,18 @@ const val CANDIDATE_TYPE_CHIP_CANDIDATE: Byte = 60
 const val CANDIDATE_TYPE_CHIP_FULL_ALTERNATIVE: Byte = 61
 
 /**
+ * 下段の「区切りを変える候補」（タップ = [ChipBarModel.applyAlternative]。確定はしない）。type で向き（印）を分け、
+ * [Candidate.score] に [LowerRow.ChipCandidates.segments] の番号を入れる。表示は塊の間に [SEGMENT_SEPARATOR]。
+ */
+const val CANDIDATE_TYPE_CHIP_SEGMENT_LEFT: Byte = 62
+const val CANDIDATE_TYPE_CHIP_SEGMENT_RIGHT: Byte = 63
+const val CANDIDATE_TYPE_CHIP_SEGMENT_BOTH: Byte = 64
+const val CANDIDATE_TYPE_CHIP_SEGMENT_SPLIT: Byte = 65
+
+/** 下段の「戻す」（直前の区切りの変更を取り消す）。 */
+const val CANDIDATE_TYPE_CHIP_UNDO: Byte = 66
+
+/**
  * 上段の 1 チップの表示。[reading] = チップの読み（区切り編集モードで読み全体をかな 1 文字ずつ並べる元。
  * 全チップの [reading] を繋げると読み全体、各チップの終わりが今の区切り）。
  * [letters] が空でなければ展開中（モデルの [ChipBarModel.longPress] / [ChipBarModel.expandForCut]。View からは使わなくなった）。
@@ -64,6 +76,48 @@ object ChipBarPresenter {
     /** 予測行で読み全体の別候補を差し込む位置（予測の先頭 [slot] 個の後ろ）。 */
     const val FULL_ALTERNATIVE_SLOT = 3
 
+    /** チップ候補で区切りを変える候補を差し込む位置（今の表記と 1 番目の別候補の後ろ）。 */
+    const val SEGMENT_ALTERNATIVE_SLOT = 2
+
+    /** 区切りを変える候補の表示で塊の間に入れる印（アダプタが小さく薄く描く）。 */
+    const val SEGMENT_SEPARATOR = "｜"
+
+    /** 「戻す」の表記。 */
+    const val UNDO_LABEL = "戻す"
+
+    /** 区切りを変える候補の表示（塊の間に [SEGMENT_SEPARATOR]）。 */
+    fun segmentLabel(alt: SegmentAlternative): String = alt.pieces.joinToString(SEGMENT_SEPARATOR) { it.output }
+
+    fun segmentType(direction: SegmentAlternative.Direction): Byte = when (direction) {
+        SegmentAlternative.Direction.LEFT -> CANDIDATE_TYPE_CHIP_SEGMENT_LEFT
+        SegmentAlternative.Direction.RIGHT -> CANDIDATE_TYPE_CHIP_SEGMENT_RIGHT
+        SegmentAlternative.Direction.BOTH -> CANDIDATE_TYPE_CHIP_SEGMENT_BOTH
+        SegmentAlternative.Direction.SPLIT -> CANDIDATE_TYPE_CHIP_SEGMENT_SPLIT
+    }
+
+    fun isSegmentAlternative(candidate: Candidate): Boolean =
+        candidate.type.toInt() in CANDIDATE_TYPE_CHIP_SEGMENT_LEFT.toInt()..CANDIDATE_TYPE_CHIP_SEGMENT_SPLIT.toInt()
+
+    /**
+     * 区切りを変える候補・戻すの表示の前後に付ける小さな印（左右の隣を取り込む向き / 戻す）。それ以外は null。
+     * アダプタが小さく薄く描く。
+     */
+    fun markerAffixes(type: Byte): Pair<String, String>? = when (type) {
+        CANDIDATE_TYPE_CHIP_SEGMENT_LEFT -> "←" to ""
+        CANDIDATE_TYPE_CHIP_SEGMENT_RIGHT -> "" to "→"
+        CANDIDATE_TYPE_CHIP_SEGMENT_BOTH -> "←" to "→"
+        CANDIDATE_TYPE_CHIP_SEGMENT_SPLIT -> "" to ""
+        CANDIDATE_TYPE_CHIP_UNDO -> "↶" to ""
+        else -> null
+    }
+
+    /** 下段でタップされた区切りを変える候補を [row] の中から探す（番号が合わなければ表示で探す）。 */
+    fun segmentFor(row: LowerRow?, candidate: Candidate): SegmentAlternative? {
+        val segments = (row as? LowerRow.ChipCandidates)?.segments ?: return null
+        segments.getOrNull(candidate.score)?.takeIf { segmentLabel(it) == candidate.string }?.let { return it }
+        return segments.firstOrNull { segmentLabel(it) == candidate.string }
+    }
+
     fun strip(state: ChipBarState?): ChipStripData {
         if (state == null || state.chips.isEmpty()) return ChipStripData.EMPTY
         return ChipStripData(
@@ -107,20 +161,44 @@ object ChipBarPresenter {
      * 下段に出す候補。予測のときは [predictions] の先頭 [FULL_ALTERNATIVE_SLOT] 個の後ろに読み全体の別候補
      * （予測に同じ表記が無いものだけ）を差し込む。チップ選択中はそのチップの候補（漢字 → かな）だけ。
      */
-    fun lowerRow(state: ChipBarState, row: LowerRow, predictions: List<Candidate>): List<Candidate> = when (row) {
+    fun lowerRow(
+        state: ChipBarState,
+        row: LowerRow,
+        predictions: List<Candidate>,
+        undo: Boolean = false,
+    ): List<Candidate> = when (row) {
         is LowerRow.ChipCandidates -> {
             val chip = state.chips.getOrNull(row.chipIndex)
             if (chip == null) predictions else {
                 val reading = state.reading.substring(chip.start, chip.end)
-                row.all.filter { it.isNotEmpty() }.map { text ->
+                fun plain(text: String) = Candidate(
+                    string = text,
+                    type = CANDIDATE_TYPE_CHIP_CANDIDATE,
+                    length = reading.length.coerceAtMost(255).toUByte(),
+                    score = 0,
+                    yomi = reading,
+                )
+                // 今の表記・1 番目の別候補 → 区切りを変える候補 → 戻す → 文全体の経路の同じ範囲の表記 → 残りの候補・かな
+                val all = row.all.filter { it.isNotEmpty() }
+                val head = all.take(SEGMENT_ALTERNATIVE_SLOT)
+                val context = row.context.filter { it.isNotEmpty() && it !in head }
+                val rest = all.drop(SEGMENT_ALTERNATIVE_SLOT).filter { it !in context }
+                val segments = row.segments.mapIndexed { index, alt ->
+                    val r = state.reading.substring(alt.start, alt.end)
                     Candidate(
-                        string = text,
-                        type = CANDIDATE_TYPE_CHIP_CANDIDATE,
-                        length = reading.length.coerceAtMost(255).toUByte(),
-                        score = 0,
-                        yomi = reading,
+                        string = segmentLabel(alt),
+                        type = segmentType(alt.direction),
+                        length = r.length.coerceAtMost(255).toUByte(),
+                        score = index,
+                        yomi = r,
                     )
                 }
+                val undoItem = if (undo) {
+                    listOf(Candidate(string = UNDO_LABEL, type = CANDIDATE_TYPE_CHIP_UNDO, length = 0u, score = 0))
+                } else {
+                    emptyList()
+                }
+                head.map(::plain) + segments + undoItem + context.map(::plain) + rest.map(::plain)
             }
         }
 
@@ -140,7 +218,7 @@ object ChipBarPresenter {
     }
 
     fun isChipCandidate(candidate: Candidate): Boolean =
-        candidate.type == CANDIDATE_TYPE_CHIP_CANDIDATE || candidate.type == CANDIDATE_TYPE_CHIP_FULL_ALTERNATIVE
+        candidate.type.toInt() in CANDIDATE_TYPE_CHIP_CANDIDATE.toInt()..CANDIDATE_TYPE_CHIP_UNDO.toInt()
 
     /** チップの表記を変えたか（境界操作・候補選択・全体候補の選択）。選択だけなら false。 */
     fun isEdited(state: ChipBarState): Boolean =
