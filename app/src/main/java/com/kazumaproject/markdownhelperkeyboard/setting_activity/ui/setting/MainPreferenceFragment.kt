@@ -298,17 +298,25 @@ class MainPreferenceFragment : AsyncPreferenceFragment() {
         viewLifecycleOwner.lifecycleScope.launch {
             val entries = withContext(Dispatchers.IO) { runCatching { CorrectionLog.read(file) }.getOrDefault(emptyList()) }
             if (!isAdded) return@launch
-            val padding = (16 * resources.displayMetrics.density).toInt()
+            // 2026-11-07 端末: 200 件を選択可能な 1 つの TextView に載せると開いた直後に約 9 秒固まった。
+            // 行ごとの ListView（見える行だけ作る）にし、文字列は IO スレッドで作る。コピーは「全部コピー」で。
             val fmt = java.text.SimpleDateFormat("MM/dd HH:mm", java.util.Locale.JAPAN)
-            val textView = TextView(context).apply {
-                text = if (entries.isEmpty()) getString(R.string.st_correction_log_empty) else entries.joinToString("\n") {
+            val rows = withContext(Dispatchers.Default) {
+                if (entries.isEmpty()) listOf(getString(R.string.st_correction_log_empty)) else entries.map {
                     "${fmt.format(java.util.Date(it.time))} [${it.kind}${if (it.ctx) "・文脈" else ""}] ${it.reading}\n  ${it.shown} → ${it.chosen}"
                 }
-                setTextIsSelectable(true)
-                setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f)
-                setPadding(padding, padding, padding, padding)
             }
-            val scroll = ScrollView(context).apply { addView(textView) }
+            if (!isAdded) return@launch
+            val padding = (12 * resources.displayMetrics.density).toInt()
+            val scroll = android.widget.ListView(context).apply {
+                adapter = object : android.widget.ArrayAdapter<String>(context, android.R.layout.simple_list_item_1, rows) {
+                    override fun getView(position: Int, convertView: android.view.View?, parent: android.view.ViewGroup): android.view.View =
+                        (super.getView(position, convertView, parent) as TextView).apply {
+                            setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f)
+                            setPadding(padding, padding / 2, padding, padding / 2)
+                        }
+                }
+            }
             AlertDialog.Builder(context)
                 .setTitle(R.string.st_correction_log_view_title)
                 .setView(scroll)

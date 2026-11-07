@@ -45,11 +45,13 @@ internal object DialectInflectionNodes {
     private const val TE: Short = 348        // て 接続助詞
     private const val NASAI: Short = 1718    // なさい 動詞 非自立 五段・ラ行特殊 命令ｉ なさる
     private const val TAGERU: Short = 1093   // たげる 動詞 非自立 一段 基本形
+    private const val KA: Short = 325        // か 助詞 副助詞／並立助詞／終助詞
 
     /** 語幹の活用形（ビット）。 */
     const val MIZEN = 1   // 未然形: 行か・言え・食べ・せ・こ
     const val RENYOU = 2  // 連用形: 待ち・食べ・し・き
     const val TE_STEM = 4 // て/で が付く形: 連用タ接続（待っ・運ん・書い）＋一段/サ変/カ変の連用形
+    const val MIZEN_U = 8 // 未然ウ接続: 行こ・入ろ・食べよ・しよ・こよ（う が付く形）
 
     // 動詞,自立 の 未然形 / 連用形 / 連用タ接続（＋一段・サ変・カ変の連用形）の左 ID（id.def から生成）
     private val MIZEN_IDS = intArrayOf(
@@ -64,6 +66,11 @@ internal object DialectInflectionNodes {
         596, 597, 615, 616, 626, 638, 701, 702, 703, 704, 705, 706, 707, 717, 726, 734, 779, 780, 781, 782, 795, 802,
         825, 826, 827, 828, 841,
     )
+    // 動詞,自立 の 未然ウ接続（文語を除く、id.def から）
+    private val MIZEN_U_IDS = intArrayOf(
+        592, 593, 611, 612, 623, 634, 687, 688, 689, 690, 691, 692, 693, 714, 724, 732, 740, 767, 768, 769, 770, 792,
+        800, 817, 818, 819, 820, 838,
+    )
     private const val VERB_FIRST = 577
     private const val VERB_LAST = 856
 
@@ -71,6 +78,7 @@ internal object DialectInflectionNodes {
         for (id in MIZEN_IDS) a[id - VERB_FIRST] = (a[id - VERB_FIRST].toInt() or MIZEN).toByte()
         for (id in RENYOU_IDS) a[id - VERB_FIRST] = (a[id - VERB_FIRST].toInt() or RENYOU).toByte()
         for (id in TE_IDS) a[id - VERB_FIRST] = (a[id - VERB_FIRST].toInt() or TE_STEM).toByte()
+        for (id in MIZEN_U_IDS) a[id - VERB_FIRST] = (a[id - VERB_FIRST].toInt() or MIZEN_U).toByte()
     }
 
     /**
@@ -101,6 +109,9 @@ internal object DialectInflectionNodes {
         // 可能の否定（広島・西日本、ら抜き＋ん）: 言えれん・食べれん・来れんかった（語幹 = 可能動詞/一段の未然形 言え・食べ）
         add(Suffix("れん", MIZEN, N))
         add(Suffix("れんかった", MIZEN, TA))
+        // 意向の う が詰まった誘い（話し言葉）: 行こっか・入ろっか・食べよっか・しよっか。辞書の 行こう か は う が要り、
+        // う の無い読みは 作業は色っか・いついこっか のように崩れていた（2026-11-07 端末）。
+        add(Suffix("っか", MIZEN_U, KA))
         // 命令（広島）: 待ちんさい・食べんさい・しんさい
         add(Suffix("んさい", RENYOU, NASAI))
         // 〜てしまった（関西・中国）: 寝落ちしてもうた・食べてしもうた・忘れてもた

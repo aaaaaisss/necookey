@@ -81,12 +81,28 @@ class ScreenContextTest {
         assertNull(ScreenContextStore.snapshot("a", 0L)) // キーボードが出ていない
         ScreenContextStore.onKeyboardShown("a")
         ScreenContextStore.recordScreen("a", listOf("今日は県庁前のバス停で、パスワード1234を見た"), 0L)
-        assertEquals(listOf("県庁前", "バス停", "パスワード"), ScreenContextStore.extractWords("今日は県庁前のバス停で、パスワード1234を見た").drop(1))
+        assertEquals(listOf("県庁前", "バス停", "パスワード"), ScreenContextStore.extractWords("今日は県庁前のバス停で、パスワード1234を見た").filter { !it.endsWith(ScreenContextStore.STEM_MARK) }.drop(1))
         assertEquals(4, ScreenContextStore.stats(0L).screenWords) // 今日・県庁前・バス停・パスワード
         val snap = ScreenContextStore.snapshot("a", 0L)!!
-        assertEquals(0.0, snap.tokenBonus("見た"), 1e-9)
+        assertEquals(ScreenContextBonus.W_SCREEN, snap.tokenBonus("見た"), 1e-9) // 活用する語は漢字の部分で（見た・見る）
+        assertEquals(0.0, snap.tokenBonus("見"), 1e-9)
         assertEquals(ScreenContextBonus.W_SCREEN, snap.tokenBonus("県庁"), 1e-9)
         ScreenContextStore.onKeyboardHidden()
         assertNull(ScreenContextStore.snapshot("a", 0L)) // 隠れたら捨てる
+    }
+
+    @Test
+    fun inflectedWordsMatchByKanjiStem() {
+        // 2026-11-07 端末: 画面に 溜める があっても ためる・たまんない が 溜 にならなかった
+        val b = ScreenContextBonus(editor = "", commits = "", screen = ScreenContextStore.extractWords("それを使って溜めとくっていう").joinToString("\n"))
+        assertEquals(ScreenContextBonus.W_SCREEN, b.tokenBonus("溜める"), 1e-9)
+        assertEquals(ScreenContextBonus.W_SCREEN, b.tokenBonus("溜まん"), 1e-9)
+        assertEquals(ScreenContextBonus.W_SCREEN, b.tokenBonus("使い"), 1e-9)
+        assertEquals(0.0, b.tokenBonus("貯める"), 1e-9)
+        assertEquals(0.0, b.tokenBonus("溜"), 1e-9) // 漢字だけの 1 字は数えない
+        val e = ScreenContextBonus(editor = "ちゃんと寝れた？", commits = "", screen = "")
+        assertEquals(ScreenContextBonus.W_EDITOR, e.tokenBonus("寝れた"), 1e-9)
+        assertEquals(ScreenContextBonus.W_EDITOR, e.tokenBonus("寝る"), 1e-9)
+        assertEquals(0.0, e.tokenBonus("練れた"), 1e-9)
     }
 }

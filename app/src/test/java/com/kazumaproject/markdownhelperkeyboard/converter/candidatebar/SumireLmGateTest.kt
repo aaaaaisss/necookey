@@ -158,4 +158,20 @@ class SumireLmGateTest {
         assertNull(SumireLmGate.keepHiraganaOverKatakanaSwap(pool, listOf(2, 0, 1), doubleArrayOf(16.4, 13.0, 17.0)))
         assertNull(SumireLmGate.keepHiraganaOverKatakanaSwap(pool, listOf(0, 1, 2), scores))
     }
+
+    @Test
+    fun shortKatakanaWordGivesWayToKanaSpelling() {
+        // 2026-11-07 端末: 繋がっトンカ・帰りクラインちゃう
+        val pool = listOf(c("繋がっトンカ", 7, 100), c("繋がっとんか", 7, 110), c("帰り本気", 7, 120))
+        val toks = listOf(listOf("繋がっ", "トンカ"), listOf("繋がっ", "とんか"), listOf("帰り", "本気"))
+        assertEquals(listOf(1, 0, 2), SumireLmGate.avoidShortKatakanaToken(pool, toks, listOf(0, 1, 2), doubleArrayOf(2.0, 1.0, 0.0)))
+        // 差が大きければそのまま
+        assertNull(SumireLmGate.avoidShortKatakanaToken(pool, toks, listOf(0, 1, 2), doubleArrayOf(3.0, 1.0, 0.0)))
+        // 漢字だけの当て字（マジ → 本気）には替えない
+        val p2 = listOf(c("マジで", 3, 100), c("本気で", 3, 110))
+        assertNull(SumireLmGate.avoidShortKatakanaToken(p2, listOf(listOf("マジ", "で"), listOf("本気", "で")), listOf(0, 1), doubleArrayOf(2.0, 1.9)))
+        // ー を含む語（デート）は対象外
+        val p3 = listOf(c("デートする", 5, 100), c("でーとする", 5, 110))
+        assertNull(SumireLmGate.avoidShortKatakanaToken(p3, listOf(listOf("デート", "する"), listOf("でーと", "する")), listOf(0, 1), doubleArrayOf(2.0, 1.9)))
+    }
 }

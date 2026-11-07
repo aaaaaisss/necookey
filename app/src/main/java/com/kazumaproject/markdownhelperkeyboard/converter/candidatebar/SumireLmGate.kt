@@ -92,6 +92,7 @@ object SumireLmGate {
             keepHiraganaOverSingleKanjiSwap(toks, order, scores)?.let { order = it }
             avoidSentenceInitialParticle(leftContext, toks, inputs.map { it.readings }, order, scores)?.let { order = it }
             avoidLoneLongReadingKanji(input, pool, order, scores)?.let { order = it }
+            avoidShortKatakanaToken(pool, toks, order, scores)?.let { order = it }
         }
         keepTrailingElongation(input, pool, order)?.let { order = it }
         // 確認用の数（メモリだけ）: 加点が付いたか・加点で 1 位が変わったか（設定「画面の文脈」の状態表示）
@@ -149,6 +150,37 @@ object SumireLmGate {
         if (top == sumire || top.none { it in '\u30A1'..'\u30F6' } || foldKatakana(top) != sumire) return null
         if (scores[order[0]] - scores[0] >= KATAKANA_SWAP_MARGIN) return null
         return listOf(0) + order.filter { it != 0 }
+    }
+
+    /** 短いカタカナの語を、その部分だけがカタカナでない候補に替えるリランカーの差（これ未満なら替える）。 */
+    const val SHORT_KATAKANA_MARGIN = 1.5
+
+    private fun isKatakanaWord(s: String): Boolean = s.length in 2..4 && s.all { it in '\u30A1'..'\u30FA' }
+
+    /**
+     * 1 位に読み 2〜4 字のカタカナだけの語（ツクヨ・タスカ・ソラン・トンカ・チョト・クライン・ヤバ、ー を含まない）があり、
+     * その語のところだけがカタカナでない（前後の表記は同じ）候補（ひらがなを含む表記）が差 [SHORT_KATAKANA_MARGIN] 未満にあれば、その最上位を 1 位にする
+     * （2026-11-07 端末: 10分もあったらツクヨ・繋がっトンカ・帰りクラインちゃう。辞書の固有名詞のカタカナがかなの並びを取っていた。
+     * 分からない語はひらがなでよく、強制のカタカナは悪い）。変えないなら null。
+     */
+    internal fun avoidShortKatakanaToken(pool: List<Candidate>, tokens: List<List<String>>, order: List<Int>, scores: DoubleArray): List<Int>? {
+        if (order.size < 2) return null
+        val t = tokens[order[0]]
+        val k = t.indexOfFirst(::isKatakanaWord)
+        if (k < 0) return null
+        val prefix = t.subList(0, k).joinToString("")
+        val suffix = t.subList(k + 1, t.size).joinToString("")
+        val best = scores[order[0]]
+        for (j in order.drop(1)) {
+            if (best - scores[j] >= SHORT_KATAKANA_MARGIN) break
+            val s = pool[j].string
+            if (s.length <= prefix.length + suffix.length || !s.startsWith(prefix) || !s.endsWith(suffix)) continue
+            val mid = s.substring(prefix.length, s.length - suffix.length)
+            // 替え先にカタカナがある・漢字だけ（マジ → 本気 のような当て字）は採らない。ひらがなを含む表記だけ。
+            if (mid.any { it in '\u30A1'..'\u30FA' } || mid.none { it in '\u3041'..'\u3096' }) continue
+            return listOf(j) + order.filter { it != j }
+        }
+        return null
     }
 
     /** 1 字漢字への差し替え・文頭の助詞・長い読みの 1 字漢字を止めるリランカーの差（これ未満なら止める）。 */

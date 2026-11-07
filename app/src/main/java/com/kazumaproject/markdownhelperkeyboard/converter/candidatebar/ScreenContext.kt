@@ -132,7 +132,7 @@ object ScreenContextStore {
     )
 
     fun stats(now: Long): Stats = synchronized(lock) {
-        val sc = screens.values.filter { now - it.time <= SCREEN_TTL_MS }.sumOf { e -> e.text.split('\n').count { it.isNotEmpty() } }
+        val sc = screens.values.filter { now - it.time <= SCREEN_TTL_MS }.sumOf { e -> e.text.split('\n').count { it.isNotEmpty() && !it.endsWith(STEM_MARK) } }
         val ed = editor?.takeIf { now - it.time <= EDITOR_TTL_MS }?.let { extractWords(it.text).size } ?: 0
         val cm = commits.values.sumOf { q -> q.count { now - it.time <= COMMIT_TTL_MS } }
         Stats(serviceConnected, keyboardVisible, sc, ed, cm, recent.size, recentApplied)
@@ -154,8 +154,41 @@ object ScreenContextStore {
             if (j - i >= 2) out.add(text.substring(i, j))
             i = j
         }
+        // 活用する語の漢字の部分（溜める → 溜、聞いてる → 聞）。語だけで、送り仮名は残さない（2026-11-07: 画面に 溜める が
+        // あっても ためる/たまんない が 溜 にならなかった。漢字 2 字以上の並びしか残しておらず、動詞・形容詞が一つも効いていなかった）。
+        for (k in stemsOf(text)) out.add(k + STEM_MARK)
         return out
     }
+
+    /** 語の漢字の部分の印（画面の語の中で、漢字のあとにひらがなが続いた並び）。 */
+    const val STEM_MARK = '〜'
+
+    /** [text] の中で、漢字の並び（1 字以上）のすぐあとにひらがなが続くものの漢字の部分。 */
+    fun stemsOf(text: String): Set<String> {
+        val out = LinkedHashSet<String>()
+        var i = 0
+        while (i < text.length) {
+            if (!isKanji(text[i])) { i++; continue }
+            var j = i + 1
+            while (j < text.length && isKanji(text[j])) j++
+            if (j < text.length && isHiragana(text[j])) out.add(text.substring(i, j))
+            i = j
+        }
+        return out
+    }
+
+    /** 語 [token] が「漢字 + ひらがな」（溜める・聞いてる・寝れた）ならその漢字の部分。違えば null。 */
+    fun stemOfToken(token: String): String? {
+        if (token.isEmpty() || !isKanji(token[0])) return null
+        var j = 1
+        while (j < token.length && isKanji(token[j])) j++
+        if (j >= token.length) return null
+        for (k in j until token.length) if (!isHiragana(token[k])) return null
+        return token.substring(0, j)
+    }
+
+    internal fun isKanji(c: Char): Boolean = c in '\u4E00'..'\u9FFF' || c == '々'
+    internal fun isHiragana(c: Char): Boolean = c in 'ぁ'..'ゖ'
 
     /** 端末を閉じた・設定を切ったときなど。 */
     fun clear() = synchronized(lock) {
@@ -212,14 +245,25 @@ class ScreenContextBonus(
     private fun eligible(token: String): Boolean =
         token.length >= 2 && token.any(ScreenContextStore::isKanjiOrKatakana)
 
-    /** 語 [token] の加点（どの層に出てくるかの最大）。 */
+    // 活用する語の漢字の部分（[ScreenContextStore.stemsOf]）。画面の層は語の一覧に印つきで入っている。
+    private val editorStems by lazy { ScreenContextStore.stemsOf(editor) }
+    private val commitStems by lazy { ScreenContextStore.stemsOf(commits) }
+    private val otherStems by lazy { ScreenContextStore.stemsOf(otherCommits) }
+    private val screenStems by lazy {
+        screen.split('\n').filter { it.endsWith(ScreenContextStore.STEM_MARK) }.map { it.dropLast(1) }.toSet()
+    }
+
+    /** 語 [token] の加点（どの層に出てくるかの最大）。活用違い（溜める と 溜まん）は漢字の部分が同じなら同じ語として数える。 */
     fun tokenBonus(token: String): Double {
-        if (!eligible(token)) return 0.0
+        val stem = ScreenContextStore.stemOfToken(token)
+        if (!eligible(token) && stem == null) return 0.0
+        fun has(text: String, stems: () -> Set<String>): Boolean =
+            (eligible(token) && text.contains(token)) || (stem != null && stem in stems())
         var b = 0.0
-        if (commits.contains(token)) b = maxOf(b, wCommit)
-        if (editor.contains(token)) b = maxOf(b, wEditor)
-        if (screen.contains(token)) b = maxOf(b, wScreen)
-        if (b == 0.0 && otherCommits.contains(token)) b = W_OTHER_COMMIT
+        if (has(commits) { commitStems }) b = maxOf(b, wCommit)
+        if (has(editor) { editorStems }) b = maxOf(b, wEditor)
+        if (has(screen) { screenStems }) b = maxOf(b, wScreen)
+        if (b == 0.0 && has(otherCommits) { otherStems }) b = W_OTHER_COMMIT
         return b
     }
 

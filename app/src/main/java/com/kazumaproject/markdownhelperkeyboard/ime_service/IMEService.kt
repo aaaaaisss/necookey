@@ -11759,6 +11759,7 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
             }
             return
         }
+        recordListCorrection(candidate, insertString)
         if (insertString.isNotEmpty()) {
             isHenkan.set(false)
             henkanPressedWithBunsetsuDetect = false
@@ -14377,6 +14378,42 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
             chosen = text,
             kind = kind,
             ctx = ScreenContextStore.contextAppliedFor(state.reading),
+        )
+        ioScope.launch {
+            try {
+                CorrectionLog.append(File(filesDir, CorrectionLog.FILE_NAME), entry)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                Timber.w(e, "correction log write failed")
+            }
+        }
+    }
+
+    /**
+     * 下の候補一覧（予測・通常の候補）から選んだときも変換ミスとして残す（2026-11-07 端末: 繋がっトンカ を下の 繋がっとんか で
+     * 直したのに記録に残らなかった。記録はチップの確定だけだった）。チップ状態がこの読みのときだけ、最初のチップの表記と違えば 一覧。
+     */
+    private fun recordListCorrection(candidate: Candidate, insertString: String) {
+        val state = chipBarState ?: return
+        if (insertString.isEmpty() || state.reading != insertString || candidate.string.isEmpty()) return
+        if (ChipBarPresenter.isChipCandidate(candidate) || isNecookeyActionCandidate(candidate)) return
+        val model = chipBarModel ?: return
+        if (!screenContextAllowed()) return
+        if (!PreferenceManager.getDefaultSharedPreferences(this).getBoolean(CorrectionLog.PREF_KEY, true)) return
+        val shown = try {
+            model.chipsOf(state.whole, state.whole.primary).joinToString("") { it.output }
+        } catch (e: Exception) {
+            return
+        }
+        if (shown.isEmpty() || shown == candidate.string) return
+        val entry = CorrectionLog.Entry(
+            time = System.currentTimeMillis(),
+            reading = insertString,
+            shown = shown,
+            chosen = candidate.string,
+            kind = CorrectionLog.KIND_LIST,
+            ctx = ScreenContextStore.contextAppliedFor(insertString),
         )
         ioScope.launch {
             try {

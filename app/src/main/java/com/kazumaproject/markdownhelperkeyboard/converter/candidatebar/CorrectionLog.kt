@@ -16,6 +16,8 @@ object CorrectionLog {
     const val KIND_CANDIDATE = "候補"
     const val KIND_SEGMENT = "区切り"
     const val KIND_KANA = "かな"
+    /** 下の候補一覧（予測・通常の候補）から選んだ（チップを使わずに確定）。 */
+    const val KIND_LIST = "一覧"
 
     data class Entry(
         val time: Long,
