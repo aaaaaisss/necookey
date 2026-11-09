@@ -50,6 +50,18 @@ class KanaDialectNodesTest {
         assertTrue(KanaDialectNodes.entriesAt("きねんび", 1).none { it.reading == "ねん" })
         assertTrue(KanaDialectNodes.entriesAt("なにやねん", 3).any { it.reading == "ねん" })
         assertTrue(KanaDialectNodes.entriesAt("あるねん", 2).any { it.reading == "ねん" })
+        // 2026-11-08: よに は ん の後だけ、もろて は て形の後だけ、ぜい・くね・やろうね は文末だけ
+        assertTrue(KanaDialectNodes.entriesAt("ひかんよに", 3).any { it.reading == "よに" })
+        assertTrue(KanaDialectNodes.entriesAt("よにでる", 0).none { it.reading == "よに" })
+        assertTrue(KanaDialectNodes.entriesAt("きてもろて", 2).any { it.reading == "もろて" })
+        assertTrue(KanaDialectNodes.entriesAt("もろてをあげて", 0).none { it.reading == "もろて" })
+        assertTrue(KanaDialectNodes.entriesAt("まっとくぜい", 4).any { it.reading == "ぜい" })
+        assertTrue(KanaDialectNodes.entriesAt("まっとくぜい！", 4).any { it.reading == "ぜい" })
+        assertTrue(KanaDialectNodes.entriesAt("とくぜいきん", 2).none { it.reading == "ぜい" })
+        assertTrue(KanaDialectNodes.entriesAt("あったくね", 3).any { it.reading == "くね" })
+        assertTrue(KanaDialectNodes.entriesAt("あったくねる", 3).none { it.reading == "くね" })
+        assertTrue(KanaDialectNodes.entriesAt("よりけりやろうね", 4).any { it.reading == "やろうね" })
+        assertTrue(KanaDialectNodes.entriesAt("やろうねこ", 0).none { it.reading == "やろうね" })
     }
 
     @Test

@@ -34,7 +34,14 @@ internal object KanaDialectNodes {
      * [after] != null なら文頭では出さず、直前の読みの 1 字が [after] のどれかのときだけ（ねん: 名詞の直後
      * = 年とともに・記念・去年 を避け、用言・助動詞の語尾 ん/い/う/や/る/え/た/す の後だけ）。
      */
-    data class Entry(val reading: String, val parts: List<Part>, val afterTe: Boolean = false, val after: String? = null)
+    data class Entry(
+        val reading: String,
+        val parts: List<Part>,
+        val afterTe: Boolean = false,
+        val after: String? = null,
+        /** 文末（入力の終わり、または直後が 。！？ー〜 など）だけ。 */
+        val final: Boolean = false,
+    )
 
     // 品詞 ID（assets/id.def）
     private const val KARA: Short = 330      // から 接続助詞
@@ -68,9 +75,18 @@ internal object KanaDialectNodes {
     private const val ITT: Short = 826      // いっ 五段・ワ行促音便 連用タ接続
     private const val KOTO: Short = 2066     // こと 名詞 非自立
     private const val TTE: Short = 391       // って 格助詞 連語
+    private const val YOU: Short = 2192      // よう 名詞 非自立 助動詞語幹
+    private const val NI_ADV: Short = 327    // に 助詞 副詞化
+    private const val MORAT: Short = 1820    // もらっ 動詞 非自立 五段・ワ行促音便 連用タ接続
+    private const val ZE: Short = 415        // ぜ 終助詞
+    private const val NE: Short = 423        // ね 終助詞
+
+    /** 文末の語（final）の直後に来てよい字。 */
+    private const val FINAL_FOLLOW = "。！？!?ー～〜…、.,"
 
     private fun p(y: String, id: Short) = Part(y, id)
-    private fun e(r: String, vararg parts: Part, afterTe: Boolean = false, after: String? = null) = Entry(r, parts.toList(), afterTe, after)
+    private fun e(r: String, vararg parts: Part, afterTe: Boolean = false, after: String? = null, final: Boolean = false) =
+        Entry(r, parts.toList(), afterTe, after, final)
 
     /** ねん の直前に許す字（用言・助動詞の語尾）。文頭・名詞の直後（年とともに・きねん・きょねん）では出さない。 */
     const val NEN_AFTER = "んいうやるえたす"
@@ -116,6 +132,18 @@ internal object KanaDialectNodes {
         add(e("っちゅう", p("って", TTE), p("いう", IU)))
         for (r in listOf("ゆって", "ゆうて")) add(e(r, p("いっ", ITT), p("て", TE)))
         add(e("ゆった", p("いっ", ITT), p("た", TA)))
+        // 否定 ん の後の ように（せんよに・ひかんよに・いらんよに、西日本の話し言葉）。悲観＋よ＋に・イラン＋世に に崩れていた（2026-11-08 端末）
+        add(e("よに", p("よう", YOU), p("に", NI_ADV), after = "ん"))
+        // もろて/もろた（= もらって/もらった、関西・中国）。て形の直後だけ（来て＋両手 に崩れていた、2026-11-08 端末）
+        add(e("もろて", p("もらっ", MORAT), p("て", TE), afterTe = true))
+        add(e("もろた", p("もらっ", MORAT), p("た", TA), afterTe = true))
+        // 文末の ぜい（= ぜ の伸ばし）。動詞・助動詞の語尾の後の文末だけ（税 に取られていた、2026-11-08 端末）
+        add(e("ぜい", p("ぜ", ZE), after = "うくぐすつぬぶむるただよ", final = true))
+        // 文末の 〜たくね？（〜たくない? の話し言葉）。た の後の文末だけ（あったクネ に崩れていた、2026-11-08 端末）
+        add(e("くね", p("ね", NE), after = "た", final = true))
+        // 文末の やろうね/やろうな（= だろうね、西日本）。野郎＋ね に崩れていた（2026-11-08 端末）。やろう 単独は標準語と衝突するので文末の ね/な 付きだけ
+        add(e("やろうね", p("だろ", DARO), p("う", U), p("ね", NE), final = true))
+        add(e("やろうな", p("だろ", DARO), p("う", U), p("な", NA), final = true))
     }
 
     private val byFirst: Map<Char, List<Entry>> = ENTRIES.groupBy { it.reading[0] }
@@ -129,7 +157,8 @@ internal object KanaDialectNodes {
             en.reading !in skip &&
                 str.startsWith(en.reading, start) &&
                 (!en.afterTe || (start > 0 && (str[start - 1] == 'て' || str[start - 1] == 'で'))) &&
-                (en.after == null || (start > 0 && str[start - 1] in en.after))
+                (en.after == null || (start > 0 && str[start - 1] in en.after)) &&
+                (!en.final || start + en.reading.length == str.length || str[start + en.reading.length] in FINAL_FOLLOW)
         }
     }
 }

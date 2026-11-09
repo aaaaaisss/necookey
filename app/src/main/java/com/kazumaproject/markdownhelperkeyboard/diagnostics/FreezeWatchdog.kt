@@ -44,6 +44,13 @@ object FreezeWatchdog {
     private const val OTHER_THREAD_MAX_FRAMES = 6
     private const val CRASH_TRACE_MAX_CHARS = 12_000
 
+    /**
+     * 全スレッドのスタック（Thread.getAllStackTraces）を取る最短の間隔。ART では全スレッドを一時停止するので、
+     * 固まっている最中に何度も取ると固まりを長引かせる（2026-11-08: 設定画面の 6〜9 秒の固まりで、他スレッドが
+     * メインの Looper へ投げる処理と重なっていた）。1 回の固まりにつき 1 回まで、続く固まりでは間隔を空ける。
+     */
+    private const val ALL_STACKS_MIN_INTERVAL_MS = 60_000L
+
     private val lock = Object()
     private val mainHandler by lazy { Handler(Looper.getMainLooper()) }
     private val writer = Executors.newSingleThreadExecutor { r ->
@@ -58,6 +65,9 @@ object FreezeWatchdog {
     @Volatile private var imeInputViewShown = false
     @Volatile private var imeStartupWatchUntil = 0L
     @Volatile private var resumedActivity: String? = null
+
+    /** 最後に全スレッドのスタックを取った時刻（見張りスレッドだけが読み書き）。 */
+    private var lastAllStacksAt = -ALL_STACKS_MIN_INTERVAL_MS
 
     @Volatile private var handledSeq = 0L
     @Volatile private var handledAtUptime = 0L
@@ -170,6 +180,13 @@ object FreezeWatchdog {
         if (frames.size > MAIN_STACK_MAX_FRAMES) {
             append("  …（あと ").append(frames.size - MAIN_STACK_MAX_FRAMES).append(" 行）\n")
         }
+        // 全スレッドのスタックは見張りスレッドで、間隔を空けて 1 回だけ取る（メインスレッドでは取らない）
+        val now = SystemClock.uptimeMillis()
+        if (Looper.myLooper() == Looper.getMainLooper() || now - lastAllStacksAt < ALL_STACKS_MIN_INTERVAL_MS) {
+            append("他のスレッド: （直近に記録済みのため省略）\n")
+            return@buildString
+        }
+        lastAllStacksAt = now
         append("他のスレッド:\n")
         val all = runCatching { Thread.getAllStackTraces() }.getOrNull().orEmpty()
         all.entries

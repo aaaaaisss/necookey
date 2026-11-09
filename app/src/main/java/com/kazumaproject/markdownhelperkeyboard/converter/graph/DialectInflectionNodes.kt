@@ -46,6 +46,8 @@ internal object DialectInflectionNodes {
     private const val NASAI: Short = 1718    // なさい 動詞 非自立 五段・ラ行特殊 命令ｉ なさる
     private const val TAGERU: Short = 1093   // たげる 動詞 非自立 一段 基本形
     private const val KA: Short = 325        // か 助詞 副助詞／並立助詞／終助詞
+    private const val TO: Short = 350        // と 助詞 接続助詞
+    private const val OKU: Short = 1295      // おく 動詞 非自立 五段・カ行イ音便 基本形
 
     /** 語幹の活用形（ビット）。 */
     const val MIZEN = 1   // 未然形: 行か・言え・食べ・せ・こ
@@ -106,6 +108,8 @@ internal object DialectInflectionNodes {
         // 否定 ん（広島・西日本）: 話さん・言えん・行かん・せん。辞書の 未然＋ん は 花さん・肺炎 のような名詞に負けていた
         // （2026-11-07 端末: あんまはなさんとこ・そうはいえん）。1 ノードにして経路に残す。
         add(Suffix("ん", MIZEN, N))
+        // 否定 ん＋と（〜しないと、西日本）: せんと・行かんと・食べんと。せ＋ん＋と がカタカナ語 セント に取られていた（2026-11-08 端末）
+        add(Suffix("んと", MIZEN, TO))
         // 可能の否定（広島・西日本、ら抜き＋ん）: 言えれん・食べれん・来れんかった（語幹 = 可能動詞/一段の未然形 言え・食べ）
         add(Suffix("れん", MIZEN, N))
         add(Suffix("れんかった", MIZEN, TA))
@@ -127,6 +131,10 @@ internal object DialectInflectionNodes {
             add(Suffix(s + "かった", TE_STEM, TA))
         }
         for (s in listOf("とって", "どって")) add(Suffix(s, TE_STEM, TE))
+        // 〜ておく の縮約（話し言葉）: 待っとく・読んどく・しといて・食べといた。待っ＋とく が マット＋く に崩れていた（2026-11-08 端末）
+        for (s in listOf("とく", "どく")) add(Suffix(s, TE_STEM, OKU))
+        for (s in listOf("といて", "どいて")) add(Suffix(s, TE_STEM, TE))
+        for (s in listOf("といた", "どいた")) add(Suffix(s, TE_STEM, TA))
         // 〜てあげる の縮約（関西・中国）: 買うてきたげる・見たげる・読んだげる・したげた
         for (t in listOf("た", "だ")) {
             add(Suffix(t + "げる", TE_STEM, TAGERU))

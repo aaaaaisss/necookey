@@ -47,6 +47,10 @@ class DialectInflectionNodesTest {
         assertTrue(DialectInflectionNodes.suffixesAt("いえんかった", 2, mizen).any { it.reading == "んかった" })
         assertTrue(DialectInflectionNodes.suffixesAt("まちんさい", 2, renyou).any { it.reading == "んさい" })
         assertTrue(DialectInflectionNodes.suffixesAt("まっとる", 2, ta).any { it.reading == "とる" })
+        // 2026-11-08: 〜ておく の縮約（待っとく）と 否定＋と（せんと）
+        assertTrue(DialectInflectionNodes.suffixesAt("まっとく", 2, ta).any { it.reading == "とく" })
+        assertTrue(DialectInflectionNodes.suffixesAt("まちとく", 2, renyou).isEmpty())
+        assertTrue(DialectInflectionNodes.suffixesAt("いえんと", 2, mizen).any { it.reading == "んと" })
         // 活用形が合わなければ付けない（待ち＋とる、待っ＋んさい）、名詞（1851）には付けない
         assertTrue(DialectInflectionNodes.suffixesAt("まちとる", 2, renyou).isEmpty())
         assertTrue(DialectInflectionNodes.suffixesAt("まっんさい", 2, ta).isEmpty())

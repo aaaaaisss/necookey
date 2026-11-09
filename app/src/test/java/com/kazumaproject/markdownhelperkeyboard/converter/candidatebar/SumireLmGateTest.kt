@@ -174,4 +174,19 @@ class SumireLmGateTest {
         val p3 = listOf(c("デートする", 5, 100), c("でーとする", 5, 110))
         assertNull(SumireLmGate.avoidShortKatakanaToken(p3, listOf(listOf("デート", "する"), listOf("でーと", "する")), listOf(0, 1), doubleArrayOf(2.0, 1.9)))
     }
+
+    @Test
+    fun finalParticleStaysKana() {
+        // 2026-11-08 端末: 使うメリットなさそ屋根 → なさそやね
+        val pool = listOf(c("使うメリットなさそ屋根", 11, 100), c("使うメリットなさそやね", 11, 110), c("使うメリット無さそ屋根", 11, 120))
+        assertEquals(listOf(1, 0, 2), SumireLmGate.keepFinalParticleKana(pool, listOf(0, 1, 2), doubleArrayOf(8.1, 6.6, 5.0)))
+        // 後ろの記号はそのまま比べる（関与に値！ → 関与にね！）
+        val p2 = listOf(c("関与に値！", 7, 100), c("関与にね！", 7, 110))
+        assertEquals(listOf(1, 0), SumireLmGate.keepFinalParticleKana(p2, listOf(0, 1), doubleArrayOf(2.0, 1.0)))
+        // 差が大きい・送り仮名つき（帰るね）・名詞＋ね（家ね）・前半が無い（船 → ふね）なら何もしない
+        assertNull(SumireLmGate.keepFinalParticleKana(pool, listOf(0, 1, 2), doubleArrayOf(9.0, 6.6, 5.0)))
+        assertNull(SumireLmGate.keepFinalParticleKana(listOf(c("もう帰るね", 6, 1), c("もうかえるね", 6, 2)), listOf(0, 1), doubleArrayOf(2.0, 1.0)))
+        assertNull(SumireLmGate.keepFinalParticleKana(listOf(c("俺の家ね", 6, 1), c("俺のいえね", 6, 2)), listOf(0, 1), doubleArrayOf(2.0, 1.0)))
+        assertNull(SumireLmGate.keepFinalParticleKana(listOf(c("船", 2, 1), c("ふね", 2, 2)), listOf(0, 1), doubleArrayOf(2.0, 1.0)))
+    }
 }

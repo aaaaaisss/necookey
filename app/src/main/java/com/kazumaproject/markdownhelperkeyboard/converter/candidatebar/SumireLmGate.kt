@@ -93,6 +93,7 @@ object SumireLmGate {
             avoidSentenceInitialParticle(leftContext, toks, inputs.map { it.readings }, order, scores)?.let { order = it }
             avoidLoneLongReadingKanji(input, pool, order, scores)?.let { order = it }
             avoidShortKatakanaToken(pool, toks, order, scores)?.let { order = it }
+            keepFinalParticleKana(pool, order, scores)?.let { order = it }
         }
         keepTrailingElongation(input, pool, order)?.let { order = it }
         // 確認用の数（メモリだけ）: 加点が付いたか・加点で 1 位が変わったか（設定「画面の文脈」の状態表示）
@@ -254,6 +255,44 @@ object SumireLmGate {
             ?: return null
         if (scores[order[0]] - scores[alt] >= LONE_KANJI_MARGIN) return null
         return listOf(alt) + order.filter { it != alt }
+    }
+
+    /** 文末の終助詞を漢字の名詞に替えた 1 位を、かなの終助詞の候補に戻すリランカーの差（これ未満なら戻す）。 */
+    const val FINAL_PARTICLE_MARGIN = 2.0
+
+    private const val FINAL_PUNCT = "。！？!?ー～〜…"
+    private val FINAL_PARTICLE_HEADS = setOf("", "や", "よ", "だ", "か")
+
+    private fun isKanji(c: Char) = c in '\u4E00'..'\u9FFF' || c == '々'
+
+    /**
+     * 文末（後ろの 。！？ー〜 は除く）で、1 位が終助詞の読みを漢字 1〜2 字の名詞にしている（なさそ屋根・関与に値・関与に寝）とき、
+     * 同じ前半のまま末尾を かな の終助詞（ね・やね・よ・だね・かな …、末字が ね/よ/な/わ）にした候補が差 [FINAL_PARTICLE_MARGIN]
+     * 未満にあれば、その最上位を 1 位にする（2026-11-08 端末: 使うメリットなさそ屋根）。漢字が送り仮名つき（帰るね）・
+     * 末尾が名詞＋ね（家ね）・前半が無い（船 → ふね）なら替えない。変えないなら null。
+     */
+    internal fun keepFinalParticleKana(pool: List<Candidate>, order: List<Int>, scores: DoubleArray): List<Int>? {
+        if (order.size < 2) return null
+        val top = pool[order[0]].string
+        val punct = top.takeLastWhile { it in FINAL_PUNCT }
+        val t = top.dropLast(punct.length)
+        val best = scores[order[0]]
+        for (j in order.drop(1)) {
+            if (best - scores[j] >= FINAL_PARTICLE_MARGIN) break
+            val s = pool[j].string
+            if (!s.endsWith(punct)) continue
+            val a = s.dropLast(punct.length)
+            var p = 0
+            while (p < t.length && p < a.length && t[p] == a[p]) p++
+            if (p == 0) continue
+            val dT = t.substring(p)
+            val dA = a.substring(p)
+            if (dT.length !in 1..2 || !dT.all(::isKanji)) continue
+            if (dA.length !in 1..3 || !isAllHiragana(dA) || dA.last() !in "ねよなわ") continue
+            if (dA.dropLast(1) !in FINAL_PARTICLE_HEADS) continue
+            return listOf(j) + order.filter { it != j }
+        }
+        return null
     }
 
     private fun isSingleKanji(s: String): Boolean =
