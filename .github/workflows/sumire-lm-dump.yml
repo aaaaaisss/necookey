@@ -103,8 +103,6 @@ jobs:
           NK_DUMP_SHARD: ${{ matrix.shard }}/${{ needs.prep.outputs.nshard }}
         timeout-minutes: 100
         run: |
-          # 区切り固定の再変換（tools/sumire_lm/ci/split_reconv.txt = "K,m,N"、空なら無効）
-          export NK_SPLIT_RECONV="$(cat tools/sumire_lm/ci/split_reconv.txt 2>/dev/null || true)"
           cp tools/sumire_lm/ci/SumireNbestDumpTest.kt app/src/test/java/com/kazumaproject/markdownhelperkeyboard/converter/quality/
           ./gradlew :app:testLiteStandardDebugUnitTest --tests '*SumireNbestDumpTest*' -i --no-daemon --max-workers=2 -Dorg.gradle.jvmargs=-Xmx2g 2>&1 | grep -E "dumped|fail |FAILED|BUILD|error:|Exception" | head -200
           wc -l cands.${{ matrix.shard }}.tsv

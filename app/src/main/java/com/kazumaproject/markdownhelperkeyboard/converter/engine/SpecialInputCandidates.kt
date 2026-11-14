@@ -30,8 +30,6 @@ import com.kazumaproject.markdownhelperkeyboard.converter.mozc.MozcBoundaryMode
 import com.kazumaproject.markdownhelperkeyboard.converter.mozc.MozcNodeAttributeTable
 import com.kazumaproject.markdownhelperkeyboard.converter.mozc.MozcSegmenter
 import com.kazumaproject.markdownhelperkeyboard.converter.path_algorithm.FindPath
-import com.kazumaproject.markdownhelperkeyboard.converter.path_algorithm.SplitReconversionConfig
-import com.kazumaproject.markdownhelperkeyboard.converter.path_algorithm.SplitReconversionResult
 import com.kazumaproject.markdownhelperkeyboard.converter.trace.BoundaryTrace
 import com.kazumaproject.markdownhelperkeyboard.converter.trace.CandidateTrace
 import com.kazumaproject.markdownhelperkeyboard.converter.trace.ConversionTrace

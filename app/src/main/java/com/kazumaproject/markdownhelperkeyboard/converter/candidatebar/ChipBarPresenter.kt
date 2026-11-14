@@ -18,15 +18,6 @@ const val CANDIDATE_TYPE_CHIP_CANDIDATE: Byte = 60
 /** 下段の読み全体の別候補（タップ = その経路の文節チップに置き換える。確定はしない）。 */
 const val CANDIDATE_TYPE_CHIP_FULL_ALTERNATIVE: Byte = 61
 
-/**
- * 下段の「区切りを変える候補」（タップ = [ChipBarModel.applyAlternative]。確定はしない）。type で向き（印）を分け、
- * [Candidate.score] に [LowerRow.ChipCandidates.segments] の番号を入れる。表示は塊の間に [SEGMENT_SEPARATOR]。
- */
-const val CANDIDATE_TYPE_CHIP_SEGMENT_LEFT: Byte = 62
-const val CANDIDATE_TYPE_CHIP_SEGMENT_RIGHT: Byte = 63
-const val CANDIDATE_TYPE_CHIP_SEGMENT_BOTH: Byte = 64
-const val CANDIDATE_TYPE_CHIP_SEGMENT_SPLIT: Byte = 65
-
 /** 下段の「戻す」（直前の区切りの変更を取り消す）。 */
 const val CANDIDATE_TYPE_CHIP_UNDO: Byte = 66
 
@@ -76,46 +67,16 @@ object ChipBarPresenter {
     /** 予測行で読み全体の別候補を差し込む位置（予測の先頭 [slot] 個の後ろ）。 */
     const val FULL_ALTERNATIVE_SLOT = 3
 
-    /** チップ候補で区切りを変える候補を差し込む位置（今の表記と 1 番目の別候補の後ろ）。 */
-    const val SEGMENT_ALTERNATIVE_SLOT = 2
-
-    /** 区切りを変える候補の表示で塊の間に入れる印（アダプタが小さく薄く描く）。 */
-    const val SEGMENT_SEPARATOR = "｜"
+    /** チップ候補で「戻す」・同じ範囲の表記を差し込む位置（今の表記と 1 番目の別候補の後ろ）。 */
+    const val HEAD_SLOT = 2
 
     /** 「戻す」の表記。 */
     const val UNDO_LABEL = "戻す"
 
-    /** 区切りを変える候補の表示（塊の間に [SEGMENT_SEPARATOR]）。 */
-    fun segmentLabel(alt: SegmentAlternative): String = alt.pieces.joinToString(SEGMENT_SEPARATOR) { it.output }
-
-    fun segmentType(direction: SegmentAlternative.Direction): Byte = when (direction) {
-        SegmentAlternative.Direction.LEFT -> CANDIDATE_TYPE_CHIP_SEGMENT_LEFT
-        SegmentAlternative.Direction.RIGHT -> CANDIDATE_TYPE_CHIP_SEGMENT_RIGHT
-        SegmentAlternative.Direction.BOTH -> CANDIDATE_TYPE_CHIP_SEGMENT_BOTH
-        SegmentAlternative.Direction.SPLIT -> CANDIDATE_TYPE_CHIP_SEGMENT_SPLIT
-    }
-
-    fun isSegmentAlternative(candidate: Candidate): Boolean =
-        candidate.type.toInt() in CANDIDATE_TYPE_CHIP_SEGMENT_LEFT.toInt()..CANDIDATE_TYPE_CHIP_SEGMENT_SPLIT.toInt()
-
-    /**
-     * 区切りを変える候補・戻すの表示の前後に付ける小さな印（左右の隣を取り込む向き / 戻す）。それ以外は null。
-     * アダプタが小さく薄く描く。
-     */
+    /** 「戻す」の表示の前に付ける小さな印。それ以外は null。アダプタが小さく薄く描く。 */
     fun markerAffixes(type: Byte): Pair<String, String>? = when (type) {
-        CANDIDATE_TYPE_CHIP_SEGMENT_LEFT -> "←" to ""
-        CANDIDATE_TYPE_CHIP_SEGMENT_RIGHT -> "" to "→"
-        CANDIDATE_TYPE_CHIP_SEGMENT_BOTH -> "←" to "→"
-        CANDIDATE_TYPE_CHIP_SEGMENT_SPLIT -> "" to ""
         CANDIDATE_TYPE_CHIP_UNDO -> "↶" to ""
         else -> null
-    }
-
-    /** 下段でタップされた区切りを変える候補を [row] の中から探す（番号が合わなければ表示で探す）。 */
-    fun segmentFor(row: LowerRow?, candidate: Candidate): SegmentAlternative? {
-        val segments = (row as? LowerRow.ChipCandidates)?.segments ?: return null
-        segments.getOrNull(candidate.score)?.takeIf { segmentLabel(it) == candidate.string }?.let { return it }
-        return segments.firstOrNull { segmentLabel(it) == candidate.string }
     }
 
     fun strip(state: ChipBarState?): ChipStripData {
@@ -178,27 +139,17 @@ object ChipBarPresenter {
                     score = 0,
                     yomi = reading,
                 )
-                // 今の表記・1 番目の別候補 → 区切りを変える候補 → 戻す → 文全体の経路の同じ範囲の表記 → 残りの候補・かな
+                // 今の表記・1 番目の別候補 → 戻す → 文全体の経路の同じ範囲の表記 → 残りの候補・かな
                 val all = row.all.filter { it.isNotEmpty() }
-                val head = all.take(SEGMENT_ALTERNATIVE_SLOT)
+                val head = all.take(HEAD_SLOT)
                 val context = row.context.filter { it.isNotEmpty() && it !in head }
-                val rest = all.drop(SEGMENT_ALTERNATIVE_SLOT).filter { it !in context }
-                val segments = row.segments.mapIndexed { index, alt ->
-                    val r = state.reading.substring(alt.start, alt.end)
-                    Candidate(
-                        string = segmentLabel(alt),
-                        type = segmentType(alt.direction),
-                        length = r.length.coerceAtMost(255).toUByte(),
-                        score = index,
-                        yomi = r,
-                    )
-                }
+                val rest = all.drop(HEAD_SLOT).filter { it !in context }
                 val undoItem = if (undo) {
                     listOf(Candidate(string = UNDO_LABEL, type = CANDIDATE_TYPE_CHIP_UNDO, length = 0u, score = 0))
                 } else {
                     emptyList()
                 }
-                head.map(::plain) + segments + undoItem + context.map(::plain) + rest.map(::plain)
+                head.map(::plain) + undoItem + context.map(::plain) + rest.map(::plain)
             }
         }
 

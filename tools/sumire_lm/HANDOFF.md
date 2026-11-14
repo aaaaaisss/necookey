@@ -238,6 +238,8 @@ Reproduce: `. env.sh; python3 $T/bunseg.py; python3 $T/bunsum.py; python3 $T/rec
 判断は JWTD tune のみ（K・m・F の選択、重み、l2 は tune / tune 内 2-fold CV）。held / AJIMEE は報告のみ、AJIMEE は一切の選択に未使用。
 
 ### 実装（既定動作・表示順は不変）
+- **2026-11-14: アプリから全削除**（ユーザーの指示「区切りを変えた候補を出す仕組み全削除」）。`SplitReconversion.kt`・`FindPath.splitConstrainedReconversion`・
+  エンジンの引数・`SplitReconversionTest`・`ci/split_reconv.txt`・ダンプの `NK_SPLIT_RECONV` は無い。以下は記録として残す。
 - `path_algorithm/SplitReconversion.kt`: `SplitReconversionConfig(maxPatterns=K, wordsPerSpan=m, perPattern=N, perPatternForced=F, popBudget)`,
   `SplitReconversionCandidate`（候補・読み区間・区切り順位・語順位の最大・N-best 由来か・forced か）, `SplitReconversionResult`（受け皿 + elapsedNs）。
 - `FindPath.splitConstrainedReconversion(graph(枝刈り前), length, cm, nBestPatterns, exclude, config, out)`:
