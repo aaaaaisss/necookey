@@ -261,7 +261,15 @@ internal object NumberCounterNodes {
             (i > 0 && isDigit(str[i - 1]))
         // この先まで続く長い辞書語（くどい・いちだいじ・ごじつ・日本語・六本木・三人組）があれば作らない。
         // ただしその語の終わりがここで作れる数＋助数詞の終わり（にじ → にじかん 二時間）なら数の語なので作る。
-        if (existing.any { it.len > len && it.candidateSource == CandidateSource.SYSTEM && (i + it.len) !in ends }) return
+        // ただし辞書が数詞で始まる語として持つ「この数＋助数詞＋…」の語（三年ぶり・三人組・一回戦: 左 ID が数詞、表記が漢数字の形で始まる）は
+        // 数の語なので止めず、その語の算用数字の双子（3年ぶり、同じ品詞・コスト − 1）も置く。
+        // （止めていたため さんねんぶり では 3年 が作られず 三年ぶり だけが残っていた。六本木・百人一首 は左 ID が数詞でないので対象外）
+        val longer = existing.filter { it.len > len && it.candidateSource == CandidateSource.SYSTEM && (i + it.len) !in ends }
+        val numericCompounds = longer.filter { it.l == NUMBER_ID && it.tango.length > kanji.length && it.tango.startsWith(kanji) }
+        for (w in numericCompounds) {
+            out += Made(i + w.len, arabic + w.tango.substring(kanji.length), w.score - 1 + extra, w.l, w.r)
+        }
+        if (longer.size > numericCompounds.size) return
         val same = existing.filter { it.len.toInt() == len }
         val twin = same.filter { it.candidateSource == CandidateSource.SYSTEM && it.tango == kanji }.minByOrNull { it.score }
         val userCost = same.filter {

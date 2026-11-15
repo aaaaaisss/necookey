@@ -172,7 +172,9 @@ internal fun generateNumberCandidates(
 /**
  * かなで打った読み全体を数にした候補（[generateNumberCandidates]）は、同じ読みの辞書の語（数でない語）より前に出さない
  * （いっせん → 一線 の後に 1000、じゅうまん → 充満 の後に 10万）。読み全体の候補のうち最も良い「数でない語」の直後に
- * 数の候補をまとめてずらす（数どうしの並びは保つ）。打った数字を含む入力・数でない語が無いときはそのまま。
+ * 半角数字・漢数字（type 31/32）を置き、全角・カンマ・指数・丸数字・ローマ数字などの言い換えは同じ読みの辞書の語の
+ * 後ろへ回す（10 個近い言い換えが固定スコア 8000 前後でまとめて入り、きゅう → 旧 を 14 位まで押し下げていた）。
+ * 打った数字を含む入力・数でない語が無いときはそのまま。
  */
 internal fun deferNumberCandidatesBelowWords(
     numbers: List<Candidate>,
@@ -181,14 +183,22 @@ internal fun deferNumberCandidatesBelowWords(
 ): List<Candidate> {
     if (numbers.isEmpty() || input.any { it in '0'..'9' || it in '０'..'９' }) return numbers
     val numberStrings = numbers.mapTo(HashSet()) { it.string }
-    val bestWord = words.asSequence()
+    val wordScores = words.asSequence()
         .filter { it.length.toInt() == input.length && it.string !in numberStrings }
         .filter { c -> c.string.any { !isNumeralOrKanaChar(it) } }
-        .minOfOrNull { it.score } ?: return numbers
+        .map { it.score }
+        .toList()
+    if (wordScores.isEmpty()) return numbers
+    val bestWord = wordScores.min()
+    val worstWord = wordScores.max()
     val minNumber = numbers.minOf { it.score }
-    val delta = bestWord + 1 - minNumber
-    if (delta <= 0) return numbers
-    return numbers.map { it.copy(score = it.score + delta) }
+    val delta = maxOf(0, bestWord + 1 - minNumber)
+    return numbers.map {
+        val primary = it.type == 31.toByte() || it.type == 32.toByte()
+        val shifted = it.score + delta
+        val score = if (primary) shifted else maxOf(shifted, worstWord + 1 + (it.score - minNumber))
+        if (score == it.score) it else it.copy(score = score)
+    }
 }
 
 /** 数字・漢数字・かな・長音（数の表記か、変換していない読みの文字）。 */
