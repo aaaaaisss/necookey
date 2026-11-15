@@ -96,7 +96,8 @@ class ScreenContextAccessibilityService : AccessibilityService() {
     private fun captureSafely() {
         try {
             capture()
-        } catch (_: Exception) {
+        } catch (e: Exception) {
+            ScreenContextStore.noteCaptureSkipped(ScreenContextStore.inputPackage, "error:${e.javaClass.simpleName}", System.currentTimeMillis())
             // ウィンドウが消えた等。次の変化で読み直す。
         }
     }
@@ -106,14 +107,16 @@ class ScreenContextAccessibilityService : AccessibilityService() {
             ScreenContextStore.clearScreen()
             return
         }
-        if (!ScreenContextStore.keyboardVisible) return
+        val now = System.currentTimeMillis()
+        if (!ScreenContextStore.keyboardVisible) return ScreenContextStore.noteCaptureSkipped("", "hidden", now)
         val target = ScreenContextStore.inputPackage
-        if (target.isEmpty() || target == packageName || isExcludedPackage(target)) return
+        if (target.isEmpty()) return ScreenContextStore.noteCaptureSkipped("", "no-target", now)
+        if (target == packageName || isExcludedPackage(target)) return ScreenContextStore.noteCaptureSkipped(target, "excluded", now)
         // いま入力しているアプリのウィンドウだけ。キーボードが出ていると前面（active）がずれることがあるので、
         // まず対話ウィンドウ一覧からそのアプリの通常ウィンドウを探し、無ければ前面のウィンドウ。
-        val root = targetRoot(target) ?: return
+        val root = targetRoot(target) ?: return ScreenContextStore.noteCaptureSkipped(target, "no-window", now)
         val pkg = root.packageName?.toString().orEmpty()
-        if (pkg != target) return
+        if (pkg != target) return ScreenContextStore.noteCaptureSkipped(target, "other-window:$pkg", now)
         val texts = ArrayList<String>()
         var chars = 0
         var nodes = 0
@@ -126,6 +129,12 @@ class ScreenContextAccessibilityService : AccessibilityService() {
             if (node.isPassword || node.isEditable) continue
             if (!node.isVisibleToUser) continue
             node.text?.toString()?.takeIf { it.isNotBlank() }?.let {
+                texts.add(it)
+                chars += it.length
+            }
+            // Flutter・React Native・一部の WebView は表示の文字を text ではなく contentDescription に出す
+            // （2026-11-15: チャットアプリの画面に 中野 が見えていても画面の語が 0 だった）
+            node.contentDescription?.toString()?.takeIf { it.isNotBlank() && it != node.text?.toString() }?.let {
                 texts.add(it)
                 chars += it.length
             }

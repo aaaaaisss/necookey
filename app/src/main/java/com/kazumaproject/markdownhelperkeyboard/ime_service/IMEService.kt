@@ -2109,6 +2109,8 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
     override fun onStartInput(attribute: EditorInfo?, restarting: Boolean) {
         dismissKeyboardSelectionPopups()
         super.onStartInput(attribute, restarting)
+        // 別の欄・キーボードの切り替え: 入力欄の前後は読み直す（onStartInputView・onUpdateSelection で変換中でないときに読む）
+        ScreenContextStore.markEditorStale()
         forwardDeleteCoordinator.reset(attribute?.initialSelStart ?: -1, attribute?.initialSelEnd ?: -1)
         resetEditorSelectionSnapshot()
         flickPreviewEditorSessionId += 1L
@@ -2720,6 +2722,9 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         ScreenContextStore.onKeyboardShown(
             if (screenContextAllowed()) (editorInfo ?: currentInputEditorInfo)?.packageName?.toString().orEmpty() else ""
         )
+        // 入力欄の前後を最初のキーより前に読む（2026-11-15: 別のキーボードで 中野 と打ってから切り替えて なかの → 中の。
+        // 前後の記録が変換（ラティス）の後だったので、その入力の最初の変換と、速く打ったときの最後の変換に文脈が無かった）
+        scheduleCleanEditorCapture()
         flickInputPreviewCoordinator.cancel(restore = true)
         // The input view can restart without onStartInput() after returning from settings.
         // Re-read preferences that may change while the existing input session is retained.
@@ -3742,6 +3747,8 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         if (candidatesStart != -1 || candidatesEnd != -1) {
             return
         }
+        // 変換中でない: 入力欄の前後を正確に読める（確定・カーソル移動・アプリが文字を変えたとき）
+        scheduleCleanEditorCapture()
 
         updateEditorSelectionSnapshot(
             newSelStart = newSelStart,
@@ -8597,6 +8604,7 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
                             segments[c.string] ?: necookeyLearningSegmentsByString[c.string].orEmpty()
                         }
                     },
+                    isContextWord = contextWordPredicate(),
                 )
             }
             if (decision != null) {
@@ -13347,6 +13355,8 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         mode: CandidateQueryMode,
         token: CandidateRequestToken,
     ) {
+        // 画面文脈（入力欄の前後）は変換の前に（ラティスの文脈ノード加点がこの変換に効くように）
+        if (mode != CandidateQueryMode.EISUKANA) ensureEditorContextBeforeLattice(input)
         if (
             (mode == CandidateQueryMode.NO_TAB_DEFAULT || mode == CandidateQueryMode.CONVERSION) &&
             shouldUseNecookeyTwoRowBar()
@@ -14035,7 +14045,8 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
                         segmentsOf = { c ->
                             c.conversionSegments.ifEmpty { pool.candidateSegmentsByString[c.string].orEmpty() }
                         },
-                        )?.let { candidates = promoteRerankedCandidate(candidates, it.top, reading) }
+                        isContextWord = contextWordPredicate(),
+                    )?.let { candidates = promoteRerankedCandidate(candidates, it.top, reading) }
                 }
                 ChipConversion.fromEngine(
                     reading = reading,
@@ -14776,18 +14787,73 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
     private fun screenContextLexicon(): ContextLexicon? =
         if (screenContextAllowed()) ScreenContextStore.lexicon(screenContextPackage(), System.currentTimeMillis()) else null
 
-    /** カーソル前（変換中の [composingLength] 字を除く）と後を最大 200 字ずつ読み、使える欄なら記録する。カーソル前を返す。 */
-    private suspend fun captureScreenContext(inputConnection: InputConnection?, composingLength: Int): String =
+    /**
+     * カーソル前（変換中の [composingLength] 字を除く）と後を最大 200 字ずつ読み、使える欄なら記録する。カーソル前を返す。
+     * [clean] = 変換中の文字列が無いときに読んだ（[ScreenContextStore.recordEditor]: 変換中の読み取りで上書きしない）。
+     */
+    private suspend fun captureScreenContext(inputConnection: InputConnection?, composingLength: Int, clean: Boolean = false): String =
         withContext(Dispatchers.IO) {
             val ic = inputConnection ?: return@withContext ""
             val n = ScreenContextStore.EDITOR_CHARS
             val before = ic.getTextBeforeCursor(n + composingLength, 0)?.toString().orEmpty().dropLast(composingLength)
             if (screenContextAllowed()) {
                 val after = ic.getTextAfterCursor(n, 0)?.toString().orEmpty()
-                ScreenContextStore.recordEditor(screenContextPackage(), before, after, System.currentTimeMillis())
+                ScreenContextStore.recordEditor(screenContextPackage(), before, after, System.currentTimeMillis(), clean = clean)
             }
             before
         }
+
+    private var cleanEditorCaptureJob: Job? = null
+
+    /**
+     * 変換中でないときに入力欄の前後を読む（onStartInputView・onUpdateSelection、最後の 1 回だけ）。読む前にもう一度
+     * 変換中でないことを確かめる（読みかけで打ち始めたら読まない。そのときは変換の前の [ensureEditorContextBeforeLattice]）。
+     */
+    private fun scheduleCleanEditorCapture() {
+        if (!screenContextAllowed()) return
+        cleanEditorCaptureJob?.cancel()
+        cleanEditorCaptureJob = scope.launch {
+            if (inputString.value.isNotEmpty() || stringInTail.get().isNotEmpty()) return@launch
+            val ic = currentInputConnection ?: return@launch
+            try {
+                captureScreenContext(ic, 0, clean = inputString.value.isEmpty())
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                Timber.w(e, "screen-context: editor capture failed")
+            }
+        }
+    }
+
+    /**
+     * 変換（ラティス）の前に、入力欄の前後の記録があることを確かめる。変換中でないときの正確な記録（[scheduleCleanEditorCapture]）が
+     * あれば何もしない。無ければ（読み取りが間に合わなかった・IC が無かった）ここで読む（変換中の文字列を差し引く読み方）。
+     * 速く打ったときにどのキーの処理も [shouldApplyCandidateResult] で途中で戻り、最後の変換まで文脈が無いままになるのを防ぐ。
+     */
+    private suspend fun ensureEditorContextBeforeLattice(insertString: String) {
+        if (!screenContextAllowed()) return
+        if (ScreenContextStore.hasCleanEditor(screenContextPackage(), System.currentTimeMillis())) return
+        try {
+            val (ic, composing) = withContext(Dispatchers.Main.immediate) {
+                currentInputConnection to if (isLiveConversionEnable == true) {
+                    lastCandidate?.length ?: insertString.length
+                } else {
+                    insertString.length
+                }
+            }
+            captureScreenContext(ic, composing)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            Timber.w(e, "screen-context: editor capture before lattice failed")
+        }
+    }
+
+    /** リランカーに渡す「文脈の語か」（[SumireLmGate.keepContextWordTop]）。文脈なしなら null。 */
+    private fun contextWordPredicate(): ((String) -> Boolean)? {
+        val lex = screenContextLexicon() ?: return null
+        return { t -> lex.wordBonus(t) > 0 }
+    }
 
     private suspend fun getLeftContext(
         inputConnection: InputConnection?,

@@ -40,6 +40,18 @@ class ContextLexicon private constructor(
         return bonusOf(m) / 2
     }
 
+    /** 表記 [tango] そのものが文脈の語（漢字・カタカナの連続の部分文字列）にあるときの加点（活用語の漢字部の半分の加点は含まない）。 */
+    fun wordBonus(tango: String): Int = if (tango.length >= 2) words[tango]?.let { bonusOf(it) } ?: 0 else 0
+
+    /** 層ごとの語の数（部分文字列の集合のうち、その層のビットを持つもの。設定の状態表示用）。 */
+    fun layerCounts(): Map<Int, Int> {
+        val out = HashMap<Int, Int>()
+        for (m in words.values) for (b in intArrayOf(LAYER_EDITOR, LAYER_COMMIT, LAYER_SCREEN, LAYER_OTHER_COMMIT)) {
+            if (m and b != 0) out[b] = (out[b] ?: 0) + 1
+        }
+        return out
+    }
+
     /** 表記 [text] の語（漢字・カタカナの連続、または活用語の漢字部）がどの層にあるか（ビット）。記録の ctx 列用。 */
     fun layersOf(text: String): Int = layersOf(runsOf(text), stemRunsOf(text))
 

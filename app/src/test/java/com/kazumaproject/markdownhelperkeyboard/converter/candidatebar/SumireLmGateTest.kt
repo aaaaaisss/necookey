@@ -189,4 +189,17 @@ class SumireLmGateTest {
         assertNull(SumireLmGate.keepFinalParticleKana(listOf(c("俺の家ね", 6, 1), c("俺のいえね", 6, 2)), listOf(0, 1), doubleArrayOf(2.0, 1.0)))
         assertNull(SumireLmGate.keepFinalParticleKana(listOf(c("船", 2, 1), c("ふね", 2, 2)), listOf(0, 1), doubleArrayOf(2.0, 1.0)))
     }
+
+    @Test
+    fun contextWordTopIsNotReplacedByPathWithoutIt() {
+        val ctx = setOf("中野")
+        val toks = listOf(listOf("中野"), listOf("中", "の"), listOf("仲", "の"))
+        // リランカーが 中の を選んでも、文脈の 中野 を含む Sumire の 1 位を守る
+        assertEquals(listOf(0, 1, 2), SumireLmGate.keepContextWordTop(toks, listOf(1, 0, 2)) { it in ctx })
+        // 1 位を変えていない・文脈の語がない → 何もしない
+        assertNull(SumireLmGate.keepContextWordTop(toks, listOf(0, 1, 2)) { it in ctx })
+        assertNull(SumireLmGate.keepContextWordTop(toks, listOf(1, 0, 2)) { false })
+        // 差し替え先も別の文脈の語を含む（文脈どうし）→ リランカーに任せる
+        assertNull(SumireLmGate.keepContextWordTop(toks, listOf(2, 0, 1)) { it == "中野" || it == "仲" })
+    }
 }

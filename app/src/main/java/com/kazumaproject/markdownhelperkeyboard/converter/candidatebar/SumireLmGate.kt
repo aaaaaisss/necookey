@@ -49,6 +49,7 @@ object SumireLmGate {
         segmentsOf: (Candidate) -> List<CandidateConversionSegment>,
         isExcluded: (Candidate) -> Boolean = { false },
         contextBonus: ScreenContextBonus? = null,
+        isContextWord: ((String) -> Boolean)? = null,
     ): Decision? {
         val seen = HashSet<String>()
         val pool = candidates.asSequence()
@@ -96,6 +97,12 @@ object SumireLmGate {
             keepFinalParticleKana(pool, order, scores)?.let { order = it }
         }
         keepTrailingElongation(input, pool, order)?.let { order = it }
+        if (isContextWord != null) {
+            keepContextWordTop(inputs.map { it.tokens }, order, isContextWord)?.let {
+                order = it
+                ScreenContextStore.rerankKeptContext++
+            }
+        }
         // 確認用の数（メモリだけ）: 加点が付いたか・加点で 1 位が変わったか（設定「画面の文脈」の状態表示）
         val withBonusTop = if (bonusApplied) pool.indices.sortedWith(compareByDescending<Int> { scores[it] }.thenBy { it }).first() else -1
         // 端末では加点はラティス（ContextLexicon）に移したので contextBonus は渡されない。渡されたときだけ数える。
@@ -131,6 +138,24 @@ object SumireLmGate {
         if (pool[order[0]].string.endsWith(run)) return null
         val keep = order.firstOrNull { pool[it].string.endsWith(run) } ?: return null
         return listOf(keep) + order.filter { it != keep }
+    }
+
+    /**
+     * 画面文脈の語（入力欄の前後・画面・最近の確定にある語、[isContextWord]）を含む Sumire の 1 位を、その語を含まない候補に
+     * 差し替えない（2026-11-15 端末: 入力欄に 中野 があっても なかの → 中の）。文脈の加点はラティスの中で付けていて
+     * （ContextLexicon）、リランカー自身は文脈の語を知らない。左文脈に 中野 があると LM は 中野中野 の繰り返しを嫌って
+     * 中の を選ぶので、学習の経路を守るのと同じく文脈の語の経路を守る。差し替え先も別の文脈の語を含むなら（文脈どうし）
+     * リランカーに任せる。変えないなら null。
+     */
+    internal fun keepContextWordTop(tokens: List<List<String>>, order: List<Int>, isContextWord: (String) -> Boolean): List<Int>? {
+        if (order.isEmpty() || order[0] == 0) return null
+        val sumire = tokens[0]
+        val picked = tokens[order[0]].toSet()
+        val ctxInSumire = sumire.filter { it !in picked && isContextWord(it) }
+        if (ctxInSumire.isEmpty()) return null
+        val sumireSet = sumire.toSet()
+        if (picked.any { it !in sumireSet && isContextWord(it) }) return null
+        return listOf(0) + order.filter { it != 0 }
     }
 
     /** カタカナをひらがなに畳んだ文字列（ー はそのまま）。 */

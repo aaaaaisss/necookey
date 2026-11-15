@@ -315,7 +315,21 @@ class MainPreferenceFragment : AsyncPreferenceFragment() {
             R.string.st_screen_context_status_summary,
             getString(if (st.serviceConnected) R.string.st_screen_context_connected else R.string.st_screen_context_not_connected),
             st.screenWords, st.editorWords, st.commitEntries, st.conversions, st.changedByContext,
-        )
+        ) + "\n" + screenContextDetail()
+    }
+
+    /** 確認用の詳しい状態（2026-11-15）: ユーザー補助の直近の読み取り・直前の文脈ありの変換で加点した語・リランカーを止めた回数。 */
+    private fun screenContextDetail(): String {
+        val now = System.currentTimeMillis()
+        val cap = ScreenContextStore.lastCapture
+        val capText = if (cap == null) "なし" else
+            "${(now - cap.time) / 1000} 秒前・${cap.pkg.ifEmpty { "-" }}・${cap.result}・語 ${cap.words}"
+        val lat = ScreenContextStore.lastLattice
+        val latText = if (lat == null) "なし" else {
+            val l = lat.layers
+            "「${lat.input}」加点した語: ${lat.words.joinToString("・").ifEmpty { "なし" }}（文脈の語 入力欄 ${l[1] ?: 0}・確定 ${l[2] ?: 0}・画面 ${l[4] ?: 0}・他アプリ ${l[8] ?: 0}）"
+        }
+        return "画面の直近の読み取り: $capText\n直前の文脈ありの変換: $latText\nリランカーが文脈の語の 1 位を守った: ${ScreenContextStore.rerankKeptContext} 回\n版: ${com.kazumaproject.markdownhelperkeyboard.BuildConfig.VERSION_NAME}"
     }
 
     /** 記録の一覧（新しい順）。全部コピー（読み・最初の変換・確定・直し方・ctx のタブ区切り、1 件 1 行）・消去。 */

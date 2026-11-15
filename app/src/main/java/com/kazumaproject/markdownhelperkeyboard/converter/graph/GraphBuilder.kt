@@ -41,6 +41,8 @@ class GraphBuilder {
     private var contextLexicon: ContextLexicon? = null
     /** この構築で文脈ノード加点が付いたノードがあったか。 */
     private var contextBonusApplied = false
+    /** この構築で語そのものの加点が付いた表記（設定の状態表示用、数件だけ）。 */
+    private val contextBonusWords = LinkedHashSet<String>()
 
     private var systemUserYomiTrie: LOUDSWithTermId? = null
     private var systemUserTangoTrie: LOUDS? = null
@@ -119,6 +121,7 @@ class GraphBuilder {
         if (endIndex <= reusedThroughEndIndex) return
         applyContextBonus(newNode, source)
         val nodes = graph.computeIfAbsent(endIndex) { mutableListOf() }
+        preferContextOverLearned(nodes, newNode, source)
 
         when (mode) {
             GraphNodeDedupMode.MOZC_KEEP_ALL -> {
@@ -160,6 +163,62 @@ class GraphBuilder {
         val b = lex.nodeBonus(node.tango)
         if (b <= 0) return
         val s = (node.score - b).coerceAtLeast(0)
+        val d = node.score - s
+        node.score = s
+        node.f -= d
+        node.g -= d
+        node.adjustedScore = s
+        contextBonusApplied = true
+        if (contextBonusWords.size < 8 && lex.wordBonus(node.tango) > 0) contextBonusWords.add(node.tango)
+    }
+
+    /**
+     * 文脈の語は、同じ区間（同じ始まり・同じ読みの長さ）の「文脈にない学習の語」より強くする（2026-11-15）。学習ノードは
+     * もともと強く（[applyContextBonus] の対象外）、文脈の加点だけでは学習の語に勝てなかった。いまの入力欄・画面にある語は、
+     * 前に別の場面で選んだ同じ読みの語より、いまの意図に近い。学習ノードは位置ごとに辞書より先に入るので、文脈ノードを
+     * 入れるときに同じ区間の学習ノードを見る（学習ノードが後から入る場合も同じ区間の文脈ノードを見る）。[addContextInLearnedSlot]。
+     */
+    private fun preferContextOverLearned(nodes: MutableList<Node>, newNode: Node, source: String) {
+        val lex = contextLexicon ?: return
+        if (source == "USER") return
+        if (source == "LEARN") {
+            // 学習の語自身が文脈にあれば何もしない
+            if (lex.wordBonus(newNode.tango) > 0) return
+            val ctx = nodes.filter {
+                it.sPos == newNode.sPos && it.len == newNode.len && it.tango != newNode.tango &&
+                    it.candidateSource != CandidateSource.LEARNED_DICTIONARY && lex.wordBonus(it.tango) > 0
+            }
+            for (c in ctx) addContextInLearnedSlot(nodes, c, newNode)
+            return
+        }
+        if (lex.wordBonus(newNode.tango) <= 0) return
+        val learned = nodes.filter {
+            it.sPos == newNode.sPos && it.len == newNode.len && it.tango != newNode.tango &&
+                it.candidateSource == CandidateSource.LEARNED_DICTIONARY && lex.wordBonus(it.tango) <= 0
+        }
+        for (l in learned) addContextInLearnedSlot(nodes, newNode, l)
+    }
+
+    /**
+     * 文脈の語 [ctx] を、学習の語 [learned] と同じ品詞（左右の連接 ID）・[learned] より [CONTEXT_OVER_LEARNED_MARGIN] 安いコストで
+     * もう一つ入れる。コストだけ下げても品詞が違うと連接コスト（文頭・文末・前後の語）で負けた（中野 = 地名、学習の 中の = 名詞）。
+     * 同じ区間・同じ文法上の位置で、学習の語の代わりに文脈の語が入る。
+     */
+    private fun addContextInLearnedSlot(nodes: MutableList<Node>, ctx: Node, learned: Node) {
+        val s = (learned.score - CONTEXT_OVER_LEARNED_MARGIN).coerceAtLeast(0)
+        val i = nodes.indexOfFirst { it.tango == ctx.tango && it.l == learned.l && it.r == learned.r }
+        if (i >= 0) {
+            val e = nodes[i]
+            if (e.score > s) lowerTo(e, s)
+            return
+        }
+        nodes.add(ctx.copy(l = learned.l, r = learned.r, score = s, f = s, g = s, adjustedScore = s, prev = null, next = null, mozcAttributes = learned.mozcAttributes))
+        contextBonusApplied = true
+    }
+
+    private fun lowerTo(node: Node, target: Int) {
+        val s = target.coerceAtLeast(0)
+        if (s >= node.score) return
         val d = node.score - s
         node.score = s
         node.f -= d
@@ -240,6 +299,7 @@ class GraphBuilder {
         val lexicon = ContextLexicon.current()
         contextLexicon = lexicon
         contextBonusApplied = false
+        contextBonusWords.clear()
 
         val signature = conversionSignature(
             yomiTrie = yomiTrie,
@@ -1180,7 +1240,7 @@ class GraphBuilder {
         )
         cachedGraph = updatedCache
         if (lexicon != null) {
-            com.kazumaproject.markdownhelperkeyboard.converter.candidatebar.ScreenContextStore.noteLatticeContext(str, contextBonusApplied)
+            com.kazumaproject.markdownhelperkeyboard.converter.candidatebar.ScreenContextStore.noteLatticeContext(str, contextBonusApplied, contextBonusWords.toList())
         }
         // チップで直した区切りの一般化（LearnedBoundaries）。キャッシュは調整前のまま残し、返すグラフだけに反映する。
         if (LearnedBoundaries.enabled) {
@@ -1254,5 +1314,7 @@ class GraphBuilder {
         const val MOZC_UNKNOWN_POS_ID: Short = 1841
         const val MOZC_MAX_WORD_COST = 32767
         const val CONTEXT_SOURCE = "CONTEXT"
+        /** 文脈の語を同じ区間の文脈にない学習の語よりどれだけ安くするか（[preferContextOverLearned]）。 */
+        const val CONTEXT_OVER_LEARNED_MARGIN = 1000
     }
 }

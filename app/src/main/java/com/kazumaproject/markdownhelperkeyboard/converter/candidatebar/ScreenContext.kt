@@ -35,17 +35,36 @@ object ScreenContextStore {
     private val lock = Any()
     private var editorPkg: String = ""
     private var editor: Entry? = null
+    private var editorClean = false
     private val commits = LinkedHashMap<String, ArrayDeque<Entry>>()
     private val screens = LinkedHashMap<String, Entry>()
 
-    /** 入力欄の前後（パスワード欄・学習しない欄では呼ばない）。 */
-    fun recordEditor(pkg: String, before: String, after: String, now: Long) = synchronized(lock) {
+    /**
+     * 入力欄の前後（パスワード欄・学習しない欄では呼ばない）。[clean] = 変換中の文字列が無いときに読んだ（前後が正確）。
+     * 変換中に読んだもの（[clean] = false）は、変換中の文字列の差し引きが表示とずれると語を欠く（ライブ変換の 中の を
+     * 引くつもりで 中野 の 野 を落とす等）ので、同じアプリの正確な記録が [EDITOR_TTL_MS] 以内にあれば上書きしない（2026-11-15）。
+     */
+    fun recordEditor(pkg: String, before: String, after: String, now: Long, clean: Boolean = false) = synchronized(lock) {
+        val prev = editor
+        if (!clean && editorClean && editorPkg == pkg && prev != null && now - prev.time <= EDITOR_TTL_MS) return@synchronized
         val text = before.takeLast(EDITOR_CHARS) + "\n" + after.take(EDITOR_CHARS)
         // 変換のたびに呼ばれる。中身が同じなら語の集合（[lexicon]）は作り直さない（時刻だけ更新）。
-        if (editorPkg != pkg || editor?.text != text) revision++
+        if (editorPkg != pkg || prev?.text != text) revision++
         editorPkg = pkg
         editor = Entry(text, now)
+        editorClean = clean
     }
+
+    /** [pkg] の入力欄の前後を、変換中でないときに [EDITOR_TTL_MS] 以内に読んであるか。 */
+    fun hasCleanEditor(pkg: String, now: Long): Boolean = synchronized(lock) {
+        editorClean && editorPkg == pkg && editor?.let { now - it.time <= EDITOR_TTL_MS } == true
+    }
+
+    /** 入力欄が変わった（別の欄・別のアプリ・キーボードの切り替え）: 正確な記録の印を外す（中身は次の読み取りで置き換わる）。 */
+    fun markEditorStale() = synchronized(lock) { editorClean = false }
+
+    /** 文脈の中身の版（変わるたびに増える。リランカーの差し替えの記憶のキーに入れる）。 */
+    val currentRevision: Long get() = synchronized(lock) { revision }
 
     fun recordCommit(pkg: String, text: String, now: Long) {
         if (text.isBlank() || !text.any(::isKanjiOrKatakana)) return
@@ -71,6 +90,7 @@ object ScreenContextStore {
             if (chars >= MAX_SCREEN_CHARS) break
             for (w in extractWords(t)) if (words.add(w)) chars += w.length + 1
         }
+        lastCapture = CaptureNote(now, pkg, "ok", words.count { !it.endsWith(STEM_MARK) })
         synchronized(lock) {
             val joined = words.joinToString("\n")
             val prev = screens.remove(pkg)
@@ -79,6 +99,26 @@ object ScreenContextStore {
             while (screens.size > MAX_APPS) screens.remove(screens.keys.first())
         }
     }
+
+    // ---- 確認用（設定「画面の文脈の状態」。キーボードが隠れても残す。語そのものは残さない） ----
+
+    /** ユーザー補助の直近の読み取り: 時刻・対象アプリ・結果（ok / 読まなかった理由）・語の数。 */
+    class CaptureNote(val time: Long, val pkg: String, val result: String, val words: Int)
+
+    @Volatile var lastCapture: CaptureNote? = null
+
+    /** ユーザー補助が読まなかったとき（理由 [reason]）。 */
+    fun noteCaptureSkipped(pkg: String, reason: String, now: Long) {
+        lastCapture = CaptureNote(now, pkg, reason, 0)
+    }
+
+    /** 直近の文脈ありの変換: 読み・加点した語（数件）・層ごとの語の数（EDITOR/COMMIT/SCREEN/他アプリ）。 */
+    class LatticeNote(val input: String, val words: List<String>, val layers: Map<Int, Int>)
+
+    @Volatile var lastLattice: LatticeNote? = null
+
+    /** リランカーが文脈の語を含む 1 位を差し替えようとして止めた回数（[SumireLmGate]）。 */
+    @Volatile var rerankKeptContext: Int = 0
 
     // ---- キーボードの表示とユーザー補助の接続（ユーザー補助はキーボードが出ている間だけ読む） ----
 
@@ -202,7 +242,7 @@ object ScreenContextStore {
 
     /** 端末を閉じた・設定を切ったときなど。 */
     fun clear() = synchronized(lock) {
-        editor = null; editorPkg = ""; commits.clear(); screens.clear()
+        editor = null; editorPkg = ""; editorClean = false; commits.clear(); screens.clear()
         recent.clear(); recentApplied = 0
         revision++; lexiconCache = null
     }
@@ -259,8 +299,10 @@ object ScreenContextStore {
     }
 
     /** 読み [input] の直前の変換で、ラティスの文脈ノード加点が付いたか（GraphBuilder が呼ぶ）。 */
-    fun noteLatticeContext(input: String, applied: Boolean) {
+    fun noteLatticeContext(input: String, applied: Boolean, words: List<String> = emptyList()) {
         noteConversion(input, applied, applied)
+        val lex = synchronized(lock) { lexiconCache }
+        lastLattice = LatticeNote(input, words, lex?.layerCounts().orEmpty())
     }
 
     /**

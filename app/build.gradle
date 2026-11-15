@@ -6,6 +6,19 @@ plugins {
     id "androidx.navigation.safeargs.kotlin"
 }
 
+def necookeyGitSha = providers.exec {
+    commandLine 'git', 'rev-parse', '--short=7', 'HEAD'
+    ignoreExitValue = true
+}.standardOutput.asText.map { it.trim() }.getOrElse("")
+def necookeyBuildDate = providers.exec {
+    commandLine 'date', '+%m%d'
+    environment 'TZ', 'Asia/Tokyo'
+    ignoreExitValue = true
+}.standardOutput.asText.map { it.trim() }.getOrElse("")
+def necookeyVersionSuffix = [necookeyGitSha, necookeyBuildDate].findAll { it }.join('.').with { it ? "+" + it : "" }
+def necookeyRunNumber = providers.environmentVariable('GITHUB_RUN_NUMBER').map { it.isInteger() ? it.toInteger() : 0 }.getOrElse(0)
+def necookeyVersionCode = necookeyRunNumber > 0 ? 822 + 3 * necookeyRunNumber : 821
+
 android {
     namespace 'com.kazumaproject.markdownhelperkeyboard'
     compileSdk 36
@@ -42,8 +55,10 @@ android {
         applicationId "io.github.aaaaaisss.necookey"
         minSdk 24
         targetSdk 36
-        versionCode 821
-        versionName "1.7.128"
+        // 版の表示（2026-11-15）: versionName = 1.7.128+<git 短縮 sha>.<ビルド日 MMdd、JST>（例 1.7.128+588b1d6.1115）。
+        // versionCode: CI（GITHUB_RUN_NUMBER あり）は 822 + 3×run 番号（毎回増える。ABI 分割の +1/+2 と重ならない）、ローカルは 821。
+        versionCode necookeyVersionCode
+        versionName "1.7.128" + necookeyVersionSuffix
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         // Japanese-only UI: the app's default resources are Japanese; drop library translations.
         resourceConfigurations += ["ja"]
