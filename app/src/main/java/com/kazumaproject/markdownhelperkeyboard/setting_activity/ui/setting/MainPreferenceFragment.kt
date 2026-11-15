@@ -140,6 +140,7 @@ class MainPreferenceFragment : AsyncPreferenceFragment() {
         refreshCorrectionLogSummary()
         refreshScreenContextStatus()
         refreshSumireLmTableSummary()
+        promptScreenContextAccessibilityOnce()
     }
 
     override fun onDestroyView() {
@@ -153,15 +154,39 @@ class MainPreferenceFragment : AsyncPreferenceFragment() {
         findPreference<Preference>(ScreenContextAccessibilityService.PREF_KEY)?.setOnPreferenceChangeListener { _, newValue ->
             if (newValue == true && !isScreenContextServiceEnabled()) {
                 // ユーザー補助はアプリからオンにできないので設定画面を開く（そこで necookey の項目をオンにする）。
-                try {
-                    startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
-                } catch (e: Exception) {
-                    Timber.w(e, "accessibility settings not available")
-                }
+                openAccessibilitySettings()
             }
             if (newValue == false) ScreenContextStore.clearScreen()
             true
         }
+    }
+
+    private fun openAccessibilitySettings() {
+        try {
+            startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
+        } catch (e: Exception) {
+            Timber.w(e, "accessibility settings not available")
+        }
+    }
+
+    /**
+     * 画面の文脈はアプリの設定では既定オン（2026-11-15）だが、ユーザー補助は Android の決まりでユーザーが端末の設定でオンにするしかない。
+     * アプリの設定がオンでサービスが有効でなければ、1 回だけ説明して端末のユーザー補助の設定へ案内する（勝手には有効にしない）。
+     * 「あとで」でも二度は出さない（状態の項目のタップでいつでも開ける）。
+     */
+    private fun promptScreenContextAccessibilityOnce() {
+        val ctx = context ?: return
+        val prefs = androidx.preference.PreferenceManager.getDefaultSharedPreferences(ctx)
+        if (prefs.getBoolean(PREF_SCREEN_CONTEXT_PROMPT_SHOWN, false)) return
+        if (!prefs.getBoolean(ScreenContextAccessibilityService.PREF_KEY, true)) return
+        if (isScreenContextServiceEnabled()) return
+        prefs.edit().putBoolean(PREF_SCREEN_CONTEXT_PROMPT_SHOWN, true).apply()
+        AlertDialog.Builder(ctx)
+            .setTitle(R.string.st_screen_context_prompt_title)
+            .setMessage(R.string.st_screen_context_prompt_message)
+            .setPositiveButton(R.string.st_screen_context_prompt_open) { _, _ -> openAccessibilitySettings() }
+            .setNegativeButton(R.string.st_screen_context_prompt_later, null)
+            .show()
     }
 
     private fun isScreenContextServiceEnabled(): Boolean {
@@ -264,6 +289,8 @@ class MainPreferenceFragment : AsyncPreferenceFragment() {
             true
         }
         findPreference<Preference>("screen_context_status_preference")?.setOnPreferenceClickListener {
+            // ユーザー補助が有効でなければ端末の設定を開く（画面の文脈を使うにはそこでオンにする）
+            if (!isScreenContextServiceEnabled()) openAccessibilitySettings()
             refreshScreenContextStatus()
             true
         }
@@ -570,6 +597,8 @@ class MainPreferenceFragment : AsyncPreferenceFragment() {
 
     companion object {
         private const val NEXT_WORD_VIEW_LIMIT = 300
+        /** 画面の文脈のユーザー補助の案内を出したか（1 回だけ）。 */
+        private const val PREF_SCREEN_CONTEXT_PROMPT_SHOWN = "screen_context_accessibility_prompt_shown"
 
         /** ナビゲーション引数: ツールバーに出すカテゴリ名（mobile_navigation.xml の label="{title}"）。 */
         const val ARG_TITLE = "title"

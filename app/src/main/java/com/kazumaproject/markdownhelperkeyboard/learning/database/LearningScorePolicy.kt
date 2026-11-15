@@ -42,6 +42,11 @@ object LearningScorePolicy {
     /** 強さが半分になる日数。 */
     const val HALF_LIFE_DAYS = 3.0
 
+    /** 学習語のコストを計算するときの「いま」（GraphBuilder）。評価で記録を時系列に再生するために差し替える（本番は現在時刻）。 */
+    @Volatile
+    @JvmStatic
+    var clock: () -> Long = { System.currentTimeMillis() }
+
     /** 回数の上限（よく使う語でも約 log2(8/0.05) ≒ 7 半減期で消える）。 */
     const val MAX_COUNT = 8
 

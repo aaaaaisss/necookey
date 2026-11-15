@@ -37,6 +37,11 @@ class GraphBuilder {
     @Volatile
     private var cachedGraph: CachedGraph? = null
 
+    /** この構築で使う画面文脈の語の集合（[ContextLexicon]、constructGraph の最初に 1 回取る）。 */
+    private var contextLexicon: ContextLexicon? = null
+    /** この構築で文脈ノード加点が付いたノードがあったか。 */
+    private var contextBonusApplied = false
+
     private var systemUserYomiTrie: LOUDSWithTermId? = null
     private var systemUserTangoTrie: LOUDS? = null
     private var systemUserTokenArray: TokenArray? = null
@@ -112,6 +117,7 @@ class GraphBuilder {
     ) {
         val reusedThroughEndIndex = (graph as? IncrementalGraph)?.reusedThroughEndIndex ?: -1
         if (endIndex <= reusedThroughEndIndex) return
+        applyContextBonus(newNode, source)
         val nodes = graph.computeIfAbsent(endIndex) { mutableListOf() }
 
         when (mode) {
@@ -142,6 +148,24 @@ class GraphBuilder {
                 }
             }
         }
+    }
+
+    /**
+     * 画面文脈の語の集合にある表記のノードを安くする（ラティスの中なので 1 位だけでなく 2 位以下・チップ下段・一覧にも効く）。
+     * ユーザー辞書・学習辞書（もともと強い）と文脈のカタカナ語ノード（作るときに加点済み）は除く。コストは 0 未満にしない。
+     */
+    private fun applyContextBonus(node: Node, source: String) {
+        val lex = contextLexicon ?: return
+        if (source == "USER" || source == "LEARN" || source == CONTEXT_SOURCE) return
+        val b = lex.nodeBonus(node.tango)
+        if (b <= 0) return
+        val s = (node.score - b).coerceAtLeast(0)
+        val d = node.score - s
+        node.score = s
+        node.f -= d
+        node.g -= d
+        node.adjustedScore = s
+        contextBonusApplied = true
     }
 
     private fun Node.toTrace(
@@ -213,6 +237,10 @@ class GraphBuilder {
         fun mozcAttributesFor(leftId: Short): Int =
             mozcNodeAttributeTable?.attributesFor(leftId.toInt()) ?: MozcNodeAttributes.NONE
 
+        val lexicon = ContextLexicon.current()
+        contextLexicon = lexicon
+        contextBonusApplied = false
+
         val signature = conversionSignature(
             yomiTrie = yomiTrie,
             englishReadingYomiTrie = englishReadingYomiTrie,
@@ -225,7 +253,7 @@ class GraphBuilder {
             beamWidth = beamWidth,
             graphNodeDedupMode = graphNodeDedupMode,
             mozcNodeAttributeTable = mozcNodeAttributeTable,
-        )
+        ).let { 31 * it + System.identityHashCode(lexicon) }
         val reusable = cachedGraph?.takeIf {
             graphNodeTrace == null &&
                 it.signature == signature &&
@@ -283,7 +311,7 @@ class GraphBuilder {
                 mozcNodeType = MozcNodeType.EOS,
             )
         )
-        val learnedCostNow = System.currentTimeMillis()
+        val learnedCostNow = LearningScorePolicy.clock()
         val dialectActive = KanaDialectNodes.mayApply(str)
         // 方言の活用語尾が始まる位置（語幹はその手前の辞書の動詞活用形、DialectInflectionNodes.kt）
         val dialectSuffixStarts = if (DialectInflectionNodes.mayApply(str)) DialectInflectionNodes.suffixStarts(str) else IntArray(0)
@@ -363,6 +391,30 @@ class GraphBuilder {
                     candidateSource = CandidateSource.LEARNED_DICTIONARY,
                 )
                 addOrUpdateNode(graph, endIndex, node, graphNodeDedupMode, graphNodeTrace, str, "LEARN")
+            }
+
+            // 2b. 文脈のカタカナ語（画面・入力欄・最近の確定にあるカタカナ 3 字以上の語、読み = ひらがな）。一時辞書、期限は文脈と同じ。
+            if (lexicon != null) {
+                for (w in lexicon.katakanaAt(str, i)) {
+                    val endIndex = i + w.reading.length
+                    if (endIndex <= reusablePrefixLength) continue
+                    val cost = (ContextLexicon.KATAKANA_NODE_COST - ContextLexicon.bonusOf(w.layers)).coerceAtLeast(0)
+                    foundInAnyDictionary = true
+                    addOrUpdateNode(
+                        graph, endIndex,
+                        Node(
+                            l = ContextLexicon.KATAKANA_NODE_POS,
+                            r = ContextLexicon.KATAKANA_NODE_POS,
+                            score = cost, f = cost, g = cost,
+                            tango = w.surface,
+                            yomiUsed = w.reading,
+                            len = w.reading.length.toShort(),
+                            sPos = i,
+                            mozcAttributes = mozcAttributesFor(ContextLexicon.KATAKANA_NODE_POS),
+                        ),
+                        graphNodeDedupMode, graphNodeTrace, str, CONTEXT_SOURCE,
+                    )
+                }
             }
 
             val localSystemUserYomiTrie = systemUserYomiTrie
@@ -1127,6 +1179,9 @@ class GraphBuilder {
             graph = graph.deepCopyForGraphBuild(),
         )
         cachedGraph = updatedCache
+        if (lexicon != null) {
+            com.kazumaproject.markdownhelperkeyboard.converter.candidatebar.ScreenContextStore.noteLatticeContext(str, contextBonusApplied)
+        }
         // チップで直した区切りの一般化（LearnedBoundaries）。キャッシュは調整前のまま残し、返すグラフだけに反映する。
         if (LearnedBoundaries.enabled) {
             val leftmost = LearnedBoundaries.shared.applyTo(graph, str, learnedCostNow)
@@ -1198,5 +1253,6 @@ class GraphBuilder {
         // app/src/main/assets/id.def: 名詞,サ変接続,*,*,*,*,*
         const val MOZC_UNKNOWN_POS_ID: Short = 1841
         const val MOZC_MAX_WORD_COST = 32767
+        const val CONTEXT_SOURCE = "CONTEXT"
     }
 }

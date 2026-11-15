@@ -10,11 +10,12 @@ import androidx.preference.PreferenceManager
 import com.kazumaproject.markdownhelperkeyboard.converter.candidatebar.ScreenContextStore
 
 /**
- * 画面の文脈（任意・既定オフ、設定「画面の文脈」とユーザー補助の両方でオン）。読む範囲は最小限（2026-11-05 絞り込み）:
+ * 画面の文脈（設定「画面の文脈」は既定オン（2026-11-15）。ただしユーザー補助はユーザーが端末の設定で有効にしたときだけ動く）。読む範囲は最小限（2026-11-05 絞り込み）:
  *  - necookey のキーボードが出ている間だけ（[ScreenContextStore.keyboardVisible]）。それ以外のイベントは無視し、隠れたら語を捨てる。
  *  - いま入力しているアプリ（EditorInfo.packageName）のウィンドウだけ。通知・システム UI・ランチャー・ほかのアプリのウィンドウは読まない。
  *  - パスワード管理・銀行・決済・認証アプリ（[isExcludedPackage]）は読まない。パスワード欄・入力欄・このアプリ自身の画面も読まない。
  *  - 残すのは漢字・カタカナ 2 字以上の語だけ（[ScreenContextStore.extractWords]）。元の文字列はすぐ捨てる。メモリだけ（3 分）、保存・送信しない。
+ *  - 取り出した語は変換のラティス（文脈ノードの加点）とカタカナ語の一時辞書に使う（ContextLexicon、期限は同じ 3 分）。
  * 読み取りは画面の変化から [THROTTLE_MS] 待ってまとめて 1 回。
  */
 class ScreenContextAccessibilityService : AccessibilityService() {
@@ -55,7 +56,7 @@ class ScreenContextAccessibilityService : AccessibilityService() {
     }
 
     private fun enabled(): Boolean =
-        PreferenceManager.getDefaultSharedPreferences(this).getBoolean(PREF_KEY, false)
+        PreferenceManager.getDefaultSharedPreferences(this).getBoolean(PREF_KEY, true)
 
     override fun onServiceConnected() {
         super.onServiceConnected()

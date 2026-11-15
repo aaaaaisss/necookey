@@ -184,7 +184,7 @@ import com.kazumaproject.markdownhelperkeyboard.clipboard_history.database.ItemT
 import com.kazumaproject.markdownhelperkeyboard.converter.candidate.BunsetsuCandidateResult
 import com.kazumaproject.markdownhelperkeyboard.converter.candidatebar.SumireLmGate
 import com.kazumaproject.markdownhelperkeyboard.converter.candidatebar.CorrectionLog
-import com.kazumaproject.markdownhelperkeyboard.converter.candidatebar.ScreenContextBonus
+import com.kazumaproject.markdownhelperkeyboard.converter.graph.ContextLexicon
 import com.kazumaproject.markdownhelperkeyboard.converter.candidatebar.ScreenContextStore
 import com.kazumaproject.markdownhelperkeyboard.converter.sumirelm.CandidateReranker
 import com.kazumaproject.markdownhelperkeyboard.converter.sumirelm.CandidateRerankers
@@ -1862,6 +1862,8 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
         Timber.d("onCreate")
         registerCrossWindowBlurListener()
         syncLatticeLmCost()
+        // 画面文脈をラティスと予測に（ContextLexicon、変換のたびに引く。作り直しは文脈が変わったときだけ）
+        ContextLexicon.provider = { screenContextLexicon() }
         lifecycleRegistry = LifecycleRegistry(this)
         lifecycleRegistry.currentState = Lifecycle.State.CREATED
         runtimeInputSharedPreferences =
@@ -2873,6 +2875,7 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
 
     override fun onDestroy() {
         FreezeWatchdog.onImeDestroyed()
+        ContextLexicon.provider = null
         ScreenContextStore.clear()
         dismissKeyboardSelectionPopups()
         unregisterCrossWindowBlurListener()
@@ -8594,7 +8597,6 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
                             segments[c.string] ?: necookeyLearningSegmentsByString[c.string].orEmpty()
                         }
                     },
-                    contextBonus = screenContextBonus(),
                 )
             }
             if (decision != null) {
@@ -14033,8 +14035,7 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
                         segmentsOf = { c ->
                             c.conversionSegments.ifEmpty { pool.candidateSegmentsByString[c.string].orEmpty() }
                         },
-                        contextBonus = screenContextBonus(),
-                    )?.let { candidates = promoteRerankedCandidate(candidates, it.top, reading) }
+                        )?.let { candidates = promoteRerankedCandidate(candidates, it.top, reading) }
                 }
                 ChipConversion.fromEngine(
                     reading = reading,
@@ -14353,6 +14354,7 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
             chosen = text,
             kind = kind,
             ctx = ScreenContextStore.contextAppliedFor(state.reading),
+            ctxLayers = ScreenContextStore.contextLayersFor(screenContextPackage(), initial.joinToString("") { it.output }, text, System.currentTimeMillis()),
         )
         ioScope.launch {
             try {
@@ -14389,6 +14391,7 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
             chosen = candidate.string,
             kind = CorrectionLog.KIND_LIST,
             ctx = ScreenContextStore.contextAppliedFor(insertString),
+            ctxLayers = ScreenContextStore.contextLayersFor(screenContextPackage(), shown, candidate.string, System.currentTimeMillis()),
         )
         ioScope.launch {
             try {
@@ -14765,9 +14768,13 @@ class IMEService : InputMethodService(), LifecycleOwner, InputConnection,
 
     private fun screenContextPackage(): String = currentInputEditorInfo?.packageName.orEmpty()
 
-    /** リランカーへの画面文脈の加点（[ScreenContextStore]）。使えない欄・文脈なしなら null。 */
-    private fun screenContextBonus(): ScreenContextBonus? =
-        if (screenContextAllowed()) ScreenContextStore.snapshot(screenContextPackage(), System.currentTimeMillis()) else null
+    /**
+     * 変換（ラティス）で使う画面文脈の語の集合（[ContextLexicon]、2026-11-15）。使えない欄・文脈なしなら null。
+     * 語の集合は文脈が変わったときだけ作り直す（[ScreenContextStore.lexicon]）。リランカーへの加点（ScreenContextBonus）は
+     * ラティスの加点と二重になるので使わない。
+     */
+    private fun screenContextLexicon(): ContextLexicon? =
+        if (screenContextAllowed()) ScreenContextStore.lexicon(screenContextPackage(), System.currentTimeMillis()) else null
 
     /** カーソル前（変換中の [composingLength] 字を除く）と後を最大 200 字ずつ読み、使える欄なら記録する。カーソル前を返す。 */
     private suspend fun captureScreenContext(inputConnection: InputConnection?, composingLength: Int): String =

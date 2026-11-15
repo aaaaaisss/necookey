@@ -42,8 +42,8 @@
     <string name="st_wikipedia">Wikipedia</string>
     <string name="st_section_screen_context">画面の文脈</string>
     <string name="st_screen_context_accessibility">画面に見えている語を変換に使う</string>
-    <string name="st_screen_context_accessibility_summary">キーボードが出ている間だけ、いま入力しているアプリの画面から漢字・カタカナ 2 字以上の語を取り出し、変換候補の順位付けに少しだけ使います。元の文章は残さず、語もメモリだけに 3 分（キーボードを閉じると消去）。保存・送信はしません。パスワード欄・入力欄、通知やほかのアプリの画面、パスワード管理・銀行・決済・認証アプリは読みません。オンにするとユーザー補助の設定画面を開きます。</string>
-    <string name="screen_context_accessibility_description">necookey キーボードが出ている間だけ、いま入力しているアプリの画面から漢字・カタカナ 2 字以上の語を取り出し、変換候補の順位付けに少しだけ使います。元の文章は残しません。語はメモリだけに 3 分置き、キーボードを閉じると消します。保存・送信はしません（アプリにネットワーク権限はありません）。パスワード欄・入力欄、通知・システム画面・ほかのアプリの画面、パスワード管理・銀行・決済・認証アプリは読みません。設定の「画面の文脈」でも切り替えられます。</string>
+    <string name="st_screen_context_accessibility_summary">キーボードが出ている間だけ、いま入力しているアプリの画面から漢字・カタカナ 2 字以上の語を取り出し、その語を変換候補に出しやすくします（カタカナ語は読みからの変換・補完にも）。元の文章は残さず、語もメモリだけに 3 分（キーボードを閉じると消去）。保存・送信はしません。パスワード欄・入力欄、通知やほかのアプリの画面、パスワード管理・銀行・決済・認証アプリは読みません。オンにするとユーザー補助の設定画面を開きます。</string>
+    <string name="screen_context_accessibility_description">necookey キーボードが出ている間だけ、いま入力しているアプリの画面から漢字・カタカナ 2 字以上の語を取り出し、その語を変換候補に出しやすくします（カタカナ語は読みからの変換・補完にも）。元の文章は残しません。語はメモリだけに 3 分置き、キーボードを閉じると消します。保存・送信はしません（アプリにネットワーク権限はありません）。パスワード欄・入力欄、通知・システム画面・ほかのアプリの画面、パスワード管理・銀行・決済・認証アプリは読みません。設定の「画面の文脈」でも切り替えられます。</string>
     <string name="st_section_next_word">次の言葉の学習</string>
     <string name="st_next_word_list">学習した組み合わせ</string>
     <string name="st_next_word_count">%1$d 件</string>
@@ -140,8 +140,12 @@
     <string name="st_correction_log_clear">消去</string>
     <string name="st_correction_log_close">閉じる</string>
     <string name="st_correction_log_cleared">記録を消去しました</string>
-    <string name="st_screen_context_status">画面の文脈の状態（タップで更新）</string>
-    <string name="st_screen_context_status_summary">ユーザー補助: %1$s ／ 今ある語: 画面 %2$d・入力欄の前後 %3$d・最近の確定 %4$d ／ 直近 %5$d 回の変換のうち文脈で 1 位が変わった %6$d 回（メモリだけ、アプリを閉じると消えます）</string>
+    <string name="st_screen_context_status">画面の文脈の状態（タップで更新・未接続ならユーザー補助の設定を開く）</string>
+    <string name="st_screen_context_prompt_title">画面の文脈をオンにする</string>
+    <string name="st_screen_context_prompt_message">画面に見えている漢字・カタカナの語を変換に使う設定はオンですが、Android の決まりで、ユーザー補助の設定で「necookey」をオンにするまで画面は読みません。\n\n読むのはキーボードが出ている間・入力中のアプリだけ。語はメモリに 3 分だけ置き、保存も送信もしません（パスワード欄・銀行・決済アプリは読みません）。\n\nこの案内は 1 回だけです。あとからは「画面の文脈の状態」をタップすると開けます。</string>
+    <string name="st_screen_context_prompt_open">ユーザー補助の設定を開く</string>
+    <string name="st_screen_context_prompt_later">あとで</string>
+    <string name="st_screen_context_status_summary">ユーザー補助: %1$s ／ 今ある語: 画面 %2$d・入力欄の前後 %3$d・最近の確定 %4$d ／ 直近 %5$d 回の変換のうち文脈の語に加点した %6$d 回（メモリだけ、アプリを閉じると消えます）</string>
     <string name="st_screen_context_connected">接続中</string>
     <string name="st_screen_context_not_connected">未接続</string>
     <string name="st_section_sumire_lm_table">変換の表（リランカー）</string>

@@ -1,15 +1,19 @@
 package com.kazumaproject.markdownhelperkeyboard.converter.candidatebar
 
+import com.kazumaproject.markdownhelperkeyboard.converter.graph.ContextLexicon
+
 /**
  * 画面文脈（ユーザー承認 2026-11-03）。すべてメモリだけで保存しない・送らない（アプリにネットワーク権限なし）。
  *
  * 3 つの層:
  *  - [Source.EDITOR] 入力欄のカーソル前後（各 [EDITOR_CHARS] 字、変換中の文字列は除く）。最新 1 件だけ。
  *  - [Source.COMMIT] 最近確定した表記（アプリ = パッケージごと、[COMMIT_TTL_MS] = 30 分）。会話の中で一度 県庁 に直したら県庁のまま。
- *  - [Source.SCREEN] ユーザー補助サービス（任意・既定オフ）が拾った、いま入力しているアプリの画面の語（漢字・カタカナ 2 字以上だけ、
+ *  - [Source.SCREEN] ユーザー補助サービス（アプリ設定は既定オン、端末のユーザー補助で有効にしたときだけ）が拾った、いま入力しているアプリの画面の語（漢字・カタカナ 2 字以上だけ、
  *    元の文字列は残さない。キーボードが出ている間だけ。隠れたら捨てる。[SCREEN_TTL_MS] = 3 分）。
  *
- * 使い方は [ScreenContextBonus]: 候補の語（Sumire の語分割の出力）が画面文脈の文字列に含まれていれば、リランカーの
+ * 使い方（2026-11-15〜）: [lexicon] の語の集合（ContextLexicon）をラティスに入れ、表記が文脈にあるノードを安くする（A1）・
+ * 文脈のカタカナ語を一時辞書としてノードと前方一致の予測に入れる（A2）。以下の [ScreenContextBonus]（リランカーへの加点）は
+ * 二重計上になるので端末では使っていない（テスト・比較用に残す）。旧: 候補の語（Sumire の語分割の出力）が画面文脈の文字列に含まれていれば、リランカーの
  * スコアに小さく加点する。読みは候補自身が入力の読みの変換なので「読み一致」は常に満たす（逆引き辞書は不要）。
  * 加点は上位 [ScreenContextBonus.TOP_N] 件・1 位との差 [ScreenContextBonus.MAX_GAP] 以内の候補だけ、1 候補あたり
  * [ScreenContextBonus.CAP] まで。2 字以上で漢字かカタカナを含む語だけ（1 字漢字は 今日 の 日 などに当たるので数えない）。
@@ -36,8 +40,11 @@ object ScreenContextStore {
 
     /** 入力欄の前後（パスワード欄・学習しない欄では呼ばない）。 */
     fun recordEditor(pkg: String, before: String, after: String, now: Long) = synchronized(lock) {
+        val text = before.takeLast(EDITOR_CHARS) + "\n" + after.take(EDITOR_CHARS)
+        // 変換のたびに呼ばれる。中身が同じなら語の集合（[lexicon]）は作り直さない（時刻だけ更新）。
+        if (editorPkg != pkg || editor?.text != text) revision++
         editorPkg = pkg
-        editor = Entry(before.takeLast(EDITOR_CHARS) + "\n" + after.take(EDITOR_CHARS), now)
+        editor = Entry(text, now)
     }
 
     fun recordCommit(pkg: String, text: String, now: Long) {
@@ -46,6 +53,7 @@ object ScreenContextStore {
             val q = commits.remove(pkg) ?: ArrayDeque()
             commits[pkg] = q
             q.addLast(Entry(text, now))
+            revision++
             while (q.size > MAX_COMMITS_PER_APP) q.removeFirst()
             while (commits.size > MAX_APPS) commits.remove(commits.keys.first())
         }
@@ -64,8 +72,10 @@ object ScreenContextStore {
             for (w in extractWords(t)) if (words.add(w)) chars += w.length + 1
         }
         synchronized(lock) {
-            screens.remove(pkg)
-            if (words.isNotEmpty()) screens[pkg] = Entry(words.joinToString("\n"), now)
+            val joined = words.joinToString("\n")
+            val prev = screens.remove(pkg)
+            if (prev?.text != joined.takeIf { words.isNotEmpty() }) revision++
+            if (words.isNotEmpty()) screens[pkg] = Entry(joined, now)
             while (screens.size > MAX_APPS) screens.remove(screens.keys.first())
         }
     }
@@ -194,9 +204,80 @@ object ScreenContextStore {
     fun clear() = synchronized(lock) {
         editor = null; editorPkg = ""; commits.clear(); screens.clear()
         recent.clear(); recentApplied = 0
+        revision++; lexiconCache = null
     }
 
-    fun clearScreen() = synchronized(lock) { screens.clear() }
+    fun clearScreen() = synchronized(lock) {
+        if (screens.isNotEmpty()) revision++
+        screens.clear()
+    }
+
+    // ---- ラティスの文脈ノード加点・画面のカタカナ語（ContextLexicon、2026-11-15） ----
+
+    /** 文脈の中身が変わるたびに増える（語の集合の作り直しの合図）。 */
+    private var revision = 0L
+    private var lexiconCache: ContextLexicon? = null
+    private var lexiconPkg: String = ""
+
+    /**
+     * [pkg] のいまの文脈の語の集合。文脈が変わったとき・どれかの層の期限が来たときだけ作り直す（変換ごとには作らない）。
+     * 何もなければ null。画面の語が古ければユーザー補助に読み直しを頼む（[snapshot] と同じ）。
+     */
+    fun lexicon(pkg: String, now: Long): ContextLexicon? = synchronized(lock) {
+        val scEntry = screens[pkg]
+        if (keyboardVisible && (scEntry == null || now - scEntry.time > SCREEN_REFRESH_MS)) captureRequester?.invoke()
+        val cached = lexiconCache
+        if (cached != null && lexiconPkg == pkg && cached.revision == revision && now < cached.expiresAt) {
+            return@synchronized cached.takeIf { !it.isEmpty }
+        }
+        var expires = Long.MAX_VALUE
+        val texts = HashMap<Int, String>()
+        editor?.takeIf { editorPkg == pkg && now - it.time <= EDITOR_TTL_MS }?.let {
+            texts[ContextLexicon.LAYER_EDITOR] = it.text
+            expires = minOf(expires, it.time + EDITOR_TTL_MS)
+        }
+        commits[pkg]?.filter { now - it.time <= COMMIT_TTL_MS }?.takeIf { it.isNotEmpty() }?.let { list ->
+            texts[ContextLexicon.LAYER_COMMIT] = list.joinToString("\n") { it.text }
+            expires = minOf(expires, list.minOf { it.time } + COMMIT_TTL_MS)
+        }
+        val other = commits.entries.filter { it.key != pkg }.flatMap { e -> e.value.filter { now - it.time <= COMMIT_TTL_MS } }
+        if (other.isNotEmpty()) {
+            texts[ContextLexicon.LAYER_OTHER_COMMIT] = other.joinToString("\n") { it.text }
+            expires = minOf(expires, other.minOf { it.time } + COMMIT_TTL_MS)
+        }
+        var screenStems: List<String> = emptyList()
+        scEntry?.takeIf { now - it.time <= SCREEN_TTL_MS }?.let { e ->
+            val lines = e.text.split('\n')
+            texts[ContextLexicon.LAYER_SCREEN] = lines.filter { !it.endsWith(STEM_MARK) }.joinToString("\n")
+            screenStems = lines.filter { it.endsWith(STEM_MARK) }.map { it.dropLast(1) }
+            expires = minOf(expires, e.time + SCREEN_TTL_MS)
+        }
+        val built = ContextLexicon.build(revision, expires, texts, screenStems)
+        lexiconCache = built
+        lexiconPkg = pkg
+        built.takeIf { !it.isEmpty }
+    }
+
+    /** 読み [input] の直前の変換で、ラティスの文脈ノード加点が付いたか（GraphBuilder が呼ぶ）。 */
+    fun noteLatticeContext(input: String, applied: Boolean) {
+        noteConversion(input, applied, applied)
+    }
+
+    /**
+     * 確定した表記 [chosen]（最初の表記 [shown]）の、直した部分の語（漢字・カタカナの連続・活用語の漢字部）が各層の文脈の語の集合に
+     * あったか。EDITOR / COMMIT（他アプリの確定を含む）/ SCREEN の順の "0"/"1" 3 字（変換ミスの記録の ctxl 列、文字列は残さない）。
+     */
+    fun contextLayersFor(pkg: String, shown: String, chosen: String, now: Long): String {
+        val lex = lexicon(pkg, now) ?: return "000"
+        val shownRuns = ContextLexicon.runsOf(shown).toSet()
+        val shownStems = ContextLexicon.stemRunsOf(shown)
+        val m = lex.layersOf(
+            ContextLexicon.runsOf(chosen).filter { it !in shownRuns },
+            ContextLexicon.stemRunsOf(chosen).filter { it !in shownStems },
+        )
+        fun bit(b: Int) = if (m and b != 0) '1' else '0'
+        return "${bit(ContextLexicon.LAYER_EDITOR)}${bit(ContextLexicon.LAYER_COMMIT or ContextLexicon.LAYER_OTHER_COMMIT)}${bit(ContextLexicon.LAYER_SCREEN)}"
+    }
 
     /** [pkg] のいまの画面文脈。何もなければ null。期限切れはここで捨てる。 */
     fun snapshot(pkg: String, now: Long): ScreenContextBonus? = synchronized(lock) {

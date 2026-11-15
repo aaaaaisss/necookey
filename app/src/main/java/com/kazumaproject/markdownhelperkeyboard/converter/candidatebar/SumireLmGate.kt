@@ -98,7 +98,10 @@ object SumireLmGate {
         keepTrailingElongation(input, pool, order)?.let { order = it }
         // 確認用の数（メモリだけ）: 加点が付いたか・加点で 1 位が変わったか（設定「画面の文脈」の状態表示）
         val withBonusTop = if (bonusApplied) pool.indices.sortedWith(compareByDescending<Int> { scores[it] }.thenBy { it }).first() else -1
-        ScreenContextStore.noteConversion(input, bonusApplied, bonusApplied && topWithoutBonus >= 0 && withBonusTop != topWithoutBonus)
+        // 端末では加点はラティス（ContextLexicon）に移したので contextBonus は渡されない。渡されたときだけ数える。
+        if (contextBonus != null) {
+            ScreenContextStore.noteConversion(input, bonusApplied, bonusApplied && topWithoutBonus >= 0 && withBonusTop != topWithoutBonus)
+        }
         val margin = if (order.size > 1) scores[order[0]] - scores[order[1]] else null
         return Decision(top = pool[order[0]], margin = margin, ranked = order.map { pool[it] }, scores = order.map { scores[it] })
     }

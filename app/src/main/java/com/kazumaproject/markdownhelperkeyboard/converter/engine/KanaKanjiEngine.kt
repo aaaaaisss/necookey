@@ -63,6 +63,7 @@ import com.kazumaproject.markdownhelperkeyboard.ime_service.extensions.toNumber
 import com.kazumaproject.markdownhelperkeyboard.ime_service.extensions.toNumberExponent
 import com.kazumaproject.markdownhelperkeyboard.ime_service.extensions.toSubscriptDigits
 import com.kazumaproject.markdownhelperkeyboard.ime_service.extensions.toSuperscriptDigits
+import com.kazumaproject.markdownhelperkeyboard.converter.graph.ContextLexicon
 import com.kazumaproject.markdownhelperkeyboard.repository.LearnRepository
 import com.kazumaproject.markdownhelperkeyboard.repository.UserDictionaryRepository
 import com.kazumaproject.toFullWidthDigitsEfficient
@@ -84,6 +85,11 @@ internal const val POS_ID_NUMBER_SEPARATED: Short = 2045
 internal const val POS_ID_NUMBER_KANJI: Short = 2046
 private const val ENGLISH_READING_CAPITALIZED_SCORE_OFFSET = 1_500
 private const val ENGLISH_READING_UPPERCASE_SCORE_OFFSET = 3_000
+/** 画面文脈のカタカナ語の前方一致（[ContextLexicon]）: 読み 3 字から、コスト 3000 ＋ 足りない 1 字 300 − 層の加点の半分、最大 3 件。 */
+private const val CONTEXT_COMPLETION_MIN_INPUT = 3
+private const val CONTEXT_COMPLETION_COST = 3_000
+private const val CONTEXT_COMPLETION_PER_CHAR = 300
+private const val CONTEXT_COMPLETION_LIMIT = 3
 
 internal fun shouldIncludeSymbolEmojiReading(
     inputLength: Int,
@@ -2819,7 +2825,30 @@ class KanaKanjiEngine {
 
         return (systemCandidates + systemUserCandidates)
             .sortedBy { it.score }
-            .take(predictionConfig.normalizedSystemCandidateLimit)
+            .take(predictionConfig.normalizedSystemCandidateLimit) + contextKatakanaCompletions(input, predictionConfig)
+    }
+
+    /**
+     * 画面文脈のカタカナ語の前方一致（ぽりめたる → ポリメタルグレー、あーきてく → アーキテクチャ）。読み 3 字から、先読みの字数の上限なし
+     * （画面に実在する語だけなので辞書の予測より強く出す）。期限は文脈と同じ（[ContextLexicon]）。
+     */
+    private fun contextKatakanaCompletions(input: String, predictionConfig: PredictionConfig): List<Candidate> {
+        if (!predictionConfig.japanesePredictionEnabled || input.length < CONTEXT_COMPLETION_MIN_INPUT) return emptyList()
+        val lex = ContextLexicon.current() ?: return emptyList()
+        return lex.katakanaCompletions(input)
+            .map { w ->
+                Candidate(
+                    string = w.surface,
+                    type = 9,
+                    length = w.reading.length.toUByte(),
+                    score = CONTEXT_COMPLETION_COST + CONTEXT_COMPLETION_PER_CHAR * (w.reading.length - input.length) -
+                        ContextLexicon.bonusOf(w.layers) / 2,
+                    leftId = ContextLexicon.KATAKANA_NODE_POS,
+                    rightId = ContextLexicon.KATAKANA_NODE_POS,
+                )
+            }
+            .sortedBy { it.score }
+            .take(CONTEXT_COMPLETION_LIMIT)
     }
 
     private fun buildPredictiveCandidatesFromDictionary(

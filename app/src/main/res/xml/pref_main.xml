@@ -121,7 +121,7 @@
             android:key="group_screen_context"
             android:title="@string/st_section_screen_context">
             <SwitchPreferenceCompat
-                android:defaultValue="false"
+                android:defaultValue="true"
                 android:key="screen_context_accessibility_preference"
                 android:summary="@string/st_screen_context_accessibility_summary"
                 android:title="@string/st_screen_context_accessibility" />

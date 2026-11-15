@@ -4,7 +4,7 @@ import java.io.File
 
 /**
  * 変換ミスの記録（2026-11-05、端末だけ・送信なし）。チップ方式で確定した表記が最初に出した変換（1 位経路のチップ）と違うとき、
- * {時刻, 読み, 最初の表記, 確定した表記, 直し方, 画面文脈の加点} を 1 行にして files/[FILE_NAME] に最新 [MAX_ENTRIES] 件だけ残す。
+ * {時刻, 読み, 最初の表記, 確定した表記, 直し方, 画面文脈の加点, 層ごとの文脈ヒット} を 1 行にして files/[FILE_NAME] に最新 [MAX_ENTRIES] 件だけ残す。
  * アプリ名は残さない。パスワード欄・学習しない欄・シークレットでは記録しない（IMEService が判定）。設定「変換ミスの記録」で一覧・全部コピー・消去・オフ。
  */
 object CorrectionLog {
@@ -26,19 +26,25 @@ object CorrectionLog {
         val chosen: String,
         val kind: String,
         val ctx: Boolean,
+        /**
+         * 直した部分の語が各層の文脈の語の集合にあったか（2026-11-15、A3）: EDITOR・COMMIT・SCREEN の順の "0"/"1" 3 字。
+         * 文脈の文字列は残さない。古い行は空。
+         */
+        val ctxLayers: String = "",
     ) {
-        fun toLine(): String = listOf(time.toString(), clean(reading), clean(shown), clean(chosen), kind, if (ctx) "1" else "0")
+        fun toLine(): String = listOf(time.toString(), clean(reading), clean(shown), clean(chosen), kind, if (ctx) "1" else "0", ctxLayers)
             .joinToString("\t")
 
-        /** コピー用の 1 行: 読み TAB 最初の表記 TAB 確定 TAB 直し方 TAB ctx=0/1。 */
-        fun toCopyLine(): String = "${clean(reading)}\t${clean(shown)}\t${clean(chosen)}\t$kind\tctx=${if (ctx) 1 else 0}"
+        /** コピー用の 1 行: 読み TAB 最初の表記 TAB 確定 TAB 直し方 TAB ctx=0/1（TAB ctxl=ECS の 0/1、ある行だけ）。 */
+        fun toCopyLine(): String = "${clean(reading)}\t${clean(shown)}\t${clean(chosen)}\t$kind\tctx=${if (ctx) 1 else 0}" +
+            (if (ctxLayers.isNotEmpty()) "\tctxl=$ctxLayers" else "")
 
         companion object {
             fun parse(line: String): Entry? {
                 val c = line.split('\t')
                 if (c.size < 5) return null
                 val t = c[0].toLongOrNull() ?: return null
-                return Entry(t, c[1], c[2], c[3], c[4], c.getOrNull(5) == "1")
+                return Entry(t, c[1], c[2], c[3], c[4], c.getOrNull(5) == "1", c.getOrNull(6).orEmpty())
             }
         }
     }
