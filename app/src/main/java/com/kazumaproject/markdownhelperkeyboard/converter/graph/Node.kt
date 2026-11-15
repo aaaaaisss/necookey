@@ -30,6 +30,9 @@ object MozcNodeAttributes {
 
     /** 動詞の連用形＋行く/来る の合成ノード（買い行く・食べ来る、RenyouMotionNodes）。ラティス LM は前の動詞の表記で引く。 */
     const val RENYOU_MOTION = 1 shl 11
+
+    /** 数＋助数詞を算用数字にしたノード（2代目・5日前、NumberCounterNodes）。ラティス LM は漢数字の表記で引く。 */
+    const val ARABIC_NUMERAL = 1 shl 12
 }
 
 data class Node(

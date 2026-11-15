@@ -500,6 +500,27 @@ class GraphBuilder {
                 }
             }
 
+            // 3.01 数＋助数詞を算用数字で（2代目・200台・5日前、NumberCounterNodes.kt）。辞書・学習・ユーザー辞書の後に置き、
+            //      str[i..) から始まる既存ノードを見て、慣用語・数でない語に負けるよう・漢数字の双子より 1 だけ安くする。
+            if (NumberCounterNodes.enabled) {
+                val made = NumberCounterNodes.build(str, i, nodesStartingAt(graph, str, i))
+                for (m in made) {
+                    if (m.end <= reusablePrefixLength) continue
+                    val yomiStr = str.substring(i, m.end)
+                    foundInAnyDictionary = true
+                    val arabic = m.tango.firstOrNull()?.let { it in '0'..'9' || it in '０'..'９' } == true
+                    addOrUpdateNode(
+                        graph, m.end,
+                        Node(
+                            l = m.l, r = m.r, score = m.cost, f = m.cost, g = m.cost, tango = m.tango,
+                            yomiUsed = yomiStr, len = yomiStr.length.toShort(), sPos = i,
+                            mozcAttributes = if (arabic) MozcNodeAttributes.ARABIC_NUMERAL else MozcNodeAttributes.NONE,
+                        ),
+                        graphNodeDedupMode, graphNodeTrace, str, "NUMBER_COUNTER",
+                    )
+                }
+            }
+
             // 3.052 口語の 動詞連用形＋行く/来る（買い行く、RenyouMotionNodes.kt）。語幹 = str[i, e) の辞書の動詞連用形。
             if (RenyouMotionNodes.enabled) {
                 for (e in i + RenyouMotionNodes.MIN_STEM_LEN..minOf(i + RenyouMotionNodes.MAX_STEM_LEN, str.length - RenyouMotionNodes.MIN_MOTION_LEN)) {
@@ -1115,6 +1136,15 @@ class GraphBuilder {
             }
         }
         return graph
+    }
+
+    /** str[i..) から始まるノード（終わりの位置ごとの一覧から sPos == i のもの）。 */
+    private fun nodesStartingAt(graph: Map<Int, List<Node>>, str: String, i: Int): List<Node> {
+        val out = ArrayList<Node>()
+        for (end in i + 1..minOf(str.length, i + 24)) {
+            graph[end]?.forEach { if (it.sPos == i) out += it }
+        }
+        return out
     }
 
     private fun Node.copyForGraphBuild(): Node = copy(

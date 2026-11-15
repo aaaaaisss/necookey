@@ -45,7 +45,9 @@ class ConversionQualityRegressionTest {
     @Test
     fun numeralReadingsStillConvert() {
         assertEquals("四日", top("よっか"))
-        assertEquals("三人", top("さんにん"))
+        // 数＋助数詞は算用数字が先（2026-11-14）、漢数字は候補に残る
+        assertTrue(strings("さんにん").take(2).contains("3人")) // 算用数字は 2 位以内でよい（辞書の 三人 が 1 位でも可）
+        assertTrue(strings("さんにん").take(5).contains("三人"))
         assertEquals("何人", top("なんにん"))
         assertEquals("第二", top("だいに"))
         assertTrue(strings("よん").take(10).contains("四"))
@@ -62,15 +64,15 @@ class ConversionQualityRegressionTest {
         assertTrue(strings("かいちょうをつとめた").take(5).contains("会長を努めた"))
     }
 
-    /** 文中の複合数詞が 1 語になる（にじゅうよん → 二重4 / 二重四 にならない）。 */
+    /** 文中の複合数詞が 1 語になる（にじゅうよん → 二重4 / 二重四 にならない）。2026-11-14 から算用数字が先、漢数字は次点。 */
     @Test
     fun compoundNumeralsInsideSentence() {
-        assertEquals("二千二十五年", top("にせんにじゅうごねん"))
-        assertTrue(strings("にせんにじゅうごねん").take(5).contains("2025年"))
-        assertEquals("二十四時間", top("にじゅうよじかん"))
-        assertEquals("時速四十五キロ", top("じそくよんじゅうごきろ"))
-        assertEquals("三十四箇所", top("さんじゅうよっかしょ"))
-        assertEquals("千九百九十一年", top("せんきゅうひゃくきゅうじゅういちねん"))
+        assertEquals("2025年", top("にせんにじゅうごねん"))
+        assertTrue(strings("にせんにじゅうごねん").take(5).contains("二千二十五年"))
+        assertEquals("24時間", top("にじゅうよじかん"))
+        assertEquals("時速45キロ", top("じそくよんじゅうごきろ"))
+        assertEquals("34箇所", top("さんじゅうよっかしょ"))
+        assertTrue(strings("せんきゅうひゃくきゅうじゅういちねん").take(2).contains("1991年"))
         // 位取りの語を含まない読み・紛らわしい読みは数詞にしない
         assertEquals("聴取率", top("ちょうしゅりつ"))
         assertEquals("四日", top("よっか"))

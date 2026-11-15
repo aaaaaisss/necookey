@@ -1364,9 +1364,13 @@ class KanaKanjiEngine {
                 }
             }
 
-        val numbersDeferred = generateNumberCandidates(
+        val numbersDeferred = deferNumberCandidatesBelowWords(
+            numbers = generateNumberCandidates(
+                input = input,
+                showSymbolCandidates = predictionConfig.showSymbolCandidates,
+            ),
             input = input,
-            showSymbolCandidates = predictionConfig.showSymbolCandidates,
+            words = resultNBestFinalDeferred.candidates,
         )
 
         val mozcUTPersonNames =
@@ -1818,9 +1822,13 @@ class KanaKanjiEngine {
                 }
             }
 
-        val numbersDeferred = generateNumberCandidates(
+        val numbersDeferred = deferNumberCandidatesBelowWords(
+            numbers = generateNumberCandidates(
+                input = input,
+                showSymbolCandidates = predictionConfig.showSymbolCandidates,
+            ),
             input = input,
-            showSymbolCandidates = predictionConfig.showSymbolCandidates,
+            words = resultNBestFinalDeferred.candidates,
         )
 
         val mozcUTPersonNames =
@@ -2288,9 +2296,13 @@ class KanaKanjiEngine {
                 }
             }
 
-        val numbersDeferred = generateNumberCandidates(
+        val numbersDeferred = deferNumberCandidatesBelowWords(
+            numbers = generateNumberCandidates(
+                input = input,
+                showSymbolCandidates = predictionConfig.showSymbolCandidates,
+            ),
             input = input,
-            showSymbolCandidates = predictionConfig.showSymbolCandidates,
+            words = resultNBestFinalDeferred.candidates,
         )
 
         val mozcUTPersonNames =

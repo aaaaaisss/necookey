@@ -117,14 +117,14 @@ internal fun generateNumberCandidates(
             )
         }
 
-        // 3. 全角・半角数字 (例: １２３, 123)
+        // 3. 全角・半角数字 (例: １２３, 123)。半角を数の候補の先頭に（2026-11-14「数字は基本算用数字に」）
         listOf(firstNum, secondNum).forEach {
             candidates.add(
                 Candidate(
                     string = it,
                     type = if (it == firstNum) (30).toByte() else (31).toByte(),
                     length = input.length.toUByte(),
-                    score = 8002,
+                    score = if (it == secondNum) 7999 else 8002,
                     leftId = POS_ID_NUMBER_ARABIC,
                     rightId = POS_ID_NUMBER_ARABIC
                 )
@@ -168,6 +168,33 @@ internal fun generateNumberCandidates(
         emptyList()
     }
 }
+
+/**
+ * かなで打った読み全体を数にした候補（[generateNumberCandidates]）は、同じ読みの辞書の語（数でない語）より前に出さない
+ * （いっせん → 一線 の後に 1000、じゅうまん → 充満 の後に 10万）。読み全体の候補のうち最も良い「数でない語」の直後に
+ * 数の候補をまとめてずらす（数どうしの並びは保つ）。打った数字を含む入力・数でない語が無いときはそのまま。
+ */
+internal fun deferNumberCandidatesBelowWords(
+    numbers: List<Candidate>,
+    input: String,
+    words: List<Candidate>,
+): List<Candidate> {
+    if (numbers.isEmpty() || input.any { it in '0'..'9' || it in '０'..'９' }) return numbers
+    val numberStrings = numbers.mapTo(HashSet()) { it.string }
+    val bestWord = words.asSequence()
+        .filter { it.length.toInt() == input.length && it.string !in numberStrings }
+        .filter { c -> c.string.any { !isNumeralOrKanaChar(it) } }
+        .minOfOrNull { it.score } ?: return numbers
+    val minNumber = numbers.minOf { it.score }
+    val delta = bestWord + 1 - minNumber
+    if (delta <= 0) return numbers
+    return numbers.map { it.copy(score = it.score + delta) }
+}
+
+/** 数字・漢数字・かな・長音（数の表記か、変換していない読みの文字）。 */
+private fun isNumeralOrKanaChar(c: Char): Boolean =
+    c in '0'..'9' || c in '０'..'９' || c in "〇一二三四五六七八九十百千万億兆,，.．" ||
+        c in '\u3041'..'\u309F' || c in '\u30A0'..'\u30FF'
 
 /**
  * Candidate リストを処理し、

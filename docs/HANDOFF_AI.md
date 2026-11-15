@@ -76,6 +76,19 @@
 - docs: LEARNING.md（4・5 の仕組み）、この HANDOFF の書き直し、SETTINGS_INVENTORY.md の最終確認（フリーズ記録の場所を新しい構成に、旧節に注記）。
 - 成果物: `necookey-prep-cleanup-<HEAD>.apk`（:app:assembleFullStandardDebug）と `necookey-all-<HEAD>.bundle`（`git bundle --all`）をプロジェクト直下に置いた。
 
+## 11 月 14 日の作業（ctx-clean）
+- 区切りを変えた候補を出す仕組みを全削除（ユーザー指示）: 文節チップ下段の「区切りを変える候補」（N-best・隣とくっつけた変換、印 ← → ｜）、
+  `FindPath.splitConstrainedReconversion`（区切り固定の再変換、既定無効の実験）。手で変える区切り（ハンドル・長押し・間のタップ・戻す）と
+  `LearnedChipSplit`（手で直した区切りの再現）は残す。docs/CHIP_BAR.md。
+- 数は基本算用数字（ユーザー方針）: `graph/NumberCounterNodes.kt`。数＋助数詞（にだいめ 2代目・くどろくぶ 9度6分・みっつ 3つ）、
+  打った数字＋助数詞（200だい 200台・9どだい 9度台）、数字だけ（1から）、日数の和語＋前/後/間/目/ぶり（いつかまえ 5日前。いつか だけは いつか）。
+  辞書の漢数字の語は同じ品詞・コスト −1 の双子、慣用語（一度・一番・一部・一時・一日・二度と…）・数でない同じ読みの語（誤解・虹）・
+  先まで続く辞書語（くどい・日本語・六本木）・学習語には負ける。ラティス LM は漢数字の表記で引く（`MozcNodeAttributes.ARABIC_NUMERAL`）。
+  テスト `NumberCounterNodesTest`（辞書なし）・`quality/ArabicNumeralConversionTest`（実機経路）。
+  算用数字は 2 位以内でよい（11/15 ユーザー判断、辞書の漢数字が 1 位でも可）。くどろくぶ は区切りの問題なので期待値から外した。
+- 読み全体の数の候補（`generateNumberCandidates`、かなの読み）: 連濁形 ぜん・びゃく・ぴゃく は直前が さん／ろっ・はっ・いっ のときだけ数
+  （ぜんちょう が 千兆 → 1000000000000000 になっていた）。同じ読みの辞書の語（数でない語）より前に出さない（`deferNumberCandidatesBelowWords`）。
+
 ## 保留・次にやること
 1. **実機確認**（ユーザーが APK で）:
    - ダーク設定画面全体の見た目、一覧画面の検索欄の高さ、学習辞書のチップの端（切れていないか）、ライセンス WebView の白いちらつき、

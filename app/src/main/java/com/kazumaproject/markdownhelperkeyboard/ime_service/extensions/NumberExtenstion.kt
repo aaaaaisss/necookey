@@ -75,11 +75,20 @@ private fun parseJapaneseNumberValue(input: String): Long? {
     var bigPlaceOrder = Int.MAX_VALUE
     var hasNumber = false
     var restrictedUnit: String? = null
+    var previousReading: String? = null
 
     while (index < input.length) {
         val entry = japaneseNumberReadings.firstOrNull {
             input.startsWith(it.reading, index)
         } ?: return null
+
+        // 連濁形は直前の数の音でしか起きない（さんぜん・さんびゃく・ろっぴゃく）。
+        // 単独の ぜん・びゃく・ぴゃく は数ではない（ぜんちょう → 全長、千兆 にしない）。
+        when (entry.reading) {
+            "ぜん", "びゃく", "びゃっ" -> if (previousReading != "さん") return null
+            "ぴゃく", "ぴゃっ" -> if (previousReading != "ろっ" && previousReading != "はっ" && previousReading != "いっ") return null
+        }
+        previousReading = entry.reading
 
         // Mozc accepts these historical readings only in constrained places:
         // 「よ」「く」 must finish the number, while 「し」 may additionally

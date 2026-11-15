@@ -74,6 +74,9 @@ class NumberExtensionTest {
             "さんご",
             "しえん",
             "しじ",
+            "ぜんちょう",
+            "ぜんせん",
+            "びゃく",
         )
 
         ordinaryReadings.forEach { input ->

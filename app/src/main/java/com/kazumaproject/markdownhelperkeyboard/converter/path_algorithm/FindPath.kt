@@ -3,6 +3,7 @@ package com.kazumaproject.markdownhelperkeyboard.converter.path_algorithm
 import com.kazumaproject.core.domain.extensions.isAllFullWidthNumericSymbol
 import com.kazumaproject.core.domain.extensions.isAllHalfWidthNumericSymbol
 import com.kazumaproject.graph.CandidateSource
+import com.kazumaproject.graph.MozcNodeAttributes
 import com.kazumaproject.graph.MozcNodeType
 import com.kazumaproject.graph.Node
 import com.kazumaproject.markdownhelperkeyboard.converter.ConnectionMatrix
@@ -13,6 +14,7 @@ import com.kazumaproject.markdownhelperkeyboard.converter.candidate.CANDIDATE_TY
 import com.kazumaproject.markdownhelperkeyboard.converter.candidate.Candidate
 import com.kazumaproject.markdownhelperkeyboard.converter.candidate.CandidateConversionSegment
 import com.kazumaproject.markdownhelperkeyboard.converter.graph.IncrementalGraphMetadata
+import com.kazumaproject.markdownhelperkeyboard.converter.graph.NumberCounterNodes
 import com.kazumaproject.markdownhelperkeyboard.converter.mozc.MozcBoundaryCheckResult
 import com.kazumaproject.markdownhelperkeyboard.converter.mozc.MozcBoundaryChecker
 import com.kazumaproject.markdownhelperkeyboard.converter.mozc.MozcBoundaryMode
@@ -953,6 +955,9 @@ class FindPath(
         private val defaultNgramRuleScorer: NgramRuleScorer = NgramRuleScorer.createDefault()
         private val bosNodes: List<Node> = listOf(BOS)
         private const val MAX_BUNSETSU_SPLIT_PATTERNS = 4
+
+        /** 算用数字の候補を漢数字の同じ候補より前に出すときの、許すスコア差の上限。 */
+        private const val ARABIC_PREFERENCE_MAX_GAP = 6000
     }
 
     private var forwardDpTraceSink: MutableList<ForwardDpTrace>? = null
@@ -1602,6 +1607,8 @@ class FindPath(
         val ngramRuleScorer = ngramRuleScorerProvider()
         val systemNgramDictionary = systemNgramDictionaryProvider()
         val systemNgramMatchedCandidates = SmallSystemNgramMatchSet()
+        // 数＋助数詞を算用数字にしたノード（NumberCounterNodes）を通る候補（漢数字の同じ候補より前に出す）
+        var arabicNumeralCandidates: HashSet<String>? = null
         val systemNgramMayAffectCandidates =
             systemNgramDictionary.ruleCount != 0 &&
                 latticeMayContainSystemNgram(
@@ -1678,6 +1685,9 @@ class FindPath(
                     if (pathMatchesSystemNgram(element, systemNgramDictionary)) {
                         systemNgramMatchedCandidates.add(stringFromNode)
                     }
+                    if (pathHasArabicNumeral(element)) {
+                        (arabicNumeralCandidates ?: HashSet<String>().also { arabicNumeralCandidates = it }).add(stringFromNode)
+                    }
                     val bunsetsuPositions = getBunsetsuPositionsFromPath(element)
                     if (
                         splitPatterns.none { it == bunsetsuPositions } &&
@@ -1724,6 +1734,7 @@ class FindPath(
                             resultFinal,
                             systemNgramMatchedCandidates,
                             n,
+                            arabicNumeralCandidates,
                         )
                         return BunsetsuCandidateResult(
                             candidates = withKanaRepair(ranked),
@@ -1736,7 +1747,7 @@ class FindPath(
                     resultFinal.size >= internalCandidateCount ||
                         (enoughCandidates && systemRuleAlreadyMatched)
                 ) {
-                    val ranked = rankSystemNgramCandidates(resultFinal, systemNgramMatchedCandidates, n)
+                    val ranked = rankSystemNgramCandidates(resultFinal, systemNgramMatchedCandidates, n, arabicNumeralCandidates)
                     return BunsetsuCandidateResult(
                         candidates = withKanaRepair(ranked),
                         splitPatterns = splitPatterns,
@@ -1784,7 +1795,7 @@ class FindPath(
             }
         }
 
-        val ranked = rankSystemNgramCandidates(resultFinal, systemNgramMatchedCandidates, n)
+        val ranked = rankSystemNgramCandidates(resultFinal, systemNgramMatchedCandidates, n, arabicNumeralCandidates)
         return BunsetsuCandidateResult(
             candidates = withKanaRepair(ranked),
             splitPatterns = splitPatterns,
@@ -1992,11 +2003,49 @@ class FindPath(
 
     private fun rankSystemNgramCandidates(
         candidates: List<Candidate>,
-        matched: Set<String>,
+        matched: MutableSet<String>,
         requested: Int,
-    ): List<Candidate> = candidates.sortedWith(
+        arabicNumeral: Set<String>? = null,
+    ): List<Candidate> = preferArabicNumerals(candidates, matched, arabicNumeral).sortedWith(
         compareByDescending<Candidate> { it.string in matched }.thenBy { it.score },
     ).take(requested)
+
+    /**
+     * 数は基本算用数字（2026-11-14）: 算用数字のノードを通る候補 A と、その数字を漢数字にしただけの候補 K（二代目・五日前）が
+     * 両方あるとき、A を K の直前に置く（スコアを K − 1 に、K が n-gram に合っていれば A も合ったことにする）。
+     * A は慣用語（一度・一番 等）からは作られない（NumberCounterNodes）ので、K が慣用語なら A は無い。
+     */
+    private fun preferArabicNumerals(
+        candidates: List<Candidate>,
+        matched: MutableSet<String>,
+        arabicNumeral: Set<String>?,
+    ): List<Candidate> {
+        if (arabicNumeral.isNullOrEmpty()) return candidates
+        val byString = HashMap<String, Candidate>(candidates.size * 2)
+        for (c in candidates) byString.putIfAbsent(c.string, c)
+        var out: MutableList<Candidate>? = null
+        candidates.forEachIndexed { index, c ->
+            if (c.string !in arabicNumeral) return@forEachIndexed
+            val kanji = byString[NumberCounterNodes.kanjiForm(c.string)] ?: return@forEachIndexed
+            if (kanji.string == c.string || c.score - kanji.score > ARABIC_PREFERENCE_MAX_GAP) return@forEachIndexed
+            if (kanji.string in matched) matched.add(c.string)
+            if (c.score >= kanji.score) {
+                val list = out ?: candidates.toMutableList().also { out = it }
+                list[index] = c.copy(score = kanji.score - 1)
+            }
+        }
+        return out ?: candidates
+    }
+
+    /** 経路に算用数字のノード（[MozcNodeAttributes.ARABIC_NUMERAL]）があるか。 */
+    private fun pathHasArabicNumeral(path: PathQueueElement): Boolean {
+        var e = path.next
+        while (e != null) {
+            if ((e.node.mozcAttributes and MozcNodeAttributes.ARABIC_NUMERAL) != 0) return true
+            e = e.next
+        }
+        return false
+    }
 
     private fun pathMatchesSystemNgram(
         path: PathQueueElement,
